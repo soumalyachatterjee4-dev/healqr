@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealQR - Project Overview</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header .subtitle {
+            font-size: 1.2em;
+            opacity: 0.95;
+            margin-bottom: 15px;
+        }
+        
+        .header .live-link {
+            display: inline-block;
+            background: white;
+            color: #667eea;
+            padding: 12px 25px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: bold;
+            margin-top: 10px;
+            transition: transform 0.3s;
+        }
+        
+        .header .live-link:hover {
+            transform: scale(1.05);
+        }
+        
+        .content {
+            padding: 40px 30px;
+        }
+        
+        .section {
+            margin-bottom: 40px;
+        }
+        
+        .section-title {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            margin: 0 -30px 25px -30px;
+            font-size: 1.5em;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .subsection {
+            margin-bottom: 25px;
+        }
+        
+        .subsection-title {
+            color: #667eea;
+            font-size: 1.2em;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            font-weight: bold;
+        }
+        
+        .subsection-title::before {
+            content: '✅';
+            margin-right: 10px;
+            font-size: 1.1em;
+        }
+        
+        .feature-list {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .feature-list li {
+            padding: 8px 0 8px 30px;
+            position: relative;
+            color: #555;
+        }
+        
+        .feature-list li::before {
+            content: '•';
+            position: absolute;
+            left: 10px;
+            color: #667eea;
+            font-size: 1.5em;
+            line-height: 1;
+        }
+        
+        .highlight-box {
+            background: #f8f9ff;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        
+        .highlight-box h3 {
+            color: #667eea;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .highlight-box h3::before {
+            content: '🌟';
+            margin-right: 10px;
+        }
+        
+        .free-badge {
+            background: #4CAF50;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            display: inline-block;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        
+        .usp-section {
+            background: #fff9e6;
+            padding: 25px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .usp-title {
+            color: #ff9800;
+            font-size: 1.1em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .usp-title::before {
+            content: '✨';
+            margin-right: 10px;
+        }
+        
+        .footer {
+            background: #333;
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .footer h2 {
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+        
+        .footer p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+        
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            
+            .container {
+                box-shadow: none;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+            
+            .section-title {
+                font-size: 1.2em;
+                margin: 0 -15px 20px -15px;
+            }
+            
+            .content {
+                padding: 20px 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>HEALQR</h1>
+            <div class="subtitle">Digital Queue Management & Patient Engagement System</div>
+            <a href="https://teamhealqr.web.app" class="live-link" target="_blank">🌐 LIVE PLATFORM</a>
+        </div>
+        
+        <div class="content">
+            <!-- For Doctors Section -->
+            <div class="section">
+                <h2 class="section-title">For Doctors (Solo Practice)</h2>
+                
+                <div class="subsection">
+                    <h3 class="subsection-title">CHAMBER MANAGEMENT</h3>
+                    <ul class="feature-list">
+                        <li>Multiple chamber support (Morning/Evening/Weekend chambers)</li>
+                        <li>Individual chamber timings and capacity management</li>
+                        <li>Real-time queue monitoring across all chambers</li>
+                        <li>Monthly schedule viewer - Plan entire month at once</li>
+                        <li>Emergency stop facility - Pause bookings instantly</li>
+                        <li>Walk-in patient management with QR verification</li>
+                    </ul>
+                </div>
+                
+                <div class="subsection">
+                    <h3 class="subsection-title">PATIENT MANAGEMENT</h3>
+                    <ul class="feature-list">
+                        <li>Complete patient visit history with full details</li>
+                        <li>Access past consultations up to 10 years</li>
+                        <li>Walk-in patient records included</li>
+                        <li>Search patients by name/phone/booking ID</li>
+                        <li>Patient health card profiles</li>
+                        <li>Digital prescription system with templates</li>
+                    </ul>
+                </div>
+                
+                <div class="subsection">
+                    <h3 class="subsection-title">QUEUE & BOOKING SYSTEM</h3>
+                    <ul class="feature-list">
+                        <li>Automated serial number assignment</li>
+                        <li>Real-time arrival time calculation</li>
+                        <li>Smart "IMMEDIATELY" notification when time passed</li>
+                        <li>Advance booking system</li>
+                        <li>QR code for each booking with verification</li>
+                        <li>Live queue status visible to patients</li>
+                    </ul>
+                </div>
+                
+                <div class="subsection">
+                    <h3 class="subsection-title">COMMUNICATION TOOLS</h3>
+                    <ul class="feature-list">
+                        <li>Push notifications via FCM (FREE)</li>
+                        <li>Appointment reminders to patients</li>
+                        <li>Follow-up notifications</li>
+                        <li>Review request system</li>
+                        <li>WhatsApp integration support</li>
+                    </ul>
+                </div>
+                
+                <div class="subsection">
+                    <h3 class="subsection-title">ANALYTICS & REPORTS</h3>
+                    <ul class="feature-list">
+                        <li>Daily/Weekly/Monthly patient statistics</li>
+                        <li>Chamber-wise performance reports</li>
+                        <li>Revenue tracking with discount management</li>
+                        <li>Patient retention analytics</li>
+                        <li>Consultation completion reports</li>
+                    </ul>
+                </div>
+                
+                <div class="subsection">
+                    <h3 class="subsection-title">PROFESSIONAL FEATURES</h3>
+                    <ul class="feature-list">
+                        <li>Personalized prescription templates</li>
+                        <li>Lab referral tracking system</li>
+                        <li>Discount card management</li>
+                        <li>Multi-language support</li>
+                        <li>Profile customization (photo, specialization, fees)</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- For Clinics Section -->
+            <div class="section">
+                <h2 class="section-title">For Clinics (Multi-Doctor)</h2>
+                
+                <div class="subsection">
+                    <h3 class="subsection-title">CLINIC DASHBOARD</h3>
+                    <ul class="feature-list">
+                        <li>Manage multiple doctors under one clinic</li>
+                        <li>Centralized patient database</li>
+                        <li>Unified booking system for all doctors</li>
+                        <li>Clinic-wide analytics and reporting</li>
+                        <li>Branch management capabilities</li>
+                    </ul>
+                </div>
+                
+                <div class="subsection">
+                    <h3 class="subsection-title">DOCTOR COLLABORATION</h3>
+                    <ul class="feature-list">
+                        <li>Merge solo chambers with clinic seamlessly</li>
+                        <li>Individual doctor schedules within clinic</li>
+                        <li>Shared patient records across doctors</li>
+                        <li>Cross-referral system between doctors</li>
+                        <li>Unified patient history access</li>
+                    </ul>
+                </div>
+                
+                <div class="subsection">
+                    <h3 class="subsection-title">ADMINISTRATIVE FEATURES</h3>
+                    <ul class="feature-list">
+                        <li>Clinic profile management (logo, address, contact)</li>
+                        <li>QR code for clinic booking page</li>
+                        <li>Receptionist/Assistant access management</li>
+                        <li>Clinic-wide notification system</li>
+                        <li>Appointment coordination across doctors</li>
+                    </ul>
+                </div>
+                
+                <div class="subsection">
+                    <h3 class="subsection-title">PATIENT DATABASE</h3>
+                    <ul class="feature-list">
+                        <li>Centralized patient records for entire clinic</li>
+                        <li>10-year consultation history storage</li>
+                        <li>Lifetime storage with Medico Locker activation</li>
+                        <li>Patient search across all doctors</li>
+                        <li>Health card system for regular patients</li>
+                    </ul>
+                </div>
+                
+                <div class="subsection">
+                    <h3 class="subsection-title">SCHEDULE MANAGEMENT</h3>
+                    <ul class="feature-list">
+                        <li>Coordinate doctor availability</li>
+                        <li>Prevent booking conflicts</li>
+                        <li>Monthly schedule planner</li>
+                        <li>Chamber allocation system</li>
+                        <li>Holiday/leave management</li>
+                    </ul>
+                </div>
+                
+                <div class="subsection">
+                    <h3 class="subsection-title">BUSINESS TOOLS</h3>
+                    <ul class="feature-list">
+                        <li>Clinic-wide revenue reports</li>
+                        <li>Doctor performance comparison</li>
+                        <li>Patient flow analytics</li>
+                        <li>Marketing campaign manager</li>
+                        <li>Promotional material display</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- For Patients Section -->
+            <div class="section">
+                <h2 class="section-title">For Patients (Patient Portal)</h2>
+                <div class="free-badge">🆓 FREE FEATURES - NO PAYMENT REQUIRED</div>
+                
+                <div class="subsection">
+                    <h3 class="subsection-title">BOOKING & APPOINTMENTS</h3>
+                    <ul class="feature-list">
+                        <li>Book appointments via QR code or search</li>
+                        <li>Search doctors by name/specialization/location</li>
+                        <li>Select preferred chamber and time slot</li>
+                        <li>Get instant booking confirmation with QR code</li>
+                        <li>See estimated arrival time</li>
+                        <li>Track live queue position in real-time</li>
+                    </ul>
+                </div>
+                
+                <div class="subsection">
+                    <h3 class="subsection-title">NOTIFICATIONS (Even Without App Installation)</h3>
+                    <ul class="feature-list">
+                        <li>Get push notifications if allowed (FREE via FCM)</li>
+                        <li>View notification history for last 2 consultations</li>
+                        <li>Access all notifications up to 120 days</li>
+                        <li>Interactive notification display in patient portal</li>
+                        <li>No need to download anything on device</li>
+                        <li>Appointment reminders</li>
+                        <li>Arrival time alerts</li>
+                        <li>Follow-up reminders</li>
+                        <li>Review requests</li>
+                    </ul>
+                </div>
+                
+                <div class="subsection">
+                    <h3 class="subsection-title">QUEUE & STATUS TRACKING</h3>
+                    <ul class="feature-list">
+                        <li>Real-time queue updates</li>
+                        <li>Know exact arrival time</li>
+                        <li>"REACH IMMEDIATELY" alert if time passed</li>
+                        <li>Check cancellation status</li>
+                        <li>Emergency stop notifications from doctor</li>
+                        <li>Live serial number tracking</li>
+                    </ul>
+                </div>
+                
+                <div class="subsection">
+                    <h3 class="subsection-title">CONSULTATION HISTORY</h3>
+                    <ul class="feature-list">
+                        <li>View past consultations - Last 120 days (interactive)</li>
+                        <li>Overall consultation history - Up to 10 years</li>
+                        <li>Lifetime storage with Medico Locker activation</li>
+                        <li>Download prescriptions</li>
+                        <li>Access lab referral details</li>
+                        <li>Review previous diagnoses and treatments</li>
+                    </ul>
+                </div>
+                
+                <div class="subsection">
+                    <h3 class="subsection-title">COMMUNICATION</h3>
+                    <ul class="feature-list">
+                        <li>Submit reviews and ratings for doctors</li>
+                        <li>Contact doctor support system</li>
+                        <li>Receive health tips and updates</li>
+                        <li>Emergency consultation requests</li>
+                        <li>Direct messaging capability</li>
+                    </ul>
+                </div>
+                
+                <div class="subsection">
+                    <h3 class="subsection-title">PROFILE MANAGEMENT</h3>
+                    <ul class="feature-list">
+                        <li>Maintain personal health card profile</li>
+                        <li>Store medical history</li>
+                        <li>Upload health documents</li>
+                        <li>Family member profiles</li>
+                        <li>Health insurance details</li>
+                    </ul>
+                </div>
+                
+                <div class="subsection">
+                    <h3 class="subsection-title">SMART FEATURES</h3>
+                    <ul class="feature-list">
+                        <li>Multi-language support</li>
+                        <li>Mobile-responsive interface</li>
+                        <li>Works on any device (phone/tablet/desktop)</li>
+                        <li>No app installation required - Web-based</li>
+                        <li>QR code verification for walk-in confirmation</li>
+                        <li>Automatic reminder system</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Key Platform Highlights -->
+            <div class="section">
+                <h2 class="section-title">Key Platform Highlights</h2>
+                
+                <div class="highlight-box">
+                    <h3>ZERO COST FOR PATIENTS</h3>
+                    <p>All patient features are completely FREE - no subscription, no hidden charges</p>
+                </div>
+                
+                <div class="highlight-box">
+                    <h3>DATA SECURITY</h3>
+                    <ul class="feature-list">
+                        <li>Secure Firebase cloud storage</li>
+                        <li>Encrypted patient data</li>
+                        <li>HIPAA-compliant architecture</li>
+                        <li>Regular automated backups</li>
+                        <li>Privacy-first design</li>
+                    </ul>
+                </div>
+                
+                <div class="highlight-box">
+                    <h3>NO APP DOWNLOAD NEEDED</h3>
+                    <ul class="feature-list">
+                        <li>Fully web-based platform</li>
+                        <li>Works on any browser</li>
+                        <li>No storage space required on phone</li>
+                        <li>Instant access via QR code or link</li>
+                        <li>Always up-to-date features</li>
+                    </ul>
+                </div>
+                
+                <div class="highlight-box">
+                    <h3>REAL-TIME SYNCHRONIZATION</h3>
+                    <ul class="feature-list">
+                        <li>Instant updates across all devices</li>
+                        <li>Doctor and patient see same queue status</li>
+                        <li>Automatic notification delivery</li>
+                        <li>Live booking status changes</li>
+                        <li>No refresh needed</li>
+                    </ul>
+                </div>
+                
+                <div class="highlight-box">
+                    <h3>SCALABILITY</h3>
+                    <ul class="feature-list">
+                        <li>Support for unlimited patients</li>
+                        <li>Multiple chambers per doctor</li>
+                        <li>Multiple doctors per clinic</li>
+                        <li>Growth-ready infrastructure</li>
+                        <li>No performance degradation</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Unique Selling Points -->
+            <div class="section">
+                <h2 class="section-title">Unique Selling Points</h2>
+                
+                <div class="usp-section">
+                    <div class="usp-title">For Doctors:</div>
+                    <ul class="feature-list">
+                        <li>Reduce waiting room congestion</li>
+                        <li>Better time management with arrival time alerts</li>
+                        <li>Digital record keeping eliminates paper</li>
+                        <li>10-year patient history at fingertips</li>
+                        <li>Monthly schedule planning saves time</li>
+                        <li>Walk-in and appointment patients unified</li>
+                        <li>Professional image with digital system</li>
+                    </ul>
+                </div>
+                
+                <div class="usp-section">
+                    <div class="usp-title">For Clinics:</div>
+                    <ul class="feature-list">
+                        <li>Seamless solo chamber merger</li>
+                        <li>Unified patient database</li>
+                        <li>Better doctor coordination</li>
+                        <li>Enhanced patient experience</li>
+                        <li>Revenue tracking and analytics</li>
+                        <li>Marketing tools integrated</li>
+                    </ul>
+                </div>
+                
+                <div class="usp-section">
+                    <div class="usp-title">For Patients:</div>
+                    <ul class="feature-list">
+                        <li>No more long waiting at clinic</li>
+                        <li>Know exact arrival time from home</li>
+                        <li>120-day interactive notification history</li>
+                        <li>Access records for 10 years</li>
+                        <li>Review doctors and chambers</li>
+                        <li>Completely FREE forever</li>
+                        <li>No app download - just scan QR</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Implementation & Support -->
+            <div class="section">
+                <h2 class="section-title">Implementation & Support</h2>
+                
+                <div class="subsection">
+                    <h3 class="subsection-title">GETTING STARTED</h3>
+                    <ul class="feature-list">
+                        <li>Simple registration process</li>
+                        <li>QR code generated instantly</li>
+                        <li>Training support available</li>
+                        <li>Easy-to-use interface</li>
+                        <li>Multi-language help guides</li>
+                    </ul>
+                </div>
+                
+                <div class="subsection">
+                    <h3 class="subsection-title">TECHNICAL SPECIFICATIONS</h3>
+                    <ul class="feature-list">
+                        <li>Cloud-based (Firebase infrastructure)</li>
+                        <li>99.9% uptime guaranteed</li>
+                        <li>Mobile & desktop responsive</li>
+                        <li>Works on all modern browsers</li>
+                        <li>Secure HTTPS connection</li>
+                    </ul>
+                </div>
+                
+                <div class="subsection">
+                    <h3 class="subsection-title">REPORTING CAPABILITIES</h3>
+                    <ul class="feature-list">
+                        <li>Daily patient count</li>
+                        <li>Revenue tracking</li>
+                        <li>Chamber performance</li>
+                        <li>Patient retention rate</li>
+                        <li>Booking vs walk-in ratio</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Contact & Demo -->
+            <div class="section">
+                <h2 class="section-title">Contact & Demo</h2>
+                <div class="highlight-box">
+                    <h3>Live Platform</h3>
+                    <p><a href="https://teamhealqr.web.app" target="_blank" style="color: #667eea; text-decoration: none; font-weight: bold;">https://teamhealqr.web.app</a></p>
+                </div>
+                <div class="highlight-box">
+                    <h3>For Enquiries & Demo</h3>
+                    <p>Contact us to schedule a demonstration and see how HealQR can transform your practice</p>
+                    <p style="margin-top: 15px; font-weight: bold; color: #4CAF50;">💡 FREE TRIAL AVAILABLE</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <h2>HEALQR</h2>
+            <p>Smarter Healthcare Queue Management</p>
+            <p>Making Healthcare Accessible, Organized & Patient-Friendly</p>
+        </div>
+    </div>
+</body>
+</html>

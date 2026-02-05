@@ -1,0 +1,577 @@
+import { useState, useEffect } from 'react';
+import { Button } from './ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Badge } from './ui/badge';
+import { 
+  Star, 
+  Share2, 
+  Copy, 
+  Bell, 
+  User,
+  BarChart3,
+  Calendar,
+  Lock,
+  Menu,
+  MapPin,
+  Clock,
+  Building2,
+  QrCode,
+  Users,
+  Stethoscope
+} from 'lucide-react';
+import { auth, db } from '../lib/firebase/config';
+import { signOut } from 'firebase/auth';
+import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { toast } from 'sonner';
+import ClinicSidebar from './ClinicSidebar';
+import ClinicProfileManager from './ClinicProfileManager';
+import ClinicQRManager from './ClinicQRManager';
+import ClinicScheduleManager from './ClinicScheduleManager';
+import ManageDoctors from './ManageDoctors';
+import DashboardPromoDisplay from './DashboardPromoDisplay';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+
+interface ClinicData {
+  id?: string;
+  name: string;
+  email: string;
+  address: string;
+  pinCode: string;
+  qrNumber: string;
+  clinicCode?: string;
+  phone?: string;
+  logoUrl?: string;
+  linkedDoctorCodes?: string[];
+  linkedDoctorsDetails?: Array<{
+    doctorId: string;
+    doctorCode: string;
+    name: string;
+    email: string;
+    specialties?: string[];
+    profileImage?: string;
+  }>;
+}
+
+interface TodayChamber {
+  id: string;
+  chamberName: string;
+  chamberNo: string;
+  doctorName: string;
+  doctorId: string;
+  specialty: string;
+  address: string;
+  startTime: string;
+  endTime: string;
+  booked: number;
+  capacity: number;
+  isExpired: boolean;
+}
+
+export default function ClinicDashboard() {
+  const [clinicData, setClinicData] = useState<ClinicData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [activeMenu, setActiveMenu] = useState('dashboard');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [shareMenuOpen, setShareMenuOpen] = useState(false);
+  const [todaysChambers, setTodaysChambers] = useState<TodayChamber[]>([]);
+  
+  // Analytics State
+  const [analyticsData, setAnalyticsData] = useState({
+    totalScans: 0,
+    totalBookings: 0,
+    qrBookings: 0,
+    cancelled: 0
+  });
+
+  useEffect(() => {
+    loadClinicData();
+    loadTodaysSchedule();
+  }, []);
+
+  const loadClinicData = async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    try {
+      const clinicRef = doc(db, 'clinics', currentUser.uid);
+      const clinicSnap = await getDoc(clinicRef);
+
+      if (clinicSnap.exists()) {
+        const data = { id: clinicSnap.id, ...clinicSnap.data() } as ClinicData;
+        setClinicData(data);
+
+        // Calculate analytics from linked doctors
+        let totalScans = 0;
+        let totalBookings = 0;
+        let qrBookings = 0;
+
+        if (data.linkedDoctorsDetails) {
+          for (const doctor of data.linkedDoctorsDetails) {
+            const doctorRef = doc(db, 'doctors', doctor.doctorId);
+            const doctorSnap = await getDoc(doctorRef);
+            
+            if (doctorSnap.exists()) {
+              const doctorData = doctorSnap.data();
+              totalScans += doctorData.totalScans || 0;
+              totalBookings += doctorData.bookingsCount || 0;
+              qrBookings += doctorData.qrBookings || 0;
+            }
+          }
+        }
+
+        setAnalyticsData({
+          totalScans,
+          totalBookings,
+          qrBookings,
+          cancelled: 0 // Can calculate from bookings if needed
+        });
+      }
+    } catch (error) {
+      console.error('Error loading clinic data:', error);
+      toast.error('Failed to load clinic data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadTodaysSchedule = async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    try {
+      const clinicRef = doc(db, 'clinics', currentUser.uid);
+      const clinicSnap = await getDoc(clinicRef);
+
+      if (clinicSnap.exists()) {
+        const linkedDoctors = clinicSnap.data().linkedDoctorsDetails || [];
+        const chambers: TodayChamber[] = [];
+        const today = new Date();
+        const todayDay = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][today.getDay()];
+        const currentTime = `${today.getHours().toString().padStart(2, '0')}:${today.getMinutes().toString().padStart(2, '0')}`;
+
+        for (const doctor of linkedDoctors) {
+          const doctorRef = doc(db, 'doctors', doctor.doctorId);
+          const doctorSnap = await getDoc(doctorRef);
+
+          if (doctorSnap.exists()) {
+            const doctorData = doctorSnap.data();
+            const allChambers = doctorData.chambers || [];
+
+            // Filter chambers for today and this clinic
+            const todayChambers = allChambers.filter((chamber: any) => {
+              if (chamber.clinicId !== currentUser.uid) return false;
+              if (chamber.frequency === 'Custom') {
+                return chamber.customDate === today.toISOString().split('T')[0];
+              } else {
+                return chamber.days.includes(todayDay);
+              }
+            });
+
+            for (const chamber of todayChambers) {
+              // Get booking count
+              const bookingsQuery = query(
+                collection(db, 'bookings'),
+                where('doctorId', '==', doctor.doctorId),
+                where('chamberId', '==', chamber.id),
+                where('date', '==', today.toISOString().split('T')[0]),
+                where('status', 'in', ['pending', 'confirmed'])
+              );
+              
+              const bookingsSnap = await getDocs(bookingsQuery);
+              const bookingCount = bookingsSnap.size;
+
+              chambers.push({
+                id: chamber.id,
+                chamberName: chamber.chamberName,
+                chamberNo: chamber.id.slice(-4),
+                doctorName: doctor.name,
+                doctorId: doctor.doctorId,
+                specialty: doctorData.specialty || 'General',
+                address: chamber.chamberAddress,
+                startTime: chamber.startTime,
+                endTime: chamber.endTime,
+                booked: bookingCount,
+                capacity: chamber.maxCapacity,
+                isExpired: currentTime > chamber.endTime
+              });
+            }
+          }
+        }
+
+        setTodaysChambers(chambers);
+      }
+    } catch (error) {
+      console.error('Error loading today\'s schedule:', error);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      window.location.href = '/';
+    } catch (error) {
+      console.error('Error logging out:', error);
+      toast.error('Failed to logout');
+    }
+  };
+
+  const copyClinicCode = () => {
+    if (clinicData?.clinicCode) {
+      navigator.clipboard.writeText(clinicData.clinicCode);
+      toast.success('Clinic code copied to clipboard!');
+      setShareMenuOpen(false);
+    }
+  };
+
+  // Render Profile Manager if menu is active
+  if (activeMenu === 'profile') {
+    return (
+      <ClinicProfileManager 
+        onMenuChange={(menu) => setActiveMenu(menu)}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  // Render QR Manager if menu is active
+  if (activeMenu === 'qr-manager') {
+    return (
+      <ClinicQRManager 
+        onMenuChange={(menu) => setActiveMenu(menu)}
+        onLogout={handleLogout}
+        profileData={{
+          image: clinicData?.logoUrl || null,
+          name: clinicData?.name || 'Clinic Name'
+        }}
+      />
+    );
+  }
+
+  // Render Schedule Manager if menu is active
+  if (activeMenu === 'schedule') {
+    return <ClinicScheduleManager onMenuChange={(menu) => setActiveMenu(menu)} onLogout={handleLogout} />;
+  }
+
+  // Render Manage Doctors if menu is active
+  if (activeMenu === 'doctors') {
+    return <ManageDoctors onNavigate={(view, doctorId) => {
+      setActiveMenu(view);
+      if (doctorId) {
+        // Store doctor ID for ClinicScheduleManager to use
+        localStorage.setItem('selectedDoctorId', doctorId);
+      }
+    }} />;
+  }
+      window.location.href = '/clinic-login';
+    } catch (error) {
+      toast.error('Failed to logout');
+    }
+  };
+
+  const copyClinicCode = () => {
+    if (clinicData?.clinicCode) {
+      navigator.clipboard.writeText(clinicData.clinicCode);
+      toast.success('Clinic code copied!');
+    }
+  };
+
+  // Mock data for charts (can be replaced with real analytics)
+  const analyticsData = {
+    totalBookings: doctors.reduce((acc, doc) => acc + (doc.bookingsCount || 0), 0) + 156, // +156 mock base
+    totalScans: 1240,
+    qrBookings: 89,
+    walkinBookings: 67
+  };
+
+  const practiceOverviewData = [
+    { name: 'Total Scans', value: analyticsData.totalScans, fill: '#60A5FA' }, // blue-400
+    { name: 'Total Bookings', value: analyticsData.totalBookings, fill: '#3B82F6' }, // blue-500
+    { name: 'QR Bookings', value: analyticsData.qrBookings, fill: '#2563EB' }, // blue-600
+  ];
+
+  const specialtyCounts = doctors.reduce((acc, doc) => {
+    const spec = doc.specialities?.[0] || 'General Physician';
+    acc[spec] = (acc[spec] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const renderDashboardHome = () => (
+    <div className="space-y-6">
+      {/* Welcome Section */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-white mb-2">
+            Welcome Back, {clinicData?.name || 'Clinic Admin'} !
+          </h1>
+          <div className="flex items-center gap-4">
+             {/* Rating */}
+            <div className="flex items-center gap-1">
+              {[1, 2, 3, 4].map((i) => (
+                <Star key={i} className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+              ))}
+              <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+              <span className="text-white ml-2 text-sm">4.9/5 <span className="text-blue-400">(Clinic Rating)</span></span>
+            </div>
+          </div>
+          
+          {/* Clinic Code */}
+          <div className="mt-4 flex flex-wrap gap-3">
+             <div className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-lg p-3">
+               <div className="p-2 bg-blue-500/10 rounded-lg">
+                 <QrCode className="w-5 h-5 text-blue-500" />
+               </div>
+               <div>
+                 <p className="text-gray-400 text-xs">Clinic Code</p>
+                 <div className="flex items-center gap-2">
+                   <p className="text-blue-400 font-mono font-bold">{clinicData?.clinicCode || 'LOADING...'}</p>
+                   <button onClick={copyClinicCode} className="hover:bg-zinc-800 p-1 rounded transition-colors">
+                     <Copy className="w-3 h-3 text-gray-400" />
+                   </button>
+                 </div>
+               </div>
+               <p className="text-xs text-gray-500 ml-2 hidden md:block">Share this code with doctors to link them to your clinic</p>
+             </div>
+          </div>
+
+          <div className="mt-4">
+             <Button variant="default" size="sm" className="bg-blue-600 hover:bg-blue-700 text-white gap-2 h-8">
+               <Lock className="w-3 h-3" /> Data is encrypted
+             </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Blue Banner Stats */}
+      <div className="w-full h-auto md:h-24 bg-gradient-to-r from-blue-600 to-blue-900 rounded-xl flex flex-col md:flex-row items-start md:items-center px-6 md:px-8 justify-between p-6 md:p-0 gap-6 md:gap-0">
+        <div className="flex items-center gap-4">
+            <div className="p-2 bg-white/10 rounded-lg">
+                <Users className="w-6 h-6 text-white" />
+            </div>
+            <div>
+                <p className="text-blue-100 text-sm">Total Doctors</p>
+                <p className="text-2xl font-bold text-white">{doctors.length}</p>
+            </div>
+        </div>
+        <div className="flex items-center gap-4 md:mr-12">
+            <div className="p-2 bg-white/10 rounded-lg">
+                <CalendarDays className="w-6 h-6 text-white" />
+            </div>
+            <div>
+                <p className="text-blue-100 text-sm">Monthly Bookings</p>
+                <p className="text-2xl font-bold text-white">{analyticsData.totalBookings}</p>
+            </div>
+        </div>
+      </div>
+
+      {/* Specialty Grid */}
+      <div>
+        <h3 className="text-white text-lg font-semibold mb-4 flex items-center gap-2">
+           <Stethoscope className="w-5 h-5 text-blue-400" />
+           Doctors by Specialty
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Object.entries(specialtyCounts).map(([specialty, count]) => (
+            <div key={specialty} className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 flex items-center justify-between hover:border-blue-500/30 transition-colors">
+              <div>
+                  <h4 className="text-gray-400 text-sm mb-1">{specialty}</h4>
+                  <p className="text-2xl font-bold text-white">{count}</p>
+              </div>
+              <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
+                  <Stethoscope className="w-5 h-5 text-blue-500" />
+              </div>
+            </div>
+          ))}
+          {doctors.length === 0 && (
+             <div className="col-span-full border border-dashed border-zinc-800 rounded-lg p-6 text-center text-gray-500">
+                No doctors added yet. Go to "Manage Doctors" to add one.
+             </div>
+          )}
+        </div>
+      </div>
+
+      {/* Clinic Overview (Charts) */}
+      <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-6">
+         <div className="flex items-center gap-2 mb-6">
+            <BarChart3 className="w-5 h-5 text-blue-500" />
+            <h3 className="text-white font-semibold">Clinic Overview</h3>
+         </div>
+         <p className="text-sm text-gray-400 mb-6">Track performance metrics across all doctors.</p>
+         
+         <div className="space-y-6">
+            {practiceOverviewData.map((item) => (
+               <div key={item.name}>
+                  <div className="flex justify-between text-sm mb-2">
+                     <span className="text-white font-medium">{item.name}</span>
+                     <span className="text-white font-bold">{item.value}</span>
+                  </div>
+                  <div className="h-3 bg-zinc-900 rounded-full overflow-hidden">
+                     <div 
+                       className="h-full rounded-full transition-all duration-1000 ease-out"
+                       style={{ 
+                         width: `${Math.min((item.value / 2000) * 100, 100)}%`, // Mock scale
+                         backgroundColor: item.fill 
+                       }}
+                     />
+                  </div>
+               </div>
+            ))}
+         </div>
+      </div>
+
+      {/* Recent Doctors List (Summary) */}
+      <div className="bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden">
+         <div className="p-6 border-b border-zinc-900 flex justify-between items-center">
+            <h3 className="text-white font-semibold flex items-center gap-2">
+               <User className="w-5 h-5 text-blue-500" />
+               Your Doctors
+            </h3>
+            <Button 
+               variant="ghost" 
+               className="text-blue-400 hover:text-blue-300 hover:bg-transparent p-0 h-auto"
+               onClick={() => setActiveMenu('doctors')}
+            >
+               Manage All <ArrowRight className="w-4 h-4 ml-1" />
+            </Button>
+         </div>
+         <div className="divide-y divide-zinc-900">
+            {doctors.slice(0, 5).map((doctor) => (
+              <div key={doctor.id} className="p-4 flex items-center justify-between hover:bg-zinc-900/50 transition-colors">
+                 <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
+                       <User className="w-5 h-5 text-blue-500" />
+                    </div>
+                    <div>
+                       <p className="text-white font-medium">{doctor.name}</p>
+                       <p className="text-xs text-gray-500">{doctor.specialities?.[0] || 'General'}</p>
+                    </div>
+                 </div>
+                 <div className="text-right">
+                    <span className={`text-xs px-2 py-1 rounded-full ${doctor.active ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                       {doctor.active ? 'Active' : 'Inactive'}
+                    </span>
+                    <p className="text-xs text-gray-500 mt-1">{doctor.bookingsCount || 0} Bookings</p>
+                 </div>
+              </div>
+            ))}
+            {doctors.length === 0 && (
+               <div className="p-8 text-center text-gray-500">
+                  No doctors found.
+               </div>
+            )}
+         </div>
+      </div>
+    </div>
+  );
+
+  const renderContent = () => {
+    switch(activeMenu) {
+      case 'dashboard':
+        return renderDashboardHome();
+      case 'doctors':
+        return <ManageDoctors />;
+      case 'profile':
+        return <ClinicProfileManager />;
+      case 'qr-manager':
+        return <ClinicQRManager onMenuChange={setActiveMenu} onLogout={handleLogout} />;
+      case 'schedule-manager':
+        return <ClinicScheduleManager />;
+      case 'todays-schedule':
+        return <ClinicTodaysSchedule />;
+        
+      // Placeholders for future modules
+      case 'analytics':
+        return <div className="p-12 text-center text-gray-500 border border-dashed border-zinc-800 rounded-lg">Analytics Module Coming Soon</div>;
+      case 'reports':
+        return <div className="p-12 text-center text-gray-500 border border-dashed border-zinc-800 rounded-lg">Reports Module Coming Soon</div>;
+      case 'preview':
+        return <div className="p-12 text-center text-gray-500 border border-dashed border-zinc-800 rounded-lg">Preview Centre Coming Soon</div>;
+      case 'settings':
+        return <div className="p-12 text-center text-gray-500 border border-dashed border-zinc-800 rounded-lg">Settings Module Coming Soon</div>;
+      
+      // Premium Placeholders
+      case 'assistant':
+        return <div className="p-12 text-center text-gray-500 border border-dashed border-zinc-800 rounded-lg">Assistant Access (Premium Feature)</div>;
+      case 'lab-referral':
+        return <div className="p-12 text-center text-gray-500 border border-dashed border-zinc-800 rounded-lg">Lab Referral Tracking (Premium Feature)</div>;
+      case 'templates':
+        return <div className="p-12 text-center text-gray-500 border border-dashed border-zinc-800 rounded-lg">Personalized Templates (Premium Feature)</div>;
+      case 'emergency':
+        return <div className="p-12 text-center text-gray-500 border border-dashed border-zinc-800 rounded-lg">Emergency Button Setup (Premium Feature)</div>;
+
+      default:
+        return renderDashboardHome();
+    }
+  };
+
+  if (loading) {
+     return <div className="min-h-screen bg-black text-white flex items-center justify-center">Loading Clinic Dashboard...</div>;
+  }
+
+  return (
+    <div className="min-h-screen bg-black text-white flex flex-col lg:flex-row">
+      {/* Sidebar - Fixed on desktop, Overlay on mobile */}
+      <ClinicSidebar 
+        isOpen={mobileMenuOpen} 
+        onClose={() => setMobileMenuOpen(false)} 
+        activeMenu={activeMenu}
+        onMenuChange={(menu) => {
+           setActiveMenu(menu);
+           setMobileMenuOpen(false); // Close mobile menu on selection
+        }}
+        onLogout={handleLogout}
+      />
+
+      {/* Main Content */}
+      <main className="flex-1 lg:ml-64 flex flex-col min-h-screen bg-black overflow-y-auto">
+         {/* Global Header */}
+         <header className="sticky top-0 z-50 bg-black border-b border-zinc-900 px-4 md:px-8 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+               <button 
+                 className="lg:hidden p-2 hover:bg-zinc-800 rounded-lg text-white"
+                 onClick={() => setMobileMenuOpen(true)}
+               >
+                 <Menu className="w-6 h-6" />
+               </button>
+               <div className="flex items-center gap-2">
+                 <div className="bg-blue-600 p-1.5 rounded-lg">
+                   <Building2 className="w-5 h-5 text-white" />
+                 </div>
+                 <span className="font-bold text-lg hidden md:block">HealQR Clinic</span>
+               </div>
+            </div>
+
+            <div className="flex items-center gap-2 md:gap-4">
+               {/* Share Button with Popover */}
+               <Popover open={shareMenuOpen} onOpenChange={setShareMenuOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white hover:bg-zinc-800">
+                      <Share2 className="w-5 h-5" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-56 bg-zinc-900 border-zinc-800 text-white flex flex-col gap-2">
+                     <p className="text-sm font-semibold mb-1">Share Dashboard</p>
+                     <Button variant="outline" size="sm" className="justify-start gap-2 border-zinc-700 bg-black hover:bg-zinc-800 text-white" onClick={copyClinicCode}>
+                        <Copy className="w-4 h-4" /> Copy Clinic Code
+                     </Button>
+                  </PopoverContent>
+               </Popover>
+
+               <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white hover:bg-zinc-800 relative">
+                  <Bell className="w-5 h-5" />
+                  <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+               </Button>
+               
+               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center cursor-pointer" onClick={() => setActiveMenu('profile')}>
+                  <Building2 className="w-4 h-4 text-white" />
+               </div>
+            </div>
+         </header>
+
+         {/* Internal Content Area */}
+         <div className="p-4 md:p-8 flex-1">
+            {renderContent()}
+         </div>
+      </main>
+    </div>
+  );
+}

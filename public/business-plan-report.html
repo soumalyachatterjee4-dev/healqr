@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealQR - 12-Month Scale-up Plan</title>
+    <style>
+        @media print {
+            @page {
+                size: A4;
+                margin: 15mm;
+            }
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .page-break {
+                page-break-before: always;
+            }
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #fff;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            padding: 30px 0;
+            border-bottom: 3px solid #2563eb;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 32px;
+            color: #1e40af;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 16px;
+            color: #64748b;
+        }
+        
+        .section {
+            margin-bottom: 40px;
+        }
+        
+        .section-title {
+            font-size: 24px;
+            color: #1e40af;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .metric-card {
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #2563eb;
+        }
+        
+        .metric-label {
+            font-size: 14px;
+            color: #64748b;
+            margin-bottom: 5px;
+        }
+        
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1e40af;
+        }
+        
+        .patient-flow {
+            background: #f0f9ff;
+            padding: 25px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        
+        .flow-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #1e40af;
+            margin-bottom: 15px;
+        }
+        
+        .flow-steps {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .flow-step {
+            background: #fff;
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-size: 14px;
+            border: 1px solid #bfdbfe;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .flow-step::before {
+            content: "✓";
+            color: #16a34a;
+            font-weight: bold;
+        }
+        
+        .optional-steps {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px dashed #94a3b8;
+        }
+        
+        .optional-label {
+            font-size: 12px;
+            color: #64748b;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .table-wrapper {
+            overflow-x: auto;
+            margin-bottom: 30px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        thead {
+            background: #1e40af;
+            color: #fff;
+        }
+        
+        th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        tbody tr {
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        tbody tr:nth-child(even) {
+            background: #f8fafc;
+        }
+        
+        td {
+            padding: 15px;
+            font-size: 13px;
+        }
+        
+        .phase-col {
+            font-weight: bold;
+            color: #1e40af;
+        }
+        
+        .revenue-col {
+            font-weight: bold;
+            color: #16a34a;
+        }
+        
+        .cost-col {
+            color: #dc2626;
+        }
+        
+        .green-check {
+            color: #16a34a;
+            font-weight: 600;
+        }
+        
+        .summary-box {
+            background: #dcfce7;
+            border: 2px solid #16a34a;
+            border-radius: 8px;
+            padding: 25px;
+            margin-top: 30px;
+        }
+        
+        .summary-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #166534;
+            margin-bottom: 15px;
+        }
+        
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+        
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            background: #fff;
+            border-radius: 6px;
+        }
+        
+        .summary-label {
+            font-weight: 600;
+            color: #374151;
+        }
+        
+        .summary-value {
+            font-weight: bold;
+            color: #16a34a;
+        }
+        
+        .notes {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 20px;
+            margin-top: 30px;
+            border-radius: 4px;
+        }
+        
+        .notes-title {
+            font-weight: bold;
+            color: #92400e;
+            margin-bottom: 10px;
+        }
+        
+        .notes ul {
+            list-style-position: inside;
+            color: #78350f;
+        }
+        
+        .notes li {
+            margin-bottom: 5px;
+        }
+        
+        .footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 2px solid #e2e8f0;
+            text-align: center;
+            color: #64748b;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>HealQR - 12-Month Scale-up Plan</h1>
+        <p>Strategic Roadmap: 0 to 150,000 Doctors</p>
+        <p style="font-size: 14px; margin-top: 10px;">Revenue Model: ₹0.30 per Ad Impression</p>
+    </div>
+
+    <!-- Key Metrics -->
+    <div class="section">
+        <h2 class="section-title">📊 Key Business Metrics</h2>
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-label">Patients per Doctor/Month</div>
+                <div class="metric-value">250</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Views per Patient (Guaranteed)</div>
+                <div class="metric-value">8</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Revenue per View</div>
+                <div class="metric-value">₹0.30</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Revenue per Patient</div>
+                <div class="metric-value">₹2.40</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Revenue per Doctor/Month</div>
+                <div class="metric-value">₹600</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Development Timeline per Phase</div>
+                <div class="metric-value">1 Month</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Patient Journey Flow -->
+    <div class="section">
+        <h2 class="section-title">🔄 Patient Journey & Ad View Points</h2>
+        <div class="patient-flow">
+            <div class="flow-title">Guaranteed Ad Impressions (8 Views per Patient)</div>
+            <div class="flow-steps">
+                <div class="flow-step">Language Selection</div>
+                <div class="flow-step">Mini Website</div>
+                <div class="flow-step">Date Selection</div>
+                <div class="flow-step">Chamber Selection</div>
+                <div class="flow-step">Booking Form</div>
+                <div class="flow-step">Confirmation</div>
+                <div class="flow-step">Consultation Complete</div>
+                <div class="flow-step">Review Request</div>
+            </div>
+            
+            <div class="optional-steps">
+                <div class="optional-label">OPTIONAL VIEWS (Additional Revenue Potential)</div>
+                <div class="flow-steps">
+                    <div class="flow-step">Appointment Reminder</div>
+                    <div class="flow-step">Follow-up Schedule</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Scale-up Table -->
+    <div class="section">
+        <h2 class="section-title">📈 Phase-wise Scale-up Plan</h2>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Phase</th>
+                        <th>Doctors to Onboard</th>
+                        <th>Monthly Revenue<br>(₹0.30/view)</th>
+                        <th>Technical Development Required</th>
+                        <th>Monthly Infrastructure Cost</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="phase-col">Phase 1<br><small>(Months 1-3)</small></td>
+                        <td><strong>20,000 Doctors</strong><br>
+                            • 50 Lakh patients/month<br>
+                            • 4 Crore views/month</td>
+                        <td class="revenue-col"><strong>₹1.2 Crore/month</strong><br>
+                            <small>₹14.4 Crore/year</small></td>
+                        <td>
+                            <strong>Foundation Setup:</strong><br>
+                            <span class="green-check">✓ Firebase optimization (Already Deployed)</span><br>
+                            <span class="green-check">✓ CDN integration (Cloudflare - Live)</span><br>
+                            <span class="green-check">✓ Ad impression tracking (Built)</span><br>
+                            <span class="green-check">✓ Analytics dashboard (Active)</span><br>
+                            • Error monitoring system<br>
+                            • Auto-scaling configuration<br>
+                            <strong>Team:</strong> 2-3 developers
+                        </td>
+                        <td class="cost-col"><strong>₹2-3 Lakh</strong><br>
+                            • Firebase: ₹1L<br>
+                            • CDN: ₹20K<br>
+                            • Monitoring: ₹10K<br>
+                            • Team: ₹1-1.5L</td>
+                    </tr>
+                    <tr>
+                        <td class="phase-col">Phase 2<br><small>(Months 4-6)</small></td>
+                        <td><strong>60,000 Doctors</strong><br>
+                            (20K + 40K new)<br>
+                            • 1.5 Crore patients/month<br>
+                            • 12 Crore views/month</td>
+                        <td class="revenue-col"><strong>₹3.6 Crore/month</strong><br>
+                            <small>₹43.2 Crore/year</small></td>
+                        <td>
+                            <strong>Scale-up Phase:</strong><br>
+                            • Database sharding (regional)<br>
+                            • Redis caching layer<br>
+                            • Load balancing setup<br>
+                            • Query optimization<br>
+                            • Reporting APIs<br>
+                            • Performance monitoring<br>
+                            <strong>Team:</strong> 4-5 developers + DevOps
+                        </td>
+                        <td class="cost-col"><strong>₹5-7 Lakh</strong><br>
+                            • Infrastructure: ₹3L<br>
+                            • Database: ₹50K<br>
+                            • Cache: ₹50K<br>
+                            • Team: ₹3-4L</td>
+                    </tr>
+                    <tr>
+                        <td class="phase-col">Phase 3<br><small>(Months 7-9)</small></td>
+                        <td><strong>100,000 Doctors</strong><br>
+                            (60K + 40K new)<br>
+                            • 2.5 Crore patients/month<br>
+                            • 20 Crore views/month</td>
+                        <td class="revenue-col"><strong>₹6 Crore/month</strong><br>
+                            <small>₹72 Crore/year</small></td>
+                        <td>
+                            <strong>Enterprise Architecture:</strong><br>
+                            • Multi-region deployment<br>
+                            • PostgreSQL cluster migration<br>
+                            • Microservices architecture<br>
+                            • Message queue (SQS/RabbitMQ)<br>
+                            • Advanced analytics (BigQuery)<br>
+                            • AI-powered error monitoring<br>
+                            <strong>Team:</strong> 8-10 engineers
+                        </td>
+                        <td class="cost-col"><strong>₹12-15 Lakh</strong><br>
+                            • Cloud infra: ₹5L<br>
+                            • Database: ₹2L<br>
+                            • Analytics: ₹1L<br>
+                            • Team: ₹6-8L</td>
+                    </tr>
+                    <tr>
+                        <td class="phase-col">Phase 4<br><small>(Months 10-12)</small></td>
+                        <td><strong>150,000 Doctors</strong><br>
+                            (100K + 50K new)<br>
+                            • 3.75 Crore patients/month<br>
+                            • 30 Crore views/month</td>
+                        <td class="revenue-col"><strong>₹9 Crore/month</strong><br>
+                            <small>₹108 Crore/year</small></td>
+                        <td>
+                            <strong>Production Grade:</strong><br>
+                            • Kubernetes cluster<br>
+                            • State-wise database sharding<br>
+                            • ElasticSearch integration<br>
+                            • Real-time analytics pipeline<br>
+                            • Disaster recovery setup<br>
+                            • Automated deployments<br>
+                            <strong>Outsource:</strong> Managed service provider
+                        </td>
+                        <td class="cost-col"><strong>₹20-25 Lakh</strong><br>
+                            • Cloud infra: ₹10L<br>
+                            • Database: ₹3L<br>
+                            • Analytics: ₹2L<br>
+                            • Managed service: ₹8-10L</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Financial Summary -->
+    <div class="section">
+        <h2 class="section-title">💰 12-Month Financial Projection</h2>
+        <div class="summary-box">
+            <div class="summary-title">Annual Summary (End of Month 12)</div>
+            <div class="summary-grid">
+                <div class="summary-item">
+                    <span class="summary-label">Total Doctors Onboarded:</span>
+                    <span class="summary-value">150,000</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Total Patients Served:</span>
+                    <span class="summary-value">3.75 Crore/month</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Monthly Revenue (Month 12):</span>
+                    <span class="summary-value">₹9 Crore</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Annual Revenue (Year 1):</span>
+                    <span class="summary-value">₹108 Crore</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Monthly Operating Cost:</span>
+                    <span class="summary-value">₹20-25 Lakh</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Monthly Net Profit:</span>
+                    <span class="summary-value">₹6.75-6.80 Crore</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Annual Net Profit:</span>
+                    <span class="summary-value">₹81-81.6 Crore</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Profit Margin:</span>
+                    <span class="summary-value">75-76%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Important Notes -->
+    <div class="notes">
+        <div class="notes-title">⚠️ Important Considerations</div>
+        <ul>
+            <li><strong>Revenue Model:</strong> Based on guaranteed 8 ad impressions per patient. Optional views (reminder, follow-up) can increase revenue by 20-25%.</li>
+            <li><strong>Current Infrastructure:</strong> Core platform already developed with Firebase Blaze plan, Cloudflare CDN (healqr.com), and analytics dashboard operational.</li>
+            <li><strong>Infrastructure:</strong> Costs include Firebase, cloud hosting, CDN, database, monitoring, and team salaries/managed services.</li>
+            <li><strong>Scalability:</strong> Architecture designed to handle 200K+ doctors with minimal changes required.</li>
+            <li><strong>Risk Mitigation:</strong> Multi-region deployment ensures 99.9% uptime. Disaster recovery in place from Phase 3.</li>
+            <li><strong>Technology Stack:</strong> Industry-standard tools (Firebase, Node.js, React, PostgreSQL) for easy handover to managed service providers.</li>
+            <li><strong>Team Strategy:</strong> Build lean team Phases 1-3, then outsource to managed services in Phase 4 to reduce operational burden.</li>
+            <li><strong>Partnership Structure:</strong> Revenue split accommodates corporate partnerships (e.g., 1 template reserved for partner branding).</li>
+            <li><strong>AI Integration:</strong> Premium AI developer assistant (Claude 3.5 Sonnet) can reduce team size by 60-70% while maintaining code quality.</li>
+        </ul>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <p><strong>HealQR Business Plan</strong> | Generated: December 19, 2025</p>
+        <p>Confidential Document - For Internal Use Only</p>
+    </div>
+</body>
+</html>

@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FCM Debug Tool</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #4ec9b0;
+        }
+        .log {
+            background: #252526;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            font-size: 13px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        .success { color: #4ec9b0; }
+        .error { color: #f48771; }
+        .warning { color: #dcdcaa; }
+        .info { color: #569cd6; }
+        button {
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: monospace;
+        }
+        button:hover {
+            background: #1177bb;
+        }
+        .section {
+            background: #252526;
+            border-left: 3px solid #007acc;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        pre {
+            background: #1e1e1e;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔥 FCM Debug Tool - TeamHealQR</h1>
+        
+        <div class="section">
+            <h3>Quick Diagnosis</h3>
+            <button onclick="runFullDiagnostic()">🔍 Run Full Diagnostic</button>
+            <button onclick="testAPIKey()">🔑 Test API Key</button>
+            <button onclick="testVAPIDKey()">📧 Test VAPID Key</button>
+            <button onclick="clearLogs()">🧹 Clear Logs</button>
+        </div>
+
+        <div id="output" class="log">
+            <span class="info">Ready to diagnose FCM issues...</span>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getMessaging, getToken } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js';
+
+        const firebaseConfig = {
+            apiKey: 'AIzaSyB1AVXeao1bqTah8cD1bGAiAQMbZ5nw0WI',
+            authDomain: 'teamhealqr.firebaseapp.com',
+            projectId: 'teamhealqr',
+            storageBucket: 'teamhealqr.firebasestorage.app',
+            messagingSenderId: '739121123030',
+            appId: '1:739121123030:web:37ed6fd7c052277b604377',
+            measurementId: 'G-6ZZ5HNE1H4',
+        };
+
+        const VAPID_KEY = 'BPE3z7Q3AVXIA7aBrN-V9e9AnvZXHtzxhrKDk-8OeG8O9wtwFhPO0o_3ExQHnw-Z6MmfxpDWy7_lYcnfIlTvRdQ';
+
+        let app, messaging;
+        const output = document.getElementById('output');
+
+        function log(message, type = 'info') {
+            const span = document.createElement('div');
+            span.className = type;
+            span.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+            output.appendChild(span);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        window.clearLogs = function() {
+            output.innerHTML = '<span class="info">Logs cleared...</span>';
+        };
+
+        window.testAPIKey = async function() {
+            log('Testing API Key restrictions...', 'info');
+            
+            try {
+                // Test Firebase Installations API (used by FCM)
+                const installationUrl = `https://firebaseinstallations.googleapis.com/v1/projects/teamhealqr/installations`;
+                const response = await fetch(installationUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        appId: firebaseConfig.appId,
+                        authVersion: 'FIS_v2',
+                        sdkVersion: 'w:10.7.1'
+                    })
+                });
+
+                log(`API Response Status: ${response.status}`, response.ok ? 'success' : 'error');
+                
+                if (response.status === 401 || response.status === 403) {
+                    log('❌ API KEY RESTRICTION DETECTED!', 'error');
+                    log('The API key has HTTP referrer restrictions.', 'error');
+                    log('', 'info');
+                    log('FIX THIS IN GOOGLE CLOUD CONSOLE:', 'warning');
+                    log('1. Go to: https://console.cloud.google.com/apis/credentials?project=teamhealqr', 'warning');
+                    log('2. Find API key: AIzaSyB1AVXeao1bqTah8cD1bGAiAQMbZ5nw0WI', 'warning');
+                    log('3. Edit > Application restrictions > HTTP referrers:', 'warning');
+                    log('   - Add: teamhealqr.web.app/*', 'warning');
+                    log('   - Add: *.teamhealqr.web.app/*', 'warning');
+                    log('   - Add: localhost/*', 'warning');
+                    log('4. API restrictions > Select APIs:', 'warning');
+                    log('   - Enable: Firebase Cloud Messaging API', 'warning');
+                    log('   - Enable: Firebase Installations API', 'warning');
+                    log('   - Enable: Cloud Firestore API', 'warning');
+                } else if (response.ok) {
+                    const data = await response.json();
+                    log('✅ API Key is accessible from this domain', 'success');
+                    log(`Installation ID: ${data.fid || 'N/A'}`, 'info');
+                } else {
+                    const errorText = await response.text();
+                    log(`Server response: ${errorText}`, 'error');
+                }
+            } catch (error) {
+                log(`Network Error: ${error.message}`, 'error');
+                log('This could indicate CORS issues or network restrictions', 'warning');
+            }
+        };
+
+        window.testVAPIDKey = async function() {
+            log('Testing VAPID Key and FCM Token generation...', 'info');
+            
+            try {
+                // Initialize Firebase
+                if (!app) {
+                    app = initializeApp(firebaseConfig);
+                    log('✅ Firebase App initialized', 'success');
+                }
+
+                // Initialize Messaging
+                if (!messaging) {
+                    messaging = getMessaging(app);
+                    log('✅ Firebase Messaging initialized', 'success');
+                }
+
+                // Check permission
+                const permission = Notification.permission;
+                log(`Notification permission: ${permission}`, permission === 'granted' ? 'success' : 'warning');
+
+                if (permission !== 'granted') {
+                    log('Requesting notification permission...', 'info');
+                    const result = await Notification.requestPermission();
+                    log(`Permission result: ${result}`, result === 'granted' ? 'success' : 'error');
+                    
+                    if (result !== 'granted') {
+                        log('Cannot proceed without notification permission', 'error');
+                        return;
+                    }
+                }
+
+                // Register service worker
+                log('Registering service worker...', 'info');
+                const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+                await navigator.serviceWorker.ready;
+                log('✅ Service worker registered and ready', 'success');
+
+                // Try to get token
+                log('Attempting to get FCM token...', 'info');
+                log(`Using VAPID Key: ${VAPID_KEY.substring(0, 30)}...`, 'info');
+                
+                const token = await getToken(messaging, {
+                    vapidKey: VAPID_KEY,
+                    serviceWorkerRegistration: registration
+                });
+
+                if (token) {
+                    log('', 'info');
+                    log('🎉 SUCCESS! FCM Token obtained:', 'success');
+                    log('', 'info');
+                    log(`Token: ${token}`, 'success');
+                    log('', 'info');
+                    log('FCM is now working correctly!', 'success');
+                } else {
+                    log('❌ No token received', 'error');
+                }
+
+            } catch (error) {
+                log('', 'info');
+                log('❌ ERROR GETTING FCM TOKEN:', 'error');
+                log(`Error Code: ${error.code || 'N/A'}`, 'error');
+                log(`Error Message: ${error.message}`, 'error');
+                log('', 'info');
+
+                // Detailed error analysis
+                if (error.message.includes('auth')) {
+                    log('🔍 DIAGNOSIS: Authentication Error', 'warning');
+                    log('This is an API KEY RESTRICTION issue.', 'warning');
+                    log('', 'info');
+                    log('SOLUTION:', 'warning');
+                    log('1. Go to Google Cloud Console', 'warning');
+                    log('2. APIs & Services > Credentials', 'warning');
+                    log('3. Edit your API key', 'warning');
+                    log('4. Remove HTTP referrer restrictions OR add your domain', 'warning');
+                    log('5. Ensure "Firebase Cloud Messaging API" is enabled', 'warning');
+                } else if (error.code === 'messaging/token-subscribe-failed') {
+                    log('🔍 DIAGNOSIS: Token subscription failed', 'warning');
+                    log('Check if Cloud Messaging API is enabled', 'warning');
+                } else if (error.message.includes('VAPID')) {
+                    log('🔍 DIAGNOSIS: VAPID key issue', 'warning');
+                    log('The VAPID key might be invalid or not matching Firebase Console', 'warning');
+                }
+
+                log('', 'info');
+                log('Full error object:', 'info');
+                log(JSON.stringify(error, null, 2), 'info');
+            }
+        };
+
+        window.runFullDiagnostic = async function() {
+            clearLogs();
+            log('═══════════════════════════════════════', 'info');
+            log('    FCM FULL DIAGNOSTIC STARTED', 'info');
+            log('═══════════════════════════════════════', 'info');
+            log('', 'info');
+
+            // 1. Browser compatibility
+            log('1️⃣ Checking Browser Compatibility...', 'info');
+            log(`   Notification API: ${('Notification' in window) ? '✅' : '❌'}`, 
+                ('Notification' in window) ? 'success' : 'error');
+            log(`   Service Worker: ${('serviceWorker' in navigator) ? '✅' : '❌'}`, 
+                ('serviceWorker' in navigator) ? 'success' : 'error');
+            log(`   Push Manager: ${('PushManager' in window) ? '✅' : '❌'}`, 
+                ('PushManager' in window) ? 'success' : 'error');
+            log('', 'info');
+
+            // 2. Configuration check
+            log('2️⃣ Firebase Configuration:', 'info');
+            log(`   Project ID: ${firebaseConfig.projectId}`, 'info');
+            log(`   App ID: ${firebaseConfig.appId}`, 'info');
+            log(`   API Key: ${firebaseConfig.apiKey.substring(0, 20)}...`, 'info');
+            log(`   Messaging Sender ID: ${firebaseConfig.messagingSenderId}`, 'info');
+            log(`   VAPID Key: ${VAPID_KEY.substring(0, 30)}...`, 'info');
+            log('', 'info');
+
+            // 3. Test API Key
+            log('3️⃣ Testing API Key Access...', 'info');
+            await testAPIKey();
+            log('', 'info');
+
+            // 4. Test VAPID & Token
+            log('4️⃣ Testing VAPID Key & Token Generation...', 'info');
+            await testVAPIDKey();
+            
+            log('', 'info');
+            log('═══════════════════════════════════════', 'info');
+            log('    DIAGNOSTIC COMPLETE', 'info');
+            log('═══════════════════════════════════════', 'info');
+        };
+
+        // Auto-run on load
+        log('FCM Debug Tool loaded. Click "Run Full Diagnostic" to start.', 'success');
+        log(`Current domain: ${window.location.hostname}`, 'info');
+        log(`Full URL: ${window.location.href}`, 'info');
+    </script>
+</body>
+</html>

@@ -1,0 +1,49 @@
+{
+  "short_name": "HealQR",
+  "name": "HealQR - Doctor's e-Assistant",
+  "gcm_sender_id": "739121123030",
+  "version": "1.0.1",
+  "description": "World's First QR-based e-Assistant for Doctors with instant bookings, patient management, and analytics",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    }
+  ],
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#10B981",
+  "background_color": "#000000",
+  "categories": ["medical", "health", "productivity", "business"],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "Access doctor dashboard",
+      "url": "/?page=dashboard",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Today's Schedule",
+      "short_name": "Schedule",
+      "description": "View today's appointments",
+      "url": "/?page=schedule",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "prefer_related_applications": false,
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  }
+}

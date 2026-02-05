@@ -1,0 +1,168 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            HEALQR FLYER CONTENT (For Template)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+═══════════════════════════════════════════════════════════
+HEADER SECTION (Top Blue Box)
+═══════════════════════════════════════════════════════════
+
+Logo: HealQR (with medical cross or QR icon)
+
+Main Headline:
+"Smart Queue Management
+You Can Trust"
+
+Subheading:
+"100% FREE for Doctors, Clinics & Patients"
+
+
+═══════════════════════════════════════════════════════════
+LEFT SIDE - FEATURES (4 Icon Boxes)
+═══════════════════════════════════════════════════════════
+
+📱 ICON BOX 1: QR-Based Booking
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Title: QR-Based Booking
+Description: 
+Instant patient bookings by scanning QR code. 
+No app downloads required. Book via QR, 
+search, or walk-in verification.
+
+
+⏱️ ICON BOX 2: Live Queue Tracker
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Title: Live Queue Tracker
+Description:
+Real-time queue position updates with 
+exact arrival time. "REACH IMMEDIATELY" 
+alerts. No waiting room congestion.
+
+
+🔔 ICON BOX 3: Smart Notifications
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Title: Smart Notifications
+Description:
+120-day notification history viewable 
+even without app. FREE FCM push 
+notifications with full interaction.
+
+
+📊 ICON BOX 4: Digital Records & Analytics
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Title: Digital Records & Analytics
+Description:
+10-year patient history storage. 
+Monthly schedule planning. Revenue tracking. 
+Lab referral management.
+
+
+═══════════════════════════════════════════════════════════
+RIGHT SIDE - TESTIMONIALS/KEY BENEFITS
+═══════════════════════════════════════════════════════════
+
+Top Text Box:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+"Your time is our top priority. 
+With smart queue management, 
+multi-language support, and 
+personalized care, we're here to 
+keep you and your patients organized."
+
+
+TESTIMONIAL 1 (With 5 stars ⭐⭐⭐⭐⭐)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Name: Dr. Juliana Silva
+Specialty: General Physician
+
+Quote:
+"No more crowded waiting rooms! 
+Patients arrive at exact time. 
+10-year history at my fingertips. 
+Best practice management tool."
+
+
+TESTIMONIAL 2 (With 5 stars ⭐⭐⭐⭐⭐)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Name: Olivia Wilson
+Role: Clinic Manager
+
+Quote:
+"Managing multiple doctors was chaotic. 
+Now unified bookings, centralized records, 
+and seamless coordination. Game changer 
+for our multi-specialty clinic!"
+
+
+TESTIMONIAL 3 (With 5 stars ⭐⭐⭐⭐⭐)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Name: Raj Patel
+Role: Patient
+
+Quote:
+"Completely FREE! I book via QR, track 
+queue from home, get arrival alerts, 
+and access my 10-year records anytime. 
+No app needed. Simply brilliant!"
+
+
+═══════════════════════════════════════════════════════════
+BOTTOM SECTION - CALL TO ACTION
+═══════════════════════════════════════════════════════════
+
+Left Box (Blue Background):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+More Information
+www.healqr.com | www.teamhealqr.web.app
+
+Right Box (Blue Background):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Contact Us
+info@healqr.com | +91-XXXX-XXXXXX
+
+Main Button/Text:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Get Started FREE Today
+https://healqr.com
+
+
+═══════════════════════════════════════════════════════════
+ADDITIONAL ELEMENTS (Optional)
+═══════════════════════════════════════════════════════════
+
+QR Code (Bottom Right):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[Place QR code linking to: https://healqr.com]
+Text below QR: "Scan to Get Started"
+
+
+Badge/Sticker Elements:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• "100% FREE"
+• "No App Needed"
+• "10-Year Data Storage"
+• "Multi-Language"
+
+
+═══════════════════════════════════════════════════════════
+COLOR SCHEME SUGGESTIONS
+═══════════════════════════════════════════════════════════
+
+Primary Color: Blue (#4A90E2 or similar medical blue)
+Secondary Color: Teal/Cyan (#00BFA5 - for accent/icons)
+Background: Light pink/cream (#FFF5F5 or white)
+Text: Dark gray/Black (#333333)
+Accent: Orange/Purple for borders/highlights
+
+
+═══════════════════════════════════════════════════════════
+ICON SUGGESTIONS FOR CANVA
+═══════════════════════════════════════════════════════════
+
+Box 1: QR code icon or smartphone scanning icon
+Box 2: Clock/timer icon or queue/people icon
+Box 3: Bell/notification icon
+Box 4: Chart/analytics icon or document/folder icon
+
+
+═══════════════════════════════════════════════════════════

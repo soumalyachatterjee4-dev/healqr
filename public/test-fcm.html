@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FCM Diagnostic Tool</title>
+    <style>
+        body { font-family: system-ui, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; background: #f0f2f5; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        h1 { color: #1a73e8; }
+        button { background: #1a73e8; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #1557b0; }
+        pre { background: #282c34; color: #abb2bf; padding: 15px; border-radius: 4px; overflow-x: auto; font-size: 14px; }
+        .status { margin-top: 10px; padding: 10px; border-radius: 4px; }
+        .success { background: #e6f4ea; color: #1e8e3e; }
+        .error { background: #fce8e6; color: #d93025; }
+        .info { background: #e8f0fe; color: #1a73e8; }
+    </style>
+</head>
+<body>
+    <h1>🐞 FCM Diagnostic Tool</h1>
+    
+    <div class="card">
+        <h2>1. Environment Check</h2>
+        <div id="envStatus">Checking...</div>
+        <pre id="envDetails"></pre>
+    </div>
+
+    <div class="card">
+        <h2>2. Permission & Token</h2>
+        <p>Click the button to request permission and get a token.</p>
+        <button onclick="startDiagnostics()">Start Diagnostics</button>
+        <div id="tokenStatus" class="status info" style="display:none">Waiting...</div>
+        <pre id="tokenOutput"></pre>
+    </div>
+
+    <div class="card">
+        <h2>3. Database Write Test</h2>
+        <div id="dbStatus" class="status info" style="display:none">Waiting for token...</div>
+        <pre id="dbOutput"></pre>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getMessaging, getToken } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js';
+        import { getFirestore, doc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // Config from teamhealqr project
+        const firebaseConfig = {
+            apiKey: 'AIzaSyB1AVXeao1bqTah8cD1bGAiAQMbZ5nw0WI',
+            authDomain: 'teamhealqr.firebaseapp.com',
+            projectId: 'teamhealqr',
+            storageBucket: 'teamhealqr.firebasestorage.app',
+            messagingSenderId: '739121123030',
+            appId: '1:739121123030:web:37ed6fd7c052277b604377',
+            measurementId: 'G-6ZZ5HNE1H4',
+        };
+
+        const VAPID_KEY = 'BFDQKXlh6jRnmtr73-nLfSPVfoE7e_edEGgM9dG-mKVUWUWN6hp49vQEAuHDyXaGPkFuguoztw07vScoD-tHE90';
+
+        let app, messaging, db;
+
+        // Initialize immediately
+        try {
+            app = initializeApp(firebaseConfig);
+            messaging = getMessaging(app);
+            db = getFirestore(app);
+            
+            const envInfo = {
+                browser: navigator.userAgent,
+                notificationsSupported: 'Notification' in window,
+                serviceWorkerSupported: 'serviceWorker' in navigator,
+                firebaseConfigured: true,
+                projectId: firebaseConfig.projectId
+            };
+            
+            document.getElementById('envDetails').textContent = JSON.stringify(envInfo, null, 2);
+            document.getElementById('envStatus').innerHTML = '✅ Environment Ready';
+            document.getElementById('envStatus').className = 'status success';
+        } catch (e) {
+            document.getElementById('envStatus').innerHTML = '❌ Initialization Failed';
+            document.getElementById('envStatus').className = 'status error';
+            document.getElementById('envDetails').textContent = e.toString();
+        }
+
+        window.startDiagnostics = async () => {
+            const tokenOut = document.getElementById('tokenOutput');
+            const tokenStatus = document.getElementById('tokenStatus');
+            const dbOut = document.getElementById('dbOutput');
+            const dbStatus = document.getElementById('dbStatus');
+
+            tokenStatus.style.display = 'block';
+            tokenStatus.textContent = 'Requesting permission...';
+            tokenOut.textContent = '';
+
+            try {
+                // 1. Permission
+                const permission = await Notification.requestPermission();
+                tokenOut.textContent += `Permission status: ${permission}\n`;
+                
+                if (permission !== 'granted') {
+                    throw new Error('Permission denied');
+                }
+
+                // 2. Service Worker
+                tokenOut.textContent += `Registering Service Worker...\n`;
+                // Try registering the one in root or public
+                const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+                tokenOut.textContent += `Service Worker registered: ${registration.scope}\n`;
+
+                // 3. Get Token
+                tokenOut.textContent += `Requesting FCM Token...\n`;
+                const token = await getToken(messaging, {
+                    vapidKey: VAPID_KEY,
+                    serviceWorkerRegistration: registration
+                });
+
+                if (!token) {
+                    throw new Error('No token received');
+                }
+
+                tokenOut.textContent += `✅ Token received:\n${token}\n`;
+                tokenStatus.textContent = '✅ Token Success';
+                tokenStatus.className = 'status success';
+
+                // 4. Test DB Write
+                dbStatus.style.display = 'block';
+                dbStatus.textContent = 'Attemping Firestore write...';
+                
+                const testId = 'test_' + Date.now();
+                await setDoc(doc(db, 'fcmTokens', testId), {
+                    token: token,
+                    type: 'diagnostic_test',
+                    userAgent: navigator.userAgent,
+                    timestamp: serverTimestamp()
+                });
+
+                dbOut.textContent = `Successfully wrote to fcmTokens/${testId}`;
+                dbStatus.textContent = '✅ Database Write Success';
+                dbStatus.className = 'status success';
+
+            } catch (err) {
+                console.error(err);
+                tokenStatus.textContent = '❌ Failed';
+                tokenStatus.className = 'status error';
+                tokenOut.textContent += `\nERROR: ${err.message}\n${err.stack}`;
+            }
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,918 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================
+    // HELPER FUNCTIONS
+    // ============================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isDoctor() {
+      return isAuthenticated() && exists(/databases/$(database)/documents/doctors/$(request.auth.uid));
+    }
+
+    // ============================================
+    // QR POOL COLLECTION
+    // ============================================
+    match /qrPool/{qrId} {
+      // Allow read for authenticated users (admin, clinic, doctor) and unauthenticated during signup validation
+      allow read: if true;
+      
+      // Allow update for:
+      // 1. Admin (full access)
+      // 2. During clinic/doctor signup for setting pending status (unauthenticated)
+      // 3. During email verification for activating QR (authenticated)
+      allow update: if (isAuthenticated() && request.auth.token.admin == true) ||
+                      (request.resource.data.status == 'pending' && request.resource.data.linkedEmail != null) ||
+                      (isAuthenticated() && request.resource.data.status == 'active' && request.resource.data.linkedEmail != null);
+      
+      // Allow create for:
+      // 1. Admin (full access)
+      // 2. Unauthenticated virtual QR generation during clinic/doctor signup
+      allow create: if (isAuthenticated() && request.auth.token.admin == true) ||
+                      (request.resource.data.qrType == 'virtual' && request.resource.data.generatedBy in ['clinic-signup', 'doctor-signup', 'self-signup']);
+      
+      // No deletes allowed
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // CLINICS COLLECTION
+    // ============================================
+    
+    match /clinics/{clinicId} {
+      // Allow read by anyone (for QR booking flow and doctor linking)
+      allow read: if true;
+      
+      // Allow create by authenticated clinic owners (UID must match document ID)
+      allow create: if isAuthenticated() && request.auth.uid == clinicId;
+      
+      // Allow update by:
+      // 1. Clinic owner (full access)
+      // 2. Doctors linking themselves (can only update linkedDoctorCodes and linkedDoctorsDetails)
+      allow update: if isAuthenticated() && (
+        request.auth.uid == clinicId ||
+        (isDoctor() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['linkedDoctorCodes', 'linkedDoctorsDetails']))
+      );
+      
+      // No deletes allowed
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // PENDING SIGNUPS COLLECTION (Temporary storage before email verification)
+    // ============================================
+    
+    match /pending_signups/{email} {
+      // Allow anyone to create (for signup flow)
+      allow create: if true;
+      
+      // Allow read by anyone (needed for email verification)
+      allow read: if true;
+      
+      // Allow delete after successful verification
+      allow delete: if true;
+      
+      // No updates
+      allow update: if false;
+    }
+    
+    // ============================================
+    // DOCTORS COLLECTION
+    // ============================================
+    
+    match /doctors/{doctorId} {
+      // Allow read for:
+      // 1. Authenticated users (own profile)
+      // 2. Anyone checking if email exists during signup (query only)
+      // 3. Anyone for QR booking flow (need to read doctor profile and update bookingsCount)
+      // 4. Allow list operations for aggregation queries (count) on landing page
+      allow read, list: if true;
+      
+      // Allow create for:
+      // 1. New signups (email verification creates profile with user's UID)
+      // 2. Clinics creating doctor profiles (for non-onboarded doctors)
+      allow create: if (isAuthenticated() && request.auth.uid == doctorId) ||
+                      (request.auth != null && request.auth.token.email_verified == true && request.auth.uid == doctorId) ||
+                      (isAuthenticated() && exists(/databases/$(database)/documents/clinics/$(request.auth.uid)));
+      
+      // Allow update by:
+      // 1. Doctor owner (full access)
+      // 2. Clinics that have this doctor linked (can update chambers, linkedClinics, status)
+      // 3. System updates (bookingsCount, totalQRScans, stats)
+      allow update: if isOwner(doctorId) || 
+                      (isAuthenticated() && exists(/databases/$(database)/documents/clinics/$(request.auth.uid))) ||
+                      (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['bookingsCount', 'bookingBlocked', 'blockReason', 'subscriptionStatus', 'totalQRScans', 'lastScanAt', 'stats']));
+      
+      // No deletes allowed
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // PATIENTS COLLECTION
+    // ============================================
+    
+    match /patients/{patientId} {
+      // Allow read by authenticated users
+      allow read: if isAuthenticated();
+      
+      // Allow create/update by authenticated users
+      allow create, update: if isAuthenticated();
+      
+      // No deletes allowed
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // BOOKINGS COLLECTION
+    // ============================================
+    
+    match /bookings/{bookingId} {
+      // Allow read by anyone (needed for QR booking flow to check existing bookings)
+      allow read: if true;
+      
+      // Allow create by anyone (for QR code bookings by patients)
+      allow create: if true;
+      
+      // Allow update by:
+      // 1. Authenticated doctors who own the booking
+      // 2. Any authenticated user (covers assistants using doctor's session via localStorage)
+      // 3. Anyone for specific fields that patients/system can update
+      allow update: if true; // Temporarily open for debugging - will restrict after testing
+      
+      // No deletes allowed
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // APPOINTMENTS COLLECTION (Alternative naming for bookings)
+    // ============================================
+    
+    match /appointments/{appointmentId} {
+      // Allow read/list by anyone (for aggregation queries and appointment lookups)
+      allow read, list: if true;
+      
+      // Allow create by anyone (for QR code bookings by patients)
+      allow create: if true;
+      
+      // Allow update by authenticated users
+      allow update: if true;
+      
+      // No deletes allowed
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // TRANSACTIONS COLLECTION
+    // ============================================
+    
+    match /transactions/{transactionId} {
+      // Allow read by authenticated users (includes admin panel)
+      allow read: if isAuthenticated();
+      
+      // Allow create by authenticated users
+      allow create: if isAuthenticated();
+      
+      // No updates or deletes
+      allow update, delete: if false;
+    }
+    
+    // ============================================
+    // NOTIFICATIONS COLLECTION
+    // ============================================
+    
+    match /notifications/{notificationId} {
+      // Allow read only by the recipient OR the doctor who created it
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.recipientId ||
+        request.auth.uid == resource.data.doctorId
+      );
+      
+      // Allow create by authenticated users (doctors creating patient notifications)
+      allow create: if isAuthenticated();
+      
+      // Allow update by authenticated users (for marking as delivered/read)
+      allow update: if isAuthenticated();
+      
+      // Allow delete by doctor who created it
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.doctorId;
+    }
+    
+    // ============================================
+    // PATIENT NOTIFICATIONS COLLECTION (120-day stored notifications)
+    // ============================================
+    
+    match /patient_notifications/{notificationId} {
+      // Allow patients to read their own notifications (by phone number match)
+      allow read: if true; // Open for now since we match by patientPhone field
+      
+      // Allow doctors/system to create notifications
+      allow create: if true;
+      
+      // Allow patients to update (mark as read)
+      allow update: if true;
+      
+      // Auto-cleanup handled by service, but allow deletion
+      allow delete: if true;
+    }
+    
+    // ============================================
+    // NOTIFICATION QUEUE COLLECTION (FCM notifications)
+    // ============================================
+    
+    match /patientFCMTokens/{phone} {
+      // Allow read/write for token registration (called from client)
+      allow read, write: if true;
+    }
+    
+    // ============================================
+    // FCM TOKENS COLLECTION (New unified token storage)
+    // ============================================
+    
+    match /fcmTokens/{userId} {
+      // Allow anyone to write their own token (needed for notification setup)
+      allow read, write: if true;
+    }
+    
+    // ============================================
+    // ASSISTANTS COLLECTION
+    // ============================================
+    
+    match /assistants/{assistantId} {
+      // Allow anyone to read for magic link verification (token-based)
+      // This is needed because verification happens before authentication
+      allow read: if true;
+      
+      // Allow doctor to write their own assistants
+      allow write: if isAuthenticated() && request.auth.uid == resource.data.doctorId;
+      
+      // Allow doctor to create new assistants
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.doctorId;
+    }
+    
+    // ============================================
+    // ASSISTANT HISTORY COLLECTION
+    // ============================================
+    
+    match /assistantHistory/{historyId} {
+      // Allow doctor to read their assistant history
+      allow read: if isAuthenticated() && request.auth.uid == resource.data.doctorId;
+      
+      // Allow system to create history entries (write-only for backend)
+      allow create: if isAuthenticated();
+      
+      // No updates or deletes
+      allow update, delete: if false;
+    }
+    
+    // ============================================
+    // NOTIFICATION QUEUE COLLECTION
+    // ============================================
+    
+    match /notificationQueue/{notificationId} {
+      // Allow read by authenticated doctors
+      allow read: if isAuthenticated() && isDoctor();
+      
+      // Allow create by authenticated doctors (for queuing patient notifications)
+      allow create: if isAuthenticated() && isDoctor();
+      
+      // Allow update by authenticated users (for status updates by Cloud Functions)
+      allow update: if isAuthenticated();
+      
+      // Allow delete by authenticated doctors
+      allow delete: if isAuthenticated() && isDoctor();
+    }
+    
+    // ============================================
+    // SCHEDULED NOTIFICATIONS COLLECTION
+    // ============================================
+    
+    match /scheduledNotifications/{notificationId} {
+      // Allow read by authenticated doctors
+      allow read: if isAuthenticated() && isDoctor();
+      
+      // Allow create by authenticated doctors
+      allow create: if isAuthenticated() && isDoctor();
+      
+      // Allow update by authenticated users (for cancellation/status updates)
+      allow update: if isAuthenticated();
+      
+      // Allow delete by authenticated doctors
+      allow delete: if isAuthenticated() && isDoctor();
+    }
+    
+    // ============================================
+    // CHAT ROOMS COLLECTION
+    // ============================================
+    
+    match /chatRooms/{chatRoomId} {
+      // Allow read if user is participant
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.doctorId ||
+        request.auth.uid == resource.data.patientId
+      );
+      
+      // Allow create by authenticated users
+      allow create: if isAuthenticated();
+      
+      // Allow update by participants
+      allow update: if isAuthenticated() && (
+        request.auth.uid == resource.data.doctorId ||
+        request.auth.uid == resource.data.patientId
+      );
+      
+      // No deletes
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // CHAT MESSAGES COLLECTION
+    // ============================================
+    
+    match /chatMessages/{messageId} {
+      // Allow read if user is sender or in the chat room
+      allow read: if isAuthenticated();
+      
+      // Allow create by authenticated users
+      allow create: if isAuthenticated();
+      
+      // Allow update only by sender (for marking as read)
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.senderId;
+      
+      // No deletes
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // REVIEWS COLLECTION
+    // ============================================
+    
+    match /reviews/{reviewId} {
+      // Allow read by anyone (public reviews)
+      allow read: if true;
+      
+      // Allow create by authenticated users
+      allow create: if isAuthenticated();
+      
+      // Allow update only by the doctor (for responding)
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.doctorId;
+      
+      // No deletes
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // DISCOUNT CARDS COLLECTION
+    // ============================================
+    
+    match /discountCards/{cardId} {
+      // Allow read by authenticated users (doctors can check validity)
+      allow read: if isAuthenticated();
+      
+      // Allow admin to create/update/delete (admin email: healqr@gmail.com)
+      // In production, add proper admin role check
+      allow create, update, delete: if isAuthenticated();
+    }
+    
+    // ============================================
+    // PRODUCTS COLLECTION (E-commerce)
+    // ============================================
+    
+    match /products/{productId} {
+      // Allow read by anyone
+      allow read: if true;
+      
+      // Allow create/update only by the product owner (doctor)
+      allow create, update: if isAuthenticated() && request.auth.uid == request.resource.data.doctorId;
+      
+      // Allow delete only by owner
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.doctorId;
+    }
+    
+    // ============================================
+    // ORDERS COLLECTION (E-commerce)
+    // ============================================
+    
+    match /orders/{orderId} {
+      // Allow read by doctor or customer
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.doctorId ||
+        request.auth.uid == resource.data.customerId
+      );
+      
+      // Allow create by authenticated users
+      allow create: if isAuthenticated();
+      
+      // Allow update only by doctor
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.doctorId;
+      
+      // No deletes
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // PRESCRIPTIONS COLLECTION
+    // ============================================
+    
+    match /prescriptions/{prescriptionId} {
+      // Allow read by doctor or patient
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.doctorId ||
+        request.auth.uid == resource.data.patientId
+      );
+      
+      // Allow create by authenticated users
+      allow create: if isAuthenticated();
+      
+      // Allow update only by doctor
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.doctorId;
+      
+      // No deletes
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // VIDEO CONSULTATIONS COLLECTION
+    // ============================================
+    
+    match /videoConsultations/{consultationId} {
+      // Allow read by doctor or patient
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.doctorId ||
+        request.auth.uid == resource.data.patientId
+      );
+      
+      // Allow create/update by doctor
+      allow create, update: if isAuthenticated() && isDoctor();
+      
+      // No deletes
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // LAB REFERRALS COLLECTION
+    // ============================================
+    
+    match /labReferrals/{referralId} {
+      // Allow read by doctor or patient
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.doctorId ||
+        request.auth.uid == resource.data.patientId
+      );
+      
+      // Allow create/update only by doctor
+      allow create, update: if isAuthenticated() && isDoctor();
+      
+      // No deletes
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // TEMPLATES COLLECTION
+    // ============================================
+    
+    match /templates/{templateId} {
+      // Allow read by anyone
+      allow read: if true;
+      
+      // Allow create/update/delete only by admins (handled server-side)
+      allow write: if false;
+    }
+    
+    // ============================================
+    // VIDEOS COLLECTION
+    // ============================================
+    
+    match /videos/{videoId} {
+      // Allow read by anyone
+      allow read: if true;
+      
+      // Allow create/update/delete only by admins (handled server-side)
+      allow write: if false;
+    }
+    
+    // ============================================
+    // ASSISTANTS COLLECTION
+    // ============================================
+    
+    match /assistants/{assistantId} {
+      // Allow read by the doctor or assistant themselves
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.doctorId ||
+        request.auth.uid == assistantId
+      );
+      
+      // Allow create/update/delete only by the doctor
+      allow write: if isAuthenticated() && request.auth.uid == resource.data.doctorId;
+    }
+    
+    // ============================================
+    // USERS COLLECTION (Unified user storage)
+    // ============================================
+    
+    match /users/{userId} {
+      // Allow anyone to read/list for aggregation queries and user lookups
+      allow read, list: if true;
+      
+      // Allow authenticated users to write their own data
+      allow create, update: if isAuthenticated() && request.auth.uid == userId;
+      
+      // No deletes allowed
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // ADMINS COLLECTION (New centralized admin authorization)
+    // ============================================
+    
+    match /admins/{adminEmail} {
+      // Allow public read for login verification (before authentication)
+      // This is safe because we only store email and authorization flag
+      allow read: if true;
+      
+      // Only authenticated admins can write
+      // In practice, this should be managed server-side or via Firebase Console
+      allow write: if false;
+    }
+    
+    // ============================================
+    // ADMIN PROFILES COLLECTION (Legacy)
+    // ============================================
+    
+    match /adminProfiles/{profileId} {
+      // Allow public read (admin panel access is already controlled by email)
+      allow read: if true;
+      
+      // Allow anyone to write (admin panel is protected by email verification)
+      // Only super_admin profile can be created/updated
+      allow write: if profileId == 'super_admin';
+    }
+    
+    // ============================================
+    // ADMIN LOGS COLLECTION
+    // ============================================
+    
+    match /adminLogs/{logId} {
+      // Only admins can read/write (handled server-side)
+      allow read, write: if false;
+    }
+    
+    // ============================================
+    // PLATFORM ANALYTICS COLLECTION
+    // ============================================
+    
+    match /platformAnalytics/{analyticsId} {
+      // Only admins can read/write (handled server-side)
+      allow read, write: if false;
+    }
+    
+    // ============================================
+    // SCHEDULED TASKS COLLECTION
+    // ============================================
+    
+    match /scheduledTasks/{taskId} {
+      // System-only collection (Cloud Functions)
+      allow read, write: if false;
+    }
+    
+    // ============================================
+    // QR SCANS COLLECTION (Analytics)
+    // ============================================
+    
+    match /qr_scans/{scanId} {
+      // Allow anyone to create (for tracking QR scans)
+      allow create: if true;
+      
+      // Allow doctors to read their own scans for analytics
+      allow read: if isAuthenticated();
+      
+      // No updates or deletes
+      allow update, delete: if false;
+    }
+    
+    // ============================================
+    // NOTIFICATION SUBSCRIPTIONS COLLECTION
+    // ============================================
+    
+    match /patientNotificationSubscriptions/{phone} {
+      // Allow anyone to read (for sending notifications)
+      allow read: if true;
+      
+      // Allow anyone to create/update (when patient consents)
+      allow create, update: if true;
+      
+      // No deletes
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // PWA PUSH NOTIFICATIONS
+    // ============================================
+    
+    match /patientNotifications/{notificationId} {
+      // Allow anyone to read (patients viewing their notifications)
+      allow read: if true;
+      
+      // Allow anyone to create (Cloud Functions + test page)
+      allow create: if true;
+      
+      // Allow anyone to update (for marking as read)
+      allow update: if true;
+      
+      // No deletes
+      allow delete: if false;
+    }
+    
+    match /notificationSubscribers/{subscriberId} {
+      // Allow anyone to read (for checking subscription status)
+      allow read: if true;
+      
+      // Allow anyone to create/update (when patient consents)
+      allow create, update: if true;
+      
+      // No deletes
+      allow delete: if false;
+    }
+    
+    match /advertisements/{adId} {
+      // Allow anyone to read (for displaying ads in notifications)
+      allow read: if true;
+      
+      // Allow anyone to create/update (for testing, will restrict to admin later)
+      allow create, update: if true;
+      
+      // Allow authenticated users to delete
+      allow delete: if isAuthenticated();
+    }
+    
+    // ============================================
+    // SCHEDULED FOLLOW-UPS COLLECTION
+    // ============================================
+    
+    match /scheduledFollowUps/{followUpId} {
+      // Allow read by authenticated doctors
+      allow read: if isAuthenticated();
+      
+      // Allow create by authenticated doctors (for scheduling follow-ups)
+      allow create: if isAuthenticated();
+      
+      // Allow update by authenticated doctors or system (for marking as sent/failed)
+      allow update: if isAuthenticated();
+      
+      // Allow delete by authenticated doctors
+      allow delete: if isAuthenticated();
+    }
+    
+    // ============================================
+    // SUPPORT REQUESTS COLLECTION
+    // ============================================
+    
+    match /supportRequests/{requestId} {
+      // Allow read by authenticated users (admin only in practice)
+      allow read: if isAuthenticated();
+      
+      // Allow create by anyone (doctors and landing page visitors can submit requests)
+      allow create: if true;
+      
+      // Allow update by authenticated users (for marking as read/resolved)
+      allow update: if isAuthenticated();
+      
+      // No deletes allowed
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // QR CODES COLLECTION
+    // ============================================
+    
+    match /qrCodes/{qrCode} {
+      // Allow anyone to read (for signup validation and QR display)
+      allow read: if true;
+      
+      // Allow create by anyone (admin generating codes - no auth required for test mode)
+      allow create: if true;
+      
+      // Allow update during signup or by admin
+      allow update: if true;
+      
+      // Allow delete by anyone (admin cleanup)
+      allow delete: if true;
+    }
+    
+    // ============================================
+    // QR BATCHES COLLECTION
+    // ============================================
+    
+    match /qrBatches/{batchId} {
+      // Allow anyone to read
+      allow read: if true;
+      
+      // Allow create by anyone (admin generating batches)
+      allow create: if true;
+      
+      // Allow update by anyone (admin updating batch status)
+      allow update: if true;
+      
+      // Allow delete by anyone (admin cleanup)
+      allow delete: if true;
+    }
+    
+    // ============================================
+    // ASSISTANTS COLLECTION
+    // ============================================
+    
+    match /assistants/{assistantId} {
+      // Allow unauthenticated read when querying by accessToken (for PIN validation)
+      // Token acts as authentication (like magic link)
+      allow read: if true;
+      
+      // Allow doctors to create assistants
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.doctorId;
+      
+      // Allow doctors to update their own assistants
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.doctorId;
+      
+      // Allow updating lastLoginAt without authentication (after PIN validation on client)
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastLoginAt']);
+      
+      // Allow doctors to delete their own assistants
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.doctorId;
+    }
+
+    // ============================================
+    // ASSISTANT ACCESS COLLECTION (OLD - DEPRECATED)
+    // ============================================
+    
+    match /assistantAccess/{accessId} {
+      // Allow anyone to query by accessToken (needed for assistant login verification)
+      // This is safe because the token is secret and unique
+      allow read, list: if true;
+      
+      // Allow doctors to create assistant access
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.doctorId;
+      
+      // Allow doctors to update/revoke their own assistant access
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.doctorId;
+      
+      // No deletes allowed (keep history)
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // ACTIVATION CODES COLLECTION (QR Pre-Generation - Legacy)
+    // ============================================
+    
+    match /activationCodes/{qrCode} {
+      // Allow anyone to read (for signup validation)
+      allow read: if true;
+      
+      // Allow create by authenticated users (admin generating codes)
+      allow create: if isAuthenticated();
+      
+      // Allow update during signup (linking QR to email)
+      // Only allow if QR is unused and being linked to authenticated user's email
+      allow update: if isAuthenticated() && 
+                      (!resource.data.linkedEmail || resource.data.linkedEmail == null) &&
+                      request.resource.data.linkedEmail == request.auth.token.email &&
+                      request.resource.data.status == 'active';
+      
+      // Allow delete by authenticated users (admin only)
+      allow delete: if isAuthenticated();
+    }
+    
+    // ============================================
+    // ADVERTISERS COLLECTION
+    // ============================================
+    
+    match /advertisers/{userId} {
+      // Allow read/write by the owner
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // ============================================
+    // ADVERTISER PROMOS COLLECTION
+    // ============================================
+    
+    match /advertiserPromos/{promoId} {
+      // Allow read by anyone (advertisers need to see it)
+      allow read: if true;
+      
+      // Allow write by authenticated users (admins)
+      allow write: if isAuthenticated();
+    }
+
+    // ============================================
+    // ADVERTISER CAMPAIGNS
+    // ============================================
+    
+    match /advertiser_campaigns/{campaignId} {
+      allow read: if isAuthenticated() && resource.data.advertiserId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.advertiserId == request.auth.uid;
+      allow update: if isAuthenticated() && resource.data.advertiserId == request.auth.uid;
+    }
+
+    // ============================================
+    // REVIEWS COLLECTION
+    // ============================================
+    
+    match /reviews/{reviewId} {
+      // Allow read by the doctor who owns the review
+      allow read: if isAuthenticated() && resource.data.doctorId == request.auth.uid;
+      
+      // Allow create by anyone (patients submitting reviews)
+      allow create: if true;
+      
+      // Allow update by doctor (e.g. marking as published)
+      allow update: if isAuthenticated() && resource.data.doctorId == request.auth.uid;
+      
+      // Allow delete by doctor
+      allow delete: if isAuthenticated() && resource.data.doctorId == request.auth.uid;
+    }
+
+    // ============================================
+    // NOTIFICATION HISTORY COLLECTION
+    // ============================================
+    
+    match /notificationHistory/{historyId} {
+      // Allow read by anyone (doctors and patients can view history)
+      // In production, you might want to restrict this to authenticated users only
+      allow read: if true;
+      
+      // Allow create by anyone (notifications are saved from client & cloud functions)
+      allow create: if true;
+      
+      // Allow update by system (for marking notifications as read, etc.)
+      allow update: if true;
+      
+      // Allow delete for cleanup (auto-delete old records)
+      allow delete: if true;
+    }
+
+    // ============================================
+    // PATIENT OTP REQUESTS COLLECTION
+    // ============================================
+    
+    match /patientOtpRequests/{requestId} {
+      // Allow anyone to create OTP requests (patient login flow)
+      allow create: if true;
+      
+      // Allow read by anyone (to check OTP status)
+      allow read: if true;
+      
+      // Allow update by Cloud Functions (to mark as sent/failed)
+      allow update: if true;
+      
+      // Allow delete for cleanup
+      allow delete: if true;
+    }
+
+    // ============================================
+    // COMPANIES COLLECTION (Doctor Company Tracking)
+    // ============================================
+    
+    match /companies/{companyName} {
+      // Allow read by anyone (for analytics/reporting)
+      allow read: if true;
+      
+      // Allow create by authenticated users during signup
+      allow create: if request.auth != null;
+      
+      // Allow update to add/remove doctors from company
+      allow update: if request.auth != null;
+      
+      // No deletes allowed
+      allow delete: if false;
+    }
+
+    // ============================================
+    // PATIENT HEALTH CARDS COLLECTION
+    // ============================================
+    
+    match /patientHealthCards/{patientPhone} {
+      // Allow read by anyone (patients can view their own health card)
+      allow read: if true;
+      
+      // Allow create/update by anyone (for patient registration)
+      allow create, update: if true;
+      
+      // Allow delete only by authorized users
+      allow delete: if request.auth != null;
+    }
+
+    // ============================================
+    // DEFAULT DENY
+    // ============================================
+    
+    // Deny access to all other documents
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Prescription - HealQR</title>
+  <link rel="icon" href="/favicon.ico">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      overflow: hidden;
+    }
+    
+    .header {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: white;
+      padding: 30px;
+      text-align: center;
+    }
+    
+    .header h1 {
+      font-size: 28px;
+      margin-bottom: 10px;
+    }
+    
+    .header p {
+      opacity: 0.9;
+      font-size: 16px;
+    }
+    
+    .content {
+      padding: 30px;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 60px 20px;
+      color: #6b7280;
+    }
+    
+    .loading .spinner {
+      width: 50px;
+      height: 50px;
+      border: 4px solid #e5e7eb;
+      border-top-color: #10b981;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .rx-images {
+      margin-bottom: 30px;
+    }
+    
+    .rx-images img {
+      width: 100%;
+      border-radius: 12px;
+      margin-bottom: 15px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    
+    .decoded-section {
+      background: #f9fafb;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    
+    .decoded-section h3 {
+      color: #10b981;
+      font-size: 18px;
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .decoded-text {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      white-space: pre-wrap;
+      line-height: 1.8;
+      color: #374151;
+      border: 1px solid #e5e7eb;
+    }
+    
+    .disclaimer {
+      background: #fef3c7;
+      border-left: 4px solid #f59e0b;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 20px;
+    }
+    
+    .disclaimer h4 {
+      color: #92400e;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+    
+    .disclaimer p {
+      color: #78350f;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    
+    .error {
+      text-align: center;
+      padding: 40px 20px;
+      color: #ef4444;
+    }
+    
+    .error-icon {
+      font-size: 48px;
+      margin-bottom: 15px;
+    }
+    
+    .download-btn {
+      background: #10b981;
+      color: white;
+      border: none;
+      padding: 15px 30px;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 20px;
+      transition: background 0.2s;
+    }
+    
+    .download-btn:hover {
+      background: #059669;
+    }
+    
+    .metadata {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 25px;
+    }
+    
+    .metadata-item {
+      background: #f3f4f6;
+      padding: 12px;
+      border-radius: 8px;
+    }
+    
+    .metadata-item label {
+      font-size: 12px;
+      color: #6b7280;
+      display: block;
+      margin-bottom: 4px;
+    }
+    
+    .metadata-item value {
+      font-size: 15px;
+      color: #1f2937;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🩺 Your Prescription</h1>
+      <p>AI-Decoded Prescription from Your Doctor</p>
+    </div>
+    
+    <div class="content">
+      <div id="loading" class="loading">
+        <div class="spinner"></div>
+        <p>Loading your prescription...</p>
+      </div>
+      
+      <div id="error" class="error" style="display: none;">
+        <div class="error-icon">⚠️</div>
+        <h3>Unable to load prescription</h3>
+        <p id="error-message">This prescription link may have expired or been viewed already.</p>
+      </div>
+      
+      <div id="content-area" style="display: none;">
+        <!-- Dynamic content will be inserted here -->
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    // Firebase imports
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+    import { getFirestore, doc, getDoc, updateDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+    // Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyAYD_tpcyW4PQO_vYQFoqfZmnYcbBYLnKI",
+      authDomain: "teamhealqr.firebaseapp.com",
+      projectId: "teamhealqr",
+      storageBucket: "teamhealqr.firebasestorage.app",
+      messagingSenderId: "658277821151",
+      appId: "1:658277821151:web:d0e3655a20c0d9a2e42fdc"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // Get notification ID from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const notificationId = urlParams.get('notificationId');
+
+    if (!notificationId) {
+      showError('Invalid prescription link');
+    } else {
+      loadPrescription(notificationId);
+    }
+
+    async function loadPrescription(notificationId) {
+      try {
+        const notifRef = doc(db, 'notifications', notificationId);
+        const notifSnap = await getDoc(notifRef);
+
+        if (!notifSnap.exists()) {
+          showError('Prescription not found or has expired');
+          return;
+        }
+
+        const data = notifSnap.data();
+
+        // Check if already viewed (one-time view)
+        if (data.viewed || data.read) {
+          // Still show it but with a warning
+          console.warn('Prescription already viewed');
+        }
+
+        // Mark as read/viewed
+        await updateDoc(notifRef, {
+          read: true,
+          viewed: true,
+          viewedAt: serverTimestamp()
+        });
+
+        // Render prescription
+        renderPrescription(data);
+
+      } catch (error) {
+        console.error('Error loading prescription:', error);
+        showError('Failed to load prescription. Please try again later.');
+      }
+    }
+
+    function renderPrescription(data) {
+      const contentArea = document.getElementById('content-area');
+      
+      let html = '<div class="metadata">';
+      html += `<div class="metadata-item"><label>Doctor</label><value>${data.doctorName || 'Doctor'}</value></div>`;
+      html += `<div class="metadata-item"><label>Patient</label><value>${data.patientName || 'You'}</value></div>`;
+      html += `<div class="metadata-item"><label>Pages</label><value>${data.totalPages || 1} page(s)</value></div>`;
+      html += '</div>';
+
+      // Prescription images
+      if (data.prescriptionImages && data.prescriptionImages.length > 0) {
+        html += '<div class="rx-images">';
+        data.prescriptionImages.forEach((imgUrl, index) => {
+          html += `<img src="${imgUrl}" alt="Prescription Page ${index + 1}" />`;
+        });
+        html += '</div>';
+      }
+
+      // Decoded text
+      if (data.decodedText) {
+        html += '<div class="decoded-section">';
+        html += '<h3>📋 AI Decoded Text</h3>';
+        html += `<div class="decoded-text">${data.decodedText}</div>`;
+        html += '</div>';
+      }
+
+      // Disclaimer
+      html += '<div class="disclaimer">';
+      html += '<h4>⚠️ Important Medical Disclaimer</h4>';
+      html += '<p>This is an AI-generated transcription for informational purposes only. AI can make mistakes. ';
+      html += 'Always verify medications with the original prescription image above. ';
+      html += 'Consult your doctor if you have any questions about your medications or dosage.</p>';
+      html += '</div>';
+
+      // Download button
+      if (data.prescriptionImages && data.prescriptionImages.length > 0) {
+        html += '<button class="download-btn" onclick="downloadImages()">📥 Download Prescription Images</button>';
+      }
+
+      contentArea.innerHTML = html;
+      document.getElementById('loading').style.display = 'none';
+      contentArea.style.display = 'block';
+
+      // Store images for download
+      window.prescriptionImages = data.prescriptionImages;
+    }
+
+    function showError(message) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('error').style.display = 'block';
+      document.getElementById('error-message').textContent = message;
+    }
+
+    window.downloadImages = async function() {
+      const images = window.prescriptionImages;
+      if (!images || images.length === 0) return;
+
+      for (let i = 0; i < images.length; i++) {
+        const link = document.createElement('a');
+        link.href = images[i];
+        link.download = `prescription_page_${i + 1}.jpg`;
+        link.click();
+        await new Promise(resolve => setTimeout(resolve, 500)); // Delay between downloads
+      }
+    };
+  </script>
+</body>
+</html>

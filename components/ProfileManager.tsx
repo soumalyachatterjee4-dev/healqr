@@ -1,0 +1,1181 @@
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Textarea } from './ui/textarea';
+import { Label } from './ui/label';
+import { Checkbox } from './ui/checkbox';
+import { 
+  Mail, 
+  Calendar, 
+  QrCode, 
+  User, 
+  MapPin, 
+  Plus, 
+  X,
+  Upload,
+  Save,
+  Clock,
+  Menu,
+  Languages,
+  Globe,
+  Zap
+} from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { ImageWithFallback } from './figma/ImageWithFallback';
+import DashboardSidebar from './DashboardSidebar';
+import { MEDICAL_SPECIALTIES } from '../utils/specialties';
+import { 
+  AlertDialog, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogHeader, 
+  AlertDialogTitle 
+} from './ui/alert-dialog';
+import { auth, storage } from '../lib/firebase/config';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+
+interface ProfileManagerProps {
+  onMenuChange?: (menu: string) => void;
+  onLogout?: () => void;
+  profileData?: {
+    image: string | null;
+    name: string;
+    degrees: string[];
+    specialities: string[];
+    language?: 'english' | 'hindi' | 'bengali';
+  };
+  onProfileUpdate?: (data: {
+    image: string | null;
+    name: string;
+    degrees: string[];
+    specialities: string[];
+    language?: 'english' | 'hindi' | 'bengali' | 'marathi' | 'tamil' | 'telugu' | 'gujarati' | 'kannada' | 'malayalam' | 'punjabi' | 'assamese';
+  }) => void;
+  activeAddOns?: string[];
+  email?: string;
+  dob?: string;
+  qrNumber?: string;
+  residentialPinCode?: string;
+  companyName?: string;
+}
+
+export default function ProfileManager({ onMenuChange, onLogout, profileData, onProfileUpdate, activeAddOns = [], email = '', dob = '', qrNumber = '', residentialPinCode = '', doctorCode = '', companyName = '' }: ProfileManagerProps & { doctorCode?: string; companyName?: string }) {
+  // Debug logging
+  useEffect(() => {
+    console.log('🔥 PROFILE MANAGER RECEIVED PROPS:');
+    console.log('Email:', email);
+    console.log('Name from profileData:', profileData?.name);
+    console.log('DOB:', dob);
+    console.log('QR Number:', qrNumber);
+    console.log('Residential PIN Code:', residentialPinCode);
+  }, [email, profileData, dob, qrNumber, residentialPinCode]);
+
+  // Sync state with props when they change (e.g. after async fetch in parent)
+  useEffect(() => {
+    if (residentialPinCode) {
+      console.log('🔄 Syncing residentialPinCode from props:', residentialPinCode);
+      setResidentialPincodeState(residentialPinCode);
+    }
+  }, [residentialPinCode]);
+
+  useEffect(() => {
+    if (profileData) {
+      console.log('🔄 Syncing profileData from props:', profileData);
+      if (profileData.name) setName(profileData.name);
+      if (profileData.image) setProfileImage(profileData.image);
+      if (profileData.language) setPreferredLanguage(profileData.language);
+      if (profileData.degrees) setDegrees(profileData.degrees);
+      if (profileData.specialities) setSpecialities(profileData.specialities);
+    }
+  }, [profileData]);
+
+  // Load profile from Firestore on mount
+  useEffect(() => {
+    loadProfileFromFirestore();
+  }, []);
+
+  const loadProfileFromFirestore = async () => {
+    try {
+      const user = auth?.currentUser;
+      if (!user) {
+        console.log('⚠️ No authenticated user, skipping profile load');
+        return;
+      }
+
+      const { db } = await import('../lib/firebase/config');
+      if (!db) return;
+
+      const { doc, getDoc } = await import('firebase/firestore');
+      const doctorDocRef = doc(db, 'doctors', user.uid);
+      const doctorDoc = await getDoc(doctorDocRef);
+
+      if (doctorDoc.exists()) {
+        const data = doctorDoc.data();
+        console.log('✅ Loaded profile from Firestore:', data);
+
+        // Set all fields from Firestore
+        if (data.name) setName(data.name);
+        if (data.pinCode) setResidentialPincodeState(data.pinCode);
+        if (data.gender) setGender(data.gender);
+        if (data.preferredLanguage) setPreferredLanguage(data.preferredLanguage);
+        if (data.degrees) setDegrees(data.degrees);
+        if (data.specialities) setSpecialities(data.specialities);
+        if (data.useDrPrefix !== undefined) setUseDrPrefix(data.useDrPrefix);
+        if (data.practisingPincodes) setPractisingPincodes(data.practisingPincodes);
+        if (data.experience) setExperience(data.experience);
+        if (data.bio) setBio(data.bio);
+        if (data.profileImage) setProfileImage(data.profileImage);
+        if (data.clinicServices) setClinicServices(data.clinicServices);
+        if (data.clinicServicesLabel) setClinicServicesLabel(data.clinicServicesLabel);
+        if (data.linkedClinicCodes) setLinkedClinicCodes(data.linkedClinicCodes);
+        if (data.linkedClinics) setLinkedClinics(data.linkedClinics);
+      } else {
+        console.log('ℹ️ No profile found in Firestore, using props/defaults');
+      }
+    } catch (error) {
+      console.error('❌ Error loading profile from Firestore:', error);
+    }
+  };
+
+  // Non-editable fields (from registration) - now received as props
+  // These fields are read-only and come from the signup process
+
+  // Editable required fields
+  const [name, setName] = useState(profileData?.name || '');
+  const [residentialPincodeState, setResidentialPincodeState] = useState(residentialPinCode);
+
+  // Optional fields
+  const [profileImage, setProfileImage] = useState<string | null>(profileData?.image || null);
+  const [gender, setGender] = useState('');
+  const [preferredLanguage, setPreferredLanguage] = useState<'english' | 'hindi' | 'bengali' | 'marathi' | 'tamil' | 'telugu' | 'gujarati' | 'kannada' | 'malayalam' | 'punjabi' | 'assamese'>(profileData?.language || 'english');
+  const [degrees, setDegrees] = useState<string[]>(profileData?.degrees || []);
+  const [specialities, setSpecialities] = useState<string[]>(profileData?.specialities || []);
+  const [useDrPrefix, setUseDrPrefix] = useState(true);
+  const [practisingPincodes, setPractisingPincodes] = useState<string[]>([]);
+  const [experience, setExperience] = useState('');
+  const [bio, setBio] = useState('');
+  const [clinicServices, setClinicServices] = useState<string[]>([]);
+  const [clinicServicesLabel, setClinicServicesLabel] = useState('Done Here');
+  
+  // Clinic linking
+  const [linkedClinicCodes, setLinkedClinicCodes] = useState<string[]>([]);
+  const [linkedClinics, setLinkedClinics] = useState<Array<{clinicId: string; clinicCode: string; name: string}>>([]);
+
+  // Temporary inputs for adding new items
+  const [newDegree, setNewDegree] = useState('');
+  const [newSpeciality, setNewSpeciality] = useState('');
+  const [newPincode, setNewPincode] = useState('');
+  const [newService, setNewService] = useState('');
+  const [newClinicCode, setNewClinicCode] = useState('');
+
+  // Confirmation dialog state
+  const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  
+  // Sidebar state for mobile
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      console.log('📤 Starting upload for:', file.name, `(${(file.size / 1024).toFixed(1)}KB)`);
+
+      if (!auth?.currentUser) {
+        alert('Please login again before uploading an image.');
+        return;
+      }
+
+      if (!storage) {
+        alert('Upload failed: storage service unavailable.');
+        return;
+      }
+
+      setIsUploadingImage(true);
+
+      // Compress image before uploading
+      console.log('🔄 Compressing image...');
+      const compressedFile = await compressImage(file);
+      console.log('✅ Compression complete');
+
+      const filePath = `doctorProfileImages/${auth.currentUser.uid}/${Date.now()}_${file.name}`;
+      console.log('☁️ Uploading to Storage:', filePath);
+      const storageRef = ref(storage, filePath);
+      await uploadBytes(storageRef, compressedFile);
+      console.log('✅ Upload complete');
+      
+      const downloadURL = await getDownloadURL(storageRef);
+      console.log('✅ Download URL obtained:', downloadURL);
+      setProfileImage(downloadURL);
+      alert('Image uploaded successfully!');
+    } catch (error: any) {
+      console.error('❌ Upload error:', error);
+      const errorMsg = error?.message || error?.code || 'Unknown error';
+      alert(`Failed to upload image: ${errorMsg}`);
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  const compressImage = (file: File): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Canvas context unavailable'));
+            return;
+          }
+
+          // Target dimensions: max 800x800 while maintaining aspect ratio
+          const MAX_WIDTH = 800;
+          const MAX_HEIGHT = 800;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height = Math.round((height * MAX_WIDTH) / width);
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width = Math.round((width * MAX_HEIGHT) / height);
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Convert to blob with quality reduction
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) {
+                reject(new Error('Image compression failed'));
+                return;
+              }
+              const compressedFile = new File([blob], file.name, {
+                type: 'image/jpeg',
+                lastModified: Date.now(),
+              });
+              console.log(`📦 Compressed: ${(file.size / 1024).toFixed(1)}KB → ${(compressedFile.size / 1024).toFixed(1)}KB`);
+              resolve(compressedFile);
+            },
+            'image/jpeg',
+            0.85 // 85% quality
+          );
+        };
+        img.onerror = () => reject(new Error('Failed to load image'));
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+    });
+  };
+
+  const addDegree = () => {
+    if (newDegree.trim()) {
+      setDegrees([...degrees, newDegree.trim()]);
+      setNewDegree('');
+    }
+  };
+
+  const removeDegree = (index: number) => {
+    setDegrees(degrees.filter((_, i) => i !== index));
+  };
+
+  const addSpeciality = () => {
+    if (newSpeciality.trim()) {
+      setSpecialities([...specialities, newSpeciality.trim()]);
+      setNewSpeciality('');
+    }
+  };
+
+  const removeSpeciality = (index: number) => {
+    setSpecialities(specialities.filter((_, i) => i !== index));
+  };
+
+  const addPincode = () => {
+    if (newPincode.trim()) {
+      setPractisingPincodes([...practisingPincodes, newPincode.trim()]);
+      setNewPincode('');
+    }
+  };
+
+  const removePincode = (index: number) => {
+    setPractisingPincodes(practisingPincodes.filter((_, i) => i !== index));
+  };
+
+  const addService = () => {
+    if (newService.trim() && clinicServices.length < 4) {
+      setClinicServices([...clinicServices, newService.trim()]);
+      setNewService('');
+    }
+  };
+
+  const removeService = (index: number) => {
+    setClinicServices(clinicServices.filter((_, i) => i !== index));
+  };
+
+  const addClinicCode = async () => {
+    if (!newClinicCode.trim()) return;
+
+    // Validate format: HQR-XXXXXX-XXXX-CLN
+    const clinicCodePattern = /^HQR-\d{6}-\d{4}-CLN$/;
+    if (!clinicCodePattern.test(newClinicCode.trim())) {
+      alert('Invalid clinic code format. Expected: HQR-XXXXXX-XXXX-CLN');
+      return;
+    }
+
+    try {
+      const { db } = await import('../lib/firebase/config');
+      const { collection, query, where, getDocs, doc, updateDoc, arrayUnion } = await import('firebase/firestore');
+
+      // Check if clinic exists
+      const clinicsRef = collection(db, 'clinics');
+      const q = query(clinicsRef, where('clinicCode', '==', newClinicCode.trim()));
+      const clinicSnap = await getDocs(q);
+
+      if (clinicSnap.empty) {
+        alert('Clinic not found. Please check the code and try again.');
+        return;
+      }
+
+      const clinicData = clinicSnap.docs[0].data();
+      const clinicId = clinicSnap.docs[0].id;
+
+      // Check if already linked
+      if (linkedClinicCodes.includes(newClinicCode.trim())) {
+        alert('You are already linked to this clinic.');
+        return;
+      }
+
+      const user = auth?.currentUser;
+      if (!user) {
+        alert('Please login to link clinic');
+        return;
+      }
+
+      const userDoctorCode = doctorCode || localStorage.getItem('healqr_doctor_code') || '';
+
+      // Update doctor's document (use setDoc with merge to create if doesn't exist)
+      const doctorDocRef = doc(db, 'doctors', user.uid);
+      const { setDoc } = await import('firebase/firestore');
+      
+      // First check if doctor document exists
+      const { getDoc } = await import('firebase/firestore');
+      const doctorSnap = await getDoc(doctorDocRef);
+      
+      if (!doctorSnap.exists()) {
+        // Create doctor document if it doesn't exist
+        await setDoc(doctorDocRef, {
+          linkedClinicCodes: [newClinicCode.trim()],
+          linkedClinics: [{
+            clinicId,
+            clinicCode: newClinicCode.trim(),
+            name: clinicData.name || 'Unknown Clinic',
+            linkedAt: new Date().toISOString()
+          }],
+          doctorCode: userDoctorCode,
+          email: user.email,
+          uid: user.uid,
+          createdAt: new Date().toISOString()
+        });
+      } else {
+        // Update existing document
+        await updateDoc(doctorDocRef, {
+          linkedClinicCodes: arrayUnion(newClinicCode.trim()),
+          linkedClinics: arrayUnion({
+            clinicId,
+            clinicCode: newClinicCode.trim(),
+            name: clinicData.name || 'Unknown Clinic',
+            linkedAt: new Date().toISOString()
+          })
+        });
+      }
+
+      // Update clinic's document
+      const clinicDocRef = doc(db, 'clinics', clinicId);
+      await updateDoc(clinicDocRef, {
+        linkedDoctorCodes: arrayUnion(userDoctorCode),
+        linkedDoctorsDetails: arrayUnion({
+          doctorId: user.uid,
+          doctorCode: userDoctorCode,
+          name: name || localStorage.getItem('healqr_user_name') || '',
+          email: email || user.email || '',
+          specialities: specialities,
+          profileImage: profileImage || '',
+          bio: bio || '',
+          linkedAt: new Date().toISOString()
+        })
+      });
+
+      // Update local state
+      setLinkedClinicCodes([...linkedClinicCodes, newClinicCode.trim()]);
+      setLinkedClinics([...linkedClinics, {
+        clinicId,
+        clinicCode: newClinicCode.trim(),
+        name: clinicData.name || 'Unknown Clinic'
+      }]);
+
+      setNewClinicCode('');
+      alert(`Successfully linked to ${clinicData.name}!`);
+    } catch (error: any) {
+      console.error('Error linking clinic:', error);
+      const errorMessage = error?.message || 'Unknown error occurred';
+      alert(`Failed to link clinic: ${errorMessage}\n\nPlease ensure:\n1. You are logged in\n2. Your profile is saved\n3. The clinic code is correct`);
+    }
+  };
+
+  const removeClinicLink = async (clinicCode: string, clinicId: string) => {
+    if (!confirm('Are you sure you want to unlink from this clinic?')) return;
+
+    try {
+      const { db } = await import('../lib/firebase/config');
+      const { doc, updateDoc, arrayRemove } = await import('firebase/firestore');
+
+      const user = auth?.currentUser;
+      if (!user) return;
+
+      // Remove from doctor's document
+      const doctorDocRef = doc(db, 'doctors', user.uid);
+      const clinicToRemove = linkedClinics.find(c => c.clinicCode === clinicCode);
+      
+      await updateDoc(doctorDocRef, {
+        linkedClinicCodes: arrayRemove(clinicCode),
+        linkedClinics: arrayRemove(clinicToRemove)
+      });
+
+      // Update local state
+      setLinkedClinicCodes(linkedClinicCodes.filter(c => c !== clinicCode));
+      setLinkedClinics(linkedClinics.filter(c => c.clinicCode !== clinicCode));
+
+      alert('Clinic unlinked successfully');
+    } catch (error) {
+      console.error('Error unlinking clinic:', error);
+      alert('Failed to unlink clinic');
+    }
+  };
+
+  const handleSaveChanges = async () => {
+    // Validation
+    if (!name.trim() || !residentialPincodeState.trim()) {
+      alert('Name and Residential Pincode are required fields');
+      return;
+    }
+    
+    try {
+      const user = auth?.currentUser;
+      if (!user) {
+        alert('You must be logged in to save profile');
+        return;
+      }
+
+      const { db } = await import('../lib/firebase/config');
+      if (!db) return;
+
+      const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+      const doctorDocRef = doc(db, 'doctors', user.uid);
+
+      // Save all profile data to Firestore
+      await setDoc(
+        doctorDocRef,
+        {
+          name,
+          pinCode: residentialPincodeState,
+          profileImage,
+          gender,
+          preferredLanguage,
+          degrees,
+          specialities,
+          practisingPincodes,
+          experience,
+          bio,
+          useDrPrefix,
+          clinicServices,
+          clinicServicesLabel,
+          linkedClinicCodes,
+          linkedClinics,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      console.log('✅ Profile saved to Firestore');
+
+      // Update shared profile data (for App.tsx state)
+      if (onProfileUpdate) {
+        onProfileUpdate({
+          image: profileImage,
+          name,
+          degrees,
+          specialities,
+          language: preferredLanguage,
+        });
+      }
+
+      // Show confirmation dialog
+      setShowSaveConfirmation(true);
+
+      // Auto-close after 2 seconds
+      setTimeout(() => {
+        setShowSaveConfirmation(false);
+      }, 2000);
+    } catch (error) {
+      console.error('❌ Error saving profile:', error);
+      alert('Failed to save profile. Please try again.');
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-black text-white flex">
+      {/* Sidebar */}
+      <DashboardSidebar 
+        activeMenu="profile" 
+        onMenuChange={onMenuChange || (() => {})}
+        onLogout={onLogout}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        activeAddOns={activeAddOns}
+      />
+
+      {/* Main Content */}
+      <div className="flex-1 lg:ml-64">
+        {/* Header */}
+        <div className="border-b border-zinc-800 px-6 py-4 flex items-center gap-4">
+          {/* Hamburger Menu for Mobile */}
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="lg:hidden text-white hover:text-emerald-500 transition-colors"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+          <h1>Profile Manager</h1>
+        </div>
+
+        {/* Content */}
+        <div className="p-6">
+          <div className="max-w-4xl mx-auto">
+            {/* Profile Image Upload */}
+            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-8 mb-6">
+              <h2 className="mb-6">Profile Picture</h2>
+              
+              <div className="flex items-center gap-6">
+                <div className="relative">
+                  {profileImage ? (
+                    <ImageWithFallback
+                      src={profileImage}
+                      alt="Profile"
+                      className="w-32 h-32 rounded-full object-cover border-2 border-emerald-500"
+                    />
+                  ) : (
+                    <div className="w-32 h-32 rounded-full bg-zinc-800 border-2 border-zinc-700 flex items-center justify-center">
+                      <User className="w-12 h-12 text-zinc-600" />
+                    </div>
+                  )}
+                </div>
+                
+                <div>
+                  <Label htmlFor="image-upload" className="cursor-pointer">
+                    <div className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-lg inline-flex items-center gap-2 transition-colors">
+                      <Upload className="w-5 h-5" />
+                      {isUploadingImage ? 'Uploading...' : 'Upload Image'}
+                    </div>
+                  </Label>
+                  <Input
+                    id="image-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                  <p className="text-gray-400 text-sm mt-2">
+                    Optional - Auto-compressed to 800x800 JPEG (85% quality)
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Non-Editable Fields */}
+            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-8 mb-6">
+              <h2 className="mb-6">Registration Details</h2>
+              <p className="text-gray-400 text-sm mb-6">These fields cannot be edited</p>
+
+              <div className="space-y-4">
+                {/* Email */}
+                <div>
+                  <Label className="mb-2 block">Email Address</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                    <Input
+                      type="email"
+                      value={email}
+                      disabled
+                      className="pl-12 bg-zinc-950 border-zinc-800 text-gray-500 h-12 rounded-lg cursor-not-allowed"
+                    />
+                  </div>
+                </div>
+
+                {/* DOB */}
+                <div>
+                  <Label className="mb-2 block">Date of Birth</Label>
+                  <div className="relative">
+                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                    <Input
+                      type="date"
+                      value={dob}
+                      disabled
+                      className="pl-12 bg-zinc-950 border-zinc-800 text-gray-500 h-12 rounded-lg cursor-not-allowed"
+                    />
+                  </div>
+                </div>
+
+                {/* Doctor Code */}
+                {doctorCode && (
+                  <div>
+                    <Label className="mb-2 block">Doctor Code</Label>
+                    <div className="relative">
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                      <Input
+                        type="text"
+                        value={doctorCode}
+                        disabled
+                        className="pl-12 bg-zinc-950 border-zinc-800 text-gray-500 h-12 rounded-lg cursor-not-allowed"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Residential Pin Code */}
+                <div>
+                  <Label className="mb-2 block">Residential Pin Code</Label>
+                  <div className="relative">
+                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                    <Input
+                      type="text"
+                      value={residentialPincodeState}
+                      disabled
+                      className="pl-12 bg-zinc-950 border-zinc-800 text-gray-500 h-12 rounded-lg cursor-not-allowed"
+                    />
+                  </div>
+                </div>
+
+                {/* QR Number */}
+                {qrNumber && (
+                  <div>
+                    <Label className="mb-2 block">QR NUMBER (Linked)</Label>
+                    <div className="relative">
+                      <QrCode className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                      <Input
+                        type="text"
+                        value={qrNumber}
+                        disabled
+                        className="pl-12 bg-zinc-950 border-zinc-800 text-gray-500 h-12 rounded-lg cursor-not-allowed font-mono"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Company Name */}
+                {companyName && (
+                  <div>
+                    <Label className="mb-2 block">Company Name</Label>
+                    <div className="relative">
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                      <Input
+                        type="text"
+                        value={companyName}
+                        disabled
+                        className="pl-12 bg-zinc-950 border-zinc-800 text-gray-500 h-12 rounded-lg cursor-not-allowed"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Editable Required Fields */}
+            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-8 mb-6">
+              <h2 className="mb-6">Basic Information</h2>
+              <p className="text-gray-400 text-sm mb-6">Required fields - cannot be left empty</p>
+
+              <div className="space-y-4">
+                {/* Name */}
+                <div>
+                  <Label className="mb-2 block">
+                    Full Name <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="relative">
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <Input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Enter your full name"
+                      className="pl-12 bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-emerald-500"
+                    />
+                  </div>
+                  
+                  {/* Dr. Prefix Checkbox */}
+                  <div className="mt-4 flex items-start gap-3 p-4 bg-zinc-800/50 rounded-lg border border-zinc-700">
+                    <Checkbox
+                      id="useDrPrefix"
+                      checked={useDrPrefix}
+                      onCheckedChange={(checked) => setUseDrPrefix(checked as boolean)}
+                      className="mt-0.5"
+                    />
+                    <div className="flex-1">
+                      <label
+                        htmlFor="useDrPrefix"
+                        className="text-sm text-white cursor-pointer block mb-1"
+                      >
+                        Display "Dr." prefix before my name
+                      </label>
+                      <p className="text-xs text-gray-400">
+                        Uncheck this if you are a non-MBBS practitioner who cannot use the "Dr." title according to rural practice regulations. This affects your dashboard welcome message and mini website display.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Optional Fields */}
+            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-8 mb-6">
+              <h2 className="mb-6">Additional Information</h2>
+              <p className="text-gray-400 text-sm mb-6">Optional fields</p>
+
+              <div className="space-y-6">
+                {/* Gender */}
+                <div>
+                  <Label className="mb-2 block">Gender</Label>
+                  <Select value={gender} onValueChange={setGender}>
+                    <SelectTrigger className="bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-emerald-500">
+                      <SelectValue placeholder="Select gender" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-zinc-900 border-zinc-800 text-white">
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                      <SelectItem value="prefer-not-to-say">Prefer not to say</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Preferred Language */}
+                <div>
+                  <Label className="mb-2 block">Preferred Language</Label>
+                  <p className="text-sm text-gray-400 mb-3">
+                    Select your preferred language for dashboard and patient data display
+                  </p>
+                  <div className="relative">
+                    <Languages className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <Select value={preferredLanguage} onValueChange={(value: 'english' | 'hindi' | 'bengali' | 'marathi' | 'tamil' | 'telugu' | 'gujarati' | 'kannada' | 'malayalam' | 'punjabi' | 'assamese') => setPreferredLanguage(value)}>
+                      <SelectTrigger className="pl-12 bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-emerald-500">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-zinc-900 border-zinc-800 text-white max-h-[300px]">
+                        <SelectItem value="english">English</SelectItem>
+                        <SelectItem value="hindi">हिंदी (Hindi)</SelectItem>
+                        <SelectItem value="bengali">বাংলা (Bengali)</SelectItem>
+                        <SelectItem value="marathi">मराठी (Marathi)</SelectItem>
+                        <SelectItem value="tamil">தமிழ் (Tamil)</SelectItem>
+                        <SelectItem value="telugu">తెలుగు (Telugu)</SelectItem>
+                        <SelectItem value="gujarati">ગુજરાતી (Gujarati)</SelectItem>
+                        <SelectItem value="kannada">ಕನ್ನಡ (Kannada)</SelectItem>
+                        <SelectItem value="malayalam">മലയാളം (Malayalam)</SelectItem>
+                        <SelectItem value="punjabi">ਪੰਜਾਬੀ (Punjabi)</SelectItem>
+                        <SelectItem value="assamese">অসমীয়া (Assamese)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="mt-4 bg-gradient-to-r from-emerald-500/20 to-blue-500/20 border-2 border-emerald-500/50 rounded-xl p-5 shadow-lg">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-emerald-500 rounded-lg animate-pulse">
+                        <Languages className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-white font-semibold flex items-center gap-2 mb-1">
+                          Real-Time Translation Active
+                          <span className="px-2 py-0.5 bg-emerald-500 text-white text-xs rounded-full animate-pulse">
+                            LIVE
+                          </span>
+                        </h4>
+                        <p className="text-emerald-300 text-sm leading-relaxed mb-3">
+                          Patient data will be automatically translated from their selected language to <strong className="text-white">{
+                            {
+                              english: 'English',
+                              hindi: 'हिंदी',
+                              bengali: 'বাংলা',
+                              marathi: 'मराठी',
+                              tamil: 'தமிழ்',
+                              telugu: 'తెలుగు',
+                              gujarati: 'ગુજરાતી',
+                              kannada: 'ಕನ್ನಡ',
+                              malayalam: 'മലയാളം',
+                              punjabi: 'ਪੰਜਾਬੀ',
+                              assamese: 'অসমীয়া'
+                            }[preferredLanguage]
+                          }</strong> across all dashboard pages.
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-gray-300 mb-2">
+                          <div className="flex items-center gap-1 bg-black/30 px-2 py-1 rounded">
+                            <Globe className="w-3 h-3" />
+                            <span>11 Languages Supported</span>
+                          </div>
+                          <div className="flex items-center gap-1 bg-black/30 px-2 py-1 rounded">
+                            <Zap className="w-3 h-3" />
+                            <span>Instant Translation</span>
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-400 italic">
+                          Need another language? Contact admin to add parliamentary languages.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Degrees */}
+                <div>
+                  <Label className="mb-2 block">Degree(s)</Label>
+                  
+                  {/* Display existing degrees */}
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {degrees.map((degree, index) => (
+                      <div
+                        key={index}
+                        className="bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 px-4 py-2 rounded-lg flex items-center gap-2"
+                      >
+                        <span>{degree}</span>
+                        <button
+                          onClick={() => removeDegree(index)}
+                          className="hover:text-emerald-300"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Add new degree */}
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      value={newDegree}
+                      onChange={(e) => setNewDegree(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && addDegree()}
+                      placeholder="Add degree (e.g., MBBS, MD)"
+                      className="bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-emerald-500"
+                    />
+                    <Button
+                      onClick={addDegree}
+                      className="bg-emerald-500 hover:bg-emerald-600 h-12 px-4"
+                    >
+                      <Plus className="w-5 h-5" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Specialities */}
+                <div>
+                  <Label className="mb-2 block">Speciality(s)</Label>
+                  
+                  {/* Display existing specialities */}
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {specialities.map((speciality, index) => (
+                      <div
+                        key={index}
+                        className="bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 px-4 py-2 rounded-lg flex items-center gap-2"
+                      >
+                        <span>{speciality}</span>
+                        <button
+                          onClick={() => removeSpeciality(index)}
+                          className="hover:text-emerald-300"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Add new speciality */}
+                  <div className="flex gap-2">
+                    <Select 
+                      value={newSpeciality} 
+                      onValueChange={(val) => setNewSpeciality(val)}
+                    >
+                      <SelectTrigger className="bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-emerald-500 w-full">
+                        <SelectValue placeholder="Select speciality" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-zinc-900 border-zinc-800 text-white max-h-[300px]">
+                        {MEDICAL_SPECIALTIES.map((spec) => (
+                          <SelectItem key={spec} value={spec}>{spec}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      onClick={addSpeciality}
+                      className="bg-emerald-500 hover:bg-emerald-600 h-12 px-4"
+                    >
+                      <Plus className="w-5 h-5" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Practising Pin Codes */}
+                <div>
+                  <Label className="mb-2 block">Practising Pin Code(s)</Label>
+                  
+                  {/* Display existing pincodes */}
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {practisingPincodes.map((pincode, index) => (
+                      <div
+                        key={index}
+                        className="bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 px-4 py-2 rounded-lg flex items-center gap-2"
+                      >
+                        <span>{pincode}</span>
+                        <button
+                          onClick={() => removePincode(index)}
+                          className="hover:text-emerald-300"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Add new pincode */}
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      value={newPincode}
+                      onChange={(e) => setNewPincode(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && addPincode()}
+                      placeholder="Add practising pin code"
+                      className="bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-emerald-500"
+                    />
+                    <Button
+                      onClick={addPincode}
+                      className="bg-emerald-500 hover:bg-emerald-600 h-12 px-4"
+                    >
+                      <Plus className="w-5 h-5" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Attached Clinic Codes - NEW */}
+                <div>
+                  <Label className="mb-2 block">Attached Clinic Code(s) (Optional)</Label>
+                  <p className="text-xs text-gray-400 mb-3">
+                    If you practice at a clinic, add their clinic code to link your profile. You can link to multiple clinics.
+                  </p>
+                  
+                  {/* Display linked clinics */}
+                  {linkedClinics.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {linkedClinics.map((clinic) => (
+                        <div
+                          key={clinic.clinicCode}
+                          className="bg-blue-500/20 border border-blue-500/30 text-blue-400 px-4 py-2 rounded-lg flex items-center gap-2"
+                        >
+                          <span className="text-sm">
+                            {clinic.name} ({clinic.clinicCode})
+                          </span>
+                          <button
+                            onClick={() => removeClinicLink(clinic.clinicCode, clinic.clinicId)}
+                            className="hover:text-blue-300"
+                            title="Unlink from clinic"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Add new clinic code */}
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      value={newClinicCode}
+                      onChange={(e) => setNewClinicCode(e.target.value.toUpperCase())}
+                      onKeyPress={(e) => e.key === 'Enter' && addClinicCode()}
+                      placeholder="HQR-XXXXXX-XXXX-CLN"
+                      className="bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-emerald-500 font-mono"
+                    />
+                    <Button
+                      onClick={addClinicCode}
+                      className="bg-blue-500 hover:bg-blue-600 h-12 px-4"
+                      title="Add clinic"
+                    >
+                      <Plus className="w-5 h-5" />
+                    </Button>
+                  </div>
+                  
+                  <p className="text-xs text-gray-500 mt-2">
+                    Format: HQR-[PinCode]-[Number]-CLN (e.g., HQR-700001-0001-CLN)
+                  </p>
+                </div>
+
+                {/* Experience */}
+                <div>
+                  <Label className="mb-2 block">Experience</Label>
+                  <div className="relative">
+                    <Clock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <Input
+                      type="text"
+                      value={experience}
+                      onChange={(e) => setExperience(e.target.value)}
+                      placeholder="e.g., 10 years"
+                      className="pl-12 bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Clinic Services/Facilities */}
+                <div>
+                  <Label className="mb-2 block">Clinic Services/Facilities (Max 4)</Label>
+                  <p className="text-xs text-gray-400 mb-3">
+                    Add services available at your clinic (e.g., ECG, ECHO, Pathology, Physiotherapy)
+                  </p>
+                  
+                  {/* Custom Label for Services */}
+                  <div className="mb-3">
+                    <Label className="mb-2 block text-sm">Service Status Text</Label>
+                    <Input
+                      value={clinicServicesLabel}
+                      onChange={(e) => setClinicServicesLabel(e.target.value)}
+                      placeholder="e.g., Done Here, Service Available, Available Here"
+                      className="bg-black border-zinc-800 text-white h-10 rounded-lg focus:border-emerald-500"
+                      maxLength={50}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      This text will appear once below all service badges
+                    </p>
+                  </div>
+                  
+                  {/* Add new service */}
+                  <div className="flex gap-2 mb-3">
+                    <Input
+                      value={newService}
+                      onChange={(e) => setNewService(e.target.value)}
+                      placeholder="e.g., ECG Done Here"
+                      className="flex-1 bg-black border-zinc-800 text-white h-10 rounded-lg focus:border-emerald-500"
+                      disabled={clinicServices.length >= 4}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          addService();
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      onClick={addService}
+                      disabled={!newService.trim() || clinicServices.length >= 4}
+                      className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 h-10 rounded-lg"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  {/* Display added services */}
+                  {clinicServices.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {clinicServices.map((service, index) => (
+                        <div
+                          key={index}
+                          className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-3 py-1.5 rounded-full text-sm flex items-center gap-2"
+                        >
+                          <span>{service}</span>
+                          <button
+                            onClick={() => removeService(index)}
+                            className="hover:bg-white/20 rounded-full p-0.5"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {clinicServices.length >= 4 && (
+                    <p className="text-xs text-yellow-400 mt-2">
+                      Maximum 4 services reached
+                    </p>
+                  )}
+                </div>
+
+                {/* Bio */}
+                <div>
+                  <Label className="mb-2 block">Bio</Label>
+                  <Textarea
+                    value={bio}
+                    onChange={(e) => {
+                      const newValue = e.target.value.slice(0, 500);
+                      setBio(newValue);
+                    }}
+                    onPaste={(e) => {
+                      e.preventDefault();
+                      const pastedText = e.clipboardData.getData('text');
+                      const currentValue = bio;
+                      const start = (e.target as HTMLTextAreaElement).selectionStart;
+                      const end = (e.target as HTMLTextAreaElement).selectionEnd;
+                      const newValue = (currentValue.substring(0, start) + pastedText + currentValue.substring(end)).slice(0, 500);
+                      setBio(newValue);
+                    }}
+                    placeholder="Write a brief bio about yourself and your practice..."
+                    className="bg-black border-zinc-800 text-white rounded-lg focus:border-emerald-500 min-h-[120px] resize-none"
+                  />
+                  <div className="text-right mt-2">
+                    <span className={`text-sm ${bio.length >= 500 ? 'text-red-500' : 'text-gray-400'}`}>
+                      {bio.length}/500 characters
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Website Preview Info */}
+            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-6 mb-6">
+              <h3 className="text-emerald-400 mb-2">Mini Website Fields</h3>
+              <p className="text-gray-300 text-sm">
+                The following fields will be displayed on your doctor mini website: <span className="text-white">Image, Name, Degree(s), Speciality(s), Experience, and Bio</span>
+              </p>
+            </div>
+
+            {/* Save Button */}
+            <Button
+              onClick={handleSaveChanges}
+              className="w-full bg-emerald-500 hover:bg-emerald-600 text-white h-14 rounded-lg flex items-center justify-center gap-2"
+            >
+              <Save className="w-5 h-5" />
+              Save Changes
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Save Confirmation Dialog */}
+      <AlertDialog open={showSaveConfirmation} onOpenChange={setShowSaveConfirmation}>
+        <AlertDialogContent className="bg-zinc-900 border-zinc-800 text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-emerald-400 flex items-center gap-2">
+              <Save className="w-5 h-5" />
+              Changes Saved Successfully
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-300">
+              Your profile has been updated successfully. All changes have been saved.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}

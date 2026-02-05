@@ -1,0 +1,87 @@
+{
+  "files.exclude": {
+    "**/.git": true,
+    "**/.svn": true,
+    "**/.hg": true,
+    "**/CVS": true,
+    "**/.DS_Store": true,
+    "**/Thumbs.db": true,
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/.firebase": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/.firebase": true,
+    "**/bower_components": true,
+    "**/*.code-search": true,
+    "**/functions-backend/node_modules": true,
+    "**/functions-backend/lib": true
+  },
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/dist/**": true,
+    "**/.firebase/**": true,
+    "**/functions-backend/node_modules/**": true,
+    "**/functions-backend/lib/**": true,
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/build/**": true
+  },
+  // TypeScript Performance Optimizations
+  "typescript.tsserver.maxTsServerMemory": 8192,
+  "typescript.updateImportsOnFileMove.enabled": "never",
+  "typescript.suggest.autoImports": false,
+  "typescript.preferences.importModuleSpecifier": "relative",
+  "typescript.tsserver.experimental.enableProjectDiagnostics": false,
+  "typescript.disableAutomaticTypeAcquisition": true,
+  "typescript.tsserver.watchOptions": {
+    "watchFile": "dynamicPriorityPolling",
+    "watchDirectory": "dynamicPriorityPolling",
+    "excludeDirectories": ["**/node_modules", "**/dist", "**/.firebase", "**/functions-backend/node_modules"]
+  },
+  
+  // Editor Performance
+  "editor.codeLens": false,
+  "editor.formatOnSave": false,
+  "editor.formatOnPaste": false,
+  "editor.minimap.enabled": false,
+  "editor.minimap.maxColumn": 80,
+  "editor.suggest.localityBonus": true,
+  "editor.largeFileOptimizations": true,
+  "editor.maxTokenizationLineLength": 10000,
+  "editor.semanticHighlighting.enabled": false,
+  "editor.renderWhitespace": "none",
+  
+  // Memory Management
+  "window.restoreWindows": "none",
+  "window.newWindowDimensions": "inherit",
+  "workbench.editor.limit.enabled": true,
+  "workbench.editor.limit.value": 5,
+  "workbench.editor.limit.perEditorGroup": true,
+  "workbench.editor.enablePreview": true,
+  "workbench.editor.closeOnFileDelete": true,
+  
+  // Git Performance
+  "git.enabled": true,
+  "git.autorefresh": false,
+  "git.autofetch": false,
+  "git.postCommitCommand": "none",
+  
+  // File Handling
+  "files.autoSave": "onFocusChange",
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  
+  // Search Performance
+  "search.followSymlinks": false,
+  "search.smartCase": true,
+  
+  // Extensions
+  "extensions.autoUpdate": false,
+  "extensions.autoCheckUpdates": false,
+  
+  // Telemetry (optional - reduces background activity)
+  "telemetry.telemetryLevel": "off"
+}
