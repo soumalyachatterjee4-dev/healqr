@@ -72,6 +72,7 @@ export default function BookingMiniWebsite({
   const [emergencyPhone, setEmergencyPhone] = useState('');
   const [showEmergencyDialog, setShowEmergencyDialog] = useState(false);
   const [personalizedTemplates, setPersonalizedTemplates] = useState<Template[]>([]);
+  const [emergencyScheduling, setEmergencyScheduling] = useState<any>(null);
 
   // Booking blocked state
   const [isBookingBlocked, setIsBookingBlocked] = useState(false);
@@ -82,6 +83,23 @@ export default function BookingMiniWebsite({
     trackQRScan();
     loadDoctorProfile();
   }, []);
+
+  // Periodically check emergency button schedule (every minute)
+  useEffect(() => {
+    if (!emergencyScheduling || !emergencyScheduling.enabled) return;
+
+    const checkSchedule = () => {
+      const bookingDoctorId = sessionStorage.getItem('booking_doctor_id');
+      if (!bookingDoctorId) return;
+
+      // Re-check if button should be active based on current time
+      loadDataFromStorage();
+    };
+
+    // Check every 60 seconds
+    const interval = setInterval(checkSchedule, 60000);
+    return () => clearInterval(interval);
+  }, [emergencyScheduling]);
 
   // Track QR scan for analytics
   const trackQRScan = async () => {
@@ -185,10 +203,19 @@ export default function BookingMiniWebsite({
           
           if (doctorDoc.exists()) {
             const data = doctorDoc.data();
-            const isActive = data.emergencyButtonActive || false;
             const phone = data.emergencyPhone || '';
-            setEmergencyButtonActive(isActive);
             setEmergencyPhone(phone);
+            
+            // Load scheduling configuration
+            const scheduling = data.emergencyScheduling || null;
+            setEmergencyScheduling(scheduling);
+            
+            // Check if button should be active based on schedule
+            const shouldBeActive = checkEmergencyButtonSchedule(
+              data.emergencyButtonActive || false,
+              scheduling
+            );
+            setEmergencyButtonActive(shouldBeActive);
           }
         }
       }
@@ -198,6 +225,46 @@ export default function BookingMiniWebsite({
     
     // Note: Personalized templates are now loaded directly from Firestore in loadDoctorProfile
     // We no longer load them from localStorage to ensure patients see the correct data
+  };
+
+  // Check if emergency button should be shown based on schedule
+  const checkEmergencyButtonSchedule = (buttonActive: boolean, scheduling: any): boolean => {
+    // If button is not active in Firestore, don't show it
+    if (!buttonActive) return false;
+    
+    // If no scheduling configured or scheduling disabled, use button state as-is
+    if (!scheduling || !scheduling.enabled) return buttonActive;
+    
+    // If scheduling is enabled, check if current time is within any time slot
+    const timeSlots = scheduling.timeSlots || [];
+    if (timeSlots.length === 0) return false;
+    
+    const now = new Date();
+    const currentDay = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][now.getDay()];
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    
+    for (const slot of timeSlots) {
+      if (!slot.days || !slot.days.includes(currentDay)) continue;
+      
+      const [startHour, startMin] = slot.startTime.split(':').map(Number);
+      const [endHour, endMin] = slot.endTime.split(':').map(Number);
+      const startMinutes = startHour * 60 + startMin;
+      const endMinutes = endHour * 60 + endMin;
+      
+      // Handle overnight slots
+      if (endMinutes < startMinutes) {
+        if (currentMinutes >= startMinutes || currentMinutes < endMinutes) {
+          return true;
+        }
+      } else {
+        if (currentMinutes >= startMinutes && currentMinutes < endMinutes) {
+          return true;
+        }
+      }
+    }
+    
+    // Not within any time slot
+    return false;
   };
 
   // Check if emergency button is activated

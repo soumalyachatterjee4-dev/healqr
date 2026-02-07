@@ -3,10 +3,19 @@ import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { AlertCircle, Phone, Shield, Power, Edit, ArrowLeft } from 'lucide-react';
+import { AlertCircle, Phone, Shield, Power, Edit, ArrowLeft, Clock, Calendar, Plus, X, Zap } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './ui/dialog';
 import { toast } from 'sonner';
 import DashboardSidebar from './DashboardSidebar';
+import { Switch } from './ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+
+interface TimeSlot {
+  id: string;
+  startTime: string;
+  endTime: string;
+  days: string[]; // ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+}
 
 interface EmergencyButtonManagerProps {
   onBack: () => void;
@@ -20,11 +29,123 @@ export default function EmergencyButtonManager({ onBack }: EmergencyButtonManage
   const [showDeactivateModal, setShowDeactivateModal] = useState(false);
   const [showChangeNumberModal, setShowChangeNumberModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  
+  // Scheduling features
+  const [schedulingEnabled, setSchedulingEnabled] = useState(false);
+  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
+  const [newSlotStart, setNewSlotStart] = useState('09:00');
+  const [newSlotEnd, setNewSlotEnd] = useState('18:00');
+  const [newSlotDays, setNewSlotDays] = useState<string[]>(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']);
+  const [isScheduleActive, setIsScheduleActive] = useState(false);
+  const [nextScheduleChange, setNextScheduleChange] = useState<string>('');
 
   // Load current status from Firestore
   useEffect(() => {
     loadEmergencyButtonStatus();
   }, []);
+
+  // Check schedule every minute when scheduling is enabled
+  useEffect(() => {
+    if (!schedulingEnabled) return;
+
+    const checkSchedule = () => {
+      const shouldBeActive = checkIfScheduleActive();
+      updateScheduleStatus(shouldBeActive);
+    };
+
+    checkSchedule(); // Check immediately
+    const interval = setInterval(checkSchedule, 60000); // Check every minute
+
+    return () => clearInterval(interval);
+  }, [schedulingEnabled, timeSlots]);
+
+  const checkIfScheduleActive = (): boolean => {
+    if (timeSlots.length === 0) {
+      setNextScheduleChange('No time slots configured');
+      return false;
+    }
+
+    const now = new Date();
+    const currentDay = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][now.getDay()];
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+    for (const slot of timeSlots) {
+      if (!slot.days.includes(currentDay)) continue;
+
+      const [startHour, startMin] = slot.startTime.split(':').map(Number);
+      const [endHour, endMin] = slot.endTime.split(':').map(Number);
+      const startMinutes = startHour * 60 + startMin;
+      const endMinutes = endHour * 60 + endMin;
+
+      // Handle overnight slots (e.g., 23:00 - 06:00)
+      if (endMinutes < startMinutes) {
+        if (currentMinutes >= startMinutes || currentMinutes < endMinutes) {
+          setNextScheduleChange(`Active until ${slot.endTime}`);
+          return true;
+        }
+      } else {
+        if (currentMinutes >= startMinutes && currentMinutes < endMinutes) {
+          setNextScheduleChange(`Active until ${slot.endTime}`);
+          return true;
+        }
+      }
+    }
+
+    setNextScheduleChange('Inactive - outside scheduled hours');
+    return false;
+  };
+
+  const calculateNextChange = (slot: TimeSlot, now: Date): string => {
+    const [endHour, endMin] = slot.endTime.split(':').map(Number);
+    const endTime = new Date(now);
+    endTime.setHours(endHour, endMin, 0, 0);
+
+    // If end time is past midnight
+    if (endTime < now) {
+      endTime.setDate(endTime.getDate() + 1);
+    }
+
+    return `Deactivates at ${slot.endTime}`;
+  };
+
+  const updateScheduleStatus = async (shouldBeActive: boolean) => {
+    if (shouldBeActive === isScheduleActive) return;
+
+    setIsScheduleActive(shouldBeActive);
+
+    if (!phoneNumber) return; // No phone number set
+
+    try {
+      const userId = localStorage.getItem('userId');
+      if (!userId) return;
+
+      const { db } = await import('../lib/firebase/config');
+      if (!db) return;
+
+      const { doc, updateDoc, serverTimestamp } = await import('firebase/firestore');
+      const doctorRef = doc(db, 'doctors', userId);
+
+      await updateDoc(doctorRef, {
+        emergencyButtonActive: shouldBeActive,
+        lastScheduleUpdate: serverTimestamp(),
+        scheduleTriggered: true
+      });
+
+      setIsActive(shouldBeActive);
+
+      if (shouldBeActive) {
+        toast.success('Emergency Button Auto-Activated', {
+          description: 'Based on your schedule'
+        });
+      } else {
+        toast.info('Emergency Button Auto-Deactivated', {
+          description: 'Schedule period ended'
+        });
+      }
+    } catch (error) {
+      console.error('Error updating schedule status:', error);
+    }
+  };
 
   const loadEmergencyButtonStatus = async () => {
     try {
@@ -44,6 +165,12 @@ export default function EmergencyButtonManager({ onBack }: EmergencyButtonManage
         
         setIsActive(active);
         setPhoneNumber(phone);
+
+        // Load scheduling settings
+        if (data.emergencyScheduling) {
+          setSchedulingEnabled(data.emergencyScheduling.enabled || false);
+          setTimeSlots(data.emergencyScheduling.timeSlots || []);
+        }
       }
     } catch (error) {
       console.error('Error loading emergency button status:', error);
@@ -79,7 +206,11 @@ export default function EmergencyButtonManager({ onBack }: EmergencyButtonManage
       await updateDoc(doctorRef, {
         emergencyButtonActive: true,
         emergencyPhone: newPhoneNumber,
-        emergencyActivatedAt: serverTimestamp()
+        emergencyActivatedAt: serverTimestamp(),
+        emergencyScheduling: {
+          enabled: schedulingEnabled,
+          timeSlots: timeSlots
+        }
       });
 
       setIsActive(true);
@@ -88,7 +219,9 @@ export default function EmergencyButtonManager({ onBack }: EmergencyButtonManage
       setShowActivateModal(false);
 
       toast.success('Emergency Button Activated!', {
-        description: 'Patients can now call you directly in emergencies'
+        description: schedulingEnabled 
+          ? 'Button will activate/deactivate based on your schedule'
+          : 'Patients can now call you directly in emergencies'
       });
     } catch (error) {
       console.error('Error activating emergency button:', error);
@@ -169,6 +302,142 @@ export default function EmergencyButtonManager({ onBack }: EmergencyButtonManage
     } finally {
       setLoading(false);
     }
+  };
+
+  // Scheduling functions
+  const toggleScheduling = async (enabled: boolean) => {
+    try {
+      const userId = localStorage.getItem('userId');
+      if (!userId) return;
+
+      const { db } = await import('../lib/firebase/config');
+      if (!db) return;
+
+      const { doc, updateDoc } = await import('firebase/firestore');
+      const doctorRef = doc(db, 'doctors', userId);
+
+      await updateDoc(doctorRef, {
+        'emergencyScheduling.enabled': enabled
+      });
+
+      setSchedulingEnabled(enabled);
+      
+      if (enabled) {
+        // Immediately apply the schedule when enabled
+        const shouldBeActive = checkIfScheduleActive();
+        await updateScheduleStatus(shouldBeActive);
+        
+        toast.success('Smart Scheduling Enabled', {
+          description: shouldBeActive 
+            ? 'Schedule active - button turned ON' 
+            : 'Schedule inactive - button turned OFF'
+        });
+      } else {
+        toast.success('Smart Scheduling Disabled', {
+          description: 'Button will remain in current state until you toggle it'
+        });
+      }
+    } catch (error) {
+      console.error('Error toggling scheduling:', error);
+      toast.error('Failed to update scheduling');
+    }
+  };
+
+  const addTimeSlot = async () => {
+    if (!newSlotStart || !newSlotEnd || newSlotDays.length === 0) {
+      toast.error('Please select time and days');
+      return;
+    }
+
+    const newSlot: TimeSlot = {
+      id: Date.now().toString(),
+      startTime: newSlotStart,
+      endTime: newSlotEnd,
+      days: [...newSlotDays]
+    };
+
+    const updatedSlots = [...timeSlots, newSlot];
+
+    try {
+      const userId = localStorage.getItem('userId');
+      if (!userId) return;
+
+      const { db } = await import('../lib/firebase/config');
+      if (!db) return;
+
+      const { doc, updateDoc } = await import('firebase/firestore');
+      const doctorRef = doc(db, 'doctors', userId);
+
+      await updateDoc(doctorRef, {
+        'emergencyScheduling.timeSlots': updatedSlots
+      });
+
+      setTimeSlots(updatedSlots);
+      setNewSlotStart('09:00');
+      setNewSlotEnd('18:00');
+      setNewSlotDays(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']);
+      
+      // Immediately re-check schedule if scheduling is enabled
+      if (schedulingEnabled) {
+        const shouldBeActive = checkIfScheduleActive();
+        await updateScheduleStatus(shouldBeActive);
+      }
+      
+      toast.success('Time Slot Added');
+    } catch (error) {
+      console.error('Error adding time slot:', error);
+      toast.error('Failed to add time slot');
+    }
+  };
+
+  const removeTimeSlot = async (slotId: string) => {
+    const updatedSlots = timeSlots.filter(slot => slot.id !== slotId);
+
+    try {
+      const userId = localStorage.getItem('userId');
+      if (!userId) return;
+
+      const { db } = await import('../lib/firebase/config');
+      if (!db) return;
+
+      const { doc, updateDoc } = await import('firebase/firestore');
+      const doctorRef = doc(db, 'doctors', userId);
+
+      await updateDoc(doctorRef, {
+        'emergencyScheduling.timeSlots': updatedSlots
+      });
+
+      setTimeSlots(updatedSlots);
+      
+      // Immediately re-check schedule if scheduling is enabled
+      if (schedulingEnabled) {
+        const shouldBeActive = checkIfScheduleActive();
+        await updateScheduleStatus(shouldBeActive);
+      }
+      
+      toast.success('Time Slot Removed');
+    } catch (error) {
+      console.error('Error removing time slot:', error);
+      toast.error('Failed to remove time slot');
+    }
+  };
+
+  const toggleDay = (day: string) => {
+    setNewSlotDays(prev =>
+      prev.includes(day)
+        ? prev.filter(d => d !== day)
+        : [...prev, day]
+    );
+  };
+
+  const dayLabels: Record<string, string> = {
+    mon: 'Mon',
+    tue: 'Tue',
+    wed: 'Wed',
+    thu: 'Thu',
+    fri: 'Fri',
+    sat: 'Sat',
+    sun: 'Sun'
   };
 
   return (
@@ -345,6 +614,161 @@ export default function EmergencyButtonManager({ onBack }: EmergencyButtonManage
                   </Button>
                 </div>
               </div>
+            </Card>
+          )}
+
+          {/* Smart Scheduling Section */}
+          {phoneNumber && (
+            <Card className="bg-zinc-900 border-zinc-800 p-6 mt-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-white font-semibold text-lg flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-purple-500" />
+                    Smart Scheduling
+                  </h3>
+                  <p className="text-gray-400 text-sm mt-1">
+                    Auto-activate/deactivate emergency button based on time slots
+                  </p>
+                </div>
+                <Switch
+                  checked={schedulingEnabled}
+                  onCheckedChange={toggleScheduling}
+                />
+              </div>
+
+              {schedulingEnabled && (
+                <div className="space-y-6">
+                  {/* Current Schedule Status */}
+                  <div className={`rounded-lg p-4 ${
+                    isScheduleActive 
+                      ? 'bg-green-500/10 border border-green-500/20' 
+                      : 'bg-zinc-800 border border-zinc-700'
+                  }`}>
+                    <div className="flex items-center gap-2">
+                      <Clock className={`w-4 h-4 ${isScheduleActive ? 'text-green-500' : 'text-gray-400'}`} />
+                      <div>
+                        <p className={`font-medium text-sm ${isScheduleActive ? 'text-green-300' : 'text-gray-300'}`}>
+                          {isScheduleActive ? 'Schedule Active Now' : 'Schedule Inactive'}
+                        </p>
+                        {nextScheduleChange && (
+                          <p className="text-xs text-gray-400 mt-0.5">{nextScheduleChange}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Time Slots Section */}
+                  <div>
+                    <h4 className="text-white font-medium text-sm mb-3">Time-Based Activation</h4>
+                    
+                    {/* Existing Time Slots */}
+                    {timeSlots.length > 0 && (
+                      <div className="space-y-2 mb-4">
+                        {timeSlots.map((slot) => (
+                          <div
+                            key={slot.id}
+                            className="bg-zinc-800 rounded-lg p-3 flex items-center justify-between"
+                          >
+                            <div>
+                              <p className="text-white font-medium text-sm">
+                                {slot.startTime} - {slot.endTime}
+                              </p>
+                              <div className="flex gap-1 mt-1 flex-wrap">
+                                {slot.days.map((day) => (
+                                  <span
+                                    key={day}
+                                    className="px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded text-xs"
+                                  >
+                                    {dayLabels[day]}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => removeTimeSlot(slot.id)}
+                              className="p-1 hover:bg-zinc-700 rounded text-gray-400 hover:text-red-400 transition-colors"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Add New Time Slot */}
+                    <div className="bg-zinc-800 rounded-lg p-4 space-y-4">
+                      <p className="text-gray-300 text-sm font-medium">Add Time Slot</p>
+                      
+                      {/* Time Inputs */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-gray-400 text-xs mb-1 block">Start Time</Label>
+                          <Input
+                            type="time"
+                            value={newSlotStart}
+                            onChange={(e) => setNewSlotStart(e.target.value)}
+                            className="bg-zinc-900 border-zinc-700 text-white"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-gray-400 text-xs mb-1 block">End Time</Label>
+                          <Input
+                            type="time"
+                            value={newSlotEnd}
+                            onChange={(e) => setNewSlotEnd(e.target.value)}
+                            className="bg-zinc-900 border-zinc-700 text-white"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Day Selection */}
+                      <div>
+                        <Label className="text-gray-400 text-xs mb-2 block">Active Days</Label>
+                        <div className="flex gap-2 flex-wrap">
+                          {Object.entries(dayLabels).map(([day, label]) => (
+                            <button
+                              key={day}
+                              onClick={() => toggleDay(day)}
+                              className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                                newSlotDays.includes(day)
+                                  ? 'bg-purple-600 text-white'
+                                  : 'bg-zinc-700 text-gray-400 hover:bg-zinc-600'
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <Button
+                        onClick={addTimeSlot}
+                        className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                        disabled={!newSlotStart || !newSlotEnd || newSlotDays.length === 0}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Time Slot
+                      </Button>
+                    </div>
+
+                    {timeSlots.length === 0 && (
+                      <p className="text-gray-500 text-xs text-center mt-3">
+                        No time slots configured. Add one to enable time-based activation.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Priority Info */}
+                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                    <p className="text-blue-300 text-xs font-medium mb-1">📋 Priority System:</p>
+                    <ul className="text-blue-300/80 text-xs space-y-0.5">
+                      <li>1. Manual Override (highest priority)</li>
+                      <li>2. Time-Based Schedule</li>
+                      <li>3. Chamber-Aware Mode (lowest priority)</li>
+                    </ul>
+                  </div>
+                </div>
+              )}
             </Card>
           )}
         </div>
