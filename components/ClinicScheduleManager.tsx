@@ -460,8 +460,8 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({ onMenuCha
           clinicId: existingChamber.clinicId
         });
 
-        // Skip inactive chambers
-        if (existingChamber.status !== 'active') {
+        // Skip ONLY explicitly inactive chambers (undefined/missing status = active)
+        if (existingChamber.status === 'inactive') {
           console.log('⏭️ Skipping inactive chamber');
           continue;
         }
@@ -482,13 +482,29 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({ onMenuCha
         // For regular frequency, check day and time conflicts
         else if (frequency !== 'Custom' && existingChamber.frequency !== 'Custom') {
           console.log('🔄 Checking regular frequency conflict');
-          // Check if there are common days
-          if (hasCommonDays(selectedDays, existingChamber.days)) {
-            console.log('✅ Found common days!');
+          
+          // CRITICAL FIX: Handle Daily frequency conflict even with empty days arrays
+          const isDailyConflict = (frequency === 'Daily' && existingChamber.frequency === 'Daily');
+          const hasCommonScheduleDays = hasCommonDays(selectedDays, existingChamber.days);
+          
+          console.log('📅 Day conflict check:', { 
+            isDailyConflict, 
+            hasCommonScheduleDays,
+            newFreq: frequency,
+            existingFreq: existingChamber.frequency,
+            newDays: selectedDays,
+            existingDays: existingChamber.days
+          });
+          
+          // Check if there are common days OR both are Daily frequency
+          if (hasCommonScheduleDays || isDailyConflict) {
+            console.log('✅ Found common days or Daily conflict!');
             // Check if time ranges overlap
             if (timeRangesOverlap(startTime, endTime, existingStartTime, existingEndTime)) {
               console.log('🚨 CONFLICT DETECTED!');
-              const commonDays = selectedDays.filter(day => existingChamber.days.includes(day));
+              const commonDays = hasCommonScheduleDays 
+                ? selectedDays.filter(day => existingChamber.days.includes(day))
+                : selectedDays; // For Daily conflict, use all selected days
               conflicts.push({
                 chamber: existingChamber,
                 reason: 'Overlapping days and time',
