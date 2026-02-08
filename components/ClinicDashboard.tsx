@@ -135,28 +135,20 @@ export default function ClinicDashboard() {
             }
 
             try {
-              const doctorRef = doc(db, 'doctors', docId);
-              const doctorSnap = await getDoc(doctorRef);
-              
-              if (doctorSnap.exists()) {
-                const doctorData = doctorSnap.data();
-                if (doctorData) {
-                  totalScans += Number(doctorData.totalScans) || 0;
-                  totalBookings += Number(doctorData.bookingsCount) || 0;
-                  qrBookings += Number(doctorData.qrBookings) || 0;
-                }
-              }
-
-              // Count monthly bookings - simple query without range
-              const monthlyQuery = query(
+              // 🔥 CLINIC ANALYTICS: Only count bookings that came through THIS CLINIC
+              // Query bookings where doctorId matches AND clinicId matches this clinic
+              const clinicBookingsQuery = query(
                 collection(db, 'bookings'),
-                where('doctorId', '==', docId)
+                where('doctorId', '==', docId),
+                where('clinicId', '==', currentUser.uid) // 🎯 ONLY this clinic's bookings
               );
-              const monthlySnap = await getDocs(monthlyQuery);
+              const clinicBookingsSnap = await getDocs(clinicBookingsQuery);
               
-              // Filter on client-side to avoid index requirement
-              monthlySnap.forEach((doc) => {
-                const bookingData = doc.data();
+              // Calculate metrics from CLINIC bookings only
+              clinicBookingsSnap.forEach((docSnap) => {
+                const bookingData = docSnap.data();
+                
+                // Monthly bookings count
                 if (bookingData.date) {
                   const bookingDate = new Date(bookingData.date);
                   if (bookingDate.getMonth() === currentMonth && bookingDate.getFullYear() === currentYear) {
@@ -164,21 +156,22 @@ export default function ClinicDashboard() {
                   }
                 }
                 
-                // Calculate other metrics while iterating
-                if (bookingData.type !== 'walkin_booking') {
-                  // QR scans count
+                // QR bookings (type: 'qr_booking' and came through clinic QR)
+                if (bookingData.type === 'qr_booking') {
                   totalScans++;
                   if (bookingData.status !== 'cancelled' && !bookingData.isCancelled) {
                     qrBookings++;
                   }
                 }
                 
+                // Walk-in bookings (added at clinic)
                 if (bookingData.type === 'walkin_booking') {
                   if (bookingData.status !== 'cancelled' && !bookingData.isCancelled) {
                     walkinBookings++;
                   }
                 }
                 
+                // Cancelled count
                 if (bookingData.status === 'cancelled' || bookingData.isCancelled === true) {
                   cancelled++;
                 }
