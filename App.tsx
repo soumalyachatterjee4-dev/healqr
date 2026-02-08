@@ -1292,20 +1292,6 @@ export default function App() {
     registerNative();
   }, []);
 
-  // 🔔 REGISTER SERVICE WORKER ON APP START (CRITICAL FOR PUSH NOTIFICATIONS)
-  // This ensures service worker stays active even after browser closes
-  useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/firebase-messaging-sw.js')
-        .then(() => {
-          // Service worker registered successfully
-        })
-        .catch((error) => {
-          console.error('Service worker registration failed:', error);
-        });
-    }
-  }, []);
-
   // 🔔 FCM Foreground Message Listener - Displays notifications when app is open
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
