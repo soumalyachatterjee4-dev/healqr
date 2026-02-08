@@ -416,7 +416,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
         });
 
         toast.success(`✅ Doctor ${existingDoctorData.name} linked to your clinic!`);
-        setShowAddDoctorModal(false);
+        setShowAddModal(false);
         setNewDoctor({ email: '', name: '', pinCode: '', dateOfBirth: '' });
         setSelectedSpecialties([]);
         return;
@@ -525,7 +525,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
       toast.info('Click the copy icon to share activation link with doctor.');
       
       // Reset form
-      setShowAddDoctorModal(false);
+      setShowAddModal(false);
       setNewDoctor({ email: '', name: '', pinCode: '', dateOfBirth: '' });
       setSelectedSpecialties([]);
       
