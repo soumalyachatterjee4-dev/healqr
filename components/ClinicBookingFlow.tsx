@@ -41,7 +41,6 @@ interface Doctor {
   chambers?: any[];
   // For display
   miniWebsiteReviews?: any[];
-  placeholderReviews?: any[];
 }
 
 interface Clinic {
