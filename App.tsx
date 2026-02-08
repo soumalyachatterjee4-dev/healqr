@@ -73,6 +73,7 @@ const AdvertiserDashboard = lazy(() => import("./components/AdvertiserDashboard"
 const AdvertiserGateway = lazy(() => import("./components/AdvertiserGateway"));
 const UpgradePage = lazy(() => import("./components/UpgradePage"));
 const ClinicProfile = lazy(() => import("./components/ClinicProfile"));
+const ClinicBookingFlow = lazy(() => import("./components/ClinicBookingFlow"));
 const PatientSearch = lazy(() => import("./components/PatientSearch"));
 const ClinicSignUp = lazy(() => import("./components/ClinicSignUp"));
 const ClinicLogin = lazy(() => import("./components/ClinicLogin"));
@@ -163,6 +164,7 @@ export default function App() {
     | "advertiser-dashboard"
     | "upgrade"
     | "clinic-profile"
+    | "clinic-booking-flow"
     | "patient-search"
     | "clinic-signup"
     | "clinic-login"
@@ -481,7 +483,7 @@ export default function App() {
     // Handle Clinic QR Scan (ONLY if no doctor selected yet)
     if (clinicId && !doctorId) {
       sessionStorage.setItem('booking_clinic_id', clinicId);
-      setCurrentPage('clinic-profile');
+      setCurrentPage('clinic-booking-flow');
       return;
     }
 
@@ -2583,6 +2585,12 @@ export default function App() {
             }}
             language={bookingLanguage}
           />
+        </Suspense>
+      )}
+
+      {currentPage === "clinic-booking-flow" && (
+        <Suspense fallback={<PageLoader />}>
+          <ClinicBookingFlow />
         </Suspense>
       )}
 
