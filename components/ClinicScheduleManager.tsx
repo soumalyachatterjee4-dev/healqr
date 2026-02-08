@@ -82,6 +82,7 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({ onMenuCha
   // View Schedules
   const [chambers, setChambers] = useState<Chamber[]>([]);
   const [expandedChambers, setExpandedChambers] = useState<Set<string>>(new Set());
+  const [editingChamberId, setEditingChamberId] = useState<string | null>(null);
 
   // Clinic Info
   const [clinicName, setClinicName] = useState('');
@@ -427,12 +428,18 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({ onMenuCha
       const allExistingChambers = doctorSnap.data().chambers || [];
       const conflicts: any[] = [];
 
+      // When editing, exclude the chamber being edited from conflict checks
+      const chambersToCheck = editingChamberId
+        ? allExistingChambers.filter((c: Chamber) => c.id !== editingChamberId)
+        : allExistingChambers;
+
       console.log('🔍 CONFLICT DETECTION START');
       console.log('📋 New schedule:', { selectedDays, frequency, startTime, endTime, chamberName });
       console.log('📚 Existing chambers:', allExistingChambers.length);
+      console.log('✏️ Editing mode:', editingChamberId ? 'YES' : 'NO');
 
       // Check each existing chamber for conflicts
-      for (const existingChamber of allExistingChambers) {
+      for (const existingChamber of chambersToCheck) {
         // Handle both old format (time: "08:00-12:00") and new format (startTime/endTime)
         let existingStartTime = existingChamber.startTime;
         let existingEndTime = existingChamber.endTime;
@@ -533,9 +540,9 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({ onMenuCha
         return; // Block the save
       }
 
-      // Create new chamber
-      const newChamber: Chamber = {
-        id: Date.now().toString(),
+      // Create or update chamber
+      const chamberData: Chamber = {
+        id: editingChamberId || Date.now().toString(),
         days: frequency === 'Custom' ? [] : selectedDays,
         frequency,
         ...(frequency === 'Bi-Weekly' || frequency === 'Monthly' ? { frequencyStartDate } : {}),
@@ -545,28 +552,28 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({ onMenuCha
         startTime,
         endTime,
         maxCapacity,
-        status: 'active',
-        createdAt: new Date(),
+        status: editingChamberId ? (allExistingChambers.find((c: Chamber) => c.id === editingChamberId)?.status || 'active') : 'active',
+        createdAt: editingChamberId ? (allExistingChambers.find((c: Chamber) => c.id === editingChamberId)?.createdAt || new Date()) : new Date(),
         clinicId: currentUser.uid // CRITICAL: Tag chamber with clinic ownership
       };
 
-      // Save to Firestore (reuse already fetched doctorSnap)
+      // Add or update chamber in doctor's chambers
+      const updatedChambers = editingChamberId
+        ? allExistingChambers.map((c: Chamber) => c.id === editingChamberId ? chamberData : c)
+        : [...allExistingChambers, chamberData];
+
+      // Save to Firestore
       await updateDoc(doctorRef, {
-        chambers: [...allExistingChambers, newChamber]
+        chambers: updatedChambers
       });
 
-      toast.success('Schedule saved successfully');
+      toast.success(editingChamberId ? 'Schedule Updated Successfully!' : 'Schedule Created Successfully!', {
+        description: editingChamberId ? `Schedule updated for Dr. ${selectedDoctor?.name}` : `Chamber added for Dr. ${selectedDoctor?.name}`,
+        duration: 5000,
+      });
 
       // Reset form
-      setSelectedDays([]);
-      setFrequency('Daily');
-      setFrequencyStartDate('');
-      setCustomDate('');
-      setChamberName('');
-      setChamberAddress('');
-      setStartTime('09:00');
-      setEndTime('17:00');
-      setMaxCapacity(20);
+      handleReset();
 
       // Reload chambers
       loadDoctorData();
@@ -615,6 +622,95 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({ onMenuCha
       }
       return newSet;
     });
+  };
+
+  const handleEditChamber = (chamber: Chamber) => {
+    setEditingChamberId(chamber.id);
+    
+    // Handle custom dates differently
+    if (chamber.frequency === 'Custom') {
+      setSelectedDays([]);
+      setCustomDate(chamber.customDate || '');
+    } else {
+      setSelectedDays(chamber.days);
+      setCustomDate('');
+    }
+    
+    setFrequency(chamber.frequency);
+    setFrequencyStartDate(chamber.frequencyStartDate || '');
+    setChamberName(chamber.chamberName);
+    setChamberAddress(chamber.chamberAddress);
+    setStartTime(chamber.startTime);
+    setEndTime(chamber.endTime);
+    setMaxCapacity(chamber.maxCapacity);
+
+    // Scroll to form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    toast.info('Editing Schedule', {
+      description: `Make your changes and click SAVE SCHEDULE to update.`,
+      duration: 3000,
+    });
+  };
+
+  const handleDeleteChamber = async (chamberId: string) => {
+    if (!selectedDoctorId) {
+      toast.error('No doctor selected');
+      return;
+    }
+
+    const confirmDelete = window.confirm(
+      `⚠️ DELETE SCHEDULE?\n\nAre you sure you want to delete this schedule?\n\nThis action cannot be undone.`
+    );
+
+    if (!confirmDelete) return;
+
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        toast.error('Authentication error');
+        return;
+      }
+
+      const doctorRef = doc(db, 'doctors', selectedDoctorId);
+      const doctorSnap = await getDoc(doctorRef);
+      
+      if (!doctorSnap.exists()) {
+        toast.error('Doctor not found');
+        return;
+      }
+
+      const allChambers = doctorSnap.data().chambers || [];
+      const updatedChambers = allChambers.filter((c: Chamber) => c.id !== chamberId);
+
+      await updateDoc(doctorRef, {
+        chambers: updatedChambers
+      });
+
+      // Update local state
+      setChambers(updatedChambers.filter((c: Chamber) => c.clinicId === currentUser.uid));
+      
+      toast.success('Schedule Deleted Successfully', {
+        description: 'The schedule has been removed.',
+        duration: 5000,
+      });
+    } catch (error) {
+      console.error('Error deleting chamber:', error);
+      toast.error('Failed to delete schedule');
+    }
+  };
+
+  const handleReset = () => {
+    setSelectedDays([]);
+    setFrequency('Daily');
+    setFrequencyStartDate('');
+    setCustomDate('');
+    setChamberName('');
+    setChamberAddress('');
+    setStartTime('09:00');
+    setEndTime('17:00');
+    setMaxCapacity(20);
+    setEditingChamberId(null);
   };
 
   const hasActivePeriods = allPeriods.some(p => p.status === 'active');
@@ -1174,14 +1270,23 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({ onMenuCha
                         )}
 
                         {/* Save Button */}
-                        <div className="flex justify-end pt-2">
+                        <div className="flex justify-end gap-2 pt-2">
                           <Button
                             onClick={handleSaveSchedule}
                             className="bg-blue-600 hover:bg-blue-700 text-white"
                           >
                             <CalendarIcon className="w-4 h-4 mr-2" />
-                            SAVE SCHEDULE
+                            {editingChamberId ? 'UPDATE SCHEDULE' : 'SAVE SCHEDULE'}
                           </Button>
+                          {editingChamberId && (
+                            <Button
+                              onClick={handleReset}
+                              variant="outline"
+                              className="border-gray-700 text-gray-300 hover:bg-gray-900 hover:text-white"
+                            >
+                              CANCEL EDIT
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </Card>
@@ -1231,7 +1336,7 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({ onMenuCha
                             {/* Expanded Details */}
                             {expandedChambers.has(chamber.id) && (
                               <div className="border-t border-gray-700 p-4 bg-gray-900/30">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                   <div>
                                     <Label className="text-gray-400 text-xs">Clinic Location</Label>
                                     <p className="text-white text-sm">{chamber.chamberName}</p>
@@ -1258,6 +1363,32 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({ onMenuCha
                                     <Label className="text-gray-400 text-xs">Max Capacity</Label>
                                     <p className="text-white text-sm">{chamber.maxCapacity} patients</p>
                                   </div>
+                                </div>
+                                
+                                {/* Action Buttons */}
+                                <div className="flex items-center justify-end gap-2 pt-4 border-t border-gray-700">
+                                  <Button
+                                    onClick={() => handleEditChamber(chamber)}
+                                    variant="outline"
+                                    size="sm"
+                                    className="border-gray-700 text-gray-300 hover:bg-gray-900 hover:text-white"
+                                  >
+                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                    </svg>
+                                    EDIT
+                                  </Button>
+                                  <Button
+                                    onClick={() => handleDeleteChamber(chamber.id)}
+                                    variant="outline"
+                                    size="sm"
+                                    className="border-red-900/50 text-red-400 hover:bg-red-950 hover:text-red-300"
+                                  >
+                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                    DELETE
+                                  </Button>
                                 </div>
                               </div>
                             )}
