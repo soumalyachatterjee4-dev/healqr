@@ -217,6 +217,43 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
     });
   };
 
+  // Helper function to check if two time ranges overlap
+  const timeRangesOverlap = (start1: string, end1: string, start2: string, end2: string) => {
+    try {
+      const [h1, m1] = start1.split(':').map(Number);
+      const [h2, m2] = end1.split(':').map(Number);
+      const [h3, m3] = start2.split(':').map(Number);
+      const [h4, m4] = end2.split(':').map(Number);
+
+      const minutes1Start = h1 * 60 + m1;
+      const minutes1End = h2 * 60 + m2;
+      const minutes2Start = h3 * 60 + m3;
+      const minutes2End = h4 * 60 + m4;
+
+      const overlaps = minutes1Start < minutes2End && minutes2Start < minutes1End;
+      console.log('⏰ Time overlap check:', { start1, end1, start2, end2, overlaps });
+      return overlaps;
+    } catch (error) {
+      console.error('Error checking time overlap:', error);
+      return false;
+    }
+  };
+
+  // Helper function to check if two day arrays have common days
+  const hasCommonDays = (days1: string[], days2: string[]) => {
+    if (!Array.isArray(days1) || !Array.isArray(days2)) {
+      console.log('🚫 Invalid days arrays:', { days1, days2 });
+      return false;
+    }
+    if (days1.length === 0 || days2.length === 0) {
+      console.log('🚫 Empty days arrays:', { days1, days2 });
+      return false;
+    }
+    const hasCommon = days1.some(day => days2.includes(day));
+    console.log('📅 Day overlap check:', { days1, days2, hasCommon });
+    return hasCommon;
+  };
+
   const handleSaveSchedule = async () => {
     // Validate required fields
     if (frequency === 'Custom') {
@@ -266,6 +303,97 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
         return;
       }
     }
+
+    // CRITICAL: Check for schedule conflicts with existing chambers
+    const conflictsToCheck = editingScheduleId 
+      ? demoSchedules.filter(s => s.id !== editingScheduleId && s.isActive !== false)
+      : demoSchedules.filter(s => s.isActive !== false);
+    
+    const conflicts: any[] = [];
+
+    console.log('🔍 CONFLICT DETECTION START');
+    console.log('📋 New schedule:', { selectedDays, frequency, startTime, endTime, chamberName, customDate });
+    console.log('📚 Existing chambers to check:', conflictsToCheck.length);
+
+    // Check each existing chamber for conflicts
+    for (const existingChamber of conflictsToCheck) {
+      console.log('🔎 Checking chamber:', {
+        name: existingChamber.chamberName,
+        days: existingChamber.days,
+        frequency: existingChamber.frequency,
+        time: `${existingChamber.startTime}-${existingChamber.endTime}`,
+        isActive: existingChamber.isActive
+      });
+
+      // For Custom frequency, check date conflict
+      if (frequency === 'Custom' && existingChamber.frequency === 'Custom') {
+        if (existingChamber.customDate === customDate) {
+          // Same custom date - check time overlap
+          if (timeRangesOverlap(startTime, endTime, existingChamber.startTime, existingChamber.endTime)) {
+            conflicts.push({
+              chamber: existingChamber,
+              reason: 'Same date and overlapping time',
+              date: customDate
+            });
+          }
+        }
+      }
+      // For regular frequency, check day and time conflicts
+      else if (frequency !== 'Custom' && existingChamber.frequency !== 'Custom') {
+        console.log('🔄 Checking regular frequency conflict');
+        // Check if there are common days
+        const newDays = frequency === 'Custom' ? [`Custom: ${customDate}`] : selectedDays;
+        if (hasCommonDays(newDays, existingChamber.days)) {
+          console.log('✅ Found common days!');
+          // Check if time ranges overlap
+          if (timeRangesOverlap(startTime, endTime, existingChamber.startTime, existingChamber.endTime)) {
+            console.log('🚨 CONFLICT DETECTED!');
+            const commonDays = newDays.filter(day => existingChamber.days.includes(day));
+            conflicts.push({
+              chamber: existingChamber,
+              reason: 'Overlapping days and time',
+              days: commonDays
+            });
+          } else {
+            console.log('⏰ No time overlap');
+          }
+        } else {
+          console.log('📅 No common days');
+        }
+      }
+    }
+
+    console.log('🎯 Total conflicts found:', conflicts.length);
+
+    // If conflicts found, show error and prevent saving
+    if (conflicts.length > 0) {
+      console.log('⚠️ BLOCKING SAVE DUE TO CONFLICTS');
+      const conflictMessages = conflicts.map(c => {
+        const days = c.days ? c.days.join(', ') : c.date;
+        const time = `${c.chamber.startTime}-${c.chamber.endTime}`;
+        const name = c.chamber.chamberName || 'Unknown';
+        return `• ${name} (${days}, ${time})`;
+      }).join('\n');
+
+      toast.error('Schedule Conflict Detected!', {
+        description: `You already have chamber(s) scheduled at this time:\n${conflictMessages}\n\nPlease choose a different day or time.`,
+        duration: 8000,
+      });
+
+      // Show detailed alert
+      alert(
+        `⚠️ SCHEDULE CONFLICT DETECTED!\n\n` +
+        `You already have chamber(s) scheduled at this time:\n\n` +
+        `${conflictMessages}\n\n` +
+        `New Schedule: ${frequency === 'Custom' ? customDate : selectedDays.join(', ')} (${startTime}-${endTime})\n\n` +
+        `❌ A doctor cannot be in two places at the same time!\n` +
+        `Please choose a different day or time slot.`
+      );
+      
+      return;
+    }
+
+    console.log('✅ No conflicts detected, proceeding to save...');
 
     // Create schedule object (remove undefined values for Firestore)
     const newSchedule: any = {

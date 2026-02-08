@@ -500,9 +500,9 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({ onMenuCha
 
       console.log('🎯 Total conflicts found:', conflicts.length);
 
-      // If conflicts found, show warning popup
+      // If conflicts found, block the save completely
       if (conflicts.length > 0) {
-        console.log('⚠️ SHOWING CONFLICT WARNING POPUP');
+        console.log('⚠️ BLOCKING SAVE DUE TO CONFLICTS');
         const conflictMessages = conflicts.map(c => {
           const location = c.isPersonalChamber ? '⚠️ PERSONAL CHAMBER' : '🏥 CLINIC CHAMBER';
           const days = c.days ? c.days.join(', ') : c.date;
@@ -511,27 +511,26 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({ onMenuCha
           const chamberEndTime = c.chamber.endTime || (c.chamber.time ? c.chamber.time.split('-')[1] : '');
           const time = `${chamberStartTime}-${chamberEndTime}`;
           const name = c.chamber.chamberName || 'Unknown';
-          return `${location}: ${name} (${days}, ${time})`;
+          return `• ${location}: ${name} (${days}, ${time})`;
         }).join('\n');
 
-        const userConfirmed = confirm(
+        toast.error('Schedule Conflict Detected!', {
+          description: `Dr. ${selectedDoctor?.name} already has chamber(s) at this time:\n${conflictMessages}\n\nPlease choose a different day or time.`,
+          duration: 8000,
+        });
+
+        // Show detailed alert
+        alert(
           `⚠️ SCHEDULE CONFLICT DETECTED!\n\n` +
           `Dr. ${selectedDoctor?.name} already has chamber(s) scheduled at this time:\n\n` +
           `${conflictMessages}\n\n` +
           `New Schedule: ${selectedDays.join(', ')} (${startTime}-${endTime})\n\n` +
-          `❌ This will create booking confusion!\n` +
-          `Patients may get fake booking numbers as system won't know which chamber to book.\n\n` +
-          `Do you want to proceed anyway? (NOT RECOMMENDED)`
+          `❌ A doctor cannot be in two places at the same time!\n` +
+          `This would create booking confusion and fake booking numbers.\n\n` +
+          `Please choose a different day or time slot.`
         );
 
-        if (!userConfirmed) {
-          toast.error('Schedule creation cancelled to prevent conflicts');
-          return;
-        }
-
-        toast.warning('Schedule created despite conflicts - monitor for booking issues', {
-          duration: 6000
-        });
+        return; // Block the save
       }
 
       // Create new chamber
