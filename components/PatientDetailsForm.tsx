@@ -42,6 +42,8 @@ interface PatientDetailsFormProps {
   doctorDegrees?: string[];
   isTestMode?: boolean; // Skip database operations in test mode
   useDrPrefix?: boolean;
+  themeColor?: 'emerald' | 'blue';
+  isClinicBooking?: boolean;
 }
 
 export interface PatientFormData {
@@ -79,7 +81,9 @@ export default function PatientDetailsForm({
   bookingType = 'qr_booking',
   doctorDegrees = [],
   isTestMode = false, // Demo mode - skip database operations
-  useDrPrefix = true
+  useDrPrefix = true,
+  themeColor = 'emerald',
+  isClinicBooking = false
 }: PatientDetailsFormProps) {
   const [formData, setFormData] = useState<PatientFormData>({
     patientName: '',

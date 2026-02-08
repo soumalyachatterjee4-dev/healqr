@@ -36,6 +36,7 @@ interface BookingConfirmationProps {
   doctorDegrees?: string[];
   isTestMode?: boolean;
   useDrPrefix?: boolean;
+  themeColor?: 'emerald' | 'blue';
 }
 
 export default function BookingConfirmation({
@@ -49,6 +50,7 @@ export default function BookingConfirmation({
   doctorDegrees = [],
   isTestMode = false,
   useDrPrefix = true,
+  themeColor = 'emerald',
 }: BookingConfirmationProps) {
   const [notificationStatus, setNotificationStatus] = useState<'checking' | 'enabled' | 'disabled' | 'enabling'>('checking');
   const [hasToken, setHasToken] = useState(false);

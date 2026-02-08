@@ -41,6 +41,7 @@ interface SelectChamberProps {
   doctorPhoto?: string;
   doctorDegrees?: string[];
   useDrPrefix?: boolean;
+  themeColor?: 'emerald' | 'blue';
 }
 
 export default function SelectChamber({
@@ -56,7 +57,9 @@ export default function SelectChamber({
   doctorPhoto = '',
   doctorDegrees = [],
   useDrPrefix = true,
+  themeColor = 'emerald',
 }: SelectChamberProps) {
+  const accentColor = themeColor === 'blue' ? 'blue' : 'emerald';
   console.log('🏥 SelectChamber received:', { doctorName, doctorSpecialty, chambersCount: chambers.length });
   
   const [selectedChamber, setSelectedChamber] = useState<ChamberWithBookingCount | null>(null);
@@ -217,6 +220,7 @@ export default function SelectChamber({
       doctorSpecialty={doctorSpecialty}
       doctorDegrees={doctorDegrees}
       useDrPrefix={useDrPrefix}
+      themeColor={themeColor}
     >
       <div>
         {/* Title */}
@@ -225,8 +229,8 @@ export default function SelectChamber({
           <p className="text-gray-400 text-sm mb-4">{t('choosePreferredLocation', language)}</p>
           
           {/* Selected Date Badge */}
-          <div className="inline-block bg-emerald-500/20 border border-emerald-500/30 backdrop-blur-sm rounded-full px-4 py-2 mb-6">
-            <p className="text-emerald-400 text-sm">{formatDate(selectedDate)}</p>
+          <div className={`inline-block bg-${accentColor}-500/20 border border-${accentColor}-500/30 backdrop-blur-sm rounded-full px-4 py-2 mb-6`}>
+            <p className={`text-${accentColor}-400 text-sm`}>{formatDate(selectedDate)}</p>
           </div>
         </div>
 
@@ -245,20 +249,20 @@ export default function SelectChamber({
                   onClick={() => setConsultationType('chamber')}
                   className={`border-2 rounded-xl p-4 transition-all ${
                     consultationType === 'chamber'
-                      ? 'border-emerald-500 bg-emerald-500/10'
+                      ? `border-${accentColor}-500 bg-${accentColor}-500/10`
                       : 'border-gray-700 bg-[#0f1419] hover:border-gray-600'
                   }`}
                 >
                   <div className="flex flex-col items-center gap-2">
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      consultationType === 'chamber' ? 'bg-emerald-500' : 'bg-gray-700'
+                      consultationType === 'chamber' ? `bg-${accentColor}-500` : 'bg-gray-700'
                     }`}>
                       <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                       </svg>
                     </div>
                     <span className={`text-sm font-medium ${
-                      consultationType === 'chamber' ? 'text-emerald-400' : 'text-gray-400'
+                      consultationType === 'chamber' ? `text-${accentColor}-400` : 'text-gray-400'
                     }`}>
                       Chamber Consultation
                     </span>
@@ -345,7 +349,7 @@ export default function SelectChamber({
                   const isBlockedForDate = (chamber as any).isBlockedForDate || false;
                   
                   // Determine status color
-                  let statusColor = 'text-emerald-400';
+                  let statusColor = `text-${accentColor}-400`;
                   if (percentageFull >= 100) statusColor = 'text-red-400';
                   else if (percentageFull >= 80) statusColor = 'text-yellow-400';
                   
@@ -370,7 +374,7 @@ export default function SelectChamber({
                         isBlockedForDate || isFull || isExpired
                           ? 'border-gray-800 bg-gray-900/50 opacity-50 cursor-not-allowed'
                           : selectedChamber?.id === chamber.id
-                          ? 'border-emerald-500 bg-emerald-500/10'
+                          ? `border-${accentColor}-500 bg-${accentColor}-500/10`
                           : 'border-gray-700 bg-[#0f1419] hover:border-gray-600'
                       }`}
                     >
@@ -408,7 +412,7 @@ export default function SelectChamber({
                 onClick={() => setSelectedChamber('main')}
                 className={`w-full text-left border-2 rounded-2xl p-5 mb-3 transition-all ${
                   selectedChamber === 'main'
-                  ? 'border-emerald-500 bg-emerald-500/10'
+                  ? `border-${accentColor}-500 bg-${accentColor}-500/10`
                   : 'border-gray-700 bg-[#0f1419] hover:border-gray-600'
                 }`}
               >
@@ -420,7 +424,7 @@ export default function SelectChamber({
                 onClick={() => setSelectedChamber('secondary')}
                 className={`w-full text-left border-2 rounded-2xl p-5 mb-3 transition-all ${
                   selectedChamber === 'secondary'
-                  ? 'border-emerald-500 bg-emerald-500/10'
+                  ? `border-${accentColor}-500 bg-${accentColor}-500/10`
                   : 'border-gray-700 bg-[#0f1419] hover:border-gray-600'
                 }`}
               >
@@ -474,7 +478,7 @@ export default function SelectChamber({
               (consultationType === 'video' || selectedChamber)
                 ? consultationType === 'video'
                   ? 'bg-red-500 hover:bg-red-600 text-white'
-                  : 'bg-emerald-500 hover:bg-emerald-600 text-white'
+                  : `bg-${accentColor}-500 hover:bg-${accentColor}-600 text-white`
                 : 'bg-gray-700 text-gray-500 cursor-not-allowed'
             }`}
           >

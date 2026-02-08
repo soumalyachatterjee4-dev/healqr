@@ -10,6 +10,7 @@ interface BookingFlowLayoutProps {
   doctorSpecialty?: string;
   showHeader?: boolean;
   useDrPrefix?: boolean;
+  themeColor?: 'emerald' | 'blue';
 }
 
 export default function BookingFlowLayout({
@@ -20,8 +21,14 @@ export default function BookingFlowLayout({
   doctorDegrees = [],
   doctorSpecialty,
   showHeader = true,
-  useDrPrefix = true
+  useDrPrefix = true,
+  themeColor = 'emerald'
 }: BookingFlowLayoutProps) {
+  const accentColor = themeColor === 'blue' ? 'blue' : 'emerald';
+  const borderColor = themeColor === 'blue' ? 'border-blue-500/30' : 'border-emerald-500/30';
+  const gradientFrom = themeColor === 'blue' ? 'from-blue-500' : 'from-emerald-500';
+  const gradientTo = themeColor === 'blue' ? 'to-blue-600' : 'to-emerald-600';
+  const textColor = themeColor === 'blue' ? 'text-blue-400' : 'text-emerald-400';
   return (
     <div className="min-h-screen bg-[#0a0f1a] flex flex-col">
       {/* Fixed Header with Doctor Info */}
@@ -45,10 +52,10 @@ export default function BookingFlowLayout({
                 <img 
                   src={doctorPhoto} 
                   alt={doctorName} 
-                  className="w-12 h-12 rounded-full object-cover flex-shrink-0 border-2 border-emerald-500/30" 
+                  className={`w-12 h-12 rounded-full object-cover flex-shrink-0 border-2 ${borderColor}`}
                 />
               ) : (
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center text-white font-bold flex-shrink-0">
+                <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${gradientFrom} ${gradientTo} flex items-center justify-center text-white font-bold flex-shrink-0`}>
                   {doctorName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'DR'}
                 </div>
               )}
@@ -64,7 +71,7 @@ export default function BookingFlowLayout({
                   </p>
                 )}
                 {doctorSpecialty && (
-                  <p className="text-xs text-emerald-400 truncate">
+                  <p className={`text-xs ${textColor} truncate`}>
                     {doctorSpecialty}
                   </p>
                 )}

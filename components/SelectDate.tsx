@@ -25,9 +25,10 @@ interface SelectDateProps {
   doctorSpecialty?: string;
   doctorPhoto?: string;
   useDrPrefix?: boolean;
+  themeColor?: 'emerald' | 'blue';
 }
 
-export default function SelectDate({ onBack, onContinue, language, maxAdvanceDays = 30, plannedOffPeriods = [], schedules = [], globalBookingEnabled = true, doctorName = '', doctorSpecialty = '', doctorPhoto = '', useDrPrefix = true }: SelectDateProps) {
+export default function SelectDate({ onBack, onContinue, language, maxAdvanceDays = 30, plannedOffPeriods = [], schedules = [], globalBookingEnabled = true, doctorName = '', doctorSpecialty = '', doctorPhoto = '', useDrPrefix = true, themeColor = 'emerald' }: SelectDateProps) {
   console.log('📅 SelectDate Props:', { 
     maxAdvanceDays, 
     globalBookingEnabled, 
@@ -184,6 +185,7 @@ export default function SelectDate({ onBack, onContinue, language, maxAdvanceDay
       doctorPhoto={doctorPhoto}
       doctorSpecialty={doctorSpecialty}
       useDrPrefix={useDrPrefix}
+      themeColor={themeColor}
     >
       <div>
 
@@ -231,7 +233,7 @@ export default function SelectDate({ onBack, onContinue, language, maxAdvanceDay
                         ? 'bg-red-900/30 text-red-400 cursor-not-allowed opacity-50'
                         : selectedDate?.getDate() === day &&
                           selectedDate?.getMonth() === currentMonth.getMonth()
-                        ? 'bg-emerald-500 text-white'
+                        ? themeColor === 'blue' ? 'bg-blue-500 text-white' : 'bg-emerald-500 text-white'
                         : 'text-gray-300 hover:bg-gray-700'
                     }`}
                   >
@@ -254,7 +256,9 @@ export default function SelectDate({ onBack, onContinue, language, maxAdvanceDay
           disabled={!selectedDate}
           className={`w-full h-12 rounded-xl ${
             selectedDate
-              ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white'
+              ? themeColor === 'blue' 
+                ? 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white'
+                : 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white'
               : 'bg-gray-700 text-gray-500 cursor-not-allowed'
           }`}
         >
