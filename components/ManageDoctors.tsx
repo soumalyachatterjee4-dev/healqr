@@ -401,19 +401,24 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
         // Add to clinic's linkedDoctorsDetails
         const clinicRef = doc(db, 'clinics', currentUser.uid);
         const existingDoctors = linkedDoctors || [];
+        const newLinkedDoctor = {
+          uid: existingDoctorId,
+          email: existingDoctorData.email,
+          name: existingDoctorData.name,
+          dateOfBirth: existingDoctorData.dateOfBirth,
+          specialties: existingDoctorData.specialties,
+          pinCode: existingDoctorData.pinCode,
+          doctorCode: existingDoctorData.doctorCode,
+          qrNumber: existingDoctorData.qrNumber,
+          status: existingDoctorData.status || 'active'
+        };
+        
         await updateDoc(clinicRef, {
-          linkedDoctorsDetails: [...existingDoctors, {
-            uid: existingDoctorId,
-            email: existingDoctorData.email,
-            name: existingDoctorData.name,
-            dateOfBirth: existingDoctorData.dateOfBirth,
-            specialties: existingDoctorData.specialties,
-            pinCode: existingDoctorData.pinCode,
-            doctorCode: existingDoctorData.doctorCode,
-            qrNumber: existingDoctorData.qrNumber,
-            status: existingDoctorData.status || 'active'
-          }]
+          linkedDoctorsDetails: [...existingDoctors, newLinkedDoctor]
         });
+
+        // Update local state immediately
+        setLinkedDoctors([...existingDoctors, newLinkedDoctor]);
 
         toast.success(`✅ Doctor ${existingDoctorData.name} linked to your clinic!`);
         setShowAddModal(false);
@@ -488,19 +493,24 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
       // Update clinic's linkedDoctorsDetails
       const clinicRef = doc(db, 'clinics', currentUser.uid);
       const existingDoctors = linkedDoctors || [];
+      const newLinkedDoctor = {
+        uid: doctorId,
+        email: newDoctor.email,
+        name: newDoctor.name,
+        dateOfBirth: newDoctor.dateOfBirth,
+        specialties: selectedSpecialties,
+        pinCode: newDoctor.pinCode,
+        doctorCode,
+        qrNumber,
+        status: 'pending_invitation'
+      };
+      
       await updateDoc(clinicRef, {
-        linkedDoctorsDetails: [...existingDoctors, {
-          uid: doctorId,
-          email: newDoctor.email,
-          name: newDoctor.name,
-          dateOfBirth: newDoctor.dateOfBirth,
-          specialties: selectedSpecialties,
-          pinCode: newDoctor.pinCode,
-          doctorCode,
-          qrNumber,
-          status: 'pending_invitation'
-        }]
+        linkedDoctorsDetails: [...existingDoctors, newLinkedDoctor]
       });
+
+      // Update local state immediately
+      setLinkedDoctors([...existingDoctors, newLinkedDoctor]);
 
       // Prepare invitation email data
       const invitationData = {
