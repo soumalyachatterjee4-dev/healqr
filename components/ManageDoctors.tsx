@@ -366,16 +366,65 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
     if (!currentUser) return;
 
     try {
-      // Check if email already exists
+      // Check if doctor with this email already exists
       const doctorsRef = collection(db, 'doctors');
       const emailQuery = query(doctorsRef, where('email', '==', newDoctor.email));
       const emailSnap = await getDocs(emailQuery);
 
       if (!emailSnap.empty) {
-        toast.error('A doctor with this email already exists');
+        // Doctor exists - check if already linked to this clinic
+        const existingDoctor = emailSnap.docs[0];
+        const existingDoctorData = existingDoctor.data();
+        const existingDoctorId = existingDoctor.id;
+
+        // Check if already linked to this clinic
+        const isAlreadyLinked = linkedDoctors.some(d => d.uid === existingDoctorId);
+        if (isAlreadyLinked) {
+          toast.error('This doctor is already linked to your clinic');
+          return;
+        }
+
+        // Doctor exists but not linked - link them to this clinic
+        console.log('🔗 Doctor found, linking to clinic...');
+        
+        // Update doctor's linkedClinics array
+        const doctorRef = doc(db, 'doctors', existingDoctorId);
+        const currentLinkedClinics = existingDoctorData.linkedClinics || [];
+        await updateDoc(doctorRef, {
+          linkedClinics: [...currentLinkedClinics, {
+            clinicId: currentUser.uid,
+            clinicName: clinicData?.name || 'Clinic',
+            clinicCode: clinicData?.clinicCode || ''
+          }]
+        });
+
+        // Add to clinic's linkedDoctorsDetails
+        const clinicRef = doc(db, 'clinics', currentUser.uid);
+        const existingDoctors = linkedDoctors || [];
+        await updateDoc(clinicRef, {
+          linkedDoctorsDetails: [...existingDoctors, {
+            uid: existingDoctorId,
+            email: existingDoctorData.email,
+            name: existingDoctorData.name,
+            dateOfBirth: existingDoctorData.dateOfBirth,
+            specialties: existingDoctorData.specialties,
+            pinCode: existingDoctorData.pinCode,
+            doctorCode: existingDoctorData.doctorCode,
+            qrNumber: existingDoctorData.qrNumber,
+            status: existingDoctorData.status || 'active'
+          }]
+        });
+
+        toast.success(`✅ Doctor ${existingDoctorData.name} linked to your clinic!`);
+        setShowAddDoctorModal(false);
+        setNewDoctor({ email: '', name: '', pinCode: '', dateOfBirth: '' });
+        setSelectedSpecialties([]);
         return;
       }
 
+      // Doctor doesn't exist - create new doctor profile
+      console.log('👤 Creating new doctor profile...');
+      
       // Generate unique IDs
       const doctorId = `doc_${Date.now()}`;
       const doctorCode = await generateDoctorCode(newDoctor.pinCode);
@@ -475,46 +524,14 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
       toast.success(`✅ Doctor added! Code: ${doctorCode}. You can book appointments immediately.`);
       toast.info('Click the copy icon to share activation link with doctor.');
       
-      return (
-        <div className="flex flex-col w-full">
-          <ClinicSidebar {...(typeof onNavigate === 'function' ? { onNavigate } : {})} />
-          <div className="flex-1 p-4">
-            <h2 className="text-2xl font-bold mb-4 text-white">Manage Doctors</h2>
-            {renderDoctorSearch()}
-            {renderLinkedDoctors()}
-          </div>
-        </div>
-      );
-      const codeQuery = query(doctorsRef, where('doctorCode', '==', doctorCode.trim().toUpperCase()));
-      const codeSnap = await getDocs(codeQuery);
-
-      if (!codeSnap.empty) {
-        const doctorData = codeSnap.docs[0].data();
-        setSearchedDoctor({
-          uid: codeSnap.docs[0].id,
-          ...doctorData
-        });
-      } else {
-        // Try searching by uid
-        const doctorRef = doc(db, 'doctors', doctorCode.trim());
-        const doctorSnap = await getDoc(doctorRef);
-        
-        if (doctorSnap.exists()) {
-          setSearchedDoctor({
-            uid: doctorSnap.id,
-            ...doctorSnap.data()
-          });
-        } else {
-          toast.error('Doctor not found');
-          setSearchedDoctor(null);
-        }
-      }
+      // Reset form
+      setShowAddDoctorModal(false);
+      setNewDoctor({ email: '', name: '', pinCode: '', dateOfBirth: '' });
+      setSelectedSpecialties([]);
+      
     } catch (error) {
-      console.error('Error searching doctor:', error);
-      toast.error('Error searching for doctor');
-      setSearchedDoctor(null);
-    } finally {
-      setSearchLoading(false);
+      console.error('Error adding doctor:', error);
+      toast.error('Error adding doctor. Please try again.');
     }
   };
 
