@@ -328,7 +328,7 @@ export default function ClinicBookingFlow({ clinicQRCode, clinicId }: ClinicBook
               setError(null);
               loadClinicData();
             }}
-            className="px-6 py-3 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors"
+            className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
           >
             Retry
           </button>
@@ -374,10 +374,10 @@ export default function ClinicBookingFlow({ clinicQRCode, clinicId }: ClinicBook
               <img
                 src={clinic.logoUrl}
                 alt={clinic.name}
-                className="w-24 h-24 rounded-full mx-auto mb-4 object-cover border-4 border-emerald-500/30"
+                className="w-24 h-24 rounded-full mx-auto mb-4 object-cover border-4 border-blue-500/30"
               />
             ) : (
-              <div className="w-24 h-24 rounded-full mx-auto mb-4 bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
+              <div className="w-24 h-24 rounded-full mx-auto mb-4 bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
                 <Building2 className="w-12 h-12 text-white" />
               </div>
             )}
@@ -412,22 +412,22 @@ export default function ClinicBookingFlow({ clinicQRCode, clinicId }: ClinicBook
             {/* Search by Specialty */}
             <button
               onClick={() => setCurrentStep('search-specialty')}
-              className="w-full p-4 rounded-2xl border-2 border-gray-700 bg-[#0f1419] hover:border-emerald-500 hover:bg-emerald-500/10 transition-all flex items-center gap-4 group"
+              className="w-full p-4 rounded-2xl border-2 border-gray-700 bg-[#0f1419] hover:border-blue-500 hover:bg-blue-500/10 transition-all flex items-center gap-4 group"
             >
-              <div className="w-12 h-12 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <div className="w-12 h-12 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center group-hover:scale-110 transition-transform">
                 <Stethoscope className="w-6 h-6" />
               </div>
               <div className="flex-1 text-left">
                 <div className="text-white font-semibold">Search by Specialty</div>
                 <div className="text-sm text-gray-400">{specialties.length} specialties available</div>
               </div>
-              <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-emerald-400 transition-colors" />
+              <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-blue-400 transition-colors" />
             </button>
 
             {/* Search by Name */}
             <button
               onClick={() => setCurrentStep('search-name')}
-              className="w-full p-4 rounded-2xl border-2 border-gray-700 bg-[#0f1419] hover:border-emerald-500 hover:bg-emerald-500/10 transition-all flex items-center gap-4 group"
+              className="w-full p-4 rounded-2xl border-2 border-gray-700 bg-[#0f1419] hover:border-blue-500 hover:bg-blue-500/10 transition-all flex items-center gap-4 group"
             >
               <div className="w-12 h-12 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center group-hover:scale-110 transition-transform">
                 <User className="w-6 h-6" />
@@ -443,7 +443,7 @@ export default function ClinicBookingFlow({ clinicQRCode, clinicId }: ClinicBook
           {/* Stats */}
           <div className="grid grid-cols-2 gap-4 mt-6 pt-6 border-t border-gray-700">
             <div className="text-center">
-              <div className="text-2xl font-bold text-emerald-400">{doctors.length}</div>
+              <div className="text-2xl font-bold text-blue-400">{doctors.length}</div>
               <div className="text-sm text-gray-400">Doctors</div>
             </div>
             <div className="text-center">
@@ -481,16 +481,16 @@ export default function ClinicBookingFlow({ clinicQRCode, clinicId }: ClinicBook
                 <button
                   key={specialty}
                   onClick={() => handleSpecialtySelect(specialty)}
-                  className="w-full p-4 rounded-2xl border-2 border-gray-700 bg-[#0f1419] hover:border-emerald-500 hover:bg-emerald-500/10 transition-all flex items-center gap-4 group"
+                  className="w-full p-4 rounded-2xl border-2 border-gray-700 bg-[#0f1419] hover:border-blue-500 hover:bg-blue-500/10 transition-all flex items-center gap-4 group"
                 >
-                  <div className="w-12 h-12 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <div className="w-12 h-12 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center group-hover:scale-110 transition-transform">
                     <Stethoscope className="w-6 h-6" />
                   </div>
                   <div className="flex-1 text-left">
                     <div className="text-white font-semibold">{specialty}</div>
                     <div className="text-sm text-gray-400">{doctorCount} doctor{doctorCount !== 1 ? 's' : ''}</div>
                   </div>
-                  <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-emerald-400 transition-colors" />
+                  <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-blue-400 transition-colors" />
                 </button>
               );
             })}
@@ -691,16 +691,16 @@ function DoctorCard({ doctor, onClick }: { doctor: Doctor; onClick: () => void }
   return (
     <button
       onClick={onClick}
-      className="w-full p-4 rounded-2xl border-2 border-gray-700 bg-[#0f1419] hover:border-emerald-500 hover:bg-emerald-500/10 transition-all flex items-center gap-4 group"
+      className="w-full p-4 rounded-2xl border-2 border-gray-700 bg-[#0f1419] hover:border-blue-500 hover:bg-blue-500/10 transition-all flex items-center gap-4 group"
     >
       {doctor.profileImage ? (
         <img
           src={doctor.profileImage}
           alt={doctor.name}
-          className="w-14 h-14 rounded-full object-cover border-2 border-emerald-500/30"
+          className="w-14 h-14 rounded-full object-cover border-2 border-blue-500/30"
         />
       ) : (
-        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center text-white font-bold">
+        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold">
           {doctor.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
         </div>
       )}
@@ -709,12 +709,12 @@ function DoctorCard({ doctor, onClick }: { doctor: Doctor; onClick: () => void }
         {doctor.degrees && doctor.degrees.length > 0 && (
           <div className="text-xs text-gray-400">{doctor.degrees.join(', ')}</div>
         )}
-        <div className="text-sm text-emerald-400">{doctor.specialty}</div>
+        <div className="text-sm text-blue-400">{doctor.specialty}</div>
         {doctor.linkedToClinic && (
           <div className="text-xs text-blue-400 mt-1">✓ Linked Doctor</div>
         )}
       </div>
-      <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-emerald-400 transition-colors" />
+      <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-blue-400 transition-colors" />
     </button>
   );
 }
