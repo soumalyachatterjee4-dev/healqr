@@ -83,7 +83,8 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
       console.log('🔄 Syncing profileData from props:', profileData);
       if (profileData.name) setName(profileData.name);
       if (profileData.image) setProfileImage(profileData.image);
-      if (profileData.language) setPreferredLanguage(profileData.language);
+      // Don't sync language from props - it's loaded directly from Firestore to avoid race conditions
+      // if (profileData.language) setPreferredLanguage(profileData.language);
       if (profileData.degrees) setDegrees(profileData.degrees);
       if (profileData.specialities) setSpecialities(profileData.specialities);
     }

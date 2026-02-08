@@ -367,6 +367,8 @@ export default function PatientDetailsForm({
           chamber: selectedChamber || null,
           chamberId, // Numeric ID for querying
           clinicId: sessionStorage.getItem('booking_clinic_id') || null,
+          clinicName: sessionStorage.getItem('booking_clinic_name') || selectedChamber || 'Clinic',
+          clinicQRCode: sessionStorage.getItem('booking_clinic_qr') || null,
           type: bookingType, // 'qr_booking' or 'walkin_booking'
           status: 'confirmed',
           paymentStatus: formData.paymentStatus,
@@ -386,7 +388,7 @@ export default function PatientDetailsForm({
           patientPhone: formData.whatsappNumber,
           patientName: normalizedName,
           doctorName: doctorName,
-          clinicName: selectedChamber || 'Clinic',
+          clinicName: sessionStorage.getItem('booking_clinic_name') || selectedChamber || 'Clinic',
           chamber: selectedChamber || '',
           notificationType: 'booking_confirmed',
           bookingStatus: 'confirmed',

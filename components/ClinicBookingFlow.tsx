@@ -167,7 +167,6 @@ export default function ClinicBookingFlow({ clinicQRCode, clinicId }: ClinicBook
                 email: fullDoctorData.email,
                 chambers: fullDoctorData.chambers,
                 miniWebsiteReviews: fullDoctorData.miniWebsiteReviews,
-                placeholderReviews: fullDoctorData.placeholderReviews,
               };
 
               doctorsList.push(doctor);
@@ -231,12 +230,14 @@ export default function ClinicBookingFlow({ clinicQRCode, clinicId }: ClinicBook
   const handleDoctorSelect = (doctor: Doctor) => {
     setSelectedDoctor(doctor);
     
-    // Store doctor ID in session for booking flow
+    // Store doctor ID and clinic context in session for booking flow
     sessionStorage.setItem('booking_doctor_id', doctor.id);
     sessionStorage.setItem('booking_clinic_id', clinic?.id || '');
+    sessionStorage.setItem('booking_clinic_name', clinic?.name || '');
+    sessionStorage.setItem('booking_clinic_qr', clinic?.qrNumber || clinicQRCode || '');
     
     console.log('✅ ClinicBookingFlow: Doctor selected:', doctor.name, '| ID:', doctor.id, '| Chambers:', doctor.chambers?.length);
-    console.log('📦 SessionStorage set: booking_doctor_id =', doctor.id);
+    console.log('📦 SessionStorage set: booking_doctor_id =', doctor.id, '| clinic_id =', clinic?.id, '| clinic_name =', clinic?.name);
     
     if (doctor.linkedToClinic) {
       setCurrentStep('doctor-profile');
@@ -610,18 +611,27 @@ export default function ClinicBookingFlow({ clinicQRCode, clinicId }: ClinicBook
     let chambersList = selectedDoctor.chambers || [];
     
     // Only filter if we have a clinic (clinic-based booking)
-    if (clinic) {
+    if (clinic && clinic.id) {
+      // 🔥 FIXED: Use clinicId for accurate filtering instead of address/name matching
       const clinicChambers = chambersList.filter(chamber => 
-        chamber.chamberAddress === clinic.address || 
-        chamber.chamberName?.toLowerCase().includes(clinic.name.toLowerCase() || '')
+        chamber.clinicId === clinic.id && chamber.status !== 'inactive'
       );
       
-      // Use filtered chambers if we found any, otherwise use all chambers
-      chambersList = clinicChambers.length > 0 ? clinicChambers : chambersList;
+      // Use filtered chambers if we found any
+      if (clinicChambers.length > 0) {
+        chambersList = clinicChambers;
+      } else {
+        console.warn('⚠️ No chambers found for clinic:', clinic.name, 'Doctor:', selectedDoctor.name);
+        // Show message that doctor has no chambers at this clinic
+        chambersList = [];
+      }
     }
-    // For solo doctor booking (no clinic), show all chambers
+    // For solo doctor booking (no clinic), show all active chambers
+    else {
+      chambersList = chambersList.filter(chamber => chamber.status !== 'inactive');
+    }
 
-    console.log('🏥 SelectChamber: Showing', chambersList.length, 'chambers for doctor', selectedDoctor.name);
+    console.log('🏥 SelectChamber: Showing', chambersList.length, 'chambers for doctor', selectedDoctor.name, 'at clinic', clinic?.name);
 
     return (
       <SelectChamber

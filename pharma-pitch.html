@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealQR - Pharma Partnership Proposal</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            overflow: hidden;
+        }
+
+        .presentation {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .slide {
+            display: none;
+            width: 90%;
+            max-width: 1200px;
+            height: 85vh;
+            background: white;
+            border-radius: 20px;
+            padding: 60px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            position: relative;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        .slide.active {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .slide-number {
+            position: absolute;
+            bottom: 30px;
+            right: 40px;
+            color: #667eea;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        h1 {
+            font-size: 64px;
+            color: #667eea;
+            margin-bottom: 20px;
+            font-weight: 700;
+        }
+
+        h2 {
+            font-size: 48px;
+            color: #667eea;
+            margin-bottom: 30px;
+            font-weight: 600;
+        }
+
+        h3 {
+            font-size: 32px;
+            color: #764ba2;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        p {
+            font-size: 24px;
+            line-height: 1.6;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .subtitle {
+            font-size: 28px;
+            color: #555;
+            font-weight: 300;
+        }
+
+        .highlight {
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .benefit-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 30px;
+            margin-top: 30px;
+        }
+
+        .benefit-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 30px;
+            border-radius: 15px;
+            color: white;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .benefit-card h3 {
+            color: white;
+            font-size: 26px;
+            margin-bottom: 15px;
+        }
+
+        .benefit-card p {
+            color: white;
+            font-size: 18px;
+            line-height: 1.5;
+        }
+
+        .feature-list {
+            list-style: none;
+            margin-top: 20px;
+        }
+
+        .feature-list li {
+            font-size: 22px;
+            padding: 15px 0;
+            padding-left: 40px;
+            position: relative;
+            color: #333;
+        }
+
+        .feature-list li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #667eea;
+            font-weight: bold;
+            font-size: 28px;
+        }
+
+        .revenue-box {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            padding: 40px;
+            border-radius: 15px;
+            color: white;
+            text-align: center;
+            margin: 30px 0;
+        }
+
+        .revenue-box h3 {
+            color: white;
+            font-size: 36px;
+            margin-bottom: 20px;
+        }
+
+        .revenue-box p {
+            color: white;
+            font-size: 22px;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 40px;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 56px;
+            font-weight: 700;
+            color: #667eea;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 20px;
+            color: #666;
+            margin-top: 10px;
+        }
+
+        .cta-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 50px;
+            border-radius: 15px;
+            text-align: center;
+            margin-top: 40px;
+        }
+
+        .cta-box h2 {
+            color: white;
+            margin-bottom: 20px;
+        }
+
+        .cta-box p {
+            color: white;
+            font-size: 26px;
+        }
+
+        .controls {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+        }
+
+        .btn {
+            background: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 18px;
+            cursor: pointer;
+            font-weight: 600;
+            color: #667eea;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .logo {
+            position: absolute;
+            top: 30px;
+            left: 40px;
+            font-size: 32px;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .demo-section {
+            background: #f8f9fa;
+            padding: 40px;
+            border-radius: 15px;
+            margin-top: 30px;
+            text-align: center;
+        }
+
+        .demo-section h3 {
+            margin-bottom: 20px;
+        }
+
+        .demo-section p {
+            font-size: 20px;
+            color: #666;
+        }
+
+        .opportunity-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 25px;
+            margin-top: 30px;
+        }
+
+        .opportunity-item {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 12px;
+            border-left: 5px solid #667eea;
+        }
+
+        .opportunity-item h4 {
+            color: #667eea;
+            font-size: 22px;
+            margin-bottom: 10px;
+        }
+
+        .opportunity-item p {
+            font-size: 18px;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="presentation">
+        <!-- Slide 1: Title -->
+        <div class="slide active">
+            <div class="logo">HealQR</div>
+            <h1>HealQR Platform</h1>
+            <p class="subtitle">Healthcare Digital Ecosystem</p>
+            <p class="subtitle" style="margin-top: 40px;">Strategic Partnership Proposal</p>
+            <p style="margin-top: 60px; font-size: 28px; color: #764ba2;">Connecting Pharma Companies with Healthcare Professionals</p>
+            <div class="slide-number">1 / 10</div>
+        </div>
+
+        <!-- Slide 2: What is HealQR -->
+        <div class="slide">
+            <div class="logo">HealQR</div>
+            <h2>What is HealQR?</h2>
+            <p style="font-size: 26px; margin-bottom: 40px;">A comprehensive digital healthcare platform connecting patients, doctors, and clinics</p>
+            <div class="stats">
+                <div class="stat-item">
+                    <span class="stat-number">1000+</span>
+                    <span class="stat-label">Active Doctors</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">50K+</span>
+                    <span class="stat-label">Patient Interactions</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">500+</span>
+                    <span class="stat-label">Clinics</span>
+                </div>
+            </div>
+            <div class="slide-number">2 / 10</div>
+        </div>
+
+        <!-- Slide 3: Live Demo Section -->
+        <div class="slide">
+            <div class="logo">HealQR</div>
+            <h2>Platform Overview</h2>
+            <div class="demo-section">
+                <h3>🌐 Live Platform Demo</h3>
+                <p style="font-size: 24px; color: #667eea; font-weight: 600; margin-top: 20px;">
+                    https://teamhealqr.web.app
+                </p>
+                <p style="margin-top: 30px;">
+                    Experience our comprehensive healthcare ecosystem in action
+                </p>
+            </div>
+            <ul class="feature-list" style="margin-top: 40px;">
+                <li>Doctor Dashboard & Patient Management</li>
+                <li>Real-time Appointment Booking System</li>
+                <li>Digital Prescription & Medical Records</li>
+                <li>Integrated Communication Tools</li>
+            </ul>
+            <div class="slide-number">3 / 10</div>
+        </div>
+
+        <!-- Slide 4: Partnership Benefits Intro -->
+        <div class="slide">
+            <div class="logo">HealQR</div>
+            <h2>Why Partner with HealQR?</h2>
+            <p style="font-size: 26px; margin-bottom: 50px;">Unlock unprecedented access to healthcare professionals and patients</p>
+            <div class="benefit-grid">
+                <div class="benefit-card">
+                    <h3>🎯 Direct Reach</h3>
+                    <p>Access to 1000+ verified doctors across multiple specialties</p>
+                </div>
+                <div class="benefit-card">
+                    <h3>📊 Data-Driven</h3>
+                    <p>Real-time analytics and engagement metrics for your campaigns</p>
+                </div>
+                <div class="benefit-card">
+                    <h3>🤝 Trust Building</h3>
+                    <p>Build authentic relationships with healthcare providers</p>
+                </div>
+                <div class="benefit-card">
+                    <h3>💡 Innovation</h3>
+                    <p>Be part of the digital healthcare revolution</p>
+                </div>
+            </div>
+            <div class="slide-number">4 / 10</div>
+        </div>
+
+        <!-- Slide 5: Benefit 1 - Product Promotion -->
+        <div class="slide">
+            <div class="logo">HealQR</div>
+            <h2>Benefit #1: Product Promotion</h2>
+            <h3 style="margin-bottom: 30px;">Showcase Your Products & Educational Content</h3>
+            <div class="opportunity-grid">
+                <div class="opportunity-item">
+                    <h4>Doctor Dashboard Integration</h4>
+                    <p>Display pharmaceutical products and educational materials directly in doctor's workspace</p>
+                </div>
+                <div class="opportunity-item">
+                    <h4>Educational Content</h4>
+                    <p>Share latest research, product information, and medical updates</p>
+                </div>
+                <div class="opportunity-item">
+                    <h4>Targeted Visibility</h4>
+                    <p>Reach doctors based on specialty, location, and practice patterns</p>
+                </div>
+                <div class="opportunity-item">
+                    <h4>Interactive Materials</h4>
+                    <p>Videos, infographics, and downloadable resources for doctors</p>
+                </div>
+            </div>
+            <div class="slide-number">5 / 10</div>
+        </div>
+
+        <!-- Slide 6: Benefit 2 - Chamber Access -->
+        <div class="slide">
+            <div class="logo">HealQR</div>
+            <h2>Benefit #2: Enhanced Access</h2>
+            <h3 style="margin-bottom: 30px;">Greater Access to Doctor Chambers</h3>
+            <ul class="feature-list">
+                <li><strong>Direct Communication Channel:</strong> Reach doctors through platform messaging</li>
+                <li><strong>Rapport Building Tools:</strong> Scheduled engagement and follow-up systems</li>
+                <li><strong>Virtual Meetings:</strong> Schedule and conduct product presentations</li>
+                <li><strong>Feedback Collection:</strong> Gather insights and doctor preferences</li>
+                <li><strong>Sample Distribution Tracking:</strong> Manage and track product samples digitally</li>
+                <li><strong>Relationship Management:</strong> Built-in CRM for pharma representatives</li>
+            </ul>
+            <div class="slide-number">6 / 10</div>
+        </div>
+
+        <!-- Slide 7: Win-Win Collaboration -->
+        <div class="slide">
+            <div class="logo">HealQR</div>
+            <h2>Win-Win Collaboration Model</h2>
+            <p style="font-size: 26px; margin-bottom: 40px;">A sustainable partnership that benefits everyone</p>
+            <div class="benefit-grid">
+                <div class="benefit-card">
+                    <h3>For Pharma Companies</h3>
+                    <p>• Premium placement in doctor dashboards<br>
+                    • Educational content distribution<br>
+                    • Direct doctor engagement tools<br>
+                    • Analytics and ROI tracking</p>
+                </div>
+                <div class="benefit-card">
+                    <h3>For HealQR Platform</h3>
+                    <p>• Sustainable revenue model<br>
+                    • Enhanced platform features<br>
+                    • Better doctor engagement<br>
+                    • Continuous platform improvement</p>
+                </div>
+            </div>
+            <div class="slide-number">7 / 10</div>
+        </div>
+
+        <!-- Slide 8: Revenue Sharing Model -->
+        <div class="slide">
+            <div class="logo">HealQR</div>
+            <h2>Revenue Sharing Opportunity</h2>
+            <div class="revenue-box">
+                <h3>💰 Additional Revenue Stream</h3>
+                <p>Participate in our 3rd party advertising revenue</p>
+            </div>
+            <div class="opportunity-grid" style="margin-top: 30px;">
+                <div class="opportunity-item">
+                    <h4>Booking Flow Ads</h4>
+                    <p>Non-intrusive advertisements during patient booking process</p>
+                </div>
+                <div class="opportunity-item">
+                    <h4>Notification Page Ads</h4>
+                    <p>Relevant ads in patient notification screens</p>
+                </div>
+                <div class="opportunity-item">
+                    <h4>Shared Revenue Model</h4>
+                    <p>Earn from platform's advertising revenue based on partnership tier</p>
+                </div>
+                <div class="opportunity-item">
+                    <h4>Performance Metrics</h4>
+                    <p>Transparent reporting and monthly revenue statements</p>
+                </div>
+            </div>
+            <div class="slide-number">8 / 10</div>
+        </div>
+
+        <!-- Slide 9: Partnership Tiers -->
+        <div class="slide">
+            <div class="logo">HealQR</div>
+            <h2>Partnership Options</h2>
+            <div class="benefit-grid">
+                <div class="benefit-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                    <h3>🥉 Bronze Partner</h3>
+                    <p>• Doctor dashboard presence<br>
+                    • Monthly content updates<br>
+                    • Basic analytics<br>
+                    • 5% ad revenue share</p>
+                </div>
+                <div class="benefit-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                    <h3>🥈 Silver Partner</h3>
+                    <p>• Premium dashboard placement<br>
+                    • Weekly content updates<br>
+                    • Advanced analytics<br>
+                    • 10% ad revenue share</p>
+                </div>
+                <div class="benefit-card" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
+                    <h3>🥇 Gold Partner</h3>
+                    <p>• Exclusive dashboard branding<br>
+                    • Daily content control<br>
+                    • Full analytics access<br>
+                    • 15% ad revenue share</p>
+                </div>
+                <div class="benefit-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <h3>💎 Platinum Partner</h3>
+                    <p>• Custom integration options<br>
+                    • API access for automation<br>
+                    • Priority support<br>
+                    • 20% ad revenue share</p>
+                </div>
+            </div>
+            <div class="slide-number">9 / 10</div>
+        </div>
+
+        <!-- Slide 10: Call to Action -->
+        <div class="slide">
+            <div class="logo">HealQR</div>
+            <h2>Let's Build Together</h2>
+            <div class="cta-box">
+                <h2>Ready to Transform Healthcare Marketing?</h2>
+                <p>Join HealQR's ecosystem and reach healthcare professionals effectively</p>
+            </div>
+            <div style="margin-top: 60px; text-align: center;">
+                <p style="font-size: 28px; color: #667eea; font-weight: 600;">Contact Us Today</p>
+                <p style="font-size: 24px; margin-top: 20px;">📧 partnership@healqr.com</p>
+                <p style="font-size: 24px;">🌐 www.healqr.com</p>
+                <p style="font-size: 24px;">📱 +91 XXXXX XXXXX</p>
+            </div>
+            <p style="text-align: center; margin-top: 60px; font-size: 32px; color: #764ba2; font-weight: 600;">
+                Thank You! 🙏
+            </p>
+            <div class="slide-number">10 / 10</div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button class="btn" onclick="previousSlide()">← Previous</button>
+        <button class="btn" onclick="nextSlide()">Next →</button>
+    </div>
+
+    <script>
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+
+        function showSlide(n) {
+            slides[currentSlide].classList.remove('active');
+            currentSlide = (n + slides.length) % slides.length;
+            slides[currentSlide].classList.add('active');
+        }
+
+        function nextSlide() {
+            showSlide(currentSlide + 1);
+        }
+
+        function previousSlide() {
+            showSlide(currentSlide - 1);
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') {
+                nextSlide();
+            } else if (e.key === 'ArrowLeft') {
+                previousSlide();
+            }
+        });
+
+        // Touch/swipe support for mobile
+        let touchStartX = 0;
+        let touchEndX = 0;
+
+        document.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+        });
+
+        document.addEventListener('touchend', (e) => {
+            touchEndX = e.changedTouches[0].screenX;
+            if (touchStartX - touchEndX > 50) {
+                nextSlide();
+            } else if (touchEndX - touchStartX > 50) {
+                previousSlide();
+            }
+        });
+    </script>
+</body>
+</html>
