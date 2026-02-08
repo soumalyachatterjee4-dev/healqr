@@ -29,6 +29,16 @@ interface SelectedDoctor {
   qrNumber?: string;
 }
 
+interface ClinicData {
+  id: string;
+  name: string;
+  logoUrl?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  linkedDoctorsDetails?: any[];
+}
+
 export default function ClinicBookingFlow() {
   const [currentStep, setCurrentStep] = useState<BookingStep>('language');
   const [language, setLanguage] = useState<Language>('english');
@@ -37,9 +47,50 @@ export default function ClinicBookingFlow() {
   const [selectedChamberId, setSelectedChamberId] = useState<number | null>(null);
   const [selectedChamberName, setSelectedChamberName] = useState<string>('');
   const [bookingId, setBookingId] = useState<string>('');
+  const [clinic, setClinic] = useState<ClinicData | null>(null);
+  const [loadingClinic, setLoadingClinic] = useState(true);
 
-  // Load language from session if returning user
+  // Load clinic data from URL parameter
   useEffect(() => {
+    const loadClinicData = async () => {
+      try {
+        // Get clinic ID from URL parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        const clinicId = urlParams.get('clinicId');
+        
+        if (!clinicId) {
+          console.error('No clinic ID found in URL');
+          setLoadingClinic(false);
+          return;
+        }
+
+        // Store in session storage
+        sessionStorage.setItem('booking_clinic_id', clinicId);
+
+        // Load clinic data from Firestore
+        const { db } = await import('../lib/firebase/config');
+        if (!db) return;
+
+        const { doc, getDoc } = await import('firebase/firestore');
+        const clinicRef = doc(db, 'clinics', clinicId);
+        const clinicSnap = await getDoc(clinicRef);
+
+        if (clinicSnap.exists()) {
+          const clinicData = { id: clinicSnap.id, ...clinicSnap.data() } as ClinicData;
+          setClinic(clinicData);
+        } else {
+          console.error('Clinic not found');
+        }
+      } catch (error) {
+        console.error('Error loading clinic:', error);
+      } finally {
+        setLoadingClinic(false);
+      }
+    };
+
+    loadClinicData();
+
+    // Load language from session if returning user
     const savedLanguage = sessionStorage.getItem('booking_language');
     if (savedLanguage) {
       setLanguage(savedLanguage as Language);
@@ -132,13 +183,40 @@ export default function ClinicBookingFlow() {
     }
   };
 
+  // Loading state
+  if (loadingClinic) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mb-4"></div>
+          <p className="text-blue-200">Loading clinic...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Clinic not found
+  if (!clinic) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-slate-900 flex items-center justify-center p-4">
+        <div className="bg-slate-800/50 border border-blue-500/20 rounded-2xl p-8 max-w-md text-center backdrop-blur-sm">
+          <div className="text-6xl mb-4">🏥</div>
+          <h2 className="text-2xl font-bold text-white mb-2">Clinic Not Found</h2>
+          <p className="text-blue-200">Please scan a valid clinic QR code to continue.</p>
+        </div>
+      </div>
+    );
+  }
+
   // Render current step
   switch (currentStep) {
     case 'language':
       return (
         <LanguageSelection 
-          onLanguageSelect={handleLanguageSelect}
-          selectedLanguage={language}
+          onContinue={handleLanguageSelect}
+          doctorName={clinic.name}
+          doctorPhoto={clinic.logoUrl}
+          useDrPrefix={false}
         />
       );
 
