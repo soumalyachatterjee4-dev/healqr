@@ -2481,6 +2481,16 @@ export default function App() {
 
           // Don't filter by end-time here - SelectChamber will show CHAMBER TIME OVER badge if expired
 
+          // 🔒 CLINIC QR FILTERING: If patient scanned a clinic QR, only show chambers for THAT clinic
+          const scannedClinicId = sessionStorage.getItem('booking_clinic_id');
+          if (scannedClinicId) {
+            // Only show chambers that belong to this specific clinic
+            if (chamber.clinicId !== scannedClinicId) {
+              console.log('🚫 Filtering out chamber (not from scanned clinic):', chamber.chamberName, 'clinicId:', chamber.clinicId);
+              return false; // Hide personal chambers and other clinics
+            }
+          }
+
           // Daily chambers always show
           if (chamber.frequency === 'Daily') {
             return true;
@@ -2500,9 +2510,12 @@ export default function App() {
         });
 
         console.log('🎯 [APP.TSX] RENDERING SELECT CHAMBER WITH:');
+        console.log('  - scannedClinicId:', sessionStorage.getItem('booking_clinic_id'));
         console.log('  - clinicAddress:', clinicAddress);
         console.log('  - clinicPlannedOffPeriods:', clinicPlannedOffPeriods);
-        console.log('  - filteredChambers:', filteredChambers);
+        console.log('  - total chambers before filtering:', doctorChambers.length);
+        console.log('  - filteredChambers after clinic filter:', filteredChambers.length);
+        console.log('  - filteredChambers:', filteredChambers.map((c: any) => ({ name: c.chamberName, clinicId: c.clinicId })));
         console.log('  - selectedDate:', selectedDate);
 
         return (
