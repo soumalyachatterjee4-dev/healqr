@@ -8,15 +8,28 @@ When patients scanned a **clinic QR code**, they could see ALL chambers of the s
 - ❌ Chambers at OTHER clinics
 - ❌ This exposed doctor's private practice and created confusion
 
+### Root Cause:
+1. **ClinicBookingFlow.tsx** was NOT passing `clinicId` to SelectChamber component
+2. **SelectChamber.tsx** had no logic to filter chambers by `clinicId` for clinic QR scans
+3. Only filtered chambers when clinic was "off", not when coming from clinic QR
+
 ### Solution Implemented:
-Added **clinic-based chamber filtering** in [App.tsx](App.tsx#L2486-L2492):
-- When `booking_clinic_id` exists in sessionStorage (patient scanned clinic QR)
-- Only show chambers where `chamber.clinicId === scannedClinicId`
-- Personal chambers (no clinicId or different clinicId) are hidden
-- Patients now ONLY see chambers at the clinic whose QR they scanned
+**Two-part fix:**
+
+1. **[ClinicBookingFlow.tsx](components/ClinicBookingFlow.tsx#L456)** - Line 456:
+   - Added `clinicId={clinic?.id}` prop to SelectChamber
+   - Now passes clinic ID when patient scans clinic QR
+
+2. **[SelectChamber.tsx](components/SelectChamber.tsx#L267-L287)**:
+   - Added NEW filter before existing "clinic is off" logic
+   - Checks if `booking_source === 'clinic_qr'` AND `clinicId` exists
+   - Filters to ONLY show chambers where `chamber.clinicId === clinicId`
+   - Personal chambers (no clinicId or different clinicId) are hidden
 
 ### Files Modified:
-- [App.tsx](App.tsx) - Lines 2486-2519: Added clinic filter in `booking- -chamber` page
+- [ClinicBookingFlow.tsx](components/ClinicBookingFlow.tsx) - Added clinicId prop to SelectChamber
+- [SelectChamber.tsx](components/SelectChamber.tsx) - Added clinic QR chamber filter logic
+- [App.tsx](App.tsx) - Added clinic filter (for doctor QR path - complementary fix)
 
 ### Build & Deployment:
 - ✅ **Build Status:** Successful
