@@ -264,6 +264,30 @@ export default function SelectChamber({
           clinicAddress: clinicAddress
         });
         
+        // 🔒 CLINIC QR FILTER: If patient scanned a clinic QR (clinicId exists),
+        // ONLY show chambers belonging to THAT specific clinic
+        const bookingSource = sessionStorage.getItem('booking_source');
+        if (clinicId && bookingSource === 'clinic_qr') {
+          const beforeFilter = sortedChambers.length;
+          console.log('🏥 CLINIC QR MODE: Filtering to show ONLY clinic chambers with ID:', clinicId);
+          
+          sortedChambers = sortedChambers.filter(chamber => {
+            const chamberClinicId = (chamber as any).clinicId;
+            const belongsToClinic = chamberClinicId === clinicId;
+            
+            console.log(`🔍 Chamber "${chamber.chamberName}":`, {
+              chamberClinicId: chamberClinicId || 'NONE',
+              targetClinicId: clinicId,
+              match: belongsToClinic,
+              action: belongsToClinic ? '✅ KEEP' : '❌ REMOVE'
+            });
+            
+            return belongsToClinic; // Keep ONLY chambers matching clinic ID
+          });
+          
+          console.log(`✅ Clinic chamber filter complete: ${beforeFilter} → ${sortedChambers.length} chambers (kept only clinic chambers)`);
+        }
+        
         // Filter out clinic chambers if clinic is off on selected date
         if (isClinicOff() && clinicId) {
           const beforeFilter = sortedChambers.length;

@@ -453,6 +453,7 @@ export default function ClinicBookingFlow() {
           doctorPhoto={selectedDoctor?.profilePhoto}
           language={language}
           themeColor="blue"
+          clinicId={clinic?.id}
           clinicAddress={clinic?.address}
           clinicPlannedOffPeriods={clinicSchedule?.plannedOffPeriods || []}
         />
