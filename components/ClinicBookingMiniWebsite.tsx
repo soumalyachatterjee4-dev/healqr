@@ -1,7 +1,10 @@
-import { Phone, MapPin, Sparkles, Calendar, Users } from 'lucide-react';
+import { Lightbulb, Calendar, Phone, Sparkles, MapPin, Users } from 'lucide-react';
 import { Button } from './ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { useState, useEffect } from 'react';
 import { t, type Language } from '../utils/translations';
+import TemplateDisplay from './TemplateDisplay';
+import BookingFlowLayout from './BookingFlowLayout';
 
 interface ClinicBookingMiniWebsiteProps {
   onBookNow?: () => void;
@@ -82,155 +85,262 @@ export default function ClinicBookingMiniWebsite({
     }
   };
 
-  if (loadingProfile) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-slate-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mb-4"></div>
-          <p className="text-blue-200">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!clinicProfile) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-slate-900 flex items-center justify-center p-4">
-        <div className="bg-slate-800/50 border border-blue-500/20 rounded-2xl p-8 max-w-md text-center backdrop-blur-sm">
-          <div className="text-6xl mb-4">🏥</div>
-          <h2 className="text-2xl font-bold text-white mb-2">Clinic Not Found</h2>
-          <p className="text-blue-200 mb-6">Unable to load clinic information</p>
-        </div>
-      </div>
-    );
-  }
-
-  const { name, clinicCode, address, phone, description, specialties, linkedDoctorsDetails = [] } = clinicProfile;
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-slate-900">
-      {/* Hero Section */}
-      <div className="relative overflow-hidden">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute inset-0" style={{
-            backgroundImage: 'radial-gradient(circle at 1px 1px, rgb(59, 130, 246) 1px, transparent 0)',
-            backgroundSize: '40px 40px'
-          }}></div>
+    <BookingFlowLayout
+      onBack={onBack}
+      doctorName={clinicProfile?.name}
+      doctorPhoto={clinicProfile?.logoUrl}
+      useDrPrefix={false}
+      themeColor="blue"
+    >
+      <div className="bg-[#1a1f2e] rounded-2xl shadow-xl overflow-hidden max-w-full">
+        {/* Book Now Button Section */}
+        <div className="bg-gradient-to-br from-gray-700 to-gray-800 px-4 sm:px-6 py-4 sm:py-6">
+          <Button
+            onClick={onBookNow}
+            disabled={!onBookNow}
+            className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Calendar className="w-5 h-5" />
+            {t('bookAppointmentNow', language)}
+          </Button>
         </div>
 
-        <div className="relative max-w-4xl mx-auto px-4 py-12">
-          {/* Clinic Logo/Name */}
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-blue-500 to-blue-600 rounded-3xl shadow-2xl shadow-blue-500/50 mb-6 transform hover:scale-105 transition-transform">
-              <span className="text-4xl font-bold text-white">
-                {name?.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || 'CL'}
-              </span>
-            </div>
-            <h1 className="text-4xl md:text-5xl font-bold text-white mb-3">
-              {name || 'Clinic'}
-            </h1>
-            {clinicCode && (
-              <div className="inline-flex items-center gap-2 bg-blue-500/20 backdrop-blur-sm border border-blue-400/30 px-4 py-2 rounded-full">
-                <Sparkles className="w-4 h-4 text-blue-300" />
-                <span className="text-blue-200 font-medium">{clinicCode}</span>
-              </div>
-            )}
-          </div>
+        {/* Know Your Clinic Section */}
+        <div className="px-4 sm:px-6 py-4 sm:py-6">
+          <h3 className="text-white text-base sm:text-lg mb-4">
+            {language === 'english' && 'About Our Clinic'}
+            {language === 'hindi' && 'हमारे क्लिनिक के बारे में'}
+            {language === 'bengali' && 'আমাদের ক্লিনিক সম্পর্কে'}
+            {language === 'marathi' && 'आमच्या क्लिनिकबद्दल'}
+          </h3>
 
-          {/* Quick Info Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            {address && (
-              <div className="bg-slate-800/50 backdrop-blur-sm border border-blue-500/20 rounded-2xl p-4 hover:bg-slate-800/70 transition-all">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center flex-shrink-0">
-                    <MapPin className="w-5 h-5 text-blue-400" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-blue-300 mb-1">Location</p>
-                    <p className="text-sm text-white font-medium">{address}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-            {phone && (
-              <div className="bg-slate-800/50 backdrop-blur-sm border border-blue-500/20 rounded-2xl p-4 hover:bg-slate-800/70 transition-all">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center flex-shrink-0">
-                    <Phone className="w-5 h-5 text-blue-400" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-blue-300 mb-1">Contact</p>
-                    <a href={`tel:${phone}`} className="text-sm text-white font-medium hover:text-blue-400">
-                      {phone}
-                    </a>
-                  </div>
-                </div>
-              </div>
-            )}
-            <div className="bg-slate-800/50 backdrop-blur-sm border border-blue-500/20 rounded-2xl p-4 hover:bg-slate-800/70 transition-all">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Users className="w-5 h-5 text-blue-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-blue-300 mb-1">Doctors</p>
-                  <p className="text-sm text-white font-medium">{linkedDoctorsDetails.length} Available</p>
-                </div>
-              </div>
+          {loadingProfile ? (
+            <div className="text-center py-8 text-gray-400">
+              {language === 'english' && 'Loading clinic profile...'}
+              {language === 'hindi' && 'क्लिनिक प्रोफाइल लोड हो रहा है...'}
+              {language === 'bengali' && 'ক্লিনিক প্রোফাইল লোড হচ্ছে...'}
             </div>
-          </div>
+          ) : (
+            <div className="flex gap-4">
+              <Avatar className="w-16 h-16 flex-shrink-0">
+                <AvatarImage
+                  src={clinicProfile?.logoUrl || ''}
+                  alt={clinicProfile?.name || 'Clinic'}
+                />
+                <AvatarFallback className="bg-blue-500 text-white text-xl">
+                  {clinicProfile?.name
+                    ? clinicProfile.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
+                    : 'CL'}
+                </AvatarFallback>
+              </Avatar>
 
-          {/* About Clinic */}
-          {description && (
-            <div className="bg-slate-800/50 backdrop-blur-sm border border-blue-500/20 rounded-2xl p-6 mb-6">
-              <h2 className="text-xl font-bold text-white mb-3 flex items-center gap-2">
-                <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                  <Sparkles className="w-4 h-4 text-blue-400" />
-                </div>
-                About Us
-              </h2>
-              <p className="text-blue-100 leading-relaxed">{description}</p>
-            </div>
-          )}
-
-          {/* Specialties */}
-          {specialties && specialties.length > 0 && (
-            <div className="bg-slate-800/50 backdrop-blur-sm border border-blue-500/20 rounded-2xl p-6 mb-8">
-              <h2 className="text-xl font-bold text-white mb-4">Our Specialties</h2>
-              <div className="flex flex-wrap gap-2">
-                {specialties.map((specialty: string, index: number) => (
-                  <span
-                    key={index}
-                    className="px-4 py-2 bg-blue-500/20 border border-blue-400/30 rounded-full text-sm text-blue-200 font-medium"
-                  >
-                    {specialty}
+              <div className="flex-1">
+                {/* Verified Badge */}
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                    <svg
+                      className="w-3 h-3 text-white"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </div>
+                  <span className="text-xs text-blue-400 font-medium">
+                    {language === 'english' && 'Verified Clinic'}
+                    {language === 'hindi' && 'सत्यापित क्लिनिक'}
+                    {language === 'bengali' && 'যাচাইকৃত ক্লিনিক'}
                   </span>
-                ))}
+                </div>
+
+                {/* Info Badges */}
+                <div className="space-y-2">
+                  {/* Line 1: Clinic Name Badge (Bigger) */}
+                  <div className="flex flex-wrap gap-2">
+                    <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-lg">
+                      {clinicProfile?.name || 'Clinic Name'}
+                    </div>
+                  </div>
+
+                  {/* Line 2: Clinic Code & Specialties */}
+                  <div className="flex flex-wrap gap-2">
+                    {/* Clinic Code Badge */}
+                    {clinicProfile?.clinicCode && (
+                      <div className="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-lg">
+                        {clinicProfile.clinicCode}
+                      </div>
+                    )}
+
+                    {/* Specialty Badges */}
+                    {clinicProfile?.specialties && clinicProfile.specialties.length > 0 && (
+                      <>
+                        {clinicProfile.specialties.slice(0, 3).map((specialty: string, index: number) => (
+                          <div
+                            key={`specialty-${index}`}
+                            className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-lg"
+                          >
+                            {specialty}
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+
+                  {/* Line 3: Doctors Count */}
+                  {clinicProfile?.linkedDoctorsDetails && clinicProfile.linkedDoctorsDetails.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-lg flex items-center gap-1">
+                        <Users className="w-3 h-3" />
+                        {clinicProfile.linkedDoctorsDetails.length} {language === 'english' ? 'Doctors' : language === 'hindi' ? 'डॉक्टर' : 'ডাক্তার'}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Description */}
+                {clinicProfile?.description ? (
+                  <p className="text-sm text-gray-300 leading-relaxed mt-3">
+                    {clinicProfile.description}
+                  </p>
+                ) : (
+                  <p className="text-sm text-gray-300 leading-relaxed mt-3">
+                    {language === 'english' && 'Quality healthcare services with experienced medical professionals.'}
+                    {language === 'hindi' && 'अनुभवी चिकित्सा पेशेवरों के साथ गुणवत्तापूर्ण स्वास्थ्य सेवाएं।'}
+                    {language === 'bengali' && 'অভিজ্ঞ চিকিৎসা পেশাদারদের সাথে মানসম্মত স্বাস্থ্যসেবা সেবা।'}
+                  </p>
+                )}
+
+                {/* Contact & Location Info */}
+                <div className="mt-3 space-y-2">
+                  {clinicProfile?.phone && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 bg-blue-500/20 rounded-full flex items-center justify-center">
+                        <Phone className="w-3 h-3 text-blue-400" />
+                      </div>
+                      <a
+                        href={`tel:${clinicProfile.phone}`}
+                        className="text-sm text-blue-400 hover:text-blue-300"
+                      >
+                        {clinicProfile.phone}
+                      </a>
+                    </div>
+                  )}
+                  {clinicProfile?.address && (
+                    <div className="flex items-start gap-2">
+                      <div className="w-6 h-6 bg-blue-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                        <MapPin className="w-3 h-3 text-blue-400" />
+                      </div>
+                      <p className="text-sm text-gray-300 flex-1">
+                        {clinicProfile.address}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Facilities/Services Badges */}
+                {clinicProfile?.facilities && clinicProfile.facilities.length > 0 && (
+                  <div className="mt-3">
+                    <div className="flex flex-wrap gap-2">
+                      {clinicProfile.facilities.map((facility: string, index: number) => {
+                        const colors = [
+                          'bg-gradient-to-r from-blue-500 to-blue-600',
+                          'bg-gradient-to-r from-purple-500 to-purple-600',
+                          'bg-gradient-to-r from-pink-500 to-pink-600',
+                          'bg-gradient-to-r from-cyan-500 to-cyan-600'
+                        ];
+                        return (
+                          <div
+                            key={index}
+                            className={`${colors[index % colors.length]} text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-lg flex items-center gap-1.5`}
+                          >
+                            <span className="text-white/90">✓</span>
+                            <span>{facility}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="text-sm text-blue-400 mt-2 font-medium">
+                      {language === 'english' && 'Available at Clinic'}
+                      {language === 'hindi' && 'क्लिनिक में उपलब्ध'}
+                      {language === 'bengali' && 'ক্লিনিকে উপলব্ধ'}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}
+        </div>
 
-          {/* Book Now Button */}
-          <div className="flex flex-col items-center gap-4">
-            <Button
-              onClick={onBookNow}
-              className="w-full max-w-md h-14 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-600 text-white text-lg font-semibold rounded-2xl shadow-xl shadow-blue-500/30 hover:shadow-2xl hover:shadow-blue-500/50 transition-all transform hover:scale-105"
-            >
-              <Calendar className="w-5 h-5 mr-2" />
-              Book Appointment Now
-            </Button>
-            <p className="text-blue-300 text-sm">Choose from {linkedDoctorsDetails.length} experienced doctors</p>
+        {/* Today's Health Tip */}
+        <div className="px-4 sm:px-6 pb-6">
+          <div className="bg-gradient-to-br from-blue-600/10 to-purple-600/10 border border-blue-500/30 rounded-2xl p-4 sm:p-5 overflow-hidden">
+            <div className="flex items-center gap-2 mb-3">
+              <Lightbulb className="w-5 h-5 text-blue-400" />
+              <h3 className="text-white text-base sm:text-lg">
+                {language === 'english' && "Today's Health Tip"}
+                {language === 'hindi' && 'आज की स्वास्थ्य सलाह'}
+                {language === 'bengali' && 'আজকের স্বাস্থ্য পরামর্শ'}
+              </h3>
+            </div>
+            <TemplateDisplay
+              placement="booking-mini-website"
+              className="rounded-xl max-w-full"
+            />
           </div>
         </div>
-      </div>
 
-      {/* Footer */}
-      <div className="py-6 text-center border-t border-blue-500/20">
-        <p className="text-blue-300 text-sm">
-          Powered by <span className="font-semibold text-blue-400">HealQR</span>
-        </p>
+        {/* Messages from Clinic Section - if personalized templates exist */}
+        {clinicProfile?.personalizedTemplates && clinicProfile.personalizedTemplates.length > 0 && (
+          <div className="px-4 sm:px-6 pb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Sparkles className="w-5 h-5 text-blue-400" />
+              <h3 className="text-white text-base sm:text-lg">
+                {language === 'english' && 'Messages from Clinic'}
+                {language === 'hindi' && 'क्लिनिक से संदेश'}
+                {language === 'bengali' && 'ক্লিনিক থেকে বার্তা'}
+              </h3>
+            </div>
+
+            <div className="space-y-4">
+              {clinicProfile.personalizedTemplates.map((template: any) => (
+                <div
+                  key={template.id}
+                  className="bg-gradient-to-br from-blue-600/10 to-purple-600/10 border border-blue-500/30 rounded-2xl p-4 sm:p-5"
+                >
+                  <span className="inline-block text-xs bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full mb-3 capitalize">
+                    {template.category}
+                  </span>
+
+                  {(template.imageUrl || template.image) && (
+                    <div className="mb-3 rounded-lg overflow-hidden">
+                      <img
+                        src={template.imageUrl || template.image || ''}
+                        alt={template.name}
+                        className="w-full h-auto max-h-[400px] object-contain bg-gradient-to-br from-blue-900/20 to-purple-900/20"
+                      />
+                    </div>
+                  )}
+
+                  <h4 className="text-white text-base sm:text-lg mb-2">
+                    {template.name}
+                  </h4>
+
+                  {template.message && (
+                    <p className="text-gray-300 text-sm sm:text-base leading-relaxed whitespace-pre-wrap">
+                      {template.message}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
-    </div>
+    </BookingFlowLayout>
   );
 }
