@@ -697,6 +697,7 @@ export default function App() {
 
             // Load chambers
             if (data.chambers && data.chambers.length > 0) {
+              console.log('🏥 [QR PATH] LOADING CHAMBERS:', data.chambers);
               setDoctorChambers(data.chambers);
               
               // Load clinic schedule if doctor has clinic chambers
@@ -705,31 +706,48 @@ export default function App() {
                 c.chamberAddress && !c.chamberName.toLowerCase().includes('home')
               );
               
+              console.log('🔍 [QR PATH] CLINIC CHAMBER FOUND:', clinicChamber);
+              
               if (clinicChamber && db) {
+                console.log('📍 [QR PATH] SEARCHING FOR CLINIC WITH ADDRESS:', clinicChamber.chamberAddress);
                 // Query clinics collection to find clinic by address
                 const clinicsRef = collection(db, 'clinics');
                 const clinicQuery = query(clinicsRef, where('address', '==', clinicChamber.chamberAddress));
                 getDocs(clinicQuery).then(clinicSnapshot => {
+                  console.log('🏥 [QR PATH] CLINIC SEARCH RESULT:', !clinicSnapshot.empty, 'docs:', clinicSnapshot.size);
                   if (!clinicSnapshot.empty) {
                     const clinicDoc = clinicSnapshot.docs[0];
                     const clinicId = clinicDoc.id;
+                    console.log('🆔 [QR PATH] CLINIC ID:', clinicId);
                     setClinicAddress(clinicChamber.chamberAddress);
                     
                     // Load clinic schedule from clinicSchedules collection
                     getDoc(doc(db, 'clinicSchedules', clinicId)).then(scheduleDoc => {
+                      console.log('📅 [QR PATH] CLINIC SCHEDULE EXISTS:', scheduleDoc.exists());
                       if (scheduleDoc.exists()) {
                         const scheduleData = scheduleDoc.data();
+                        console.log('📋 [QR PATH] CLINIC SCHEDULE DATA:', scheduleData);
                         if (scheduleData.plannedOffPeriods && Array.isArray(scheduleData.plannedOffPeriods)) {
-                          setClinicPlannedOffPeriods(scheduleData.plannedOffPeriods.map((p: any) => ({
+                          const periods = scheduleData.plannedOffPeriods.map((p: any) => ({
                             startDate: p.startDate,
                             endDate: p.endDate,
                             status: p.status || 'active'
-                          })));
+                          }));
+                          console.log('✅ [QR PATH] SETTING CLINIC PERIODS:', periods);
+                          setClinicPlannedOffPeriods(periods);
+                        } else {
+                          console.log('⚠️ [QR PATH] NO PLANNED OFF PERIODS');
                         }
+                      } else {
+                        console.log('⚠️ [QR PATH] NO CLINIC SCHEDULE DOCUMENT');
                       }
-                    });
+                    }).catch(e => console.error('❌ [QR PATH] SCHEDULE ERROR:', e));
+                  } else {
+                    console.log('⚠️ [QR PATH] NO CLINIC FOUND WITH ADDRESS:', clinicChamber.chamberAddress);
                   }
-                });
+                }).catch(e => console.error('❌ [QR PATH] CLINIC SEARCH ERROR:', e));
+              } else {
+                console.log('⚠️ [QR PATH] NO CLINIC CHAMBER OR DB');
               }
             }
 
@@ -772,6 +790,7 @@ export default function App() {
 
             // Load chambers
             if (data.chambers && data.chambers.length > 0) {
+              console.log('🏥 [DIRECT ID PATH] LOADING CHAMBERS:', data.chambers);
               setDoctorChambers(data.chambers);
               
               // Load clinic schedule if doctor has clinic chambers
@@ -780,31 +799,48 @@ export default function App() {
                 c.chamberAddress && !c.chamberName.toLowerCase().includes('home')
               );
               
+              console.log('🔍 [DIRECT ID PATH] CLINIC CHAMBER FOUND:', clinicChamber);
+              
               if (clinicChamber && db) {
+                console.log('📍 [DIRECT ID PATH] SEARCHING FOR CLINIC WITH ADDRESS:', clinicChamber.chamberAddress);
                 // Query clinics collection to find clinic by address
                 const clinicsRef = collection(db, 'clinics');
                 const clinicQuery = query(clinicsRef, where('address', '==', clinicChamber.chamberAddress));
                 getDocs(clinicQuery).then(clinicSnapshot => {
+                  console.log('🏥 [DIRECT ID PATH] CLINIC SEARCH RESULT:', !clinicSnapshot.empty, 'docs:', clinicSnapshot.size);
                   if (!clinicSnapshot.empty) {
                     const clinicDoc = clinicSnapshot.docs[0];
                     const clinicId = clinicDoc.id;
+                    console.log('🆔 [DIRECT ID PATH] CLINIC ID:', clinicId);
                     setClinicAddress(clinicChamber.chamberAddress);
                     
                     // Load clinic schedule from clinicSchedules collection
                     getDoc(doc(db, 'clinicSchedules', clinicId)).then(scheduleDoc => {
+                      console.log('📅 [DIRECT ID PATH] CLINIC SCHEDULE EXISTS:', scheduleDoc.exists());
                       if (scheduleDoc.exists()) {
                         const scheduleData = scheduleDoc.data();
+                        console.log('📋 [DIRECT ID PATH] CLINIC SCHEDULE DATA:', scheduleData);
                         if (scheduleData.plannedOffPeriods && Array.isArray(scheduleData.plannedOffPeriods)) {
-                          setClinicPlannedOffPeriods(scheduleData.plannedOffPeriods.map((p: any) => ({
+                          const periods = scheduleData.plannedOffPeriods.map((p: any) => ({
                             startDate: p.startDate,
                             endDate: p.endDate,
                             status: p.status || 'active'
-                          })));
+                          }));
+                          console.log('✅ [DIRECT ID PATH] SETTING CLINIC PERIODS:', periods);
+                          setClinicPlannedOffPeriods(periods);
+                        } else {
+                          console.log('⚠️ [DIRECT ID PATH] NO PLANNED OFF PERIODS');
                         }
+                      } else {
+                        console.log('⚠️ [DIRECT ID PATH] NO CLINIC SCHEDULE DOCUMENT');
                       }
-                    });
+                    }).catch(e => console.error('❌ [DIRECT ID PATH] SCHEDULE ERROR:', e));
+                  } else {
+                    console.log('⚠️ [DIRECT ID PATH] NO CLINIC FOUND WITH ADDRESS:', clinicChamber.chamberAddress);
                   }
-                });
+                }).catch(e => console.error('❌ [DIRECT ID PATH] CLINIC SEARCH ERROR:', e));
+              } else {
+                console.log('⚠️ [DIRECT ID PATH] NO CLINIC CHAMBER OR DB');
               }
             }
 
@@ -2313,6 +2349,12 @@ export default function App() {
 
           return false;
         });
+
+        console.log('🎯 [APP.TSX] RENDERING SELECT CHAMBER WITH:');
+        console.log('  - clinicAddress:', clinicAddress);
+        console.log('  - clinicPlannedOffPeriods:', clinicPlannedOffPeriods);
+        console.log('  - filteredChambers:', filteredChambers);
+        console.log('  - selectedDate:', selectedDate);
 
         return (
           <SelectChamber
