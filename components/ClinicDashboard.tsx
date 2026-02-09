@@ -126,6 +126,8 @@ export default function ClinicDashboard() {
 
         // Get current month date range for client-side filtering
         const now = new Date();
+        // Adjust for timezone offset to get correct YYYY-MM-DD
+        const todayStr = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
         const currentMonth = now.getMonth();
         const currentYear = now.getFullYear();
 
@@ -154,6 +156,15 @@ export default function ClinicDashboard() {
                 
                 // Check if booking is cancelled
                 const isCancelled = bookingData.status === 'cancelled' || bookingData.isCancelled === true;
+                
+                // Drop Outs (No Show) Logic:
+                // Patient booked but did not come by end of day (23:59)
+                // Conditions: Date is in the past AND Not Cancelled AND Not Marked Seen (Eye button not pressed)
+                if (bookingData.appointmentDate && bookingData.appointmentDate < todayStr) {
+                  if (!isCancelled && !bookingData.isMarkedSeen) {
+                    dropOuts++;
+                  }
+                }
                 
                 // Clinic QR bookings
                 if (bookingData.bookingSource === 'clinic_qr') {
@@ -202,6 +213,8 @@ export default function ClinicDashboard() {
         } catch (scanError) {
           console.error('Error loading scan data:', scanError);
         }
+        
+        // Removed inferred dropout calculation as per user request (strict definition: Booked but No Show)
         
         totalBookings = qrBookings + walkinBookings;
         monthlyBookings = totalBookings; // All bookings are for this clinic (no historical filter needed)
@@ -591,6 +604,7 @@ export default function ClinicDashboard() {
                         { name: 'Clinic QR Bookings', value: analyticsData.clinicQRBookings, fill: '#8b5cf6' },
                         { name: 'Doctor QR Bookings', value: analyticsData.doctorQRBookings, fill: '#ec4899' },
                         { name: 'Walk-in Bookings', value: analyticsData.walkinBookings, fill: '#f59e0b' },
+                        { name: 'Drop Outs (No Show)', value: analyticsData.dropOuts, fill: '#ef4444' },
                         { name: 'Cancelled', value: analyticsData.cancelled, fill: '#6b7280' },
                       ].map((item, index) => {
                         const maxValue = Math.max(
@@ -599,6 +613,7 @@ export default function ClinicDashboard() {
                           analyticsData.clinicQRBookings,
                           analyticsData.doctorQRBookings,
                           analyticsData.walkinBookings,
+                          analyticsData.dropOuts,
                           analyticsData.cancelled,
                           1
                         );
