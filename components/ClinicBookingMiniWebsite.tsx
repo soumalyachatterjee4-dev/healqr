@@ -1,10 +1,20 @@
-import { Lightbulb, Calendar, Phone, Sparkles, MapPin, Users } from 'lucide-react';
+import { Lightbulb, Calendar, Phone, Sparkles, MapPin, Users, Star } from 'lucide-react';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { useState, useEffect } from 'react';
 import { t, type Language } from '../utils/translations';
 import TemplateDisplay from './TemplateDisplay';
 import BookingFlowLayout from './BookingFlowLayout';
+import ReviewCard from './ReviewCard';
+
+interface Review {
+  id: number;
+  patientName: string;
+  rating: number;
+  date: string;
+  comment: string;
+  verified: boolean;
+}
 
 interface ClinicBookingMiniWebsiteProps {
   onBookNow?: () => void;
@@ -19,6 +29,8 @@ export default function ClinicBookingMiniWebsite({
 }: ClinicBookingMiniWebsiteProps) {
   const [clinicProfile, setClinicProfile] = useState<any>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [allReviewsForStats, setAllReviewsForStats] = useState<Review[]>([]);
 
   useEffect(() => {
     trackQRScan();
@@ -70,13 +82,39 @@ export default function ClinicBookingMiniWebsite({
       const { db } = await import('../lib/firebase/config');
       if (!db) return;
       
-      const { doc, getDoc } = await import('firebase/firestore');
+      const { doc, getDoc, collection, query, where, getDocs, orderBy, limit } = await import('firebase/firestore');
 
       const clinicRef = doc(db, 'clinics', bookingClinicId);
       const clinicSnap = await getDoc(clinicRef);
 
       if (clinicSnap.exists()) {
         setClinicProfile({ id: clinicSnap.id, ...clinicSnap.data() });
+        
+        // Load clinic reviews
+        try {
+          const reviewsQuery = query(
+            collection(db, 'reviews'),
+            where('clinicId', '==', bookingClinicId),
+            where('isApproved', '==', true),
+            orderBy('date', 'desc'),
+            limit(10)
+          );
+          
+          const reviewsSnap = await getDocs(reviewsQuery);
+          const loadedReviews = reviewsSnap.docs.map((doc, index) => ({
+            id: index + 1,
+            patientName: doc.data().patientName || 'Patient',
+            rating: doc.data().rating || 5,
+            date: doc.data().date || new Date().toISOString().split('T')[0],
+            comment: doc.data().comment || '',
+            verified: doc.data().verified || true,
+          }));
+          
+          setReviews(loadedReviews.slice(0, 2));
+          setAllReviewsForStats(loadedReviews);
+        } catch (reviewError) {
+          console.error('Error loading clinic reviews:', reviewError);
+        }
       }
     } catch (error) {
       console.error('Error loading clinic profile:', error);
@@ -167,40 +205,52 @@ export default function ClinicBookingMiniWebsite({
                     </div>
                   </div>
 
-                  {/* Line 2: Clinic Code & Specialties */}
+                  {/* Line 2: Specialties Count & Doctors Count */}
                   <div className="flex flex-wrap gap-2">
-                    {/* Clinic Code Badge */}
-                    {clinicProfile?.clinicCode && (
+                    {/* Specialties Count Badge */}
+                    {clinicProfile?.specialties && clinicProfile.specialties.length > 0 && (
                       <div className="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-lg">
-                        {clinicProfile.clinicCode}
+                        {clinicProfile.specialties.length} {language === 'english' ? 'Specialties Available' : language === 'hindi' ? 'विशेषताएं उपलब्ध' : language === 'bengali' ? 'বিশেষত্ব উপলব্ধ' : 'Specialties'}
                       </div>
                     )}
 
-                    {/* Specialty Badges */}
-                    {clinicProfile?.specialties && clinicProfile.specialties.length > 0 && (
-                      <>
-                        {clinicProfile.specialties.slice(0, 3).map((specialty: string, index: number) => (
-                          <div
-                            key={`specialty-${index}`}
-                            className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-lg"
-                          >
-                            {specialty}
-                          </div>
-                        ))}
-                      </>
-                    )}
-                  </div>
-
-                  {/* Line 3: Doctors Count */}
-                  {clinicProfile?.linkedDoctorsDetails && clinicProfile.linkedDoctorsDetails.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
+                    {/* Doctors Count Badge */}
+                    {clinicProfile?.linkedDoctorsDetails && clinicProfile.linkedDoctorsDetails.length > 0 && (
                       <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-lg flex items-center gap-1">
                         <Users className="w-3 h-3" />
                         {clinicProfile.linkedDoctorsDetails.length} {language === 'english' ? 'Doctors' : language === 'hindi' ? 'डॉक्टर' : 'ডাক্তার'}
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
+
+                {/* Rating */}
+                {allReviewsForStats.length > 0 && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <div className="flex">
+                      {[1, 2, 3, 4, 5].map((star) => {
+                        const calculatedRating = allReviewsForStats.reduce((sum, r) => sum + r.rating, 0) / allReviewsForStats.length;
+                        const isFilled = star <= Math.floor(calculatedRating);
+                        return (
+                          <Star
+                            key={star}
+                            className={`w-3.5 h-3.5 ${
+                              isFilled
+                                ? 'fill-yellow-400 text-yellow-400'
+                                : 'fill-transparent text-gray-600'
+                            }`}
+                          />
+                        );
+                      })}
+                    </div>
+                    <span className="text-sm text-white">
+                      {(allReviewsForStats.reduce((sum, r) => sum + r.rating, 0) / allReviewsForStats.length).toFixed(1)}/5
+                    </span>
+                    <span className="text-sm text-gray-400">
+                      {allReviewsForStats.length} {language === 'english' ? 'reviews' : language === 'hindi' ? 'समीक्षाएं' : 'পর্যালোচনা'}
+                    </span>
+                  </div>
+                )}
 
                 {/* Description */}
                 {clinicProfile?.description ? (
@@ -242,11 +292,11 @@ export default function ClinicBookingMiniWebsite({
                   )}
                 </div>
 
-                {/* Facilities/Services Badges */}
-                {clinicProfile?.facilities && clinicProfile.facilities.length > 0 && (
+                {/* Service Badges */}
+                {clinicProfile?.serviceBadges && clinicProfile.serviceBadges.length > 0 && (
                   <div className="mt-3">
                     <div className="flex flex-wrap gap-2">
-                      {clinicProfile.facilities.map((facility: string, index: number) => {
+                      {clinicProfile.serviceBadges.slice(0, 4).map((service: string, index: number) => {
                         const colors = [
                           'bg-gradient-to-r from-blue-500 to-blue-600',
                           'bg-gradient-to-r from-purple-500 to-purple-600',
@@ -259,15 +309,15 @@ export default function ClinicBookingMiniWebsite({
                             className={`${colors[index % colors.length]} text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-lg flex items-center gap-1.5`}
                           >
                             <span className="text-white/90">✓</span>
-                            <span>{facility}</span>
+                            <span>{service}</span>
                           </div>
                         );
                       })}
                     </div>
                     <p className="text-sm text-blue-400 mt-2 font-medium">
-                      {language === 'english' && 'Available at Clinic'}
-                      {language === 'hindi' && 'क्लिनिक में उपलब्ध'}
-                      {language === 'bengali' && 'ক্লিনিকে উপলব্ধ'}
+                      {language === 'english' && 'Done Here'}
+                      {language === 'hindi' && 'यहाँ उपलब्ध'}
+                      {language === 'bengali' && 'এখানে করা হয়'}
                     </p>
                   </div>
                 )}
@@ -335,6 +385,31 @@ export default function ClinicBookingMiniWebsite({
                       {template.message}
                     </p>
                   )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Patient Reviews Section */}
+        {reviews.length > 0 && (
+          <div className="px-4 sm:px-6 pb-6">
+            <h3 className="text-white text-base sm:text-lg mb-4">
+              {language === 'english' && 'Patient Reviews'}
+              {language === 'hindi' && 'रोगी समीक्षाएं'}
+              {language === 'bengali' && 'রোগী পর্যালোচনা'}
+            </h3>
+            <div className="space-y-4">
+              {reviews.slice(0, 2).map((review, index) => (
+                <div key={review.id || index} className="w-full">
+                  <ReviewCard
+                    patientName={review.patientName}
+                    rating={review.rating}
+                    date={review.date}
+                    comment={review.comment}
+                    verified={review.verified}
+                    doctorName={clinicProfile?.name || 'Clinic'}
+                  />
                 </div>
               ))}
             </div>
