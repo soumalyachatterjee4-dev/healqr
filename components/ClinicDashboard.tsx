@@ -508,6 +508,15 @@ export default function ClinicDashboard() {
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-white/10 rounded-lg flex items-center justify-center">
+                    <QrCode className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-blue-100 text-sm">Total Scans</p>
+                    <p className="text-3xl font-bold text-white">{analyticsData.totalScans}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-white/10 rounded-lg flex items-center justify-center">
                     <Calendar className="w-6 h-6 text-white" />
                   </div>
                   <div>
