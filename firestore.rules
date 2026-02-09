@@ -116,6 +116,36 @@ service cloud.firestore {
     }
     
     // ============================================
+    // SCHEDULES COLLECTION (Doctor Schedule Settings)
+    // ============================================
+    
+    match /schedules/{doctorId} {
+      // Allow read by anyone (needed for QR booking flow to check doctor availability)
+      allow read: if true;
+      
+      // Allow create/update by doctor owner only
+      allow create, update: if isOwner(doctorId);
+      
+      // No deletes allowed
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // CLINIC SCHEDULES COLLECTION (Clinic-Wide Schedule Settings)
+    // ============================================
+    
+    match /clinicSchedules/{clinicId} {
+      // Allow read by anyone (needed for QR booking flow to check clinic availability)
+      allow read: if true;
+      
+      // Allow create/update by clinic owner only
+      allow create, update: if isOwner(clinicId);
+      
+      // No deletes allowed
+      allow delete: if false;
+    }
+    
+    // ============================================
     // PATIENTS COLLECTION
     // ============================================
     
