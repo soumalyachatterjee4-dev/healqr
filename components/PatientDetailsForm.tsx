@@ -214,6 +214,13 @@ export default function PatientDetailsForm({
         where('time', '==', selectedTime || 'immediate')
       );
       
+      console.log('🔍 Querying bookings with:', {
+        doctorId,
+        appointmentDate,
+        chamber: selectedChamber || 'walk-in',
+        time: selectedTime || 'immediate'
+      });
+      
       const querySnapshot = await getDocs(q);
       const existingBookings = querySnapshot.docs;
       
@@ -367,8 +374,8 @@ export default function PatientDetailsForm({
           chamberAddress: '', // Add if available
           date: selectedDate || new Date(),
           appointmentDate: appointmentDateToSave, // YYYY-MM-DD format for querying (SAME as query)
-          time: selectedTime || null,
-          chamber: selectedChamber || null,
+          time: selectedTime || 'immediate', // MUST MATCH QUERY DEFAULT
+          chamber: selectedChamber || 'walk-in', // MUST MATCH QUERY DEFAULT
           chamberId, // Numeric ID for querying
           clinicId: sessionStorage.getItem('booking_clinic_id') || null,
           clinicName: sessionStorage.getItem('booking_clinic_name') || selectedChamber || 'Clinic',

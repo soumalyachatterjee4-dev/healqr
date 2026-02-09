@@ -830,12 +830,47 @@ export default function App() {
             setGlobalBookingEnabled(data.globalBookingEnabled !== false);
 
             // Load blocked days
+            // CRITICAL: Filter out clinic planned off - only include doctor's personal planned off
             if (data.plannedOffPeriods && Array.isArray(data.plannedOffPeriods)) {
-              const periods = data.plannedOffPeriods.map((p: any) => ({
-                startDate: p.startDate,
-                endDate: p.endDate,
-                status: p.status || 'active'
-              }));
+              const periods = data.plannedOffPeriods
+                .filter((p: any) => {
+                  // Check for clinic periods by appliesTo field
+                  if (p.appliesTo === 'clinic') {
+                    console.log('🏥 Filtering OUT clinic planned off for doctor solo booking:', {
+                      period: `${p.startDate} - ${p.endDate}`,
+                      clinicId: p.clinicId,
+                      clinicName: p.clinicName
+                    });
+                    return false;
+                  }
+                  
+                  // Legacy periods might not have appliesTo but have clinicId/clinicName
+                  // These are old clinic periods that should also be filtered out
+                  if (!p.appliesTo && (p.clinicId || p.clinicName)) {
+                    console.log('🏥 Filtering OUT LEGACY clinic planned off for doctor solo booking:', {
+                      period: `${p.startDate} - ${p.endDate}`,
+                      clinicId: p.clinicId,
+                      clinicName: p.clinicName
+                    });
+                    return false;
+                  }
+                  
+                  // Include doctor-specific planned off
+                  if (p.appliesTo === 'doctor') return true;
+                  
+                  // Include legacy periods without appliesTo AND without clinic identifiers
+                  // (assumed to be old doctor-specific periods)
+                  return true;
+                })
+                .map((p: any) => ({
+                  startDate: p.startDate,
+                  endDate: p.endDate,
+                  status: p.status || 'active',
+                  appliesTo: p.appliesTo || 'doctor', // Default to doctor for legacy
+                  doctorId: p.doctorId,
+                  doctorName: p.doctorName
+                }));
+              console.log('✅ Doctor solo booking - Loaded doctor-only planned off periods:', periods.length);
               setPlannedOffPeriods(periods);
             }
 
@@ -998,12 +1033,47 @@ export default function App() {
             setGlobalBookingEnabled(data.globalBookingEnabled !== false);
 
             // Load blocked days (plannedOffPeriods)
+            // CRITICAL: Filter out clinic planned off - only include doctor's personal planned off
             if (data.plannedOffPeriods && Array.isArray(data.plannedOffPeriods)) {
-              const periods = data.plannedOffPeriods.map((p: any) => ({
-                startDate: p.startDate,
-                endDate: p.endDate,
-                status: p.status || 'active'
-              }));
+              const periods = data.plannedOffPeriods
+                .filter((p: any) => {
+                  // Check for clinic periods by appliesTo field
+                  if (p.appliesTo === 'clinic') {
+                    console.log('🏥 Filtering OUT clinic planned off for doctor solo booking:', {
+                      period: `${p.startDate} - ${p.endDate}`,
+                      clinicId: p.clinicId,
+                      clinicName: p.clinicName
+                    });
+                    return false;
+                  }
+                  
+                  // Legacy periods might not have appliesTo but have clinicId/clinicName
+                  // These are old clinic periods that should also be filtered out
+                  if (!p.appliesTo && (p.clinicId || p.clinicName)) {
+                    console.log('🏥 Filtering OUT LEGACY clinic planned off for doctor solo booking:', {
+                      period: `${p.startDate} - ${p.endDate}`,
+                      clinicId: p.clinicId,
+                      clinicName: p.clinicName
+                    });
+                    return false;
+                  }
+                  
+                  // Include doctor-specific planned off
+                  if (p.appliesTo === 'doctor') return true;
+                  
+                  // Include legacy periods without appliesTo AND without clinic identifiers
+                  // (assumed to be old doctor-specific periods)
+                  return true;
+                })
+                .map((p: any) => ({
+                  startDate: p.startDate,
+                  endDate: p.endDate,
+                  status: p.status || 'active',
+                  appliesTo: p.appliesTo || 'doctor', // Default to doctor for legacy
+                  doctorId: p.doctorId,
+                  doctorName: p.doctorName
+                }));
+              console.log('✅ Doctor solo booking - Loaded doctor-only planned off periods:', periods.length);
               setPlannedOffPeriods(periods);
             }
 

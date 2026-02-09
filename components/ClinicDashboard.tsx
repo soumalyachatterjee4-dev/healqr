@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { auth, db } from '../lib/firebase/config';
 import { signOut } from 'firebase/auth';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { toast } from 'sonner';
 import ClinicSidebar from './ClinicSidebar';
 import ClinicProfileManager from './ClinicProfileManager';
@@ -72,6 +72,7 @@ export default function ClinicDashboard() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [shareMenuOpen, setShareMenuOpen] = useState(false);
   const [todaysChambers, setTodaysChambers] = useState<TodayChamber[]>([]);
+  const [refreshTrigger, setRefreshTrigger] = useState(0); // Real-time refresh trigger
   
   // Analytics State
   const [analyticsData, setAnalyticsData] = useState({
@@ -86,9 +87,41 @@ export default function ClinicDashboard() {
     monthlyBookings: 0
   });
 
+  // Load data whenever refreshTrigger changes
   useEffect(() => {
     loadClinicData();
     loadTodaysSchedule();
+  }, [refreshTrigger]);
+
+  // 🔥 REAL-TIME LISTENER: Triggers refresh via state change
+  useEffect(() => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+    
+    let timeoutId: NodeJS.Timeout | null = null;
+    
+    const bookingsQuery = query(
+      collection(db, 'bookings'),
+      where('clinicId', '==', currentUser.uid)
+    );
+    
+    const unsubscribe = onSnapshot(bookingsQuery, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added' || change.type === 'modified' || change.type === 'removed') {
+          console.log('🔄 Clinic booking changed, triggering refresh...');
+          // Debounce: wait 800ms to avoid rapid updates
+          if (timeoutId) clearTimeout(timeoutId);
+          timeoutId = setTimeout(() => {
+            setRefreshTrigger(prev => prev + 1); // Trigger data reload
+          }, 800);
+        }
+      });
+    });
+    
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      unsubscribe();
+    };
   }, []);
 
   const loadClinicData = async () => {

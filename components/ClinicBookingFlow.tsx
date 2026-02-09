@@ -48,6 +48,7 @@ export default function ClinicBookingFlow() {
   const [selectedChamberId, setSelectedChamberId] = useState<number | null>(null);
   const [selectedChamberName, setSelectedChamberName] = useState<string>('');
   const [bookingId, setBookingId] = useState<string>('');
+  const [confirmationData, setConfirmationData] = useState<any>(null); // Store full booking data for confirmation
   const [clinic, setClinic] = useState<ClinicData | null>(null);
   const [loadingClinic, setLoadingClinic] = useState(true);
   const [clinicSchedule, setClinicSchedule] = useState<any>(null);
@@ -300,8 +301,20 @@ export default function ClinicBookingFlow() {
     setCurrentStep('patient-form');
   };
 
-  const handleBookingComplete = (generatedBookingId: string) => {
-    setBookingId(generatedBookingId);
+  const handleBookingComplete = (data: any) => {
+    console.log('✅ Booking completed with data:', data);
+    
+    // Handle both string (legacy) and object formats
+    let bId = '';
+    
+    if (typeof data === 'string') {
+      bId = data;
+    } else if (data && data.bookingId) {
+      bId = data.bookingId;
+      setConfirmationData(data);
+    }
+    
+    setBookingId(bId);
     setCurrentStep('confirmation');
   };
 
@@ -437,6 +450,7 @@ export default function ClinicBookingFlow() {
           maxAdvanceDays={mergedMaxAdvanceDays}
           plannedOffPeriods={mergedPlannedOffPeriods}
           globalBookingEnabled={(clinicSchedule?.globalBookingEnabled ?? true) && (doctorSchedule?.globalBookingEnabled ?? true)}
+          clinicId={clinic?.id}
         />
       );
 
@@ -489,6 +503,23 @@ export default function ClinicBookingFlow() {
           doctorName={selectedDoctor?.name || ''}
           language={language}
           themeColor="blue"
+          // Pass required data structure
+          patientData={{
+            patientName: confirmationData?.patientName || '',
+            whatsappNumber: confirmationData?.whatsappNumber || '',
+            age: confirmationData?.age,
+            gender: confirmationData?.gender,
+            purposeOfVisit: confirmationData?.purposeOfVisit
+          }}
+          appointmentData={{
+            serialNo: confirmationData?.serialNo?.toString() || confirmationData?.tokenNumber?.toString() || '---',
+            bookingId: bookingId,
+            doctorName: selectedDoctor?.name || 'Doctor',
+            date: selectedDate ? new Date(selectedDate) : new Date(),
+            time: confirmationData?.selectedTime || '10:00 AM - 02:00 PM', // Fallback or need to capture time
+            location: selectedChamberName || clinic?.address || 'Clinic',
+            consultationType: 'chamber'
+          }}
         />
       );
 

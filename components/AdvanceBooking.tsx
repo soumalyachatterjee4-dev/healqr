@@ -91,11 +91,31 @@ export default function AdvanceBooking({ onMenuChange, onLogout, activeAddOns = 
         console.log('📋 Planned off periods for matched clinic:', plannedOffPeriods);
         
         // Check if date falls within any planned off period
+        // CRITICAL: Only apply clinic planned off for THIS specific clinic
         for (const period of plannedOffPeriods) {
           // Check status field (not isActive)
           if (period.status !== 'active') {
             console.log('⏭️ Skipping inactive period:', period);
             continue;
+          }
+          
+          // CRITICAL: Handle clinic planned off filtering
+          if (period.appliesTo === 'clinic') {
+            // If period has clinicId, only block if it matches this clinic
+            if (period.clinicId && period.clinicId !== clinicId) {
+              console.log('⏭️ Skipping clinic planned off from different clinic:', {
+                periodClinicId: period.clinicId,
+                currentClinicId: clinicId
+              });
+              continue;
+            }
+            // If period has NO clinicId (legacy), apply to this clinic anyway
+            // (These are old periods created before clinicId tracking was added)
+            console.log('✅ Applying clinic planned off (legacy or matching):', {
+              periodClinicId: period.clinicId || 'LEGACY',
+              currentClinicId: clinicId,
+              hasClinicId: !!period.clinicId
+            });
           }
           
           const start = new Date(period.startDate);
@@ -106,7 +126,8 @@ export default function AdvanceBooking({ onMenuChange, onLogout, activeAddOns = 
             checkDate: check.toDateString(),
             periodStart: start.toDateString(),
             periodEnd: end.toDateString(),
-            isInRange: check >= start && check <= end
+            isInRange: check >= start && check <= end,
+            appliesTo: period.appliesTo
           });
           
           if (check >= start && check <= end) {
@@ -115,7 +136,8 @@ export default function AdvanceBooking({ onMenuChange, onLogout, activeAddOns = 
               clinicId,
               clinicName: clinic.clinicName,
               period: `${period.startDate} to ${period.endDate}`,
-              reason: period.reason
+              reason: period.reason,
+              appliesTo: period.appliesTo
             });
             return true;
           }

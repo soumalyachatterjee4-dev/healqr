@@ -8,7 +8,7 @@ import AddPatientModal, { PatientFormData } from './AddPatientModal';
 import PatientDetails from './PatientDetails';
 import { toast } from 'sonner';
 import { auth, db } from '../lib/firebase/config';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 
 interface ClinicTodaysScheduleProps {
   onMenuChange?: (menu: string) => void;
@@ -230,6 +230,41 @@ function ChamberPatientDetailsLoader({
     loadPatients();
   }, [chamber.id, doctorId, refreshTrigger]);
 
+  // 🔥 REAL-TIME LISTENER: Triggers refresh via state
+  useEffect(() => {
+    const bookingsRef = collection(db, 'bookings');
+    
+    let numericChamberId = typeof chamber.id === 'string' ? parseInt(chamber.id, 10) : chamber.id;
+    if (!numericChamberId || isNaN(numericChamberId)) {
+      numericChamberId = -1;
+    }
+    
+    let timeoutId: NodeJS.Timeout | null = null;
+    
+    const qrBookingsQuery = query(
+      bookingsRef,
+      where('chamberId', '==', numericChamberId)
+    );
+    
+    const unsubscribe = onSnapshot(qrBookingsQuery, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added' || change.type === 'modified' || change.type === 'removed') {
+          console.log('🔄 Chamber booking changed, triggering refresh...');
+          // Debounce to prevent rapid reloads
+          if (timeoutId) clearTimeout(timeoutId);
+          timeoutId = setTimeout(() => {
+            setRefreshTrigger(prev => prev + 1); // Trigger loadPatients
+          }, 800);
+        }
+      });
+    });
+    
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      unsubscribe();
+    };
+  }, [chamber.id]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
@@ -278,9 +313,41 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
   const [selectedChamber, setSelectedChamber] = useState<{ chamber: DoctorChamber; doctorId: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedDoctorForPatient, setSelectedDoctorForPatient] = useState<{ id: string; name: string } | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
     loadTodaysSchedule();
+  }, [refreshTrigger]);
+
+  // 🔥 REAL-TIME LISTENER: Triggers refresh via state
+  useEffect(() => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+    
+    let timeoutId: NodeJS.Timeout | null = null;
+    
+    const bookingsQuery = query(
+      collection(db, 'bookings'),
+      where('clinicId', '==', currentUser.uid)
+    );
+    
+    const unsubscribe = onSnapshot(bookingsQuery, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added' || change.type === 'modified' || change.type === 'removed') {
+          console.log('🔄 Clinic booking changed, triggering refresh...');
+          // Debounce to prevent rapid reloads
+          if (timeoutId) clearTimeout(timeoutId);
+          timeoutId = setTimeout(() => {
+            setRefreshTrigger(prev => prev + 1);
+          }, 800);
+        }
+      });
+    });
+    
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      unsubscribe();
+    };
   }, []);
 
   const loadTodaysSchedule = async () => {

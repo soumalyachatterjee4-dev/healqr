@@ -76,18 +76,46 @@ export default function BookingConfirmation({
         let startHour: number, startMin: number = 0;
         let endHour: number, endMin: number = 0;
         
-        // Handle 24-hour format
-        if (startStr.includes(':')) {
+        // Check for AM/PM format FIRST (handles both "10:00 AM" and "10 AM")
+        if (startStr.toLowerCase().includes('am') || startStr.toLowerCase().includes('pm') || 
+            endStr.toLowerCase().includes('am') || endStr.toLowerCase().includes('pm')) {
+          // 12-hour format (e.g., "10:00 AM - 02:00 PM" or "10 AM - 2 PM")
+          const startParts = startStr.toLowerCase().replace(/\s+/g, ' ').split(' ');
+          const endParts = endStr.toLowerCase().replace(/\s+/g, ' ').split(' ');
+          
+          // Parse start time
+          const startTimePart = startParts[0];
+          const startPeriod = startParts[1] || endParts[1]; // Use end period if start doesn't have one
+          if (startTimePart.includes(':')) {
+            const [h, m] = startTimePart.split(':').map(s => parseInt(s));
+            startHour = h;
+            startMin = m || 0;
+          } else {
+            startHour = parseInt(startTimePart);
+          }
+          if (startPeriod === 'pm' && startHour < 12) startHour += 12;
+          if (startPeriod === 'am' && startHour === 12) startHour = 0;
+          
+          // Parse end time
+          const endTimePart = endParts[0];
+          const endPeriod = endParts[1];
+          if (endTimePart.includes(':')) {
+            const [h, m] = endTimePart.split(':').map(s => parseInt(s));
+            endHour = h;
+            endMin = m || 0;
+          } else {
+            endHour = parseInt(endTimePart);
+          }
+          if (endPeriod === 'pm' && endHour < 12) endHour += 12;
+          if (endPeriod === 'am' && endHour === 12) endHour = 0;
+        } else if (startStr.includes(':')) {
+          // 24-hour format (e.g., "20:30 - 23:59")
           [startHour, startMin] = startStr.split(':').map(Number);
           [endHour, endMin] = endStr.split(':').map(Number);
         } else {
-          // Handle 12-hour format
-          const isPM = endStr.includes('pm');
+          // Simple hour format without colons or AM/PM (fallback)
           startHour = parseInt(startStr);
-          endHour = parseInt(endStr.replace(/[ap]m/g, '').trim());
-          
-          if (isPM && startHour < 12) startHour += 12;
-          if (isPM && endHour < 12) endHour += 12;
+          endHour = parseInt(endStr);
         }
         
         const startTime = new Date(appointmentData.date);
@@ -293,7 +321,7 @@ export default function BookingConfirmation({
           </div>
 
           <h1 className="text-center text-white mb-2" style={{ fontSize: '2rem', fontWeight: '700' }}>
-            #{appointmentData.serialNo}
+            #{appointmentData?.serialNo || '---'}
           </h1>
           <p className="text-center text-emerald-400 mb-4">
             {t('bookingConfirmed', language)}
@@ -301,21 +329,21 @@ export default function BookingConfirmation({
 
           <div className="bg-[#0f1419] p-4 rounded-2xl mb-4 border border-gray-700">
             <h3 className="text-white mb-3">{t('patientDetails', language)}</h3>
-            <p className="text-gray-300">{patientData.patientName}</p>
-            <p className="text-gray-300">+91 {patientData.whatsappNumber}</p>
-            {patientData.gender && <p className="text-gray-300">{patientData.gender}</p>}
-            {patientData.age && <p className="text-gray-300">Age: {patientData.age}</p>}
-            {patientData.purposeOfVisit && <p className="text-gray-300">Purpose: {patientData.purposeOfVisit}</p>}
+            <p className="text-gray-300">{patientData?.patientName || ''}</p>
+            <p className="text-gray-300">+91 {patientData?.whatsappNumber || ''}</p>
+            {patientData?.gender && <p className="text-gray-300">{patientData.gender}</p>}
+            {patientData?.age && <p className="text-gray-300">Age: {patientData.age}</p>}
+            {patientData?.purposeOfVisit && <p className="text-gray-300">Purpose: {patientData.purposeOfVisit}</p>}
           </div>
 
           <div className="bg-[#0f1419] p-4 rounded-2xl mb-4 border border-gray-700">
             <h3 className="text-white mb-3">{t('appointmentDetails', language)}</h3>
-            <p className="text-gray-300">Booking ID: {appointmentData.bookingId}</p>
-            <p className="text-gray-300">Doctor: {appointmentData.doctorName}</p>
-            <p className="text-gray-300">Date: {formatDate(appointmentData.date)}</p>
-            <p className="text-gray-300">Time: {appointmentData.time}</p>
-            {appointmentData.consultationType !== 'video' && (
-              <p className="text-gray-300">Location: {appointmentData.location}</p>
+            <p className="text-gray-300">Booking ID: {appointmentData?.bookingId || ''}</p>
+            <p className="text-gray-300">Doctor: {appointmentData?.doctorName || doctorName}</p>
+            <p className="text-gray-300">Date: {appointmentData?.date ? formatDate(appointmentData.date) : ''}</p>
+            <p className="text-gray-300">Time: {appointmentData?.time || ''}</p>
+            {appointmentData?.consultationType !== 'video' && (
+              <p className="text-gray-300">Location: {appointmentData?.location || ''}</p>
             )}
             {appointmentData.consultationType === 'video' && (
               <div className="mt-2 pt-2 border-t border-gray-600">

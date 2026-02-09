@@ -475,18 +475,46 @@ export default function PatientLiveStatus({ bookingId, language = 'english' }: P
         let startHour: number, startMin: number = 0;
         let endHour: number, endMin: number = 0;
         
-        // Handle 24-hour format
-        if (startStr.includes(':')) {
+        // Check for AM/PM format FIRST (handles both "10:00 AM" and "10 AM")
+        if (startStr.toLowerCase().includes('am') || startStr.toLowerCase().includes('pm') || 
+            endStr.toLowerCase().includes('am') || endStr.toLowerCase().includes('pm')) {
+          // 12-hour format (e.g., "10:00 AM - 02:00 PM" or "10 AM - 2 PM")
+          const startParts = startStr.toLowerCase().replace(/\s+/g, ' ').split(' ');
+          const endParts = endStr.toLowerCase().replace(/\s+/g, ' ').split(' ');
+          
+          // Parse start time
+          const startTimePart = startParts[0];
+          const startPeriod = startParts[1] || endParts[1]; // Use end period if start doesn't have one
+          if (startTimePart.includes(':')) {
+            const [h, m] = startTimePart.split(':').map(s => parseInt(s));
+            startHour = h;
+            startMin = m || 0;
+          } else {
+            startHour = parseInt(startTimePart);
+          }
+          if (startPeriod === 'pm' && startHour < 12) startHour += 12;
+          if (startPeriod === 'am' && startHour === 12) startHour = 0;
+          
+          // Parse end time
+          const endTimePart = endParts[0];
+          const endPeriod = endParts[1];
+          if (endTimePart.includes(':')) {
+            const [h, m] = endTimePart.split(':').map(s => parseInt(s));
+            endHour = h;
+            endMin = m || 0;
+          } else {
+            endHour = parseInt(endTimePart);
+          }
+          if (endPeriod === 'pm' && endHour < 12) endHour += 12;
+          if (endPeriod === 'am' && endHour === 12) endHour = 0;
+        } else if (startStr.includes(':')) {
+          // 24-hour format (e.g., "20:30 - 23:59")
           [startHour, startMin] = startStr.split(':').map(Number);
           [endHour, endMin] = endStr.split(':').map(Number);
         } else {
-          // Handle 12-hour format
-          const isPM = endStr.includes('pm');
+          // Simple hour format without colons or AM/PM (fallback)
           startHour = parseInt(startStr);
-          endHour = parseInt(endStr.replace(/[ap]m/g, '').trim());
-          
-          if (isPM && startHour < 12) startHour += 12;
-          if (isPM && endHour < 12) endHour += 12;
+          endHour = parseInt(endStr);
         }
         
         const startTime = new Date();

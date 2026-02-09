@@ -344,6 +344,51 @@ export default function SelectChamber({
     loadBookingCounts();
   }, [chambers, selectedDate, refreshKey]); // Add refreshKey to dependency array
 
+  // 🔥 REAL-TIME LISTENER: Separate useEffect to avoid infinite loop
+  useEffect(() => {
+    const doctorId = sessionStorage.getItem('booking_doctor_id');
+    if (!doctorId) return;
+    
+    let timeoutId: NodeJS.Timeout | null = null;
+    
+    const setupListener = async () => {
+      const { db } = await import('../lib/firebase/config');
+      if (!db) return;
+      
+      const { collection, query, where, onSnapshot } = await import('firebase/firestore');
+      
+      const bookingsQuery = query(
+        collection(db, 'bookings'),
+        where('doctorId', '==', doctorId)
+      );
+      
+      const unsubscribe = onSnapshot(bookingsQuery, (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added' || change.type === 'modified' || change.type === 'removed') {
+            console.log('🔄 Booking changed, refreshing chamber counts...');
+            // Debounce: wait 500ms before refreshing to avoid rapid updates
+            if (timeoutId) clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => {
+              setRefreshKey(prev => prev + 1);
+            }, 500);
+          }
+        });
+      });
+      
+      return unsubscribe;
+    };
+    
+    let unsub: (() => void) | undefined;
+    setupListener().then(unsubscribe => {
+      unsub = unsubscribe;
+    });
+    
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      if (unsub) unsub();
+    };
+  }, []); // Empty dependency - listener stays active
+
   // Force refresh booking counts when component becomes visible (user returns from booking)
   useEffect(() => {
     const handleVisibilityChange = () => {

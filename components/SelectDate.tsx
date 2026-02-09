@@ -15,6 +15,8 @@ interface SelectDateProps {
     startDate: string;
     endDate: string;
     status: string;
+    appliesTo?: 'clinic' | 'doctor';
+    clinicId?: string;
   }>;
   schedules?: Array<{
     days: string[];
@@ -26,13 +28,15 @@ interface SelectDateProps {
   doctorPhoto?: string;
   useDrPrefix?: boolean;
   themeColor?: 'emerald' | 'blue';
+  clinicId?: string; // CRITICAL: Pass clinic ID to filter clinic-specific planned off
 }
 
-export default function SelectDate({ onBack, onContinue, language, maxAdvanceDays = 30, plannedOffPeriods = [], schedules = [], globalBookingEnabled = true, doctorName = '', doctorSpecialty = '', doctorPhoto = '', useDrPrefix = true, themeColor = 'emerald' }: SelectDateProps) {
+export default function SelectDate({ onBack, onContinue, language, maxAdvanceDays = 30, plannedOffPeriods = [], schedules = [], globalBookingEnabled = true, doctorName = '', doctorSpecialty = '', doctorPhoto = '', useDrPrefix = true, themeColor = 'emerald', clinicId }: SelectDateProps) {
   console.log('📅 SelectDate Props:', { 
     maxAdvanceDays, 
     globalBookingEnabled, 
     plannedOffPeriodsCount: plannedOffPeriods.length,
+    clinicId: clinicId || 'NOT_FROM_CLINIC',
     schedulesCount: schedules.length,
     doctorName,
     doctorSpecialty
@@ -100,7 +104,27 @@ export default function SelectDate({ onBack, onContinue, language, maxAdvanceDay
     }
     
     // Disable dates in planned off periods (only active periods)
-    const activePlannedOffPeriods = plannedOffPeriods.filter(p => p.status === 'active');
+    // CRITICAL: Filter out clinic planned off if not booking through that clinic
+    const activePlannedOffPeriods = plannedOffPeriods.filter(p => {
+      // Always include doctor-specific planned off
+      if (p.status !== 'active') return false;
+      if (p.appliesTo === 'doctor') return true;
+      
+      // For clinic planned off, only include if booking through that specific clinic
+      if (p.appliesTo === 'clinic') {
+        const isMatchingClinic = p.clinicId && clinicId && p.clinicId === clinicId;
+        console.log('🏥 Clinic Planned Off Filter:', {
+          periodClinicId: p.clinicId,
+          currentClinicId: clinicId,
+          isMatchingClinic,
+          included: isMatchingClinic
+        });
+        return isMatchingClinic;
+      }
+      
+      // Legacy periods without appliesTo (assume doctor-specific)
+      return true;
+    });
     
     console.log(`🔍 SelectDate: Checking if day ${day} is blocked`, {
       activePlannedOffPeriodsCount: activePlannedOffPeriods.length,

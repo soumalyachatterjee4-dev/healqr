@@ -10,7 +10,7 @@ import { useState, useEffect } from 'react';
 import DashboardSidebar from './DashboardSidebar';
 import { toast } from 'sonner';
 import { db, auth } from '../lib/firebase/config';
-import { doc, getDoc, updateDoc, serverTimestamp, Timestamp, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, setDoc, serverTimestamp, Timestamp, collection, query, where, getDocs } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { decrypt } from '../utils/encryptionService';
 
@@ -686,6 +686,10 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
     }
 
     try {
+      // Fetch doctor's name from Firestore
+      const doctorDoc = await getDoc(doc(db, 'doctors', doctorId));
+      const doctorName = doctorDoc.exists() ? doctorDoc.data().name : 'Unknown Doctor';
+
       const now = new Date();
       const createdDate = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
       const createdTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
@@ -699,6 +703,9 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
         createdTime: createdTime,
         status: 'active' as const,
         deactivatedDate: null,
+        appliesTo: 'doctor' as const,
+        doctorId: doctorId,
+        doctorName: doctorName,
       };
       
       const updatedPeriods = [newPeriod, ...allPeriods];

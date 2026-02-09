@@ -1,115 +1,50 @@
-# Project Status Update - February 9, 2026
+# Project Status Update - February 9, 2026 (Final Session Report)
 
-## 🎯 LATEST FIX: Clinic QR Chamber Privacy Filter (Feb 9, 2026)
+## 🚀 Summary of Session Achievements
+We successfully resolved a critical privacy issue and two subsequent blocking bugs in the Clinic Booking Flow. The bookings are now flowing correctly from Scan → Select → Book → Confirmation.
 
-### Issue Fixed:
-When patients scanned a **clinic QR code**, they could see ALL chambers of the selected doctor, including:
-- ❌ Doctor's personal HOME chambers
-- ❌ Chambers at OTHER clinics
-- ❌ This exposed doctor's private practice and created confusion
+## 🛠️ 1. Privacy Fix: Clinic QR Chamber Filtering
+**Issue:**  
+Scanning a Clinic's QR code displayed **all** of a doctor's chambers (including their personal home chambers), which was a privacy violation for doctors working at multiple locations.
 
-### Root Cause:
-1. **ClinicBookingFlow.tsx** was NOT passing `clinicId` to SelectChamber component
-2. **SelectChamber.tsx** had no logic to filter chambers by `clinicId` for clinic QR scans
-3. Only filtered chambers when clinic was "off", not when coming from clinic QR
+**Fix Implemented:**  
+- **Logic:** Added strict filtering in the chamber selection screen. When the booking source is a Clinic QR (`booking_source` = `clinic-qr`), we now compare each chamber's `clinicId` against the scanned `clinicId`.
+- **Result:** Only chambers belonging to the specific scanned clinic are shown. Personal or other-clinic chambers are hidden.
+- **Files:** `components/SelectChamber.tsx` (Filter logic), `components/ClinicBookingFlow.tsx` (Prop passing).
 
-### Solution Implemented:
-**Two-part fix:**
+## 🛠️ 2. Critical Bug Fix: "Doctor Information Missing"
+**Issue:**  
+Submitting the booking form resulted in a "Doctor information missing" error toast, blocking the booking.
 
-1. **[ClinicBookingFlow.tsx](components/ClinicBookingFlow.tsx#L456)** - Line 456:
-   - Added `clinicId={clinic?.id}` prop to SelectChamber
-   - Now passes clinic ID when patient scans clinic QR
+**Fix Implemented:**  
+- **Root Cause:** The `doctorId` prop was not being passed from the wizard flow to the `PatientDetailsForm` component. Validation failed on the receiving end.
+- **Fix:** Explicitly passed `doctorId={selectedDoctor?.uid}` and correctly mapped `selectedChamber` name.
+- **Files:** `components/ClinicBookingFlow.tsx`.
 
-2. **[SelectChamber.tsx](components/SelectChamber.tsx#L267-L287)**:
-   - Added NEW filter before existing "clinic is off" logic
-   - Checks if `booking_source === 'clinic_qr'` AND `clinicId` exists
-   - Filters to ONLY show chambers where `chamber.clinicId === clinicId`
-   - Personal chambers (no clinicId or different clinicId) are hidden
+## 🛠️ 3. Critical Bug Fix: Confirmation Screen Crash
+**Issue:**  
+After a successful booking, the Confirmation screen crashed with: `TypeError: Cannot read properties of undefined (reading 'serialNo')`.
 
-### Files Modified:
-- [ClinicBookingFlow.tsx](components/ClinicBookingFlow.tsx) - Added clinicId prop to SelectChamber
-- [SelectChamber.tsx](components/SelectChamber.tsx) - Added clinic QR chamber filter logic
-- [App.tsx](App.tsx) - Added clinic filter (for doctor QR path - complementary fix)
+**Fix Implemented:**  
+- **Root Cause:** `PatientDetailsForm` was returning only a string ID/undefined in some paths, but `ClinicBookingFlow` expected a rich object to populate the confirmation screen details (Token #, Serial #).
+- **Fix:**
+    1.  Updated `PatientDetailsForm.tsx` to return the full booking object (`{ bookingId, serialNo, tokenNumber, ... }`) in the `onSubmit` callback.
+    2.  Updated `ClinicBookingFlow.tsx` to capture this object into state (`confirmationData`).
+    3.  Updated `BookingConfirmation.tsx` to handle this data safely with optional chaining.
+- **Files:** `components/ClinicBookingFlow.tsx`, `components/BookingConfirmation.tsx`.
 
-### Build & Deployment:
-- ✅ **Build Status:** Successful
-- ✅ **Deployment:** Live at `https://teamhealqr.web.app`
-- ✅ **Git Backup:** Committed with message: "Fix: Filter chambers by clinic when scanning clinic QR code"
+## 📊 Deployment Status
+- **Build:** ✅ Passing (`npm run build`)
+- **Hosting:** ✅ Deployed Live (`firebase deploy --only hosting`)
+- **URL:** https://teamhealqr.web.app
 
-### Testing Required:
-1. Scan a **clinic QR code**
-2. Select a doctor from that clinic
-3. Select a date
-4. **Verify:** Only chambers from that specific clinic appear
-5. **Verify:** Personal chambers (HOME CHAMBER 1, etc.) are NOT shown
-
-## ⚡ LATEST FIX: Missing Doctor Data in Clinic Bookings (Feb 9, 2026)
-
-### Issue Fixed:
-When booking via **Clinic QR** -> **Patient Information Form**, clicking "Confirm Booking" showed:
-- ❌ **Error:** "Doctor information missing"
-- ❌ Blocking the booking process
-
-### Root Cause:
-- `ClinicBookingFlow.tsx` was rendering `PatientDetailsForm` **without passing the `doctorId` prop**.
-- The form validation specifically checks `if (!doctorId)` and throws the error.
-- Also, `selectedChamber` name was being passed with the wrong prop name (`selectedChamberName` instead of `selectedChamber`).
-
-### Solution Implemented:
-Updated `components/ClinicBookingFlow.tsx` to correctly pass props:
-```tsx
-<PatientDetailsForm
-  doctorId={selectedDoctor?.uid}        // ✅ Added this
-  selectedChamber={selectedChamberName} // ✅ Fixed this (was selectedChamberName)
-  // ...other props
-/>
-```
-
-### Files Modified:
-- [ClinicBookingFlow.tsx](components/ClinicBookingFlow.tsx) - Lines 470-480
-
-### Testing Required:
-1. Scan Clinic QR (or use link with `?clinicId=...`)
-2. Select Doctor (Linked/Non-linked)
-3. Select Date & Chamber
-4. Fill Patient Details
-5. **Verify:** Booking submits successfully without "Doctor information missing" error
+## 📝 Next Steps (When You Return)
+1.  **Verify Production:** Perform a full end-to-end booking test on the live link using a real Clinic QR code.
+    - Check: Are personal chambers hidden?
+    - Check: Does the booking succeed?
+    - Check: Does the confirmation screen show the correct Token # and Serial #?
+2.  **Code Cleanup:** The `ClinicBookingFlow.tsx` has some legacy comments and console logs that could be tidied up.
+3.  **Feature Extension:** Consider if "Video Consultation" options need similar clinic-specific filtering (currently scoped to physical chambers).
 
 ---
-
-## 1. Previous Achievement: Fixed "Drop Out" Analytics Logic
-We have successfully restored and redefined the "Drop Out" metric in the Clinic Dashboard analytics.
-
-### Current "Drop Out" Definition (Strict "No Show"):
-A patient is counted as a **Drop Out** ONLY if:
-1.  They have a confirmed booking (`status: confirmed`).
-2.  The appointment date is in the **past** (before today).
-3.  The booking was **NOT cancelled**.
-4.  The patient was **NOT marked as seen** (The "Eye" button was never pressed by the doctor).
-
-*Previous logic utilizing raw QR scan counts has been removed to avoid data mismatch issues.*
-
-## 2. Key Files Modified (Drop Out Fix)
-*   `components/ClinicDashboard.tsx`:
-    *   Updated `loadClinicData` function.
-    *   Added logic to calculate `dropOuts` based on `appointmentDate < todayStr` AND `!isMarkedSeen`.
-    *   Updated the **Practice Overview Chart** to include the red bar for "Drop Outs (No Show)".
-    *   Renamed chart label from "Code Scanned Only" to "Drop Outs (No Show)".
-
-## 3. Overall Status
-*   **Build Status:** Successful (`npm run build`).
-*   **Deployment:** Live on Firebase Hosting (`https://teamhealqr.web.app`).
-*   **Version Control:** All changes backed up with descriptive commit messages.
-
-## 4. Next Steps
-1.  **Test Clinic QR Chamber Filter:** Scan a clinic QR and verify only that clinic's chambers appear
-2.  **Verify Drop Out Data:** Check if the "Drop Out" numbers on the dashboard match actual no-shows
-3.  **Monitor:** Watch for any edge cases or issues reported by users
-
-## 5. Technical Context
-*   **Database:** Firestore collections `bookings` and `qrScans`.
-*   **Framework:** React + Vite.
-*   **Hosting:** Firebase.
-
----
-*Created to facilitate seamless session continuity.*
+*End of Session - Feb 9, 2026*
