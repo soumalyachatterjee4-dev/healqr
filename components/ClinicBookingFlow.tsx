@@ -200,7 +200,7 @@ export default function ClinicBookingFlow() {
       if (doctorScheduleSnap.exists()) {
         const scheduleData = doctorScheduleSnap.data();
         const doctorPlannedOff = scheduleData.plannedOffPeriods || [];
-        console.log('✅ Doctor Schedule LOADED:', {
+        console.log('✅ Doctor Schedule LOADED from schedules collection:', {
           doctorUid: doctor.uid,
           maxAdvanceDays: scheduleData.maxAdvanceDays,
           totalPlannedOffPeriods: doctorPlannedOff.length,
@@ -217,14 +217,41 @@ export default function ClinicBookingFlow() {
           globalBookingEnabled: scheduleData.globalBookingEnabled ?? true
         });
       } else {
-        console.warn('⚠️ NO schedule document found for doctor:', doctor.uid);
-        console.log('Using default schedule settings');
-        // Default doctor schedule if not found
-        setDoctorSchedule({
-          maxAdvanceDays: 30,
-          plannedOffPeriods: [],
-          globalBookingEnabled: true
-        });
+        console.warn('⚠️ NO schedule document found in schedules collection for doctor:', doctor.uid);
+        console.log('📋 FALLBACK: Trying to load from doctors collection (legacy location)...');
+        
+        // FALLBACK: Read from doctors collection if schedules doesn't exist
+        if (doctorProfileSnap.exists()) {
+          const profileData = doctorProfileSnap.data();
+          const legacyPlannedOff = profileData.plannedOffPeriods || [];
+          const legacyMaxDays = profileData.maxAdvanceBookingDays || 30;
+          
+          console.log('✅ Doctor Schedule LOADED from doctors collection (LEGACY):', {
+            doctorUid: doctor.uid,
+            maxAdvanceDays: legacyMaxDays,
+            totalPlannedOffPeriods: legacyPlannedOff.length,
+            activePeriods: legacyPlannedOff.filter((p: any) => p.status === 'active').length,
+            periods: legacyPlannedOff.map((p: any) => ({
+              startDate: p.startDate,
+              endDate: p.endDate,
+              status: p.status
+            }))
+          });
+          
+          setDoctorSchedule({
+            maxAdvanceDays: legacyMaxDays,
+            plannedOffPeriods: legacyPlannedOff,
+            globalBookingEnabled: true
+          });
+        } else {
+          console.log('🔴 No schedule data found in either collection, using defaults');
+          // Default doctor schedule if not found
+          setDoctorSchedule({
+            maxAdvanceDays: 30,
+            plannedOffPeriods: [],
+            globalBookingEnabled: true
+          });
+        }
       }
     } catch (error) {
       console.error('❌ Error loading doctor schedule:', error);
