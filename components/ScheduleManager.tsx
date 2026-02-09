@@ -268,12 +268,12 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
   // NEW: Effect to fetch clinic when clinic code changes
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
-      if (clinicCode && clinicCode.length >= 3) {
+      if (clinicCode && clinicCode.length >= 5) {
         fetchClinicByCode(clinicCode);
       } else if (clinicCode.length === 0) {
         setClinicData(null);
       }
-    }, 500); // Debounce for 500ms
+    }, 1500); // Debounce for 1.5 seconds - wait for user to finish typing
 
     return () => clearTimeout(debounceTimer);
   }, [clinicCode]);
@@ -1540,7 +1540,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
                   )}
                   {!clinicData && !loadingClinic && (
                     <p className="text-xs text-gray-500">
-                      If this chamber is for a specific clinic, enter their clinic code here. Name and address will be auto-filled.
+                      Enter clinic code (5+ characters). Auto-search starts after you stop typing.
                     </p>
                   )}
                 </div>
