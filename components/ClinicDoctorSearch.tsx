@@ -241,7 +241,22 @@ export default function ClinicDoctorSearch({
           <p className="text-blue-200 text-sm">Find the right doctor for you</p>
         </div>
 
-        <div className="px-4 sm:px-6 py-6">
+        {/* Scrollable Content Area */}
+        <div className="px-4 sm:px-6 py-6 max-h-[calc(100vh-280px)] overflow-y-auto">
+          {/* Today's Health Tip */}
+          <div className="mb-6">
+            <div className="bg-gradient-to-br from-blue-600/10 to-purple-600/10 border border-blue-500/30 rounded-2xl p-4 sm:p-5 overflow-hidden">
+              <div className="flex items-center gap-2 mb-3">
+                <Lightbulb className="w-5 h-5 text-blue-400" />
+                <h3 className="text-white text-base sm:text-lg">Today's Health Tip</h3>
+              </div>
+              <TemplateDisplay
+                placement="booking-mini-website"
+                className="rounded-xl max-w-full"
+              />
+            </div>
+          </div>
+
           {/* Specialty Selection */}
           {searchMode === 'specialty' && !selectedSpecialty && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
