@@ -162,12 +162,23 @@ export default function ClinicBookingFlow() {
       
       if (doctorScheduleSnap.exists()) {
         const scheduleData = doctorScheduleSnap.data();
+        const doctorPlannedOff = scheduleData.plannedOffPeriods || [];
+        console.log('✅ Doctor Schedule LOADED:', {
+          doctorUid: doctor.uid,
+          maxAdvanceDays: scheduleData.maxAdvanceDays,
+          totalPlannedOffPeriods: doctorPlannedOff.length,
+          activePeriods: doctorPlannedOff.filter((p: any) => p.status === 'active').length,
+          periods: doctorPlannedOff.map((p: any) => ({
+            startDate: p.startDate,
+            endDate: p.endDate,
+            status: p.status
+          }))
+        });
         setDoctorSchedule({
           maxAdvanceDays: scheduleData.maxAdvanceDays || 30,
-          plannedOffPeriods: scheduleData.plannedOffPeriods || [],
+          plannedOffPeriods: doctorPlannedOff,
           globalBookingEnabled: scheduleData.globalBookingEnabled ?? true
         });
-        console.log('📅 Doctor Schedule Settings:', scheduleData);
       } else {
         // Default doctor schedule if not found
         setDoctorSchedule({
@@ -355,6 +366,8 @@ export default function ClinicBookingFlow() {
           doctorPhoto={selectedDoctor?.profilePhoto}
           language={language}
           themeColor="blue"
+          clinicAddress={clinic?.address}
+          clinicPlannedOffPeriods={clinicSchedule?.plannedOffPeriods || []}
         />
       );
 

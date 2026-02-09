@@ -30,7 +30,8 @@ interface ChamberWithBookingCount extends Chamber {
 
 interface SelectChamberProps {
   onBack: () => void;
-  onContinue: (chamberName: string, consultationType: 'chamber' | 'video') => void;
+  onContinue?: (chamberName: string, consultationType: 'chamber' | 'video') => void;
+  onChamberSelect?: (chamberId: number, chamberName: string) => void; // For clinic QR flow
   language: Language;
   selectedDate: Date;
   onLanguageChange?: (language: Language) => void;
@@ -42,11 +43,14 @@ interface SelectChamberProps {
   doctorDegrees?: string[];
   useDrPrefix?: boolean;
   themeColor?: 'emerald' | 'blue';
+  clinicAddress?: string; // Clinic address to filter when clinic is off
+  clinicPlannedOffPeriods?: any[]; // Clinic planned off periods
 }
 
 export default function SelectChamber({
   onBack,
   onContinue,
+  onChamberSelect,
   language,
   selectedDate,
   onLanguageChange,
@@ -58,9 +62,55 @@ export default function SelectChamber({
   doctorDegrees = [],
   useDrPrefix = true,
   themeColor = 'emerald',
+  clinicAddress,
+  clinicPlannedOffPeriods = [],
 }: SelectChamberProps) {
   const accentColor = themeColor === 'blue' ? 'blue' : 'emerald';
-  console.log('🏥 SelectChamber received:', { doctorName, doctorSpecialty, chambersCount: chambers.length });
+  console.log('🏥 SelectChamber received:', { doctorName, doctorSpecialty, chambersCount: chambers.length, clinicAddress });
+  
+  // Check if selected date falls in clinic planned off period
+  const isClinicOff = () => {
+    const date = new Date(selectedDate);
+    date.setHours(0, 0, 0, 0);
+    
+    const activePlannedOffPeriods = clinicPlannedOffPeriods.filter((p: any) => p.status === 'active');
+    
+    for (const period of activePlannedOffPeriods) {
+      let startDate: Date;
+      let endDate: Date;
+      
+      if (typeof period.startDate === 'string') {
+        const [year, month, dayVal] = period.startDate.split('-').map(Number);
+        startDate = new Date(year, month - 1, dayVal);
+      } else if (period.startDate?.toDate) {
+        startDate = period.startDate.toDate();
+      } else {
+        startDate = new Date(period.startDate);
+      }
+      
+      if (typeof period.endDate === 'string') {
+        const [year, month, dayVal] = period.endDate.split('-').map(Number);
+        endDate = new Date(year, month - 1, dayVal);
+      } else if (period.endDate?.toDate) {
+        endDate = period.endDate.toDate();
+      } else {
+        endDate = new Date(period.endDate);
+      }
+      
+      startDate.setHours(0, 0, 0, 0);
+      endDate.setHours(0, 0, 0, 0);
+      
+      if (date >= startDate && date <= endDate) {
+        console.log('❌ Clinic is OFF on selected date:', {
+          selectedDate: date.toDateString(),
+          clinicOffPeriod: { start: startDate.toDateString(), end: endDate.toDateString() }
+        });
+        return true;
+      }
+    }
+    
+    return false;
+  };
   
   const [selectedChamber, setSelectedChamber] = useState<ChamberWithBookingCount | null>(null);
   const [selectedChamberName, setSelectedChamberName] = useState<string>('');
@@ -174,7 +224,25 @@ export default function SelectChamber({
         );
         
         // Sort chambers by start time (earliest first)
-        const sortedChambers = chambersWithBookingData.sort((a, b) => (a.startMinutes || 0) - (b.startMinutes || 0));
+        let sortedChambers = chambersWithBookingData.sort((a, b) => (a.startMinutes || 0) - (b.startMinutes || 0));
+        
+        // Filter out clinic chambers if clinic is off on selected date
+        if (isClinicOff() && clinicAddress) {
+          const beforeFilter = sortedChambers.length;
+          sortedChambers = sortedChambers.filter(chamber => {
+            // Check if chamber address matches clinic address (case-insensitive partial match)
+            const chamberAddr = chamber.chamberAddress?.toLowerCase() || '';
+            const clinicAddr = clinicAddress.toLowerCase();
+            const isClinicChamber = chamberAddr.includes(clinicAddr) || clinicAddr.includes(chamberAddr);
+            
+            if (isClinicChamber) {
+              console.log(`🚫 Filtering out clinic chamber: "${chamber.chamberName}" (Clinic is off on selected date)`);
+            }
+            
+            return !isClinicChamber; // Keep only NON-clinic chambers
+          });
+          console.log(`✅ Chamber filtering: ${beforeFilter} → ${sortedChambers.length} chambers (removed ${beforeFilter - sortedChambers.length} clinic chambers)`);
+        }
         
         setChambersWithCounts(sortedChambers);
       } catch (error) {
@@ -467,9 +535,14 @@ export default function SelectChamber({
           <Button
             onClick={() => {
               if (consultationType === 'video') {
-                onContinue(chambers.length > 0 ? chambers[0].chamberName : 'Video Consultation', 'video');
-              } else {
-                selectedChamber && onContinue(selectedChamber.chamberName, 'chamber');
+                onContinue?.(chambers.length > 0 ? chambers[0].chamberName : 'Video Consultation', 'video');
+              } else if (selectedChamber) {
+                // Call onChamberSelect if provided (clinic QR flow), otherwise onContinue (doctor QR flow)
+                if (onChamberSelect) {
+                  onChamberSelect(selectedChamber.id, selectedChamber.chamberName);
+                } else {
+                  onContinue?.(selectedChamber.chamberName, 'chamber');
+                }
               }
               console.log('📤 Sending to parent:', { chamber: selectedChamber?.chamberName, chamberId: selectedChamber?.id, consultationType });
             }}
