@@ -51,31 +51,67 @@ export default function AdvanceBooking({ onMenuChange, onLogout, activeAddOns = 
 
   // Helper function to check if a clinic is off on a given date
   const isClinicOffForChamber = (chamberAddress: string, checkDate: string): boolean => {
-    if (!checkDate) return false;
+    if (!checkDate) {
+      console.log('⚠️ isClinicOffForChamber: No checkDate provided');
+      return false;
+    }
+
+    console.log('🔍 Checking if chamber is off:', {
+      chamberAddress,
+      checkDate,
+      clinicSchedulesCount: Object.keys(clinicSchedules).length,
+      clinicDataCount: Object.keys(clinicData).length
+    });
 
     // Find if this chamber belongs to any clinic by matching addresses
     for (const [clinicId, schedule] of Object.entries(clinicSchedules)) {
       const clinic = clinicData[clinicId];
-      if (!clinic) continue;
+      if (!clinic) {
+        console.log('⚠️ No clinic data found for clinic ID:', clinicId);
+        continue;
+      }
       
       const clinicAddress = clinic.address || '';
       
       // Check if chamber address matches clinic address
-      if (chamberAddress.toLowerCase().includes(clinicAddress.toLowerCase()) || 
-          clinicAddress.toLowerCase().includes(chamberAddress.toLowerCase())) {
-        
+      const chamberLower = chamberAddress.toLowerCase();
+      const clinicLower = clinicAddress.toLowerCase();
+      const isMatch = chamberLower.includes(clinicLower) || clinicLower.includes(chamberLower);
+      
+      console.log('🏥 Checking clinic:', {
+        clinicId,
+        clinicName: clinic.clinicName,
+        clinicAddress,
+        chamberAddress,
+        addressMatch: isMatch
+      });
+      
+      if (isMatch) {
         const plannedOffPeriods = schedule?.plannedOffPeriods || [];
+        console.log('📋 Planned off periods for matched clinic:', plannedOffPeriods);
         
         // Check if date falls within any planned off period
         for (const period of plannedOffPeriods) {
-          if (!period.isActive) continue;
+          // Check status field (not isActive)
+          if (period.status !== 'active') {
+            console.log('⏭️ Skipping inactive period:', period);
+            continue;
+          }
           
           const start = new Date(period.startDate);
           const end = new Date(period.endDate);
           const check = new Date(checkDate);
           
+          console.log('📅 Comparing dates:', {
+            checkDate: check.toDateString(),
+            periodStart: start.toDateString(),
+            periodEnd: end.toDateString(),
+            isInRange: check >= start && check <= end
+          });
+          
           if (check >= start && check <= end) {
-            console.log('🚫 Chamber', chamberAddress, 'is OFF (clinic off):', {
+            console.log('🚫🚫🚫 Chamber IS OFF (clinic off):', {
+              chamberAddress,
               clinicId,
               clinicName: clinic.clinicName,
               period: `${period.startDate} to ${period.endDate}`,
@@ -87,6 +123,7 @@ export default function AdvanceBooking({ onMenuChange, onLogout, activeAddOns = 
       }
     }
     
+    console.log('✅ Chamber is AVAILABLE (clinic open)');
     return false;
   };
 
