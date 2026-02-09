@@ -75,28 +75,26 @@ export default function ClinicBookingFlow() {
         const scanSessionId = `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         sessionStorage.setItem('scan_session_id', scanSessionId);
         
-        const { db } = await import('../lib/firebase/config');
-        if (db) {
-          const { collection, addDoc, serverTimestamp } = await import('firebase/firestore');
-          try {
-            await addDoc(collection(db, 'qrScans'), {
-              scannedBy: 'clinic',
-              clinicId: clinicId,
-              timestamp: serverTimestamp(),
-              scanSessionId: scanSessionId,
-              completed: false // Will be updated when booking is confirmed
-            });
-            console.log('📊 Clinic QR scan tracked');
-          } catch (error) {
-            console.error('Error tracking scan:', error);
-          }
-        }
-
         // Load clinic data from Firestore
         const { db } = await import('../lib/firebase/config');
         if (!db) return;
 
-        const { doc, getDoc } = await import('firebase/firestore');
+        const { collection, addDoc, serverTimestamp, doc, getDoc } = await import('firebase/firestore');
+        
+        // Track scan
+        try {
+          await addDoc(collection(db, 'qrScans'), {
+            scannedBy: 'clinic',
+            clinicId: clinicId,
+            timestamp: serverTimestamp(),
+            scanSessionId: scanSessionId,
+            completed: false // Will be updated when booking is confirmed
+          });
+          console.log('📊 Clinic QR scan tracked');
+        } catch (error) {
+          console.error('Error tracking scan:', error);
+        }
+
         const clinicRef = doc(db, 'clinics', clinicId);
         const clinicSnap = await getDoc(clinicRef);
 
