@@ -217,6 +217,7 @@ export default function ClinicBookingFlow() {
           doctorName={clinic.name}
           doctorPhoto={clinic.logoUrl}
           useDrPrefix={false}
+          themeColor="blue"
         />
       );
 

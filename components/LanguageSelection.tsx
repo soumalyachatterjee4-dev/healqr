@@ -13,10 +13,22 @@ interface LanguageSelectionProps {
   doctorPhoto?: string;
   doctorDegrees?: string[];
   useDrPrefix?: boolean;
+  themeColor?: 'emerald' | 'blue';
 }
 
-export default function LanguageSelection({ onContinue, onBack, doctorName = '', doctorSpecialty = '', doctorPhoto = '', doctorDegrees = [], useDrPrefix = true }: LanguageSelectionProps) {
+export default function LanguageSelection({ onContinue, onBack, doctorName = '', doctorSpecialty = '', doctorPhoto = '', doctorDegrees = [], useDrPrefix = true, themeColor = 'emerald' }: LanguageSelectionProps) {
   const [selectedLanguage, setSelectedLanguage] = useState<Language>('english');
+
+  // Theme-aware color variables
+  const iconGradient = themeColor === 'blue' ? 'from-blue-400 to-blue-600' : 'from-emerald-400 to-emerald-600';
+  const selectedBorder = themeColor === 'blue' ? 'border-blue-500' : 'border-emerald-500';
+  const selectedBg = themeColor === 'blue' ? 'bg-blue-500/10' : 'bg-emerald-500/10';
+  const selectedIconBg = themeColor === 'blue' ? 'bg-blue-500/20' : 'bg-emerald-500/20';
+  const selectedIconText = themeColor === 'blue' ? 'text-blue-400' : 'text-emerald-400';
+  const benefitIconColor = themeColor === 'blue' ? 'text-blue-400' : 'text-emerald-400';
+  const buttonGradient = themeColor === 'blue' 
+    ? 'from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700' 
+    : 'from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700';
   
   console.log('🔍 LanguageSelection Props:', { doctorName, doctorSpecialty, doctorPhoto, doctorDegrees });
 
@@ -97,11 +109,12 @@ export default function LanguageSelection({ onContinue, onBack, doctorName = '',
       doctorDegrees={doctorDegrees}
       doctorSpecialty={doctorSpecialty}
       useDrPrefix={useDrPrefix}
+      themeColor={themeColor}
     >
       <div className="bg-[#1a1f2e] rounded-3xl shadow-2xl p-6 sm:p-8">
         {/* Icon */}
         <div className="flex justify-center mb-6">
-          <div className="w-20 h-20 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
+          <div className={`w-20 h-20 bg-gradient-to-br ${iconGradient} rounded-2xl flex items-center justify-center shadow-lg`}>
             <Check className="w-10 h-10 text-white" strokeWidth={3} />
           </div>
         </div>
@@ -120,12 +133,12 @@ export default function LanguageSelection({ onContinue, onBack, doctorName = '',
               onClick={() => setSelectedLanguage(language.id)}
               className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center gap-4 ${
                 selectedLanguage === language.id
-                  ? 'border-emerald-500 bg-emerald-500/10'
+                  ? `${selectedBorder} ${selectedBg}`
                   : 'border-gray-700 bg-[#0f1419] hover:border-gray-600'
               }`}
             >
               <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                selectedLanguage === language.id ? 'bg-emerald-500/20 text-emerald-400' : 'bg-gray-800 text-gray-400'
+                selectedLanguage === language.id ? `${selectedIconBg} ${selectedIconText}` : 'bg-gray-800 text-gray-400'
               }`}>
                 <span className="font-semibold">{language.code}</span>
               </div>
@@ -145,15 +158,15 @@ export default function LanguageSelection({ onContinue, onBack, doctorName = '',
           </h3>
           <ul className="space-y-2 text-sm text-gray-300">
             <li className="flex items-start gap-2">
-              <MessageSquare className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
+              <MessageSquare className={`w-4 h-4 ${benefitIconColor} mt-0.5 flex-shrink-0`} />
               <span>{t('benefitMessages', selectedLanguage)}</span>
             </li>
             <li className="flex items-start gap-2">
-              <Bell className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
+              <Bell className={`w-4 h-4 ${benefitIconColor} mt-0.5 flex-shrink-0`} />
               <span>{t('benefitNotifications', selectedLanguage)}</span>
             </li>
             <li className="flex items-start gap-2">
-              <FileText className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
+              <FileText className={`w-4 h-4 ${benefitIconColor} mt-0.5 flex-shrink-0`} />
               <span>{t('benefitConfirmations', selectedLanguage)}</span>
             </li>
           </ul>
@@ -165,7 +178,7 @@ export default function LanguageSelection({ onContinue, onBack, doctorName = '',
         {/* Continue Button */}
         <Button
           onClick={() => onContinue(selectedLanguage)}
-          className="w-full h-14 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-2xl flex items-center justify-center gap-2 shadow-lg"
+          className={`w-full h-14 bg-gradient-to-r ${buttonGradient} text-white rounded-2xl flex items-center justify-center gap-2 shadow-lg`}
         >
           <span>{t('continue', selectedLanguage)}</span>
           <ArrowRight className="w-5 h-5" />
