@@ -69,6 +69,7 @@ export default function ClinicBookingFlow() {
 
         // Store in session storage
         sessionStorage.setItem('booking_clinic_id', clinicId);
+        sessionStorage.setItem('booking_source', 'clinic_qr'); // Mark as clinic QR booking
 
         // Load clinic data from Firestore
         const { db } = await import('../lib/firebase/config');

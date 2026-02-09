@@ -157,8 +157,14 @@ export default function ClinicDashboard() {
                 }
                 
                 // QR bookings (type: 'qr_booking' and came through clinic QR)
-                if (bookingData.type === 'qr_booking') {
-                  totalScans++;
+                // 🎯 SCANS ONLY COUNT FOR CLINIC QR - NOT DOCTOR QR
+                if (bookingData.bookingSource === 'clinic_qr') {
+                  totalScans++; // Only clinic QR scans count as scans
+                  if (bookingData.status !== 'cancelled' && !bookingData.isCancelled) {
+                    qrBookings++;
+                  }
+                } else if (bookingData.type === 'qr_booking' || bookingData.bookingSource === 'doctor_qr') {
+                  // Doctor QR bookings: count as booking but NOT as scan
                   if (bookingData.status !== 'cancelled' && !bookingData.isCancelled) {
                     qrBookings++;
                   }

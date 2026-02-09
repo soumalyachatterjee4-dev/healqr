@@ -373,6 +373,7 @@ export default function PatientDetailsForm({
           clinicId: sessionStorage.getItem('booking_clinic_id') || null,
           clinicName: sessionStorage.getItem('booking_clinic_name') || selectedChamber || 'Clinic',
           clinicQRCode: sessionStorage.getItem('booking_clinic_qr') || null,
+          bookingSource: sessionStorage.getItem('booking_source') || 'doctor_qr', // 'clinic_qr' or 'doctor_qr' or 'walkin'
           type: bookingType, // 'qr_booking' or 'walkin_booking'
           status: 'confirmed',
           paymentStatus: formData.paymentStatus,

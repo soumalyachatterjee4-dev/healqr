@@ -687,6 +687,7 @@ export default function App() {
           if (!querySnapshot.empty) {
             const actualDoctorId = querySnapshot.docs[0].id;
             sessionStorage.setItem('booking_doctor_id', actualDoctorId);
+            sessionStorage.setItem('booking_source', 'doctor_qr'); // Mark as doctor QR booking
 
             // Load doctor data
             const data = querySnapshot.docs[0].data();
@@ -831,6 +832,7 @@ export default function App() {
       } else {
         // Regular doctorId provided
         sessionStorage.setItem('booking_doctor_id', doctorId);
+        sessionStorage.setItem('booking_source', 'doctor_qr'); // Mark as doctor QR booking
 
         // Load doctor data immediately
         if (db) {
