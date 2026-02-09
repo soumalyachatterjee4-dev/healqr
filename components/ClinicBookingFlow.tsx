@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import LanguageSelection from './LanguageSelection';
 import ClinicBookingMiniWebsite from './ClinicBookingMiniWebsite';
 import ClinicDoctorSearch from './ClinicDoctorSearch';
@@ -49,6 +49,8 @@ export default function ClinicBookingFlow() {
   const [bookingId, setBookingId] = useState<string>('');
   const [clinic, setClinic] = useState<ClinicData | null>(null);
   const [loadingClinic, setLoadingClinic] = useState(true);
+  const [clinicSchedule, setClinicSchedule] = useState<any>(null);
+  const [doctorSchedule, setDoctorSchedule] = useState<any>(null);
 
   // Load clinic data from URL parameter
   useEffect(() => {
@@ -78,6 +80,26 @@ export default function ClinicBookingFlow() {
         if (clinicSnap.exists()) {
           const clinicData = { id: clinicSnap.id, ...clinicSnap.data() } as ClinicData;
           setClinic(clinicData);
+          
+          // Load clinic schedule settings
+          const clinicScheduleRef = doc(db, 'clinicSchedules', clinicId);
+          const clinicScheduleSnap = await getDoc(clinicScheduleRef);
+          if (clinicScheduleSnap.exists()) {
+            const scheduleData = clinicScheduleSnap.data();
+            setClinicSchedule({
+              maxAdvanceDays: scheduleData.maxAdvanceDays || 30,
+              plannedOffPeriods: scheduleData.plannedOffPeriods || [],
+              globalBookingEnabled: scheduleData.globalBookingEnabled ?? true
+            });
+            console.log('📅 Clinic Schedule Settings:', scheduleData);
+          } else {
+            // Default clinic schedule if not found
+            setClinicSchedule({
+              maxAdvanceDays: 30,
+              plannedOffPeriods: [],
+              globalBookingEnabled: true
+            });
+          }
         } else {
           console.error('Clinic not found');
         }
@@ -108,7 +130,7 @@ export default function ClinicBookingFlow() {
     setCurrentStep('doctor-search');
   };
 
-  const handleDoctorSelect = (doctor: SelectedDoctor) => {
+  const handleDoctorSelect = async (doctor: SelectedDoctor) => {
     setSelectedDoctor(doctor);
     // Store doctor info in session
     sessionStorage.setItem('booking_doctor_id', doctor.uid);
@@ -119,6 +141,51 @@ export default function ClinicBookingFlow() {
     if (doctor.qrNumber) {
       sessionStorage.setItem('booking_doctor_qr', doctor.qrNumber);
     }
+    
+    // Load doctor's schedule settings
+    try {
+      const { db } = await import('../lib/firebase/config');
+      if (!db) {
+        // Use defaults if db not available
+        setDoctorSchedule({
+          maxAdvanceDays: 30,
+          plannedOffPeriods: [],
+          globalBookingEnabled: true
+        });
+        setCurrentStep('select-date');
+        return;
+      }
+      
+      const { doc, getDoc } = await import('firebase/firestore');
+      const doctorScheduleRef = doc(db, 'schedules', doctor.uid);
+      const doctorScheduleSnap = await getDoc(doctorScheduleRef);
+      
+      if (doctorScheduleSnap.exists()) {
+        const scheduleData = doctorScheduleSnap.data();
+        setDoctorSchedule({
+          maxAdvanceDays: scheduleData.maxAdvanceDays || 30,
+          plannedOffPeriods: scheduleData.plannedOffPeriods || [],
+          globalBookingEnabled: scheduleData.globalBookingEnabled ?? true
+        });
+        console.log('📅 Doctor Schedule Settings:', scheduleData);
+      } else {
+        // Default doctor schedule if not found
+        setDoctorSchedule({
+          maxAdvanceDays: 30,
+          plannedOffPeriods: [],
+          globalBookingEnabled: true
+        });
+      }
+    } catch (error) {
+      console.error('Error loading doctor schedule:', error);
+      // Use defaults on error
+      setDoctorSchedule({
+        maxAdvanceDays: 30,
+        plannedOffPeriods: [],
+        globalBookingEnabled: true
+      });
+    }
+    
     setCurrentStep('select-date');
   };
 
@@ -240,16 +307,39 @@ export default function ClinicBookingFlow() {
       );
 
     case 'select-date':
+      // Merge clinic and doctor schedules - use most restrictive settings
+      const mergedMaxAdvanceDays = Math.min(
+        clinicSchedule?.maxAdvanceDays || 30,
+        doctorSchedule?.maxAdvanceDays || 30
+      );
+      
+      // Combine planned off periods from both clinic and doctor
+      const mergedPlannedOffPeriods = [
+        ...(clinicSchedule?.plannedOffPeriods || []).map((p: any) => ({ ...p, source: 'clinic' })),
+        ...(doctorSchedule?.plannedOffPeriods || []).map((p: any) => ({ ...p, source: 'doctor' }))
+      ];
+      
+      console.log('📅 Merged Schedule Settings:', {
+        clinicMaxDays: clinicSchedule?.maxAdvanceDays,
+        doctorMaxDays: doctorSchedule?.maxAdvanceDays,
+        mergedMaxAdvanceDays,
+        clinicOffPeriods: clinicSchedule?.plannedOffPeriods?.length || 0,
+        doctorOffPeriods: doctorSchedule?.plannedOffPeriods?.length || 0,
+        totalOffPeriods: mergedPlannedOffPeriods.length
+      });
+      
       return (
         <SelectDate
-          onDateSelect={handleDateSelect}
+          onContinue={handleDateSelect}
           onBack={handleBack}
           doctorName={selectedDoctor?.name || ''}
-          doctorDegrees={selectedDoctor?.degrees}
           doctorSpecialty={selectedDoctor?.specialties?.[0]}
           doctorPhoto={selectedDoctor?.profilePhoto}
           language={language}
           themeColor="blue"
+          maxAdvanceDays={mergedMaxAdvanceDays}
+          plannedOffPeriods={mergedPlannedOffPeriods}
+          globalBookingEnabled={(clinicSchedule?.globalBookingEnabled ?? true) && (doctorSchedule?.globalBookingEnabled ?? true)}
         />
       );
 
