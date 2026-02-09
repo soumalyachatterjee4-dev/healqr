@@ -372,7 +372,61 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
           return (a.startMinutes || 0) - (b.startMinutes || 0);
         });
 
-        setChambers(sortedChambers);
+        // 🚫 FILTER OUT CLINIC CHAMBERS IF CLINIC IS OFF TODAY
+        console.log('🔵 [TODAY\'S SCHEDULE] Checking for clinic off periods...');
+        const filteredChambers = [];
+        
+        for (const chamber of sortedChambers) {
+          const originalChamber = allChambers.find((c: any) => c.id === chamber.id);
+          const clinicId = originalChamber?.clinicId;
+          
+          if (clinicId) {
+            console.log(`🏥 [TODAY\'S SCHEDULE] Chamber "${chamber.name}" has clinicId: ${clinicId}`);
+            
+            // Load clinic schedule to check if clinic is off today
+            try {
+              const scheduleDoc = await getDoc(doc(db, 'clinicSchedules', clinicId));
+              if (scheduleDoc.exists()) {
+                const scheduleData = scheduleDoc.data();
+                const plannedOffPeriods = scheduleData.plannedOffPeriods || [];
+                
+                // Check if today falls within any active planned off period
+                let isClinicOff = false;
+                for (const period of plannedOffPeriods) {
+                  if (period.status === 'active') {
+                    const periodStart = new Date(period.startDate);
+                    const periodEnd = new Date(period.endDate);
+                    const today = new Date(todayStr);
+                    
+                    if (today >= periodStart && today <= periodEnd) {
+                      isClinicOff = true;
+                      console.log(`🚫 [TODAY\'S SCHEDULE] Clinic ${clinicId} is OFF today (${todayStr}). Removing chamber "${chamber.name}"`);
+                      break;
+                    }
+                  }
+                }
+                
+                if (!isClinicOff) {
+                  filteredChambers.push(chamber);
+                }
+              } else {
+                // No clinic schedule found, include chamber
+                filteredChambers.push(chamber);
+              }
+            } catch (error) {
+              console.error(`❌ Error checking clinic schedule for ${clinicId}:`, error);
+              // On error, include chamber
+              filteredChambers.push(chamber);
+            }
+          } else {
+            // No clinicId (home chamber), always include
+            console.log(`🏠 [TODAY\'S SCHEDULE] Chamber "${chamber.name}" has no clinicId (home chamber) - KEEP`);
+            filteredChambers.push(chamber);
+          }
+        }
+
+        console.log(`✅ [TODAY\'S SCHEDULE] Filtered chambers: ${sortedChambers.length} → ${filteredChambers.length} (removed ${sortedChambers.length - filteredChambers.length} clinic chambers)`);
+        setChambers(filteredChambers);
       } catch (error) {
         console.error('Error loading today\'s schedule:', error);
         toast.error('Failed to load today\'s schedule');
