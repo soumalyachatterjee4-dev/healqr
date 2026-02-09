@@ -71,6 +71,27 @@ export default function ClinicBookingFlow() {
         sessionStorage.setItem('booking_clinic_id', clinicId);
         sessionStorage.setItem('booking_source', 'clinic_qr'); // Mark as clinic QR booking
 
+        // Track QR scan immediately (separate from booking)
+        const scanSessionId = `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        sessionStorage.setItem('scan_session_id', scanSessionId);
+        
+        const { db } = await import('../lib/firebase/config');
+        if (db) {
+          const { collection, addDoc, serverTimestamp } = await import('firebase/firestore');
+          try {
+            await addDoc(collection(db, 'qrScans'), {
+              scannedBy: 'clinic',
+              clinicId: clinicId,
+              timestamp: serverTimestamp(),
+              scanSessionId: scanSessionId,
+              completed: false // Will be updated when booking is confirmed
+            });
+            console.log('📊 Clinic QR scan tracked');
+          } catch (error) {
+            console.error('Error tracking scan:', error);
+          }
+        }
+
         // Load clinic data from Firestore
         const { db } = await import('../lib/firebase/config');
         if (!db) return;

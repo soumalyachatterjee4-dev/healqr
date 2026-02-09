@@ -689,6 +689,24 @@ export default function App() {
             sessionStorage.setItem('booking_doctor_id', actualDoctorId);
             sessionStorage.setItem('booking_source', 'doctor_qr'); // Mark as doctor QR booking
 
+            // Track QR scan immediately (separate from booking)
+            const scanSessionId = `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            sessionStorage.setItem('scan_session_id', scanSessionId);
+            
+            try {
+              const { addDoc, serverTimestamp } = await import('firebase/firestore');
+              await addDoc(collection(db, 'qrScans'), {
+                scannedBy: 'doctor',
+                doctorId: actualDoctorId,
+                timestamp: serverTimestamp(),
+                scanSessionId: scanSessionId,
+                completed: false // Will be updated when booking is confirmed
+              });
+              console.log('📊 Doctor QR scan tracked');
+            } catch (error) {
+              console.error('Error tracking scan:', error);
+            }
+
             // Load doctor data
             const data = querySnapshot.docs[0].data();
             setBookingDoctorName(data.name || '');
@@ -833,6 +851,26 @@ export default function App() {
         // Regular doctorId provided
         sessionStorage.setItem('booking_doctor_id', doctorId);
         sessionStorage.setItem('booking_source', 'doctor_qr'); // Mark as doctor QR booking
+
+        // Track QR scan immediately (separate from booking)
+        const scanSessionId = `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        sessionStorage.setItem('scan_session_id', scanSessionId);
+        
+        if (db) {
+          try {
+            const { addDoc, serverTimestamp } = await import('firebase/firestore');
+            await addDoc(collection(db, 'qrScans'), {
+              scannedBy: 'doctor',
+              doctorId: doctorId,
+              timestamp: serverTimestamp(),
+              scanSessionId: scanSessionId,
+              completed: false // Will be updated when booking is confirmed
+            });
+            console.log('📊 Doctor QR scan tracked (direct ID)');
+          } catch (error) {
+            console.error('Error tracking scan:', error);
+          }
+        }
 
         // Load doctor data immediately
         if (db) {

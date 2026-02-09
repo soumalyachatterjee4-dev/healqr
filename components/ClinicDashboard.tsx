@@ -156,15 +156,8 @@ export default function ClinicDashboard() {
                   }
                 }
                 
-                // QR bookings (type: 'qr_booking' and came through clinic QR)
-                // 🎯 SCANS ONLY COUNT FOR CLINIC QR - NOT DOCTOR QR
-                if (bookingData.bookingSource === 'clinic_qr') {
-                  totalScans++; // Only clinic QR scans count as scans
-                  if (bookingData.status !== 'cancelled' && !bookingData.isCancelled) {
-                    qrBookings++;
-                  }
-                } else if (bookingData.type === 'qr_booking' || bookingData.bookingSource === 'doctor_qr') {
-                  // Doctor QR bookings: count as booking but NOT as scan
+                // QR bookings (from both clinic QR and doctor QR)
+                if (bookingData.type === 'qr_booking' || bookingData.bookingSource === 'clinic_qr' || bookingData.bookingSource === 'doctor_qr') {
                   if (bookingData.status !== 'cancelled' && !bookingData.isCancelled) {
                     qrBookings++;
                   }
@@ -188,6 +181,20 @@ export default function ClinicDashboard() {
               // Continue with other doctors
             }
           }
+        }
+        
+        // 🎯 SCANS: Query qrScans collection separately (scan ≠ booking)
+        try {
+          const scansQuery = query(
+            collection(db, 'qrScans'),
+            where('scannedBy', '==', 'clinic'),
+            where('clinicId', '==', currentUser.uid)
+          );
+          const scansSnap = await getDocs(scansQuery);
+          totalScans = scansSnap.size; // Total number of clinic QR scans (regardless of booking completion)
+          console.log(`📊 Total Clinic QR Scans: ${totalScans}`);
+        } catch (scanError) {
+          console.error('Error loading scan data:', scanError);
         }
         
         totalBookings = qrBookings + walkinBookings;

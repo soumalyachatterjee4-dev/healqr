@@ -387,6 +387,29 @@ export default function PatientDetailsForm({
           createdAt: serverTimestamp()
         });
 
+        // Update QR scan record to mark as completed
+        const scanSessionId = sessionStorage.getItem('scan_session_id');
+        if (scanSessionId) {
+          try {
+            const { collection, query, where, getDocs, updateDoc, doc } = await import('firebase/firestore');
+            const scansRef = collection(db, 'qrScans');
+            const scanQuery = query(scansRef, where('scanSessionId', '==', scanSessionId));
+            const scanSnapshot = await getDocs(scanQuery);
+            
+            if (!scanSnapshot.empty) {
+              const scanDoc = scanSnapshot.docs[0];
+              await updateDoc(doc(db, 'qrScans', scanDoc.id), {
+                completed: true,
+                bookingId: bookingId,
+                completedAt: serverTimestamp()
+              });
+              console.log('✅ QR scan marked as completed');
+            }
+          } catch (error) {
+            console.error('Error updating scan record:', error);
+          }
+        }
+
         // Save to notification history for patient history feature
         const { saveNotificationHistory } = await import('../services/notificationHistoryService');
         await saveNotificationHistory({
