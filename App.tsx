@@ -738,16 +738,37 @@ export default function App() {
                   } else {
                     console.log('📍 [QR PATH] NO CLINIC ID, SEARCHING BY ADDRESS:', clinicChamber.chamberAddress);
                     
-                    // Fallback: Query clinics collection by address
+                    // Fallback: Get all clinics and find by partial address match
                     const clinicsRef = collection(db, 'clinics');
-                    const clinicQuery = query(clinicsRef, where('address', '==', clinicChamber.chamberAddress));
-                    const clinicSnapshot = await getDocs(clinicQuery);
+                    const clinicSnapshot = await getDocs(clinicsRef);
                     
-                    console.log('🏥 [QR PATH] CLINIC SEARCH RESULT:', !clinicSnapshot.empty, 'docs:', clinicSnapshot.size);
-                    if (!clinicSnapshot.empty) {
-                      const clinicDoc = clinicSnapshot.docs[0];
-                      const clinicId = clinicDoc.id;
-                      console.log('🆔 [QR PATH] CLINIC ID:', clinicId);
+                    console.log('🏥 [QR PATH] LOADED CLINICS:', clinicSnapshot.size);
+                    
+                    // Find clinic by partial address match
+                    const chamberAddr = (clinicChamber.chamberAddress || '').toLowerCase().trim();
+                    let matchedClinicDoc = null;
+                    
+                    for (const clinicDoc of clinicSnapshot.docs) {
+                      const clinicData = clinicDoc.data();
+                      const clinicAddr = (clinicData.address || '').toLowerCase().trim();
+                      const clinicName = (clinicData.name || '').toLowerCase().trim();
+                      
+                      console.log('🔍 [QR PATH] Comparing:', { chamberAddr, clinicAddr, clinicName });
+                      
+                      // Check if they match (partial or full)
+                      if (chamberAddr.includes(clinicAddr) || 
+                          clinicAddr.includes(chamberAddr) ||
+                          (clinicName && chamberAddr.includes(clinicName))) {
+                        console.log('✅ [QR PATH] MATCHED CLINIC:', clinicDoc.id, clinicData.name);
+                        matchedClinicDoc = clinicDoc;
+                        break;
+                      }
+                    }
+                    
+                    if (matchedClinicDoc) {
+                      const clinicId = matchedClinicDoc.id;
+                      const clinicData = matchedClinicDoc.data();
+                      console.log('🆔 [QR PATH] MATCHED CLINIC ID:', clinicId, '| NAME:', clinicData.name);
                       setClinicAddress(clinicChamber.chamberAddress);
                       
                       // Load clinic schedule from clinicSchedules collection
@@ -771,7 +792,7 @@ export default function App() {
                         console.log('⚠️ [QR PATH] NO CLINIC SCHEDULE DOCUMENT');
                       }
                     } else {
-                      console.log('⚠️ [QR PATH] NO CLINIC FOUND WITH ADDRESS:', clinicChamber.chamberAddress);
+                      console.log('⚠️ [QR PATH] NO CLINIC FOUND MATCHING ADDRESS:', clinicChamber.chamberAddress);
                     }
                   }
                 } catch (e) {
@@ -862,16 +883,37 @@ export default function App() {
                   } else {
                     console.log('📍 [DIRECT ID PATH] NO CLINIC ID, SEARCHING BY ADDRESS:', clinicChamber.chamberAddress);
                     
-                    // Fallback: Query clinics collection by address
+                    // Fallback: Get all clinics and find by partial address match
                     const clinicsRef = collection(db, 'clinics');
-                    const clinicQuery = query(clinicsRef, where('address', '==', clinicChamber.chamberAddress));
-                    const clinicSnapshot = await getDocs(clinicQuery);
+                    const clinicSnapshot = await getDocs(clinicsRef);
                     
-                    console.log('🏥 [DIRECT ID PATH] CLINIC SEARCH RESULT:', !clinicSnapshot.empty, 'docs:', clinicSnapshot.size);
-                    if (!clinicSnapshot.empty) {
-                      const clinicDoc = clinicSnapshot.docs[0];
-                      const clinicId = clinicDoc.id;
-                      console.log('🆔 [DIRECT ID PATH] CLINIC ID:', clinicId);
+                    console.log('🏥 [DIRECT ID PATH] LOADED CLINICS:', clinicSnapshot.size);
+                    
+                    // Find clinic by partial address match
+                    const chamberAddr = (clinicChamber.chamberAddress || '').toLowerCase().trim();
+                    let matchedClinicDoc = null;
+                    
+                    for (const clinicDoc of clinicSnapshot.docs) {
+                      const clinicData = clinicDoc.data();
+                      const clinicAddr = (clinicData.address || '').toLowerCase().trim();
+                      const clinicName = (clinicData.name || '').toLowerCase().trim();
+                      
+                      console.log('🔍 [DIRECT ID PATH] Comparing:', { chamberAddr, clinicAddr, clinicName });
+                      
+                      // Check if they match (partial or full)
+                      if (chamberAddr.includes(clinicAddr) || 
+                          clinicAddr.includes(chamberAddr) ||
+                          (clinicName && chamberAddr.includes(clinicName))) {
+                        console.log('✅ [DIRECT ID PATH] MATCHED CLINIC:', clinicDoc.id, clinicData.name);
+                        matchedClinicDoc = clinicDoc;
+                        break;
+                      }
+                    }
+                    
+                    if (matchedClinicDoc) {
+                      const clinicId = matchedClinicDoc.id;
+                      const clinicData = matchedClinicDoc.data();
+                      console.log('🆔 [DIRECT ID PATH] MATCHED CLINIC ID:', clinicId, '| NAME:', clinicData.name);
                       setClinicAddress(clinicChamber.chamberAddress);
                       
                       // Load clinic schedule from clinicSchedules collection
@@ -895,7 +937,7 @@ export default function App() {
                         console.log('⚠️ [DIRECT ID PATH] NO CLINIC SCHEDULE DOCUMENT');
                       }
                     } else {
-                      console.log('⚠️ [DIRECT ID PATH] NO CLINIC FOUND WITH ADDRESS:', clinicChamber.chamberAddress);
+                      console.log('⚠️ [DIRECT ID PATH] NO CLINIC FOUND MATCHING ADDRESS:', clinicChamber.chamberAddress);
                     }
                   }
                 } catch (e) {
