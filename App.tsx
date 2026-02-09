@@ -406,6 +406,7 @@ export default function App() {
     isActive?: boolean;
   }>>([]);
   // Clinic schedule data for chamber filtering (doctor QR flow)
+  const [clinicId, setClinicId] = useState(''); // Added for proper chamber filtering
   const [clinicAddress, setClinicAddress] = useState('');
   const [clinicPlannedOffPeriods, setClinicPlannedOffPeriods] = useState<Array<{
     startDate: string;
@@ -713,6 +714,7 @@ export default function App() {
                   // If chamber has clinicId, use it directly; otherwise search by address
                   if (clinicChamber.clinicId) {
                     console.log('🆔 [QR PATH] USING CLINIC ID FROM CHAMBER:', clinicChamber.clinicId);
+                    setClinicId(clinicChamber.clinicId); // Store clinic ID for filtering
                     setClinicAddress(clinicChamber.chamberAddress);
                     
                     // Load clinic schedule from clinicSchedules collection
@@ -766,13 +768,14 @@ export default function App() {
                     }
                     
                     if (matchedClinicDoc) {
-                      const clinicId = matchedClinicDoc.id;
+                      const matchedClinicId = matchedClinicDoc.id;
                       const clinicData = matchedClinicDoc.data();
-                      console.log('🆔 [QR PATH] MATCHED CLINIC ID:', clinicId, '| NAME:', clinicData.name);
+                      console.log('🆔 [QR PATH] MATCHED CLINIC ID:', matchedClinicId, '| NAME:', clinicData.name);
+                      setClinicId(matchedClinicId); // Store clinic ID for filtering
                       setClinicAddress(clinicChamber.chamberAddress);
                       
                       // Load clinic schedule from clinicSchedules collection
-                      const scheduleDoc = await getDoc(doc(db, 'clinicSchedules', clinicId));
+                      const scheduleDoc = await getDoc(doc(db, 'clinicSchedules', matchedClinicId));
                       console.log('📅 [QR PATH] CLINIC SCHEDULE EXISTS:', scheduleDoc.exists());
                       if (scheduleDoc.exists()) {
                         const scheduleData = scheduleDoc.data();
@@ -858,6 +861,7 @@ export default function App() {
                   // If chamber has clinicId, use it directly; otherwise search by address
                   if (clinicChamber.clinicId) {
                     console.log('🆔 [DIRECT ID PATH] USING CLINIC ID FROM CHAMBER:', clinicChamber.clinicId);
+                    setClinicId(clinicChamber.clinicId); // Store clinic ID for filtering
                     setClinicAddress(clinicChamber.chamberAddress);
                     
                     // Load clinic schedule from clinicSchedules collection
@@ -911,13 +915,14 @@ export default function App() {
                     }
                     
                     if (matchedClinicDoc) {
-                      const clinicId = matchedClinicDoc.id;
+                      const matchedClinicId = matchedClinicDoc.id;
                       const clinicData = matchedClinicDoc.data();
-                      console.log('🆔 [DIRECT ID PATH] MATCHED CLINIC ID:', clinicId, '| NAME:', clinicData.name);
+                      console.log('🆔 [DIRECT ID PATH] MATCHED CLINIC ID:', matchedClinicId, '| NAME:', clinicData.name);
+                      setClinicId(matchedClinicId); // Store clinic ID for filtering
                       setClinicAddress(clinicChamber.chamberAddress);
                       
                       // Load clinic schedule from clinicSchedules collection
-                      const scheduleDoc = await getDoc(doc(db, 'clinicSchedules', clinicId));
+                      const scheduleDoc = await getDoc(doc(db, 'clinicSchedules', matchedClinicId));
                       console.log('📅 [DIRECT ID PATH] CLINIC SCHEDULE EXISTS:', scheduleDoc.exists());
                       if (scheduleDoc.exists()) {
                         const scheduleData = scheduleDoc.data();
@@ -2473,6 +2478,7 @@ export default function App() {
             doctorPhoto={bookingDoctorPhoto}
             doctorDegrees={bookingDoctorDegrees}
             useDrPrefix={bookingDoctorUseDrPrefix}
+            clinicId={clinicId}
             clinicAddress={clinicAddress}
             clinicPlannedOffPeriods={clinicPlannedOffPeriods}
           />

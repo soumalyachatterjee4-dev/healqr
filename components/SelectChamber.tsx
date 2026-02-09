@@ -43,6 +43,7 @@ interface SelectChamberProps {
   doctorDegrees?: string[];
   useDrPrefix?: boolean;
   themeColor?: 'emerald' | 'blue';
+  clinicId?: string; // Clinic ID for exact chamber matching
   clinicAddress?: string; // Clinic address to filter when clinic is off
   clinicPlannedOffPeriods?: any[]; // Clinic planned off periods
 }
@@ -62,6 +63,7 @@ export default function SelectChamber({
   doctorDegrees = [],
   useDrPrefix = true,
   themeColor = 'emerald',
+  clinicId,
   clinicAddress,
   clinicPlannedOffPeriods = [],
 }: SelectChamberProps) {
@@ -69,8 +71,7 @@ export default function SelectChamber({
   console.log('🏥 SelectChamber received:', { 
     doctorName, 
     doctorSpecialty, 
-    chambersCount: chambers.length, 
-    clinicAddress,
+    chambersCount: chambers.length,     clinicId,    clinicAddress,
     selectedDate: selectedDate instanceof Date ? selectedDate.toDateString() : selectedDate,
     clinicPlannedOffPeriodsCount: clinicPlannedOffPeriods.length,
     clinicPlannedOffPeriods: clinicPlannedOffPeriods
@@ -257,37 +258,55 @@ export default function SelectChamber({
         console.log('🔵 CHAMBER FILTERING START:', {
           totalChambers: sortedChambers.length,
           clinicIsOff: isClinicOff(),
+          hasClinicId: !!clinicId,
+          clinicId: clinicId,
           hasClinicAddress: !!clinicAddress,
           clinicAddress: clinicAddress
         });
         
         // Filter out clinic chambers if clinic is off on selected date
-        if (isClinicOff() && clinicAddress) {
+        if (isClinicOff() && clinicId) {
           const beforeFilter = sortedChambers.length;
-          console.log('🚫 FILTERING MODE: Clinic is OFF, removing clinic chambers');
+          console.log('🚫 FILTERING MODE: Clinic is OFF, removing clinic chambers by ID');
           
           sortedChambers = sortedChambers.filter(chamber => {
-            // Check if chamber address matches clinic address (case-insensitive partial match)
-            const chamberAddr = chamber.chamberAddress?.toLowerCase() || '';
-            const clinicAddr = clinicAddress.toLowerCase();
-            const isClinicChamber = chamberAddr.includes(clinicAddr) || clinicAddr.includes(chamberAddr);
+            // Use clinicId for exact matching (primary method)
+            const chamberClinicId = (chamber as any).clinicId;
+            const isClinicChamber = chamberClinicId === clinicId;
             
             console.log(`🔍 Chamber check: "${chamber.chamberName}"`, {
-              chamberAddress: chamber.chamberAddress,
-              clinicAddress: clinicAddress,
+              chamberClinicId: chamberClinicId || 'NONE',
+              matchingClinicId: clinicId,
               isMatch: isClinicChamber,
               action: isClinicChamber ? 'REMOVE' : 'KEEP'
             });
             
             if (isClinicChamber) {
-              console.log(`🚫🚫🚫 REMOVING clinic chamber: "${chamber.chamberName}" at "${chamber.chamberAddress}"`);
+              console.log(`🚫🚫🚫 REMOVING clinic chamber: "${chamber.chamberName}" (clinicId: ${chamberClinicId})`);
             }
             
             return !isClinicChamber; // Keep only NON-clinic chambers
           });
           console.log(`✅ Chamber filtering complete: ${beforeFilter} → ${sortedChambers.length} chambers (removed ${beforeFilter - sortedChambers.length} clinic chambers)`);
+        } else if (isClinicOff() && !clinicId && clinicAddress) {
+          // Fallback to address matching ONLY if clinicId not available
+          const beforeFilter = sortedChambers.length;
+          console.log('⚠️ FALLBACK FILTERING: Using address matching (clinicId not available)');
+          
+          sortedChambers = sortedChambers.filter(chamber => {
+            const chamberAddr = chamber.chamberAddress?.toLowerCase() || '';
+            const clinicAddr = clinicAddress.toLowerCase();
+            const isClinicChamber = chamberAddr.includes(clinicAddr) || clinicAddr.includes(chamberAddr);
+            
+            if (isClinicChamber) {
+              console.log(`🚫 REMOVING clinic chamber (address match): "${chamber.chamberName}" at "${chamber.chamberAddress}"`);
+            }
+            
+            return !isClinicChamber;
+          });
+          console.log(`✅ Chamber filtering complete: ${beforeFilter} → ${sortedChambers.length} chambers (removed ${beforeFilter - sortedChambers.length} clinic chambers)`);
         } else {
-          console.log('✅ NO FILTERING: Clinic is open or no clinic address provided');
+          console.log('✅ NO FILTERING: Clinic is open or no clinic ID/address provided');
         }
         
         setChambersWithCounts(sortedChambers);
