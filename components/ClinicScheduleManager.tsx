@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { auth, db } from '../lib/firebase/config';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -64,8 +64,16 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({ onMenuCha
   const [allPeriods, setAllPeriods] = useState<PlannedOffPeriod[]>([]);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
 
-  // Maximum Advance Days
+  // Maximum Advance Days (Per-Doctor)
   const [maxAdvanceDays, setMaxAdvanceDays] = useState('30');
+
+  // Clinic-Wide Schedule Settings
+  const [clinicMaxAdvanceDays, setClinicMaxAdvanceDays] = useState('30');
+  const [clinicPlannedOffEnabled, setClinicPlannedOffEnabled] = useState(false);
+  const [clinicStartDate, setClinicStartDate] = useState('');
+  const [clinicEndDate, setClinicEndDate] = useState('');
+  const [clinicPlannedOffPeriods, setClinicPlannedOffPeriods] = useState<PlannedOffPeriod[]>([]);
+  const [showClinicHistoryModal, setShowClinicHistoryModal] = useState(false);
 
   // Schedule Maker
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -152,7 +160,30 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({ onMenuCha
     };
 
     loadDoctors();
+    loadClinicSchedule();
   }, []);
+
+  // Load clinic-wide schedule settings
+  const loadClinicSchedule = async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    try {
+      const clinicScheduleRef = doc(db, 'clinicSchedules', currentUser.uid);
+      const clinicScheduleSnap = await getDoc(clinicScheduleRef);
+
+      if (clinicScheduleSnap.exists()) {
+        const data = clinicScheduleSnap.data();
+        setClinicMaxAdvanceDays(data.maxAdvanceDays?.toString() || '30');
+        setClinicPlannedOffPeriods(data.plannedOffPeriods || []);
+        console.log('📅 Loaded Clinic Schedule:', data);
+      } else {
+        console.log('📅 No clinic schedule found, using defaults');
+      }
+    } catch (error) {
+      console.error('Error loading clinic schedule:', error);
+    }
+  };
 
   // Function to load doctor data (moved outside useEffect so it can be called from anywhere)
   const loadDoctorData = async () => {
@@ -343,6 +374,103 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({ onMenuCha
     } catch (error) {
       console.error('Error saving max advance days:', error);
       toast.error('Failed to update setting');
+    }
+  };
+
+  // Save Clinic-Wide Planned Off Period
+  const handleSaveClinicPlannedOff = async () => {
+    if (!clinicStartDate || !clinicEndDate) {
+      toast.error('Please select start and end dates');
+      return;
+    }
+
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    try {
+      const newPeriod: PlannedOffPeriod = {
+        id: Date.now().toString(),
+        startDate: clinicStartDate,
+        endDate: clinicEndDate,
+        status: 'active',
+        createdAt: new Date(),
+        appliesTo: 'clinic'
+      };
+
+      const clinicScheduleRef = doc(db, 'clinicSchedules', currentUser.uid);
+      const clinicScheduleSnap = await getDoc(clinicScheduleRef);
+
+      let existingPeriods: PlannedOffPeriod[] = [];
+      if (clinicScheduleSnap.exists()) {
+        existingPeriods = clinicScheduleSnap.data().plannedOffPeriods || [];
+      }
+
+      await setDoc(clinicScheduleRef, {
+        plannedOffPeriods: [...existingPeriods, newPeriod],
+        globalBookingEnabled: true // Ensure global booking is enabled
+      }, { merge: true });
+
+      toast.success('Clinic-wide planned off period saved');
+
+      // Reset form
+      setClinicPlannedOffEnabled(false);
+      setClinicStartDate('');
+      setClinicEndDate('');
+
+      // Reload clinic schedule
+      loadClinicSchedule();
+
+    } catch (error) {
+      console.error('Error saving clinic planned off:', error);
+      toast.error('Failed to save planned off period');
+    }
+  };
+
+  // Save Clinic-Wide Maximum Advance Days
+  const handleSaveClinicMaxAdvanceDays = async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    try {
+      const clinicScheduleRef = doc(db, 'clinicSchedules', currentUser.uid);
+      
+      await setDoc(clinicScheduleRef, {
+        maxAdvanceDays: parseInt(clinicMaxAdvanceDays),
+        globalBookingEnabled: true
+      }, { merge: true });
+
+      toast.success('Clinic-wide advance booking days updated');
+    } catch (error) {
+      console.error('Error saving clinic max advance days:', error);
+      toast.error('Failed to update setting');
+    }
+  };
+
+  // Deactivate Clinic Planned Off Period
+  const handleDeactivateClinicPeriod = async (periodId: string) => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    try {
+      const clinicScheduleRef = doc(db, 'clinicSchedules', currentUser.uid);
+      const clinicScheduleSnap = await getDoc(clinicScheduleRef);
+
+      if (clinicScheduleSnap.exists()) {
+        const periods = clinicScheduleSnap.data().plannedOffPeriods || [];
+        const updatedPeriods = periods.map((p: PlannedOffPeriod) =>
+          p.id === periodId ? { ...p, status: 'cancelled' } : p
+        );
+
+        await setDoc(clinicScheduleRef, {
+          plannedOffPeriods: updatedPeriods
+        }, { merge: true });
+
+        toast.success('Clinic planned off period cancelled');
+        loadClinicSchedule();
+      }
+    } catch (error) {
+      console.error('Error deactivating clinic period:', error);
+      toast.error('Failed to cancel period');
     }
   };
 
@@ -780,6 +908,140 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({ onMenuCha
 
         {/* Content */}
         <div className="px-4 lg:px-8 py-8">
+          {/* Clinic-Wide Schedule Settings */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-white text-xl font-semibold">Clinic-Wide Schedule Settings</h2>
+              <p className="text-gray-400 text-sm">These settings apply to all bookings through your clinic QR</p>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Clinic Planned Off */}
+              <Card className="bg-gray-800/50 border-gray-700 p-6">
+                <h3 className="text-white text-lg mb-2">Clinic Planned Off</h3>
+                <p className="text-gray-400 text-sm mb-6">
+                  {clinicPlannedOffPeriods.filter(p => p.status === 'active').length > 0
+                    ? `${clinicPlannedOffPeriods.filter(p => p.status === 'active').length} active period(s). Clinic will be closed during these dates.`
+                    : "Set dates when your entire clinic will be closed"}
+                </p>
+
+                {clinicPlannedOffPeriods.filter(p => p.status === 'active').length > 0 && (
+                  <div className="bg-red-900/30 border border-red-500/50 rounded-lg p-3 mb-4">
+                    <div className="flex items-center gap-2 text-red-400 text-sm">
+                      <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                      Clinic bookings blocked - {clinicPlannedOffPeriods.filter(p => p.status === 'active').length} Active Period(s)
+                    </div>
+                  </div>
+                )}
+
+                {!clinicPlannedOffEnabled ? (
+                  <div className="space-y-4">
+                    <Button
+                      onClick={() => setShowClinicHistoryModal(true)}
+                      disabled={clinicPlannedOffPeriods.length === 0}
+                      variant="outline"
+                      className="w-full bg-gray-900/50 border-gray-700 text-white hover:bg-gray-900 disabled:opacity-30"
+                    >
+                      <Eye className="w-4 h-4 mr-2" />
+                      View History ({clinicPlannedOffPeriods.length})
+                    </Button>
+
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="clinic-planned-off" className="text-gray-300">
+                        Enable Clinic Planned Off
+                      </Label>
+                      <Switch
+                        id="clinic-planned-off"
+                        checked={clinicPlannedOffEnabled}
+                        onCheckedChange={setClinicPlannedOffEnabled}
+                        className="data-[state=checked]:bg-blue-600"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <Label className="text-gray-300 text-sm">Start Date</Label>
+                    <Input
+                      type="date"
+                      value={clinicStartDate}
+                      onChange={(e) => setClinicStartDate(e.target.value)}
+                      className="bg-gray-900/50 border-gray-700 text-white"
+                    />
+
+                    <Label className="text-gray-300 text-sm">End Date</Label>
+                    <Input
+                      type="date"
+                      value={clinicEndDate}
+                      onChange={(e) => setClinicEndDate(e.target.value)}
+                      className="bg-gray-900/50 border-gray-700 text-white"
+                    />
+
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={handleSaveClinicPlannedOff}
+                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        Save
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setClinicPlannedOffEnabled(false);
+                          setClinicStartDate('');
+                          setClinicEndDate('');
+                        }}
+                        variant="outline"
+                        className="flex-1 bg-gray-900/50 border-gray-700 text-white hover:bg-gray-900"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </Card>
+
+              {/* Clinic Maximum Advance Booking Days */}
+              <Card className="bg-gray-800/50 border-gray-700 p-6">
+                <h3 className="text-white text-lg mb-2">Clinic Maximum Advance Booking Days</h3>
+                <p className="text-gray-400 text-sm mb-6">
+                  Set how far in advance patients can book through your clinic. If a doctor allows more days, the smaller value will apply.
+                </p>
+
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min="1"
+                      max="365"
+                      value={clinicMaxAdvanceDays}
+                      onChange={(e) => setClinicMaxAdvanceDays(e.target.value)}
+                      className="bg-gray-900/50 border-gray-700 text-white"
+                    />
+                    <span className="text-gray-400">days</span>
+                  </div>
+
+                  <div className="bg-blue-900/30 border border-blue-500/50 rounded-lg p-3">
+                    <div className="flex items-start gap-2">
+                      <Info className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                      <p className="text-blue-200 text-xs">
+                        Patients will see available slots only within the next {clinicMaxAdvanceDays} days in their booking calendar.
+                      </p>
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={handleSaveClinicMaxAdvanceDays}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    Save
+                  </Button>
+                </div>
+              </Card>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-gray-700 my-8"></div>
+
           {/* Doctor Selection */}
           {doctors.length === 0 ? (
             <Card className="bg-gray-800/50 border-gray-700 p-8 mb-8">
@@ -833,13 +1095,13 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({ onMenuCha
 
               {selectedDoctorId && (
                 <>
-                  {/* Section 1: Global Settings */}
+                  {/* Section 1: Per-Doctor Settings */}
                   <div className="mb-8">
                     <div className="flex items-start justify-between mb-6">
-                      <h2 className="text-white">Global Settings</h2>
-                      <p className="text-gray-400 text-sm hidden md:block">Configure general availability and booking settings</p>
+                      <h2 className="text-white">Per-Doctor Schedule Settings</h2>
+                      <p className="text-gray-400 text-sm hidden md:block">Settings for Dr. {selectedDoctor?.name || 'Selected Doctor'}</p>
                     </div>
-                    <p className="text-gray-400 text-sm md:hidden mb-6">Configure general availability and booking settings</p>
+                    <p className="text-gray-400 text-sm md:hidden mb-6">Settings for Dr. {selectedDoctor?.name || 'Selected Doctor'}</p>
 
                     {/* Cards Grid */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1575,6 +1837,101 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({ onMenuCha
             <div className="p-6 border-t border-gray-700">
               <Button
                 onClick={() => setShowHistoryModal(false)}
+                className="bg-gray-700 hover:bg-gray-600 text-white w-full"
+              >
+                Close
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Clinic History Modal */}
+      {showClinicHistoryModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="bg-gray-800 border-gray-700 max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-gray-700">
+              <div className="flex items-center justify-between">
+                <h2 className="text-white text-xl font-semibold">Clinic Planned Off History</h2>
+                <button
+                  onClick={() => setShowClinicHistoryModal(false)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+              <p className="text-gray-400 text-sm mt-2">
+                Manage clinic-wide blocked periods
+              </p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6">
+              {clinicPlannedOffPeriods.length === 0 ? (
+                <div className="text-center py-8">
+                  <CalendarIcon className="w-12 h-12 text-gray-500 mx-auto mb-3" />
+                  <p className="text-gray-400">No planned off periods found</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {clinicPlannedOffPeriods.map((period) => (
+                    <div
+                      key={period.id}
+                      className={`p-4 rounded-lg border ${
+                        period.status === 'active'
+                          ? 'bg-red-500/10 border-red-500/20'
+                          : period.status === 'completed'
+                          ? 'bg-gray-700/30 border-gray-600'
+                          : 'bg-gray-700/50 border-gray-600'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span
+                              className={`px-2 py-1 rounded text-xs font-medium ${
+                                period.status === 'active'
+                                  ? 'bg-red-500 text-white'
+                                  : period.status === 'completed'
+                                  ? 'bg-gray-600 text-gray-300'
+                                  : 'bg-gray-700 text-gray-400'
+                              }`}
+                            >
+                              {period.status.toUpperCase()}
+                            </span>
+                            <span className="px-2 py-1 rounded text-xs font-medium bg-blue-600 text-white">
+                              ENTIRE CLINIC
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-4 text-sm">
+                            <div>
+                              <span className="text-gray-400">From:</span>
+                              <span className="text-white ml-2">{period.startDate}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-400">To:</span>
+                              <span className="text-white ml-2">{period.endDate}</span>
+                            </div>
+                          </div>
+                        </div>
+                        {period.status === 'active' && (
+                          <Button
+                            onClick={() => handleDeactivateClinicPeriod(period.id)}
+                            variant="outline"
+                            className="bg-gray-900/50 border-gray-700 text-red-400 hover:bg-red-500/20 hover:text-red-300"
+                          >
+                            Cancel
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 border-t border-gray-700">
+              <Button
+                onClick={() => setShowClinicHistoryModal(false)}
                 className="bg-gray-700 hover:bg-gray-600 text-white w-full"
               >
                 Close
