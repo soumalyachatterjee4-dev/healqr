@@ -78,6 +78,8 @@ export default function ClinicDashboard() {
     totalScans: 0,
     totalBookings: 0,
     qrBookings: 0,
+    clinicQRBookings: 0,
+    doctorQRBookings: 0,
     walkinBookings: 0,
     dropOuts: 0,
     cancelled: 0,
@@ -115,6 +117,8 @@ export default function ClinicDashboard() {
         let totalScans = 0;
         let totalBookings = 0;
         let qrBookings = 0;
+        let clinicQRBookings = 0;
+        let doctorQRBookings = 0;
         let walkinBookings = 0;
         let dropOuts = 0;
         let cancelled = 0;
@@ -148,30 +152,32 @@ export default function ClinicDashboard() {
               clinicBookingsSnap.forEach((docSnap) => {
                 const bookingData = docSnap.data();
                 
-                // Monthly bookings count
-                if (bookingData.date) {
-                  const bookingDate = new Date(bookingData.date);
-                  if (bookingDate.getMonth() === currentMonth && bookingDate.getFullYear() === currentYear) {
-                    monthlyBookings++;
-                  }
-                }
+                // Check if booking is cancelled
+                const isCancelled = bookingData.status === 'cancelled' || bookingData.isCancelled === true;
                 
-                // QR bookings (from both clinic QR and doctor QR)
-                if (bookingData.type === 'qr_booking' || bookingData.bookingSource === 'clinic_qr' || bookingData.bookingSource === 'doctor_qr') {
-                  if (bookingData.status !== 'cancelled' && !bookingData.isCancelled) {
+                // Clinic QR bookings
+                if (bookingData.bookingSource === 'clinic_qr') {
+                  if (!isCancelled) {
+                    clinicQRBookings++;
                     qrBookings++;
                   }
                 }
-                
+                // Doctor QR bookings (patient scanned doctor QR, booked clinic chamber)
+                else if (bookingData.bookingSource === 'doctor_qr' || (bookingData.type === 'qr_booking' && !bookingData.bookingSource)) {
+                  if (!isCancelled) {
+                    doctorQRBookings++;
+                    qrBookings++;
+                  }
+                }
                 // Walk-in bookings (added at clinic)
-                if (bookingData.type === 'walkin_booking') {
-                  if (bookingData.status !== 'cancelled' && !bookingData.isCancelled) {
+                else if (bookingData.type === 'walkin_booking') {
+                  if (!isCancelled) {
                     walkinBookings++;
                   }
                 }
                 
                 // Cancelled count
-                if (bookingData.status === 'cancelled' || bookingData.isCancelled === true) {
+                if (isCancelled) {
                   cancelled++;
                 }
               });
@@ -198,11 +204,14 @@ export default function ClinicDashboard() {
         }
         
         totalBookings = qrBookings + walkinBookings;
+        monthlyBookings = totalBookings; // All bookings are for this clinic (no historical filter needed)
 
         setAnalyticsData({
           totalScans,
           totalBookings,
           qrBookings,
+          clinicQRBookings,
+          doctorQRBookings,
           walkinBookings,
           dropOuts,
           cancelled,
@@ -579,14 +588,16 @@ export default function ClinicDashboard() {
                       {[
                         { name: 'Total Scans', value: analyticsData.totalScans, fill: '#3b82f6' },
                         { name: 'Total Bookings', value: analyticsData.totalBookings, fill: '#10b981' },
-                        { name: 'QR Bookings', value: analyticsData.qrBookings, fill: '#8b5cf6' },
+                        { name: 'Clinic QR Bookings', value: analyticsData.clinicQRBookings, fill: '#8b5cf6' },
+                        { name: 'Doctor QR Bookings', value: analyticsData.doctorQRBookings, fill: '#ec4899' },
                         { name: 'Walk-in Bookings', value: analyticsData.walkinBookings, fill: '#f59e0b' },
                         { name: 'Cancelled', value: analyticsData.cancelled, fill: '#6b7280' },
                       ].map((item, index) => {
                         const maxValue = Math.max(
                           analyticsData.totalScans,
                           analyticsData.totalBookings,
-                          analyticsData.qrBookings,
+                          analyticsData.clinicQRBookings,
+                          analyticsData.doctorQRBookings,
                           analyticsData.walkinBookings,
                           analyticsData.cancelled,
                           1
