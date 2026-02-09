@@ -46,6 +46,49 @@ export default function AdvanceBooking({ onMenuChange, onLogout, activeAddOns = 
   const [loading, setLoading] = useState(false);
   const [maxAdvanceDays, setMaxAdvanceDays] = useState<number>(7);
   const [chamberBookingCounts, setChamberBookingCounts] = useState<Record<number, { booked: number; capacity: number }>>({});
+  const [clinicSchedules, setClinicSchedules] = useState<Record<string, any>>({});
+  const [clinicData, setClinicData] = useState<Record<string, any>>({});
+
+  // Helper function to check if a clinic is off on a given date
+  const isClinicOffForChamber = (chamberAddress: string, checkDate: string): boolean => {
+    if (!checkDate) return false;
+
+    // Find if this chamber belongs to any clinic by matching addresses
+    for (const [clinicId, schedule] of Object.entries(clinicSchedules)) {
+      const clinic = clinicData[clinicId];
+      if (!clinic) continue;
+      
+      const clinicAddress = clinic.address || '';
+      
+      // Check if chamber address matches clinic address
+      if (chamberAddress.toLowerCase().includes(clinicAddress.toLowerCase()) || 
+          clinicAddress.toLowerCase().includes(chamberAddress.toLowerCase())) {
+        
+        const plannedOffPeriods = schedule?.plannedOffPeriods || [];
+        
+        // Check if date falls within any planned off period
+        for (const period of plannedOffPeriods) {
+          if (!period.isActive) continue;
+          
+          const start = new Date(period.startDate);
+          const end = new Date(period.endDate);
+          const check = new Date(checkDate);
+          
+          if (check >= start && check <= end) {
+            console.log('🚫 Chamber', chamberAddress, 'is OFF (clinic off):', {
+              clinicId,
+              clinicName: clinic.clinicName,
+              period: `${period.startDate} to ${period.endDate}`,
+              reason: period.reason
+            });
+            return true;
+          }
+        }
+      }
+    }
+    
+    return false;
+  };
 
   // Load doctor's chambers and max advance days
   useEffect(() => {
@@ -69,6 +112,46 @@ export default function AdvanceBooking({ onMenuChange, onLogout, activeAddOns = 
             using: advanceDays
           });
           setMaxAdvanceDays(advanceDays);
+          
+          // Load clinic schedules for linked clinics
+          const linkedClinics = doctorData.linkedClinics || [];
+          console.log('🏥 Doctor QR Flow: Loading clinic schedules for', linkedClinics.length, 'linked clinics');
+          
+          const schedules: Record<string, any> = {};
+          const clinics: Record<string, any> = {};
+          
+          for (const clinicLink of linkedClinics) {
+            const clinicId = clinicLink.clinicId || clinicLink.id;
+            if (!clinicId) continue;
+
+            try {
+              // Load clinic data
+              const clinicRef = doc(db, 'clinics', clinicId);
+              const clinicSnap = await getDoc(clinicRef);
+              
+              if (clinicSnap.exists()) {
+                clinics[clinicId] = clinicSnap.data();
+                console.log('✅ Loaded clinic data for', clinicId, clinics[clinicId].clinicName);
+              }
+              
+              // Load clinic schedule
+              const clinicScheduleRef = doc(db, 'clinicSchedules', clinicId);
+              const clinicScheduleSnap = await getDoc(clinicScheduleRef);
+              
+              if (clinicScheduleSnap.exists()) {
+                const scheduleData = clinicScheduleSnap.data();
+                schedules[clinicId] = scheduleData;
+                console.log('✅ Loaded clinic schedule for', clinicId, scheduleData);
+              } else {
+                console.log('⚠️ No schedule found for clinic', clinicId);
+              }
+            } catch (err) {
+              console.error('❌ Error loading clinic data/schedule for', clinicId, err);
+            }
+          }
+          
+          setClinicSchedules(schedules);
+          setClinicData(clinics);
           
           // Set today as default selected date
           const today = new Date();
@@ -321,9 +404,19 @@ export default function AdvanceBooking({ onMenuChange, onLogout, activeAddOns = 
                   {chambers.filter(c => c.isActive !== false).map(chamber => {
                     const count = chamberBookingCounts[chamber.id];
                     const statusText = count ? `${count.booked}/${count.capacity}` : '0/0';
+                    const isClinicOff = isClinicOffForChamber(chamber.chamberAddress, selectedDate);
+                    const displayText = isClinicOff 
+                      ? `${chamber.chamberName} - Clinic Closed`
+                      : `${chamber.chamberName} (${statusText})`;
+                    
                     return (
-                      <option key={chamber.id} value={chamber.id}>
-                        {chamber.chamberName} ({statusText})
+                      <option 
+                        key={chamber.id} 
+                        value={chamber.id}
+                        disabled={isClinicOff}
+                        style={isClinicOff ? { color: '#888', fontStyle: 'italic' } : {}}
+                      >
+                        {displayText}
                       </option>
                     );
                   })}
