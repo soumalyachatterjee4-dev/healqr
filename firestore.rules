@@ -937,6 +937,38 @@ service cloud.firestore {
     }
 
     // ============================================
+    // QR SCANS COLLECTION
+    // ============================================
+    
+    match /qrScans/{scanId} {
+      // Allow read by:
+      // 1. Clinics (to view their own scans)
+      // 2. Doctors (to view their own scans)
+      // 3. Admin (full access)
+      allow read: if isAuthenticated() && (
+        (resource.data.scannedBy == 'clinic' && request.auth.uid == resource.data.clinicId) ||
+        (resource.data.scannedBy == 'doctor' && request.auth.uid == resource.data.doctorId) ||
+        request.auth.token.admin == true
+      );
+      
+      // Allow list (query) for clinics and doctors to get their scan counts
+      allow list: if isAuthenticated() && (
+        (request.query.filters.scannedBy == 'clinic') ||
+        (request.query.filters.scannedBy == 'doctor') ||
+        request.auth.token.admin == true
+      );
+      
+      // Allow create by anyone (scan tracking happens before auth)
+      allow create: if true;
+      
+      // Allow update to mark scans as completed
+      allow update: if true;
+      
+      // No deletes allowed
+      allow delete: if false;
+    }
+
+    // ============================================
     // DEFAULT DENY
     // ============================================
     
