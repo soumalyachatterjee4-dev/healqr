@@ -131,6 +131,13 @@ export default function ClinicBookingFlow() {
   };
 
   const handleDoctorSelect = async (doctor: SelectedDoctor) => {
+    console.log('🔵 handleDoctorSelect CALLED with doctor:', {
+      name: doctor.name,
+      uid: doctor.uid,
+      doctorCode: doctor.doctorCode,
+      fullDoctorObject: doctor
+    });
+    
     setSelectedDoctor(doctor);
     // Store doctor info in session
     sessionStorage.setItem('booking_doctor_id', doctor.uid);
@@ -143,9 +150,11 @@ export default function ClinicBookingFlow() {
     }
     
     // Load doctor's schedule settings
+    console.log('🔍 Attempting to load schedule for doctor UID:', doctor.uid);
     try {
       const { db } = await import('../lib/firebase/config');
       if (!db) {
+        console.warn('⚠️ Firebase DB not available, using defaults');
         // Use defaults if db not available
         setDoctorSchedule({
           maxAdvanceDays: 30,
@@ -158,7 +167,9 @@ export default function ClinicBookingFlow() {
       
       const { doc, getDoc } = await import('firebase/firestore');
       const doctorScheduleRef = doc(db, 'schedules', doctor.uid);
+      console.log('📄 Firestore path:', `schedules/${doctor.uid}`);
       const doctorScheduleSnap = await getDoc(doctorScheduleRef);
+      console.log('📊 Schedule document exists?', doctorScheduleSnap.exists());
       
       if (doctorScheduleSnap.exists()) {
         const scheduleData = doctorScheduleSnap.data();
@@ -180,6 +191,8 @@ export default function ClinicBookingFlow() {
           globalBookingEnabled: scheduleData.globalBookingEnabled ?? true
         });
       } else {
+        console.warn('⚠️ NO schedule document found for doctor:', doctor.uid);
+        console.log('Using default schedule settings');
         // Default doctor schedule if not found
         setDoctorSchedule({
           maxAdvanceDays: 30,
@@ -188,7 +201,7 @@ export default function ClinicBookingFlow() {
         });
       }
     } catch (error) {
-      console.error('Error loading doctor schedule:', error);
+      console.error('❌ Error loading doctor schedule:', error);
       // Use defaults on error
       setDoctorSchedule({
         maxAdvanceDays: 30,
