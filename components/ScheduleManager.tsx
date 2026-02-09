@@ -116,6 +116,8 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
   const [chamberName, setChamberName] = useState('');
   const [chamberAddress, setChamberAddress] = useState('');
   const [clinicCode, setClinicCode] = useState(''); // NEW: Optional clinic code to link chamber
+  const [clinicData, setClinicData] = useState<any>(null); // NEW: Store fetched clinic data
+  const [loadingClinic, setLoadingClinic] = useState(false); // NEW: Loading state for clinic fetch
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [maxCapacity, setMaxCapacity] = useState(1);
@@ -157,6 +159,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
     setChamberName('');
     setChamberAddress('');
     setClinicCode('');
+    setClinicData(null); // Reset clinic data
     setStartTime('');
     setEndTime('');
     setMaxCapacity(1);
@@ -180,6 +183,10 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
     setChamberName(schedule.chamberName);
     setChamberAddress(schedule.chamberAddress);
     setClinicCode(schedule.clinicCode || '');
+    // If editing a chamber with clinic, fetch clinic data
+    if (schedule.clinicId) {
+      fetchClinicDataById(schedule.clinicId);
+    }
     setStartTime(schedule.startTime);
     setEndTime(schedule.endTime);
     setMaxCapacity(schedule.maxCapacity);
@@ -192,6 +199,84 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
       duration: 3000,
     });
   };
+
+  // NEW: Fetch clinic data by ID (for editing existing chambers)
+  const fetchClinicDataById = async (clinicId: string) => {
+    try {
+      setLoadingClinic(true);
+      const clinicRef = doc(db, 'clinics', clinicId);
+      const clinicSnap = await getDoc(clinicRef);
+      
+      if (clinicSnap.exists()) {
+        const data = clinicSnap.data();
+        setClinicData({ id: clinicSnap.id, ...data });
+        setClinicCode(data.clinicCode || '');
+        toast.success('Clinic data loaded', {
+          description: data.name,
+          duration: 2000,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching clinic:', error);
+    } finally {
+      setLoadingClinic(false);
+    }
+  };
+
+  // NEW: Fetch and auto-populate clinic data when clinic code is entered
+  const fetchClinicByCode = async (code: string) => {
+    if (!code.trim()) {
+      setClinicData(null);
+      return;
+    }
+
+    try {
+      setLoadingClinic(true);
+      const clinicsRef = collection(db, 'clinics');
+      const clinicQuery = query(clinicsRef, where('clinicCode', '==', code.trim()));
+      const clinicSnap = await getDocs(clinicQuery);
+      
+      if (!clinicSnap.empty) {
+        const clinicDoc = clinicSnap.docs[0];
+        const data = clinicDoc.data();
+        setClinicData({ id: clinicDoc.id, ...data });
+        
+        // Auto-populate chamber name and address from clinic
+        setChamberName(data.name || '');
+        setChamberAddress(data.address || '');
+        
+        toast.success('Clinic found!', {
+          description: `Chamber will be linked to ${data.name}`,
+          duration: 3000,
+        });
+      } else {
+        setClinicData(null);
+        toast.error('Clinic not found', {
+          description: 'Please check the clinic code and try again',
+          duration: 3000,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching clinic:', error);
+      setClinicData(null);
+      toast.error('Failed to fetch clinic data');
+    } finally {
+      setLoadingClinic(false);
+    }
+  };
+
+  // NEW: Effect to fetch clinic when clinic code changes
+  useEffect(() => {
+    const debounceTimer = setTimeout(() => {
+      if (clinicCode && clinicCode.length >= 3) {
+        fetchClinicByCode(clinicCode);
+      } else if (clinicCode.length === 0) {
+        setClinicData(null);
+      }
+    }, 500); // Debounce for 500ms
+
+    return () => clearTimeout(debounceTimer);
+  }, [clinicCode]);
 
   const handleDeleteSchedule = async (id: number) => {
     const updatedSchedules = demoSchedules.filter(s => s.id !== id);
@@ -284,7 +369,15 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
 
     // Look up clinic by code if provided
     let resolvedClinicId: string | undefined = undefined;
-    if (clinicCode && clinicCode.trim()) {
+    let resolvedClinicName: string | undefined = undefined;
+    
+    if (clinicData) {
+      // Clinic data already fetched and validated
+      resolvedClinicId = clinicData.id;
+      resolvedClinicName = clinicData.name;
+      console.log('✅ Using fetched clinic data:', { code: clinicCode, id: resolvedClinicId, name: resolvedClinicName });
+    } else if (clinicCode && clinicCode.trim()) {
+      // Fallback: Look up clinic if code is provided but data not fetched
       try {
         const clinicsRef = collection(db, 'clinics');
         const clinicQuery = query(clinicsRef, where('clinicCode', '==', clinicCode.trim()));
@@ -292,7 +385,8 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
         
         if (!clinicSnap.empty) {
           resolvedClinicId = clinicSnap.docs[0].id;
-          console.log('✅ Found clinic:', { code: clinicCode, id: resolvedClinicId });
+          resolvedClinicName = clinicSnap.docs[0].data().name;
+          console.log('✅ Found clinic:', { code: clinicCode, id: resolvedClinicId, name: resolvedClinicName });
         } else {
           toast.error('Clinic code not found. Please check and try again.');
           return;
@@ -421,6 +515,9 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
     }
     if (resolvedClinicId) {
       newSchedule.clinicId = resolvedClinicId;
+    }
+    if (resolvedClinicName) {
+      newSchedule.clinicName = resolvedClinicName;
     }
 
     // Add or update schedule
@@ -1392,7 +1489,12 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
                       onChange={(e) => setChamberName(e.target.value)}
                       className="bg-gray-900/50 border-gray-700 text-white w-full"
                       placeholder="Enter chamber name"
+                      disabled={!!clinicData}
+                      title={clinicData ? "Auto-filled from clinic data" : "Enter chamber name"}
                     />
+                    {clinicData && (
+                      <p className="text-xs text-emerald-500">✓ Auto-filled from clinic</p>
+                    )}
                   </div>
                   <div className="space-y-2 w-full">
                     <Label htmlFor="chamber-address" className="text-gray-300 text-sm">
@@ -1404,7 +1506,12 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
                       onChange={(e) => setChamberAddress(e.target.value)}
                       className="bg-gray-900/50 border-gray-700 text-white w-full"
                       placeholder="Enter chamber address"
+                      disabled={!!clinicData}
+                      title={clinicData ? "Auto-filled from clinic data" : "Enter chamber address"}
                     />
+                    {clinicData && (
+                      <p className="text-xs text-emerald-500">✓ Auto-filled from clinic</p>
+                    )}
                   </div>
                 </div>
 
@@ -1419,10 +1526,23 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
                     onChange={(e) => setClinicCode(e.target.value)}
                     className="bg-gray-900/50 border-gray-700 text-white w-full"
                     placeholder="Enter clinic code to link this chamber"
+                    disabled={loadingClinic}
                   />
-                  <p className="text-xs text-gray-500">
-                    If this chamber is for a specific clinic, enter their clinic code here
-                  </p>
+                  {loadingClinic && (
+                    <p className="text-xs text-gray-400">🔍 Looking up clinic...</p>
+                  )}
+                  {clinicData && (
+                    <div className="bg-emerald-900/20 border border-emerald-500/30 rounded-lg p-3">
+                      <p className="text-sm text-emerald-400 font-medium">✓ Linked to: {clinicData.name}</p>
+                      <p className="text-xs text-gray-400 mt-1">{clinicData.address}</p>
+                      <p className="text-xs text-emerald-500/70 mt-1">Chamber name and address auto-filled from clinic</p>
+                    </div>
+                  )}
+                  {!clinicData && !loadingClinic && (
+                    <p className="text-xs text-gray-500">
+                      If this chamber is for a specific clinic, enter their clinic code here. Name and address will be auto-filled.
+                    </p>
+                  )}
                 </div>
 
                 {/* Start Time & End Time */}
