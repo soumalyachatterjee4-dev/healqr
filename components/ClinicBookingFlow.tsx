@@ -27,6 +27,7 @@ interface SelectedDoctor {
   profilePhoto?: string;
   doctorCode?: string;
   qrNumber?: string;
+  chambers?: any[]; // Doctor's chambers
 }
 
 interface ClinicData {
@@ -138,24 +139,13 @@ export default function ClinicBookingFlow() {
       fullDoctorObject: doctor
     });
     
-    setSelectedDoctor(doctor);
-    // Store doctor info in session
-    sessionStorage.setItem('booking_doctor_id', doctor.uid);
-    sessionStorage.setItem('booking_doctor_name', doctor.name);
-    if (doctor.doctorCode) {
-      sessionStorage.setItem('booking_doctor_code', doctor.doctorCode);
-    }
-    if (doctor.qrNumber) {
-      sessionStorage.setItem('booking_doctor_qr', doctor.qrNumber);
-    }
-    
-    // Load doctor's schedule settings
-    console.log('🔍 Attempting to load schedule for doctor UID:', doctor.uid);
+    // Load doctor's schedule settings AND chambers
+    console.log('🔍 Loading doctor data for UID:', doctor.uid);
     try {
       const { db } = await import('../lib/firebase/config');
       if (!db) {
         console.warn('⚠️ Firebase DB not available, using defaults');
-        // Use defaults if db not available
+        setSelectedDoctor(doctor);
         setDoctorSchedule({
           maxAdvanceDays: 30,
           plannedOffPeriods: [],
@@ -166,6 +156,42 @@ export default function ClinicBookingFlow() {
       }
       
       const { doc, getDoc } = await import('firebase/firestore');
+      
+      // Load doctor's profile (includes chambers)
+      const doctorProfileRef = doc(db, 'doctors', doctor.uid);
+      const doctorProfileSnap = await getDoc(doctorProfileRef);
+      
+      let doctorWithChambers = { ...doctor };
+      
+      if (doctorProfileSnap.exists()) {
+        const profileData = doctorProfileSnap.data();
+        doctorWithChambers.chambers = profileData.chambers || [];
+        console.log('✅ Doctor profile LOADED:', {
+          doctorUid: doctor.uid,
+          chambersCount: doctorWithChambers.chambers.length,
+          chambers: doctorWithChambers.chambers.map((c: any) => ({
+            name: c.chamberName,
+            address: c.chamberAddress
+          }))
+        });
+      } else {
+        console.warn('⚠️ Doctor profile not found for:', doctor.uid);
+        doctorWithChambers.chambers = [];
+      }
+      
+      setSelectedDoctor(doctorWithChambers);
+      
+      // Store doctor info in session
+      sessionStorage.setItem('booking_doctor_id', doctor.uid);
+      sessionStorage.setItem('booking_doctor_name', doctor.name);
+      if (doctor.doctorCode) {
+        sessionStorage.setItem('booking_doctor_code', doctor.doctorCode);
+      }
+      if (doctor.qrNumber) {
+        sessionStorage.setItem('booking_doctor_qr', doctor.qrNumber);
+      }
+      
+      // Load doctor's schedule
       const doctorScheduleRef = doc(db, 'schedules', doctor.uid);
       console.log('📄 Firestore path:', `schedules/${doctor.uid}`);
       const doctorScheduleSnap = await getDoc(doctorScheduleRef);
@@ -373,6 +399,7 @@ export default function ClinicBookingFlow() {
           onChamberSelect={handleChamberSelect}
           onBack={handleBack}
           selectedDate={selectedDate}
+          chambers={selectedDoctor?.chambers || []}
           doctorName={selectedDoctor?.name || ''}
           doctorDegrees={selectedDoctor?.degrees}
           doctorSpecialty={selectedDoctor?.specialties?.[0]}

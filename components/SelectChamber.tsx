@@ -66,14 +66,34 @@ export default function SelectChamber({
   clinicPlannedOffPeriods = [],
 }: SelectChamberProps) {
   const accentColor = themeColor === 'blue' ? 'blue' : 'emerald';
-  console.log('🏥 SelectChamber received:', { doctorName, doctorSpecialty, chambersCount: chambers.length, clinicAddress });
+  console.log('🏥 SelectChamber received:', { 
+    doctorName, 
+    doctorSpecialty, 
+    chambersCount: chambers.length, 
+    clinicAddress,
+    selectedDate: selectedDate instanceof Date ? selectedDate.toDateString() : selectedDate,
+    clinicPlannedOffPeriodsCount: clinicPlannedOffPeriods.length,
+    clinicPlannedOffPeriods: clinicPlannedOffPeriods
+  });
   
   // Check if selected date falls in clinic planned off period
   const isClinicOff = () => {
+    console.log('🔍 isClinicOff CHECK START:', {
+      selectedDate: selectedDate instanceof Date ? selectedDate.toDateString() : selectedDate,
+      clinicPlannedOffPeriods: clinicPlannedOffPeriods,
+      count: clinicPlannedOffPeriods.length
+    });
+    
+    if (!clinicPlannedOffPeriods || clinicPlannedOffPeriods.length === 0) {
+      console.log('⚠️ No clinic planned off periods provided');
+      return false;
+    }
+    
     const date = new Date(selectedDate);
     date.setHours(0, 0, 0, 0);
     
     const activePlannedOffPeriods = clinicPlannedOffPeriods.filter((p: any) => p.status === 'active');
+    console.log('📋 Active clinic planned off periods:', activePlannedOffPeriods.length, activePlannedOffPeriods);
     
     for (const period of activePlannedOffPeriods) {
       let startDate: Date;
@@ -100,8 +120,15 @@ export default function SelectChamber({
       startDate.setHours(0, 0, 0, 0);
       endDate.setHours(0, 0, 0, 0);
       
+      console.log('🔄 Comparing dates:', {
+        checkDate: date.toDateString(),
+        periodStart: startDate.toDateString(),
+        periodEnd: endDate.toDateString(),
+        isInRange: date >= startDate && date <= endDate
+      });
+      
       if (date >= startDate && date <= endDate) {
-        console.log('❌ Clinic is OFF on selected date:', {
+        console.log('❌❌❌ CLINIC IS OFF on selected date:', {
           selectedDate: date.toDateString(),
           clinicOffPeriod: { start: startDate.toDateString(), end: endDate.toDateString() }
         });
@@ -109,6 +136,7 @@ export default function SelectChamber({
       }
     }
     
+    console.log('✅ Clinic is OPEN on selected date');
     return false;
   };
   
@@ -226,22 +254,40 @@ export default function SelectChamber({
         // Sort chambers by start time (earliest first)
         let sortedChambers = chambersWithBookingData.sort((a, b) => (a.startMinutes || 0) - (b.startMinutes || 0));
         
+        console.log('🔵 CHAMBER FILTERING START:', {
+          totalChambers: sortedChambers.length,
+          clinicIsOff: isClinicOff(),
+          hasClinicAddress: !!clinicAddress,
+          clinicAddress: clinicAddress
+        });
+        
         // Filter out clinic chambers if clinic is off on selected date
         if (isClinicOff() && clinicAddress) {
           const beforeFilter = sortedChambers.length;
+          console.log('🚫 FILTERING MODE: Clinic is OFF, removing clinic chambers');
+          
           sortedChambers = sortedChambers.filter(chamber => {
             // Check if chamber address matches clinic address (case-insensitive partial match)
             const chamberAddr = chamber.chamberAddress?.toLowerCase() || '';
             const clinicAddr = clinicAddress.toLowerCase();
             const isClinicChamber = chamberAddr.includes(clinicAddr) || clinicAddr.includes(chamberAddr);
             
+            console.log(`🔍 Chamber check: "${chamber.chamberName}"`, {
+              chamberAddress: chamber.chamberAddress,
+              clinicAddress: clinicAddress,
+              isMatch: isClinicChamber,
+              action: isClinicChamber ? 'REMOVE' : 'KEEP'
+            });
+            
             if (isClinicChamber) {
-              console.log(`🚫 Filtering out clinic chamber: "${chamber.chamberName}" (Clinic is off on selected date)`);
+              console.log(`🚫🚫🚫 REMOVING clinic chamber: "${chamber.chamberName}" at "${chamber.chamberAddress}"`);
             }
             
             return !isClinicChamber; // Keep only NON-clinic chambers
           });
-          console.log(`✅ Chamber filtering: ${beforeFilter} → ${sortedChambers.length} chambers (removed ${beforeFilter - sortedChambers.length} clinic chambers)`);
+          console.log(`✅ Chamber filtering complete: ${beforeFilter} → ${sortedChambers.length} chambers (removed ${beforeFilter - sortedChambers.length} clinic chambers)`);
+        } else {
+          console.log('✅ NO FILTERING: Clinic is open or no clinic address provided');
         }
         
         setChambersWithCounts(sortedChambers);
