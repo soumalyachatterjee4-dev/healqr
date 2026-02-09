@@ -607,12 +607,19 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
       const updatedPeriods = [newPeriod, ...allPeriods];
       setAllPeriods(updatedPeriods);
 
-      // Save to Firestore
+      // Save to Firestore - both collections
       await updateDoc(doc(db, 'doctors', doctorId), {
         plannedOffPeriods: updatedPeriods,
         globalBookingEnabled: false,
         updatedAt: serverTimestamp()
       });
+      
+      // Also save to schedules collection for clinic QR flow
+      await setDoc(doc(db, 'schedules', doctorId), {
+        plannedOffPeriods: updatedPeriods,
+        globalBookingEnabled: false,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
 
       // ============================================
       // 📤 SEND CANCELLATION TO ALL AFFECTED PATIENTS
@@ -750,12 +757,19 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
       // Check if there are any remaining active periods
       const hasActivePeriodsLeft = updatedPeriods.some(p => p.status === 'active');
 
-      // Save to Firestore
+      // Save to Firestore - both collections
       await updateDoc(doc(db, 'doctors', doctorId), {
         plannedOffPeriods: updatedPeriods,
         globalBookingEnabled: hasActivePeriodsLeft ? false : true,
         updatedAt: serverTimestamp()
       });
+      
+      // Also save to schedules collection for clinic QR flow
+      await setDoc(doc(db, 'schedules', doctorId), {
+        plannedOffPeriods: updatedPeriods,
+        globalBookingEnabled: hasActivePeriodsLeft ? false : true,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
 
       // ============================================
       // 📤 SEND RESTORATION TO ALL AFFECTED PATIENTS
@@ -874,7 +888,13 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
         updatedAt: serverTimestamp()
       });
       
-      console.log('✅ Max advance days saved successfully');
+      // Also save to schedules collection for clinic QR flow
+      await setDoc(doc(db, 'schedules', doctorId), {
+        maxAdvanceDays: days,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+      
+      console.log('✅ Max advance days saved successfully to both collections');
       toast.success('Settings Saved Successfully', {
         description: `Patients can now book appointments up to ${days} days in advance.`,
         duration: 5000,
