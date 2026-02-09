@@ -405,6 +405,13 @@ export default function App() {
     chamberAddress: string;
     isActive?: boolean;
   }>>([]);
+  // Clinic schedule data for chamber filtering (doctor QR flow)
+  const [clinicAddress, setClinicAddress] = useState('');
+  const [clinicPlannedOffPeriods, setClinicPlannedOffPeriods] = useState<Array<{
+    startDate: string;
+    endDate: string;
+    status: string;
+  }>>([]);
 
   // Check for email verification link on mount - RUNS FIRST
   useEffect(() => {
@@ -691,6 +698,39 @@ export default function App() {
             // Load chambers
             if (data.chambers && data.chambers.length > 0) {
               setDoctorChambers(data.chambers);
+              
+              // Load clinic schedule if doctor has clinic chambers
+              // Find first clinic chamber (non-home chamber) to get clinic address
+              const clinicChamber = data.chambers.find((c: any) => 
+                c.chamberAddress && !c.chamberName.toLowerCase().includes('home')
+              );
+              
+              if (clinicChamber && db) {
+                // Query clinics collection to find clinic by address
+                const clinicsRef = collection(db, 'clinics');
+                const clinicQuery = query(clinicsRef, where('address', '==', clinicChamber.chamberAddress));
+                getDocs(clinicQuery).then(clinicSnapshot => {
+                  if (!clinicSnapshot.empty) {
+                    const clinicDoc = clinicSnapshot.docs[0];
+                    const clinicId = clinicDoc.id;
+                    setClinicAddress(clinicChamber.chamberAddress);
+                    
+                    // Load clinic schedule from clinicSchedules collection
+                    getDoc(doc(db, 'clinicSchedules', clinicId)).then(scheduleDoc => {
+                      if (scheduleDoc.exists()) {
+                        const scheduleData = scheduleDoc.data();
+                        if (scheduleData.plannedOffPeriods && Array.isArray(scheduleData.plannedOffPeriods)) {
+                          setClinicPlannedOffPeriods(scheduleData.plannedOffPeriods.map((p: any) => ({
+                            startDate: p.startDate,
+                            endDate: p.endDate,
+                            status: p.status || 'active'
+                          })));
+                        }
+                      }
+                    });
+                  }
+                });
+              }
             }
 
             // Load schedule settings
@@ -733,6 +773,39 @@ export default function App() {
             // Load chambers
             if (data.chambers && data.chambers.length > 0) {
               setDoctorChambers(data.chambers);
+              
+              // Load clinic schedule if doctor has clinic chambers
+              // Find first clinic chamber (non-home chamber) to get clinic address
+              const clinicChamber = data.chambers.find((c: any) => 
+                c.chamberAddress && !c.chamberName.toLowerCase().includes('home')
+              );
+              
+              if (clinicChamber && db) {
+                // Query clinics collection to find clinic by address
+                const clinicsRef = collection(db, 'clinics');
+                const clinicQuery = query(clinicsRef, where('address', '==', clinicChamber.chamberAddress));
+                getDocs(clinicQuery).then(clinicSnapshot => {
+                  if (!clinicSnapshot.empty) {
+                    const clinicDoc = clinicSnapshot.docs[0];
+                    const clinicId = clinicDoc.id;
+                    setClinicAddress(clinicChamber.chamberAddress);
+                    
+                    // Load clinic schedule from clinicSchedules collection
+                    getDoc(doc(db, 'clinicSchedules', clinicId)).then(scheduleDoc => {
+                      if (scheduleDoc.exists()) {
+                        const scheduleData = scheduleDoc.data();
+                        if (scheduleData.plannedOffPeriods && Array.isArray(scheduleData.plannedOffPeriods)) {
+                          setClinicPlannedOffPeriods(scheduleData.plannedOffPeriods.map((p: any) => ({
+                            startDate: p.startDate,
+                            endDate: p.endDate,
+                            status: p.status || 'active'
+                          })));
+                        }
+                      }
+                    });
+                  }
+                });
+              }
             }
 
             // Load schedule settings
@@ -2254,6 +2327,8 @@ export default function App() {
             doctorPhoto={bookingDoctorPhoto}
             doctorDegrees={bookingDoctorDegrees}
             useDrPrefix={bookingDoctorUseDrPrefix}
+            clinicAddress={clinicAddress}
+            clinicPlannedOffPeriods={clinicPlannedOffPeriods}
           />
         );
       })()}
