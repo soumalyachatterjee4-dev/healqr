@@ -465,8 +465,10 @@ export default function ClinicBookingFlow() {
           onSubmit={handleBookingComplete}
           onBack={handleBack}
           selectedDate={selectedDate}
-          selectedChamberId={selectedChamberId!}
-          selectedChamberName={selectedChamberName}
+          // Pass required IDs
+          doctorId={selectedDoctor?.uid} 
+          selectedChamber={selectedChamberName}
+          // Pass display data
           doctorName={selectedDoctor?.name || ''}
           doctorDegrees={selectedDoctor?.degrees}
           doctorSpecialty={selectedDoctor?.specialties?.[0]}
@@ -474,6 +476,8 @@ export default function ClinicBookingFlow() {
           language={language}
           themeColor="blue"
           isClinicBooking={true}
+          // Pass chamberId separately if needed by form (though interface only shows selectedChamber string)
+          // selectedChamberId is used internally by flow but maybe not needed by form unless extended
         />
       );
 

@@ -43,6 +43,38 @@ When patients scanned a **clinic QR code**, they could see ALL chambers of the s
 4. **Verify:** Only chambers from that specific clinic appear
 5. **Verify:** Personal chambers (HOME CHAMBER 1, etc.) are NOT shown
 
+## ⚡ LATEST FIX: Missing Doctor Data in Clinic Bookings (Feb 9, 2026)
+
+### Issue Fixed:
+When booking via **Clinic QR** -> **Patient Information Form**, clicking "Confirm Booking" showed:
+- ❌ **Error:** "Doctor information missing"
+- ❌ Blocking the booking process
+
+### Root Cause:
+- `ClinicBookingFlow.tsx` was rendering `PatientDetailsForm` **without passing the `doctorId` prop**.
+- The form validation specifically checks `if (!doctorId)` and throws the error.
+- Also, `selectedChamber` name was being passed with the wrong prop name (`selectedChamberName` instead of `selectedChamber`).
+
+### Solution Implemented:
+Updated `components/ClinicBookingFlow.tsx` to correctly pass props:
+```tsx
+<PatientDetailsForm
+  doctorId={selectedDoctor?.uid}        // ✅ Added this
+  selectedChamber={selectedChamberName} // ✅ Fixed this (was selectedChamberName)
+  // ...other props
+/>
+```
+
+### Files Modified:
+- [ClinicBookingFlow.tsx](components/ClinicBookingFlow.tsx) - Lines 470-480
+
+### Testing Required:
+1. Scan Clinic QR (or use link with `?clinicId=...`)
+2. Select Doctor (Linked/Non-linked)
+3. Select Date & Chamber
+4. Fill Patient Details
+5. **Verify:** Booking submits successfully without "Doctor information missing" error
+
 ---
 
 ## 1. Previous Achievement: Fixed "Drop Out" Analytics Logic
