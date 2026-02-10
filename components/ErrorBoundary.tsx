@@ -38,6 +38,23 @@ class ErrorBoundary extends Component<Props, State> {
       timestamp: new Date().toISOString(),
     });
 
+    // Auto-recover from stale asset errors (HTML returned for JS or chunk load failures)
+    const isStaleAssetError =
+      error.message.includes("Unexpected token '<'") ||
+      error.message.includes('ChunkLoadError') ||
+      error.message.includes('Loading chunk');
+
+    if (isStaleAssetError) {
+      const reloadKey = 'healqr_forced_reload_v1';
+      if (!sessionStorage.getItem(reloadKey)) {
+        sessionStorage.setItem(reloadKey, '1');
+        const url = new URL(window.location.href);
+        url.searchParams.set('v', Date.now().toString());
+        window.location.replace(url.toString());
+        return;
+      }
+    }
+
     this.setState({
       error,
       errorInfo,

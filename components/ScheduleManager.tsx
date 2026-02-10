@@ -139,7 +139,20 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
     maxCapacity: number;
     isActive?: boolean;
     createdAt?: number;
+    inactivePeriods?: Array<{
+      startDate: string;
+      endDate: string;
+      createdAt: string;
+    }>;
   }>>([]);
+
+  // Track inactive date ranges for chambers being scheduled
+  const [chamberInactiveDates, setChamberInactiveDates] = useState<{
+    [chamberId: number]: {
+      startDate: string;
+      endDate: string;
+    }
+  }>({});
 
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -1018,6 +1031,34 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
     const chamber = demoSchedules.find(s => s.id === id);
     if (!chamber) return;
 
+    // If turning chamber back ON, just clear the date picker state
+    if (chamber.isActive === false) {
+      const updatedSchedules = demoSchedules.map(s => 
+        s.id === id ? { ...s, isActive: true } : s
+      );
+      setDemoSchedules(updatedSchedules);
+      
+      // Clear date picker state
+      const newDates = { ...chamberInactiveDates };
+      delete newDates[id];
+      setChamberInactiveDates(newDates);
+      
+      try {
+        await updateDoc(doc(db, 'doctors', doctorId), {
+          chambers: updatedSchedules,
+          updatedAt: serverTimestamp()
+        });
+        toast.success('Chamber Activated', {
+          description: `${chamber.chamberName} is now accepting bookings.`,
+        });
+      } catch (error) {
+        console.error('Error activating chamber:', error);
+        toast.error('Failed to activate chamber');
+        setDemoSchedules(demoSchedules);
+      }
+      return;
+    }
+
     // If chamber is currently active (turning OFF), check for seen patients first
     if (chamber.isActive !== false) {
       try {
@@ -1097,35 +1138,83 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
       }
     }
 
-    // All patients are non-seen or chamber is being reactivated, proceed with toggle
+    // All patients are non-seen, proceed with turning chamber OFF
+    // Just toggle the UI - date range will be saved when user fills it and clicks save
     const updatedSchedules = demoSchedules.map(s => 
-      s.id === id ? { ...s, isActive: s.isActive === false ? true : false } : s
+      s.id === id ? { ...s, isActive: false } : s
     );
     
     setDemoSchedules(updatedSchedules);
     
+    // Initialize date picker state
+    setChamberInactiveDates({
+      ...chamberInactiveDates,
+      [id]: { startDate: '', endDate: '' }
+    });
+    
+    toast.info('Chamber Toggle OFF', {
+      description: 'Please select date range to schedule chamber closure.',
+      duration: 4000,
+    });
+  };
+
+  const handleSaveChamberInactivePeriod = async (chamberId: number) => {
+    if (!doctorId || !db) {
+      toast.error('Authentication error');
+      return;
+    }
+
+    const dates = chamberInactiveDates[chamberId];
+    if (!dates || !dates.startDate || !dates.endDate) {
+      toast.error('Please select both start and end dates');
+      return;
+    }
+
+    if (new Date(dates.startDate) > new Date(dates.endDate)) {
+      toast.error('Start date cannot be after end date');
+      return;
+    }
+
+    const chamber = demoSchedules.find(s => s.id === chamberId);
+    if (!chamber) return;
+
+    const newPeriod = {
+      startDate: dates.startDate,
+      endDate: dates.endDate,
+      createdAt: new Date().toISOString(),
+    };
+
+    const updatedSchedules = demoSchedules.map(s => {
+      if (s.id === chamberId) {
+        const existingPeriods = s.inactivePeriods || [];
+        return {
+          ...s,
+          inactivePeriods: [...existingPeriods, newPeriod],
+        };
+      }
+      return s;
+    });
+
+    setDemoSchedules(updatedSchedules);
+
+    // Clear the date picker state
+    const newDates = { ...chamberInactiveDates };
+    delete newDates[chamberId];
+    setChamberInactiveDates(newDates);
+
     try {
       await updateDoc(doc(db, 'doctors', doctorId), {
         chambers: updatedSchedules,
         updatedAt: serverTimestamp()
       });
-      
-      const updatedChamber = updatedSchedules.find(s => s.id === id);
-      const isActive = updatedChamber?.isActive !== false;
-      
-      toast.success(
-        isActive ? 'Chamber Activated' : 'Chamber Deactivated',
-        {
-          description: isActive 
-            ? `${updatedChamber?.chamberName} is now accepting bookings.`
-            : `${updatedChamber?.chamberName} bookings are now disabled.`,
-          duration: 5000,
-        }
-      );
+
+      toast.success('Chamber Closure Scheduled', {
+        description: `${chamber.chamberName} will be unavailable from ${dates.startDate} to ${dates.endDate}.`,
+        duration: 5000,
+      });
     } catch (error) {
-      console.error('Error toggling chamber:', error);
-      toast.error('Failed to update chamber status');
-      // Revert state on error
+      console.error('Error saving inactive period:', error);
+      toast.error('Failed to save schedule');
       setDemoSchedules(demoSchedules);
     }
   };
@@ -1714,6 +1803,108 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
                           </div>
                         </div>
                       </div>
+
+                      {/* Date Range Picker - Shows when chamber is inactive */}
+                      {schedule.isActive === false && chamberInactiveDates[schedule.id] && (
+                        <div className="pt-4 border-t border-gray-700">
+                          <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-4 space-y-4">
+                            <div>
+                              <Label className="text-gray-300 text-sm mb-2 block">
+                                Select Inactive Period
+                              </Label>
+                              <p className="text-gray-500 text-xs mb-3">
+                                Choose the date range when this chamber should be unavailable
+                              </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <Label className="text-gray-400 text-xs mb-1.5 block">Start Date</Label>
+                                <Input
+                                  type="date"
+                                  value={chamberInactiveDates[schedule.id]?.startDate || ''}
+                                  onChange={(e) => setChamberInactiveDates({
+                                    ...chamberInactiveDates,
+                                    [schedule.id]: {
+                                      ...chamberInactiveDates[schedule.id],
+                                      startDate: e.target.value
+                                    }
+                                  })}
+                                  className="bg-gray-800 border-gray-700 text-white"
+                                  min={new Date().toISOString().split('T')[0]}
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-gray-400 text-xs mb-1.5 block">End Date</Label>
+                                <Input
+                                  type="date"
+                                  value={chamberInactiveDates[schedule.id]?.endDate || ''}
+                                  onChange={(e) => setChamberInactiveDates({
+                                    ...chamberInactiveDates,
+                                    [schedule.id]: {
+                                      ...chamberInactiveDates[schedule.id],
+                                      endDate: e.target.value
+                                    }
+                                  })}
+                                  className="bg-gray-800 border-gray-700 text-white"
+                                  min={chamberInactiveDates[schedule.id]?.startDate || new Date().toISOString().split('T')[0]}
+                                />
+                              </div>
+                            </div>
+
+                            <Button
+                              onClick={() => handleSaveChamberInactivePeriod(schedule.id)}
+                              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                              size="sm"
+                            >
+                              <CalendarIcon className="w-4 h-4 mr-2" />
+                              Save Inactive Period
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Show Active Inactive Periods */}
+                      {schedule.inactivePeriods && schedule.inactivePeriods.length > 0 && (
+                        <div className="pt-4 border-t border-gray-700">
+                          <p className="text-gray-400 text-xs mb-2">Scheduled Closures:</p>
+                          <div className="space-y-2">
+                            {schedule.inactivePeriods.map((period, idx) => (
+                              <div key={idx} className="bg-red-900/20 border border-red-900/30 rounded px-3 py-2 flex items-center justify-between">
+                                <span className="text-red-400 text-xs">
+                                  {period.startDate} to {period.endDate}
+                                </span>
+                                <Button
+                                  onClick={() => {
+                                    const updatedSchedules = demoSchedules.map(s => {
+                                      if (s.id === schedule.id) {
+                                        const nextPeriods = s.inactivePeriods?.filter((_, i) => i !== idx) || [];
+                                        return {
+                                          ...s,
+                                          inactivePeriods: nextPeriods,
+                                          isActive: nextPeriods.length === 0 ? true : s.isActive
+                                        };
+                                      }
+                                      return s;
+                                    });
+                                    setDemoSchedules(updatedSchedules);
+                                    updateDoc(doc(db!, 'doctors', doctorId), {
+                                      chambers: updatedSchedules,
+                                      updatedAt: serverTimestamp()
+                                    });
+                                    toast.success('Inactive period removed');
+                                  }}
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 px-2 text-red-400 hover:text-red-300 hover:bg-red-900/30"
+                                >
+                                  Remove
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
                       {/* Capacity & Actions */}
                       <div className="flex items-center justify-between pt-4 border-t border-gray-700">

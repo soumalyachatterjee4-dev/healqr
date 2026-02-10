@@ -196,49 +196,124 @@ export default function PatientDetailsForm({
       const { generateBookingId } = await import('../utils/idGenerator');
       const bookingId = await generateBookingId(doctorCode, selectedDate || new Date());
 
+      // ============================================
+      // 🎯 STEP 1: GET CHAMBER ID FIRST
+      // Must resolve chamber before querying bookings
+      // ============================================
+      let chamberId = -1; // Default to -1 instead of null for better querying
+      
+      if (doctorDoc.exists()) {
+        const doctorData = doctorDoc.data();
+        
+        if (doctorData.chambers && Array.isArray(doctorData.chambers)) {
+          // Try exact match first
+          let foundChamber = doctorData.chambers.find((c: any) => c.chamberName === selectedChamber);
+          
+          // If no exact match, try case-insensitive match
+          if (!foundChamber) {
+            foundChamber = doctorData.chambers.find((c: any) => 
+              c.chamberName?.toLowerCase() === selectedChamber?.toLowerCase()
+            );
+          }
+          
+          // If still no match, try partial match (both ways)
+          if (!foundChamber && selectedChamber) {
+            foundChamber = doctorData.chambers.find((c: any) => 
+              c.chamberName?.includes(selectedChamber) || selectedChamber?.includes(c.chamberName)
+            );
+          }
+          
+          // Last resort: normalize and compare (remove special chars, spaces)
+          if (!foundChamber && selectedChamber) {
+            const normalizedSelected = selectedChamber.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+            foundChamber = doctorData.chambers.find((c: any) => {
+              const normalizedChamber = c.chamberName?.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+              return normalizedChamber === normalizedSelected;
+            });
+          }
+          
+          if (foundChamber) {
+            chamberId = foundChamber.id;
+            console.log('✅ Chamber resolved:', {
+              selectedChamber,
+              foundChamber: foundChamber.chamberName,
+              chamberId
+            });
+          } else {
+            console.error('❌ Chamber not found! Selected:', selectedChamber, '| Available:', doctorData.chambers.map((c: any) => c.chamberName));
+            console.error('⚠️ Using chamberId = -1 (this booking will not appear in chamber views)');
+          }
+        }
+      }
 
-      // Query existing bookings for same doctor, date, chamber, and time
+      // ============================================
+      // 🎯 STEP 2: QUERY CHAMBER-SPECIFIC BOOKINGS
+      // Filter by BOTH doctorId AND chamberId for unified serial numbers
+      // ============================================
       const { query: firestoreQuery, where, getDocs } = await import('firebase/firestore');
       const bookingsRef = collection(db, 'bookings');
       
-      // Format date for comparison (YYYY-MM-DD) - using local timezone
+      // Format date for appointment saving (YYYY-MM-DD) - using local timezone
       const appointmentDate = selectedDate 
         ? new Date(selectedDate.getTime() - selectedDate.getTimezoneOffset() * 60000).toISOString().split('T')[0]
         : new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
       
+      // Get TODAY'S DATE STRING for filtering
+      const todayStr = new Date().toISOString().split('T')[0];
+      
+      // 🔑 CRITICAL FIX: Query by BOTH doctorId AND chamberId
+      // This ensures unified serial numbers per chamber across all booking sources
+      // (Doctor QR, Clinic QR, Walk-in all share the same sequence for the same chamber)
       const q = firestoreQuery(
         bookingsRef,
         where('doctorId', '==', doctorId),
-        where('appointmentDate', '==', appointmentDate),
-        where('chamber', '==', selectedChamber || 'walk-in'),
-        where('time', '==', selectedTime || 'immediate')
+        where('chamberId', '==', chamberId)
       );
       
-      console.log('🔍 Querying bookings with:', {
+      console.log('🔍 Querying CHAMBER-SPECIFIC bookings for unified serial numbers:', {
         doctorId,
+        chamberId,
+        chamberName: selectedChamber,
+        todayStr,
         appointmentDate,
-        chamber: selectedChamber || 'walk-in',
         time: selectedTime || 'immediate'
       });
       
       const querySnapshot = await getDocs(q);
-      const existingBookings = querySnapshot.docs;
       
-      // Generate serial token number (THIS IS THE REAL NUMBER)
-      const tokenNumber = `#${existingBookings.length + 1}`;
-      const serialNo = existingBookings.length + 1;
+      // 🔄 FILTER FOR TODAY ONLY
+      const todaysBookings = querySnapshot.docs.filter(doc => {
+        const bookingData = doc.data();
+        const bookingDate = bookingData.date?.toDate ? bookingData.date.toDate() : bookingData.date;
+        const bookingDateStr = bookingDate instanceof Date ? bookingDate.toISOString().split('T')[0] : '';
+        return bookingDateStr === todayStr;
+      });
+      
+      // 🎯 Generate CHAMBER-SPECIFIC serial number
+      // All bookings for this chamber today (Dr QR + Clinic QR + Walk-in) share one sequence
+      const tokenNumber = `#${todaysBookings.length + 1}`;
+      const serialNo = todaysBookings.length + 1;
       
       // Store appointmentDate in outer scope for consistent use in save operation
       const appointmentDateToSave = appointmentDate;
+      
+      console.log('✅ CHAMBER-SPECIFIC Serial Number (UNIFIED across all sources):', {
+        serialNo,
+        tokenNumber,
+        chamberId,
+        chamberName: selectedChamber,
+        totalChamberBookingsToday: todaysBookings.length,
+        doctorId,
+        todayStr,
+        appointmentDate: appointmentDateToSave
+      });
       
       // ============================================
       // 💾 SAVE TO DATABASE IMMEDIATELY (PREVENT RACE CONDITION)
       // Must save BEFORE showing confirmation to ensure correct serial numbers
       // ============================================
       
-      // Get chamberId from the selected chamber name (reuse existing doctorDoc)
-      let chamberId = -1; // Default to -1 instead of null for better querying
-      
+      // ✅ Validate planned off periods and chamber active status
       if (doctorDoc.exists()) {
         const doctorData = doctorDoc.data();
         
@@ -288,55 +363,20 @@ export default function PatientDetailsForm({
             });
             
             if (bookingDate >= startDate && bookingDate <= endDate) {
-
               toast.error('This date is unavailable due to planned off period. Please select another date.');
               setIsSubmitting(false);
               return;
             }
           }
-          
-
         }
         
-        if (doctorData.chambers && Array.isArray(doctorData.chambers)) {
-          // Try exact match first
-          let foundChamber = doctorData.chambers.find((c: any) => c.chamberName === selectedChamber);
-          
-          // If no exact match, try case-insensitive match
-          if (!foundChamber) {
-            foundChamber = doctorData.chambers.find((c: any) => 
-              c.chamberName?.toLowerCase() === selectedChamber?.toLowerCase()
-            );
-          }
-          
-          // If still no match, try partial match (both ways)
-          if (!foundChamber && selectedChamber) {
-            foundChamber = doctorData.chambers.find((c: any) => 
-              c.chamberName?.includes(selectedChamber) || selectedChamber?.includes(c.chamberName)
-            );
-          }
-          
-          // Last resort: normalize and compare (remove special chars, spaces)
-          if (!foundChamber && selectedChamber) {
-            const normalizedSelected = selectedChamber.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-            foundChamber = doctorData.chambers.find((c: any) => {
-              const normalizedChamber = c.chamberName?.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-              return normalizedChamber === normalizedSelected;
-            });
-          }
-          
-          if (foundChamber) {
-            // Check if chamber is active
-            if (foundChamber.isActive === false) {
-              toast.error('This chamber is currently unavailable for bookings. Please try again later.');
-              setIsSubmitting(false);
-              return;
-            }
-            
-            chamberId = foundChamber.id;
-          } else {
-            console.error('❌ Chamber not found! Selected:', selectedChamber, '| Available:', doctorData.chambers.map((c: any) => c.chamberName));
-            console.error('⚠️ Using chamberId = -1 (this booking will not appear in chamber views)');
+        // Check if chamber is active (already resolved chamberId above)
+        if (doctorData.chambers && Array.isArray(doctorData.chambers) && chamberId !== -1) {
+          const foundChamber = doctorData.chambers.find((c: any) => c.id === chamberId);
+          if (foundChamber && foundChamber.isActive === false) {
+            toast.error('This chamber is currently unavailable for bookings. Please try again later.');
+            setIsSubmitting(false);
+            return;
           }
         }
       }
@@ -417,26 +457,30 @@ export default function PatientDetailsForm({
           }
         }
 
-        // Save to notification history for patient history feature
-        const { saveNotificationHistory } = await import('../services/notificationHistoryService');
-        await saveNotificationHistory({
-          patientPhone: formData.whatsappNumber,
-          patientName: normalizedName,
-          doctorName: doctorName,
-          clinicName: sessionStorage.getItem('booking_clinic_name') || selectedChamber || 'Clinic',
-          chamber: selectedChamber || '',
-          notificationType: 'booking_confirmed',
-          bookingStatus: 'confirmed',
-          notificationStatus: 'sent',
-          timestamp: new Date(),
-          consultationDate: appointmentDateToSave,
-          consultationTime: selectedTime || '',
-          serialNumber: String(tokenNumber),
-          bookingId: bookingId,
-          doctorId: doctorId,
-          isWalkIn: bookingType === 'walkin_booking',
-          walkInVerified: bookingType === 'qr_booking' // QR bookings are verified, walk-in are not yet
-        });
+        // Save to notification history for patient history feature (non-blocking)
+        try {
+          const { saveNotificationHistory } = await import('../services/notificationHistoryService');
+          await saveNotificationHistory({
+            patientPhone: formData.whatsappNumber,
+            patientName: normalizedName,
+            doctorName: doctorName,
+            clinicName: sessionStorage.getItem('booking_clinic_name') || selectedChamber || 'Clinic',
+            chamber: selectedChamber || '',
+            notificationType: 'booking_confirmed',
+            bookingStatus: 'confirmed',
+            notificationStatus: 'sent',
+            timestamp: new Date(),
+            consultationDate: appointmentDateToSave,
+            consultationTime: selectedTime || '',
+            serialNumber: String(tokenNumber),
+            bookingId: bookingId,
+            doctorId: doctorId,
+            isWalkIn: bookingType === 'walkin_booking',
+            walkInVerified: bookingType === 'qr_booking' // QR bookings are verified, walk-in are not yet
+          });
+        } catch (historyError) {
+          console.error('❌ Failed to save notification history (non-blocking):', historyError);
+        }
       } catch (saveError) {
         console.error('❌ Failed to save booking to Firestore:', saveError);
         throw saveError; // Re-throw to be caught by outer try-catch

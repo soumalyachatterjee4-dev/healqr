@@ -65,6 +65,8 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({ onMenuCha
   const [endDate, setEndDate] = useState('');
   const [allPeriods, setAllPeriods] = useState<PlannedOffPeriod[]>([]);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [chamberSpecificClosure, setChamberSpecificClosure] = useState<'all' | 'specific'>('all'); // all = all chambers, specific = select specific chamber
+  const [selectedClosureChamber, setSelectedClosureChamber] = useState<string>(''); // chamber name for specific closure
 
   // Maximum Advance Days (Per-Doctor)
   const [advanceDaysScope, setAdvanceDaysScope] = useState<'clinic' | 'doctor'>('doctor');
@@ -215,6 +217,8 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({ onMenuCha
     setEndDate('');
     setSelectedDays([]);
     setFrequency('Daily');
+    setChamberSpecificClosure('all');
+    setSelectedClosureChamber('');
     // Reset to clinic info
     setChamberName(clinicName);
     setChamberAddress(clinicAddress);
@@ -232,6 +236,11 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({ onMenuCha
       return;
     }
 
+    if (chamberSpecificClosure === 'specific' && !selectedClosureChamber) {
+      toast.error('Please select a chamber for this closure');
+      return;
+    }
+
     const currentUser = auth.currentUser;
     if (!currentUser) return;
 
@@ -245,23 +254,36 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({ onMenuCha
         appliesTo: globalOffScope,
         ...(globalOffScope === 'doctor' && selectedDoctor && {
           doctorId: selectedDoctor.uid,
-          doctorName: selectedDoctor.name
+          doctorName: selectedDoctor.name,
+          clinicId: currentUser.uid,
+          clinicName: clinicName
         }),
         ...(globalOffScope === 'clinic' && {
           clinicId: currentUser.uid,
           clinicName: clinicName
+        }),
+        ...(chamberSpecificClosure === 'specific' && selectedClosureChamber && {
+          chamberName: selectedClosureChamber
         })
       };
 
       if (globalOffScope === 'clinic') {
-        // Apply to all doctors in clinic
+        // Store in clinic document FIRST (central source of truth)
         const clinicRef = doc(db, 'clinics', currentUser.uid);
         const clinicSnap = await getDoc(clinicRef);
 
         if (clinicSnap.exists()) {
-          const linkedDoctors = clinicSnap.data().linkedDoctorsDetails || [];
+          // Add to clinic's own planned off periods
+          const existingClinicPeriods = clinicSnap.data().plannedOffPeriods || [];
+          await updateDoc(clinicRef, {
+            plannedOffPeriods: [...existingClinicPeriods, newPeriod]
+          });
+          
+          console.log('✅ Stored in clinic document');
 
-          console.log('📋 Applying planned off to', linkedDoctors.length, 'doctors');
+          // Also push to all linked doctors (for backward compatibility)
+          const linkedDoctors = clinicSnap.data().linkedDoctorsDetails || [];
+          console.log('📋 Also applying to', linkedDoctors.length, 'linked doctors');
 
           let successCount = 0;
           let errorCount = 0;
@@ -290,12 +312,10 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({ onMenuCha
 
           console.log('📊 Results:', successCount, 'success,', errorCount, 'errors');
 
-          if (successCount > 0) {
-            toast.success(`Planned off applied to ${successCount} doctor${successCount > 1 ? 's' : ''}`);
-          }
-
+          toast.success(`Planned off period saved for ${clinicName}`);
+          
           if (errorCount > 0) {
-            toast.error(`Failed to update ${errorCount} doctor${errorCount > 1 ? 's' : ''}`);
+            toast.error(`Failed to sync to ${errorCount} doctor${errorCount > 1 ? 's' : ''}`);
           }
         }
       } else {
@@ -303,6 +323,17 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({ onMenuCha
         if (!selectedDoctorId) {
           toast.error('Please select a doctor');
           return;
+        }
+
+        // Store in clinic document too (clinic-scoped doctor off)
+        const clinicRef = doc(db, 'clinics', currentUser.uid);
+        const clinicSnap = await getDoc(clinicRef);
+
+        if (clinicSnap.exists()) {
+          const existingClinicPeriods = clinicSnap.data().plannedOffPeriods || [];
+          await updateDoc(clinicRef, {
+            plannedOffPeriods: [...existingClinicPeriods, newPeriod]
+          });
         }
 
         const doctorRef = doc(db, 'doctors', selectedDoctorId);
@@ -988,6 +1019,72 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({ onMenuCha
                           {/* Date Selection - Shows when enabled */}
                           {plannedOffEnabled && (
                             <div className="space-y-4 pt-2">
+                              {/* Chamber Selection - For chamber-specific closures */}
+                              <div className="bg-gray-900/30 border border-gray-700 rounded-lg p-4">
+                                <h4 className="text-white text-sm mb-2">Closure Scope</h4>
+                                <p className="text-gray-400 text-sm mb-4">
+                                  Choose whether this closure applies to all chambers or a specific one
+                                </p>
+
+                                <div className="grid grid-cols-2 gap-3 mb-4">
+                                  <button
+                                    onClick={() => {
+                                      setChamberSpecificClosure('all');
+                                      setSelectedClosureChamber('');
+                                    }}
+                                    className={`
+                                      py-3 px-4 rounded-lg border-2 transition-all text-sm
+                                      ${chamberSpecificClosure === 'all'
+                                        ? 'bg-blue-600 border-blue-600 text-white'
+                                        : 'bg-gray-900/50 border-gray-700 text-gray-400 hover:border-gray-600'
+                                      }
+                                    `}
+                                  >
+                                    <Building2 className="w-4 h-4 mx-auto mb-1" />
+                                    All Chambers
+                                  </button>
+                                  <button
+                                    onClick={() => setChamberSpecificClosure('specific')}
+                                    className={`
+                                      py-3 px-4 rounded-lg border-2 transition-all text-sm
+                                      ${chamberSpecificClosure === 'specific'
+                                        ? 'bg-blue-600 border-blue-600 text-white'
+                                        : 'bg-gray-900/50 border-gray-700 text-gray-400 hover:border-gray-600'
+                                      }
+                                    `}
+                                  >
+                                    <MapPin className="w-4 h-4 mx-auto mb-1" />
+                                    Specific Chamber
+                                  </button>
+                                </div>
+
+                                {/* Chamber Dropdown - Shows when specific is selected */}
+                                {chamberSpecificClosure === 'specific' && (
+                                  <div className="space-y-2">
+                                    <Label htmlFor="closure-chamber" className="text-gray-300 text-sm">
+                                      Select Chamber
+                                    </Label>
+                                    <Select value={selectedClosureChamber} onValueChange={setSelectedClosureChamber}>
+                                      <SelectTrigger className="bg-gray-900/50 border-gray-700 text-white">
+                                        <SelectValue placeholder="Choose a chamber" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {chambers.map((chamber) => (
+                                          <SelectItem key={chamber.id} value={chamber.chamberName}>
+                                            <div className="flex items-center gap-2">
+                                              <span>{chamber.chamberName}</span>
+                                              {chamber.chamberAddress && (
+                                                <span className="text-gray-400 text-xs">({chamber.chamberAddress})</span>
+                                              )}
+                                            </div>
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                )}
+                              </div>
+
                               <div className="bg-gray-900/30 border border-gray-700 rounded-lg p-4">
                                 <h4 className="text-white text-sm mb-2">Select Off Period</h4>
                                 <p className="text-gray-400 text-sm mb-4">

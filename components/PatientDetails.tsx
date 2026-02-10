@@ -53,6 +53,7 @@ interface PatientDetailsProps {
   prepaymentActive?: boolean; // Whether doctor has pre-payment collection feature activated
   activeAddOns?: string[]; // Active premium add-ons purchased by doctor
   doctorLanguage?: Language; // Doctor's preferred language for AI translation
+  doctorId?: string; // Doctor ID for loading correct doctor info (for non-linked doctors)
 }
 
 interface PatientButtonStates {
@@ -82,6 +83,7 @@ export default function PatientDetails({
   prepaymentActive = false,
   doctorLanguage = 'english',
   activeAddOns = [],
+  doctorId,
 }: PatientDetailsProps) {
   const [isReviewRestricted, setIsReviewRestricted] = useState(false);
 
@@ -175,22 +177,28 @@ export default function PatientDetails({
   useEffect(() => {
     const loadDoctorInfo = async () => {
       try {
-        const user = auth.currentUser;
-        if (user) {
-          const doctorDoc = await getDoc(doc(db, 'doctors', user.uid));
-          if (doctorDoc.exists()) {
-            setDoctorInfo({
-              id: user.uid,
-              name: doctorDoc.data().name || 'Doctor'
-            });
-          }
+        let docId = doctorId;
+        
+        // If doctorId not provided, try to get current user
+        if (!docId) {
+          const user = auth.currentUser;
+          if (!user) return;
+          docId = user.uid;
+        }
+
+        const doctorDoc = await getDoc(doc(db, 'doctors', docId));
+        if (doctorDoc.exists()) {
+          setDoctorInfo({
+            id: docId,
+            name: doctorDoc.data().name || 'Doctor'
+          });
         }
       } catch (error) {
         console.error('Failed to load doctor info:', error);
       }
     };
     loadDoctorInfo();
-  }, []);
+  }, [doctorId]);
 
   // Push reminders temporarily disabled while notification system is rebuilt.
 
@@ -1009,10 +1017,19 @@ export default function PatientDetails({
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <h1 className="text-white">Patient Details</h1>
-        <p className="text-gray-400 text-sm mt-1">
-          View and manage patient notifications for selected chamber
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-white">Patient Details</h1>
+            {doctorInfo.name && (
+              <p className="text-emerald-400 text-sm font-semibold mt-1">
+                Dr. {doctorInfo.name}
+              </p>
+            )}
+            <p className="text-gray-400 text-sm mt-1">
+              View and manage patient notifications for selected chamber
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Chamber Info & Progress */}

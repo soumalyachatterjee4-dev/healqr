@@ -1,14 +1,16 @@
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
-import { Menu, MapPin, Clock, Plus, Calendar, ArrowLeft, User } from 'lucide-react';
+import { Menu, MapPin, Clock, Plus, Calendar, ArrowLeft, User, Power } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import ClinicSidebar from './ClinicSidebar';
 import AddPatientModal, { PatientFormData } from './AddPatientModal';
 import PatientDetails from './PatientDetails';
+import ChamberBlockingModal from './ChamberBlockingModal';
+import ChamberRestorationModal from './ChamberRestorationModal';
 import { toast } from 'sonner';
 import { auth, db } from '../lib/firebase/config';
-import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, onSnapshot, updateDoc } from 'firebase/firestore';
 
 interface ClinicTodaysScheduleProps {
   onMenuChange?: (menu: string) => void;
@@ -31,6 +33,7 @@ interface DoctorChamber {
   isExpired: boolean;
   booked: number;
   schedule: string;
+  doctorId?: string;
 }
 
 interface DoctorSchedule {
@@ -85,6 +88,22 @@ function ChamberPatientDetailsLoader({
 
         const qrBookingsSnap = await getDocs(qrBookingsQuery);
         
+        // Query 1B: Fallback query for non-linked doctors - search by doctorId + chamberId + date
+        // This handles cases where clinic QR bookings might have different chamberId mapping
+        let fallbackQrBookings: any[] = [];
+        if (qrBookingsSnap.empty) {
+          const fallbackQuery = query(
+            bookingsRef,
+            where('doctorId', '==', doctorId),
+            where('appointmentDate', '==', todayStr)
+          );
+          const fallbackSnap = await getDocs(fallbackQuery);
+          fallbackQrBookings = fallbackSnap.docs.filter(doc => {
+            const data = doc.data();
+            return data.type !== 'walkin_booking';
+          });
+        }
+        
         // Query 2: Walk-in bookings for this doctor + clinic (added via ADD PATIENT button)
         const walkInQuery = query(
           bookingsRef,
@@ -103,22 +122,64 @@ function ChamberPatientDetailsLoader({
           return bookingDateStr === todayStr;
         });
 
-        // Process QR bookings
-        const qrPatients = qrBookingsSnap.docs
-          .filter(doc => {
-            const data = doc.data();
-            return data.type !== 'walkin_booking';
-          })
+        // Process QR bookings (use fallback if primary query returned no results)
+        const qrBookingDocs = (qrBookingsSnap.empty && fallbackQrBookings.length > 0
+          ? fallbackQrBookings
+          : qrBookingsSnap.docs
+              .filter(doc => {
+                const data = doc.data();
+                return data.type !== 'walkin_booking';
+              })
+        ).filter(doc => {
+          const data = doc.data();
+          const dataChamberId = typeof data.chamberId === 'string' ? parseInt(data.chamberId, 10) : data.chamberId;
+          if (dataChamberId !== undefined && dataChamberId !== null && !isNaN(dataChamberId)) {
+            return dataChamberId === numericChamberId;
+          }
+          const chamberName = (data.chamberName || data.chamber || '').toString().toLowerCase();
+          const targetName = (chamber.chamberName || '').toString().toLowerCase();
+          return chamberName !== '' && targetName !== '' && chamberName === targetName;
+        });
+        
+        const buildAppointmentDateTime = (dateValue: any, timeValue: any, fallback: Date) => {
+          if (dateValue && timeValue && timeValue !== 'immediate') {
+            const dateStr = typeof dateValue === 'string'
+              ? dateValue
+              : (dateValue.toDate ? dateValue.toDate().toISOString().split('T')[0] : '');
+            const timeStr = String(timeValue);
+            const date = new Date(dateStr);
+            if (!isNaN(date.getTime())) {
+              const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+              if (match) {
+                let hour = parseInt(match[1], 10);
+                const minute = parseInt(match[2], 10);
+                const ampm = (match[3] || '').toLowerCase();
+                if (ampm === 'pm' && hour < 12) hour += 12;
+                if (ampm === 'am' && hour === 12) hour = 0;
+                date.setHours(hour, minute, 0, 0);
+                return date;
+              }
+            }
+          }
+
+          if (dateValue?.toDate) return dateValue.toDate();
+          if (dateValue) {
+            const parsed = new Date(dateValue);
+            if (!isNaN(parsed.getTime())) return parsed;
+          }
+          return fallback;
+        };
+
+        const qrPatients = qrBookingDocs
           .map(doc => {
             const data = doc.data();
             
             const bookingTime = data.createdAt?.toDate 
               ? data.createdAt.toDate() 
               : new Date(data.createdAt);
-            
-            const appointmentTime = data.date?.toDate 
-              ? data.date.toDate() 
-              : new Date(data.date);
+
+            const appointmentFallback = data.date?.toDate ? data.date.toDate() : bookingTime;
+            const appointmentTime = buildAppointmentDateTime(data.appointmentDate, data.time, appointmentFallback);
             
             const isCancelledStatus = (data.isCancelled === true) || (data.status === 'cancelled');
             
@@ -159,17 +220,33 @@ function ChamberPatientDetailsLoader({
               fcmNotificationSent: data.fcmNotificationSent || false,
               doctorId: data.doctorId,
               chamberId: data.chamberId,
+              serialNo: data.serialNo || 0, // 🔄 SYNCHRONIZE: Use serialNo from Firestore
+              tokenNumber: data.tokenNumber || `#${data.serialNo || 0}`, // 🔄 SYNCHRONIZE
               type: 'qr_booking', // Mark as QR booking
             };
           });
 
-        // Process walk-in patients
-        const walkInPatients = todaysWalkIns.map(doc => {
-          const data = doc.data();
+        // Process walk-in patients (filter to this chamber when possible)
+        const walkInPatients = todaysWalkIns
+          .filter(doc => {
+            const data = doc.data();
+            const dataChamberId = typeof data.chamberId === 'string' ? parseInt(data.chamberId, 10) : data.chamberId;
+            if (dataChamberId !== undefined && dataChamberId !== null && !isNaN(dataChamberId)) {
+              return dataChamberId === numericChamberId;
+            }
+            const chamberName = (data.chamberName || data.chamber || '').toString().toLowerCase();
+            const targetName = (chamber.chamberName || '').toString().toLowerCase();
+            return chamberName !== '' && targetName !== '' && chamberName === targetName;
+          })
+          .map(doc => {
+            const data = doc.data();
           
           const bookingTime = data.createdAt?.toDate 
             ? data.createdAt.toDate() 
             : new Date(data.createdAt || new Date());
+
+          const appointmentFallback = data.date?.toDate ? data.date.toDate() : bookingTime;
+          const appointmentTime = buildAppointmentDateTime(data.appointmentDate, data.time, appointmentFallback);
 
           // Walk-in patients are NOT encrypted (entered manually by clinic)
           const patientName = data.patientName || 'N/A';
@@ -178,18 +255,19 @@ function ChamberPatientDetailsLoader({
           const gender = data.gender || 'N/A';
           const purposeOfVisit = data.purposeOfVisit || 'N/A';
 
-          return {
+            return {
             id: doc.id,
             name: patientName,
             phone: whatsappNumber,
             bookingId: data.bookingId || doc.id,
             tokenNumber: data.tokenNumber || '#0',
+            serialNo: data.serialNo || 0, // 🔄 SYNCHRONIZE: Walk-ins also have serialNo
             age: typeof age === 'number' ? age : (parseInt(age) || 0),
             gender: gender.toUpperCase(),
             visitType: data.visitType || 'walk-in',
             purposeOfVisit: purposeOfVisit,
             bookingTime: bookingTime,
-            appointmentTime: bookingTime,
+            appointmentTime: appointmentTime,
             appointmentDate: todayStr,
             paymentVerified: false,
             consultationType: 'chamber',
@@ -201,21 +279,24 @@ function ChamberPatientDetailsLoader({
             reminderSent: false,
             fcmNotificationSent: false,
             doctorId: data.doctorId,
-            chamberId: null,
+            chamberId: data.chamberId ?? numericChamberId,
             type: 'walkin_booking', // Mark as walk-in
             verifiedByPatient: data.verifiedByPatient || false,
             verificationMethod: data.verificationMethod || 'manual_override',
             reviewScheduled: data.reviewScheduled || false,
             followUpScheduled: data.followUpScheduled || false,
-          };
-        });
+            };
+          });
 
         // Combine QR and walk-in patients
         const allPatients = [...qrPatients, ...walkInPatients]
           .sort((a, b) => {
+            // 1. Non-cancelled first
             if (a.isCancelled !== b.isCancelled) return a.isCancelled ? 1 : -1;
+            // 2. Not seen first (active patients)
             if (a.isMarkedSeen !== b.isMarkedSeen) return a.isMarkedSeen ? 1 : -1;
-            return (a.bookingTime?.getTime() || 0) - (b.bookingTime?.getTime() || 0);
+            // 3. Sort by stored serial number (assigned at booking time)
+            return (a.serialNo || 0) - (b.serialNo || 0);
           });
 
         setChamberPatients(allPatients);
@@ -286,20 +367,18 @@ function ChamberPatientDetailsLoader({
         </Button>
 
         <PatientDetails
-          chamber={{
-            id: chamber.id,
-            name: chamber.chamberName,
-            address: chamber.chamberAddress,
-            startTime: chamber.startTime,
-            endTime: chamber.endTime,
-            schedule: chamber.schedule,
-            booked: chamber.booked,
-            capacity: chamber.maxCapacity
-          }}
+          chamberName={chamber.chamberName}
+          chamberAddress={chamber.chamberAddress}
+          scheduleTime={`${chamber.startTime} - ${chamber.endTime}`}
+          scheduleDate={new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          currentPatients={chamberPatients.filter(p => !p.isCancelled).length}
+          totalPatients={chamberPatients.length}
           patients={chamberPatients}
+          onBack={onBack}
           onRefresh={refreshPatients}
           activeAddOns={[]}
           doctorLanguage="english"
+          doctorId={doctorId}
         />
       </div>
     </div>
@@ -314,6 +393,25 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
   const [loading, setLoading] = useState(true);
   const [selectedDoctorForPatient, setSelectedDoctorForPatient] = useState<{ id: string; name: string } | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [chambersTogglingState, setChambersTogglingState] = useState<{ [key: string]: boolean }>({});
+  const [blockingModalOpen, setBlockingModalOpen] = useState(false);
+  const [restorationModalOpen, setRestorationModalOpen] = useState(false);
+  const [pendingBlockingData, setPendingBlockingData] = useState<{
+    doctorId: string;
+    chamberId: number;
+    chamberName: string;
+    currentStatus: boolean;
+    pendingPatients: any[];
+  } | null>(null);
+  const [pendingRestorationData, setPendingRestorationData] = useState<{
+    doctorId: string;
+    chamberId: number;
+    chamberName: string;
+    currentStatus: boolean;
+    restoredPatients: any[];
+  } | null>(null);
+  const [isProcessingBlockConfirm, setIsProcessingBlockConfirm] = useState(false);
+  const [isProcessingRestoreConfirm, setIsProcessingRestoreConfirm] = useState(false);
 
   useEffect(() => {
     loadTodaysSchedule();
@@ -349,6 +447,356 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
       unsubscribe();
     };
   }, []);
+
+  const getCurrentDate = () => {
+    const today = new Date();
+    const options: Intl.DateTimeFormatOptions = {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    };
+    return today.toLocaleDateString('en-US', options);
+  };
+
+  const handleChamberToggle = async (doctorId: string, chamberId: number, currentStatus: boolean) => {
+    try {
+      // If trying to TURN OFF the chamber, check for pending bookings
+      if (currentStatus === true) { // Currently ON, trying to turn OFF
+        setChambersTogglingState(prev => ({ ...prev, [`${doctorId}-${chamberId}`]: true }));
+        
+        // Check for pending (non-intervened) bookings for this chamber
+        const today = new Date();
+        const todayStr = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+        
+        const bookingsRef = collection(db, 'bookings');
+        const pendingBookingsQuery = query(
+          bookingsRef,
+          where('chamberId', '==', chamberId),
+          where('doctorId', '==', doctorId),
+          where('appointmentDate', '==', todayStr)
+        );
+        
+        const bookingsSnap = await getDocs(pendingBookingsQuery);
+        
+        // Check if there are any non-intervened, non-cancelled bookings
+        const pendingBookings = bookingsSnap.docs.filter(doc => {
+          const data = doc.data();
+          const isMarkedSeen = data.isMarkedSeen || false;
+          const isCancelled = data.isCancelled === true || data.status === 'cancelled';
+          
+          // Pending if NOT marked seen AND NOT cancelled
+          return !isMarkedSeen && !isCancelled;
+        });
+        
+        if (pendingBookings.length > 0) {
+          // Show modal with pending patients instead of just blocking
+          const pendingPatientsList = pendingBookings.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              name: data.patientName || 'Unknown Patient',
+              phone: data.whatsappNumber || data.phone || 'N/A',
+              appointmentTime: data.appointmentTime || 'N/A',
+            };
+          });
+
+          // Find chamber name
+          const doctorRef = doc(db, 'doctors', doctorId);
+          const doctorSnap = await getDoc(doctorRef);
+          const chamberName = 'Chamber';
+          if (doctorSnap.exists()) {
+            const chambers = doctorSnap.data().chambers || [];
+            const chamber = chambers.find((ch: any) => ch.id === chamberId);
+            if (chamber) {
+              // Chamber name logic
+            }
+          }
+
+          setPendingBlockingData({
+            doctorId,
+            chamberId,
+            chamberName,
+            currentStatus,
+            pendingPatients: pendingPatientsList,
+          });
+          setBlockingModalOpen(true);
+          setChambersTogglingState(prev => ({ ...prev, [`${doctorId}-${chamberId}`]: false }));
+          return;
+        }
+      }
+      
+      // If trying to TURN ON the chamber, check for cancelled bookings
+      if (currentStatus === false) { // Currently OFF, trying to turn ON
+        setChambersTogglingState(prev => ({ ...prev, [`${doctorId}-${chamberId}`]: true }));
+        
+        // Check for cancelled bookings for this chamber
+        const today = new Date();
+        const todayStr = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+        
+        const bookingsRef = collection(db, 'bookings');
+        const cancelledBookingsQuery = query(
+          bookingsRef,
+          where('chamberId', '==', chamberId),
+          where('doctorId', '==', doctorId),
+          where('appointmentDate', '==', todayStr),
+          where('isCancelled', '==', true)
+        );
+        
+        const bookingsSnap = await getDocs(cancelledBookingsQuery);
+        
+        if (bookingsSnap.docs.length > 0) {
+          // Show restoration modal with cancelled patients
+          const restoredPatientsList = bookingsSnap.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              name: data.patientName || 'Unknown Patient',
+              phone: data.whatsappNumber || data.phone || 'N/A',
+              appointmentTime: data.appointmentTime || 'N/A',
+            };
+          });
+
+          // Find chamber name
+          const doctorRef = doc(db, 'doctors', doctorId);
+          const doctorSnap = await getDoc(doctorRef);
+          const chamberName = 'Chamber';
+          if (doctorSnap.exists()) {
+            const chambers = doctorSnap.data().chambers || [];
+            const chamber = chambers.find((ch: any) => ch.id === chamberId);
+            if (chamber) {
+              // Chamber name logic
+            }
+          }
+
+          setPendingRestorationData({
+            doctorId,
+            chamberId,
+            chamberName,
+            currentStatus,
+            restoredPatients: restoredPatientsList,
+          });
+          setRestorationModalOpen(true);
+          setChambersTogglingState(prev => ({ ...prev, [`${doctorId}-${chamberId}`]: false }));
+          return;
+        }
+      }
+      
+      setChambersTogglingState(prev => ({ ...prev, [`${doctorId}-${chamberId}`]: true }));
+      
+      const chamberRef = doc(db, 'doctors', doctorId);
+      const doctorSnap = await getDoc(chamberRef);
+      
+      if (doctorSnap.exists()) {
+        const chambers = doctorSnap.data().chambers || [];
+        const updatedChambers = chambers.map((ch: any) => {
+          if (ch.id === chamberId) {
+            return { ...ch, isActive: !currentStatus };
+          }
+          return ch;
+        });
+        
+        await updateDoc(chamberRef, { chambers: updatedChambers });
+        
+        // Refresh schedules
+        setRefreshTrigger(prev => prev + 1);
+        toast.success(currentStatus ? 'Chamber disabled' : 'Chamber enabled');
+      }
+    } catch (error) {
+      console.error('Error toggling chamber:', error);
+      toast.error('Failed to toggle chamber');
+    } finally {
+      setChambersTogglingState(prev => ({ ...prev, [`${doctorId}-${chamberId}`]: false }));
+    }
+  };
+
+  const handleRestoreChamberConfirm = async () => {
+    if (!pendingRestorationData) return;
+
+    const {
+      doctorId,
+      chamberId,
+      currentStatus,
+      restoredPatients,
+    } = pendingRestorationData;
+
+    setIsProcessingRestoreConfirm(true);
+
+    try {
+      const { sendAppointmentRestored } = await import('../services/notificationService');
+      const doctorRef = doc(db, 'doctors', doctorId);
+      const doctorSnap = await getDoc(doctorRef);
+
+      if (!doctorSnap.exists()) {
+        toast.error('Doctor not found');
+        setIsProcessingRestoreConfirm(false);
+        return;
+      }
+
+      const doctorData = doctorSnap.data();
+      const doctorName = doctorData.name || 'Doctor';
+      const doctorSpecialty = doctorData.specialty || '';
+      const doctorPhoto = doctorData.profilePhoto || '';
+
+      // Restore all cancelled bookings and send notifications
+      for (const patient of restoredPatients) {
+        try {
+          // Update booking status
+          await updateDoc(doc(db, 'bookings', patient.id), {
+            isCancelled: false,
+            status: 'pending',
+            cancellationType: null,
+            cancelledBy: null,
+          });
+
+          // Send restoration notification
+          const today = new Date();
+          const appointmentDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+
+          await sendAppointmentRestored({
+            patientPhone: patient.phone,
+            patientName: patient.name,
+            age: 'N/A',
+            sex: 'N/A',
+            purpose: 'Appointment',
+            doctorId,
+            doctorName,
+            doctorSpecialty,
+            doctorPhoto,
+            clinicName: 'Chamber',
+            chamberAddress: '',
+            bookingId: patient.id,
+            appointmentDate,
+            appointmentTime: patient.appointmentTime,
+            chamber: 'Chamber',
+            tokenNumber: 'N/A',
+            message: 'Your appointment has been restored and is now active. The doctor is ready to see you.',
+            language: 'english',
+          }).catch((err: any) => {
+            console.warn(`⚠️ Failed to send restoration notification to ${patient.name}:`, err);
+          });
+        } catch (error) {
+          console.error(`❌ Error restoring booking for ${patient.name}:`, error);
+        }
+      }
+
+      // Now enable the chamber
+      const chambers = doctorData.chambers || [];
+      const updatedChambers = chambers.map((ch: any) => {
+        if (ch.id === chamberId) {
+          return { ...ch, isActive: !currentStatus };
+        }
+        return ch;
+      });
+
+      await updateDoc(doctorRef, { chambers: updatedChambers });
+
+      // Refresh
+      setRefreshTrigger(prev => prev + 1);
+      toast.success(`Chamber restored and ${restoredPatients.length} patient(s) notified of restoration`);
+    } catch (error) {
+      console.error('❌ Error restoring chamber:', error);
+      toast.error('Failed to restore chamber');
+    } finally {
+      setIsProcessingRestoreConfirm(false);
+      setRestorationModalOpen(false);
+      setPendingRestorationData(null);
+    }
+  };
+
+  const handleBlockChamberConfirm = async () => {
+    if (!pendingBlockingData) return;
+
+    const {
+      doctorId,
+      chamberId,
+      currentStatus,
+      pendingPatients,
+    } = pendingBlockingData;
+
+    setIsProcessingBlockConfirm(true);
+
+    try {
+      const { sendAppointmentCancelled } = await import('../services/notificationService');
+      const doctorRef = doc(db, 'doctors', doctorId);
+      const doctorSnap = await getDoc(doctorRef);
+
+      if (!doctorSnap.exists()) {
+        toast.error('Doctor not found');
+        setIsProcessingBlockConfirm(false);
+        return;
+      }
+
+      const doctorData = doctorSnap.data();
+      const doctorName = doctorData.name || 'Doctor';
+      const doctorSpecialty = doctorData.specialty || '';
+      const doctorPhoto = doctorData.profilePhoto || '';
+
+      // Cancel all pending bookings and send notifications
+      for (const patient of pendingPatients) {
+        try {
+          // Update booking status
+          await updateDoc(doc(db, 'bookings', patient.id), {
+            isCancelled: true,
+            status: 'cancelled',
+            cancellationType: 'CHAMBER_BLOCKED',
+            cancelledBy: 'clinic_system',
+          });
+
+          // Send cancellation notification
+          const today = new Date();
+          const appointmentDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+
+          await sendAppointmentCancelled({
+            patientPhone: patient.phone,
+            patientName: patient.name,
+            age: 'N/A',
+            sex: 'N/A',
+            purpose: 'Appointment',
+            doctorId,
+            doctorName,
+            doctorSpecialty,
+            doctorPhoto,
+            clinicName: 'Chamber',
+            chamberAddress: '',
+            bookingId: patient.id,
+            appointmentDate,
+            appointmentTime: patient.appointmentTime,
+            chamber: 'Chamber',
+            tokenNumber: 'N/A',
+            message: 'Your appointment has been cancelled. The doctor has blocked this time slot. Please contact the clinic for rescheduling.',
+            language: 'english',
+          }).catch((err: any) => {
+            console.warn(`⚠️ Failed to send notification to ${patient.name}:`, err);
+          });
+        } catch (error) {
+          console.error(`❌ Error cancelling booking for ${patient.name}:`, error);
+        }
+      }
+
+      // Now block the chamber
+      const chambers = doctorData.chambers || [];
+      const updatedChambers = chambers.map((ch: any) => {
+        if (ch.id === chamberId) {
+          return { ...ch, isActive: !currentStatus };
+        }
+        return ch;
+      });
+
+      await updateDoc(doctorRef, { chambers: updatedChambers });
+
+      // Refresh
+      setRefreshTrigger(prev => prev + 1);
+      toast.success(`Chamber blocked and ${pendingPatients.length} patient(s) notified of cancellation`);
+    } catch (error) {
+      console.error('❌ Error blocking chamber:', error);
+      toast.error('Failed to block chamber');
+    } finally {
+      setIsProcessingBlockConfirm(false);
+      setBlockingModalOpen(false);
+      setPendingBlockingData(null);
+    }
+  };
 
   const loadTodaysSchedule = async () => {
     const currentUser = auth.currentUser;
@@ -438,7 +886,7 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
                 // Count only non-cancelled bookings
                 const qrBookedCount = qrBookingsSnap.docs.filter(doc => {
                   const data = doc.data();
-                  return data.status !== 'cancelled';
+                  return data.isCancelled !== true && data.status !== 'cancelled';
                 }).length;
 
                 let scheduleText = '';
@@ -498,15 +946,9 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
         }
       }
 
-      // Sort schedules by earliest chamber start time (doctors with no chambers go to end)
-      schedules.sort((a, b) => {
-        if (a.chambers.length === 0 && b.chambers.length === 0) return 0;
-        if (a.chambers.length === 0) return 1;
-        if (b.chambers.length === 0) return -1;
-        const aEarliest = Math.min(...a.chambers.map(c => c.startMinutes));
-        const bEarliest = Math.min(...b.chambers.map(c => c.startMinutes));
-        return aEarliest - bEarliest;
-      });
+      // ✅ SIMPLE SORT: Match doctor dashboard - just alphabetical by doctor name
+      // Chambers within each doctor are already sorted by time (active first, then expired)
+      schedules.sort((a, b) => a.doctorName.localeCompare(b.doctorName));
 
       setDoctorSchedules(schedules);
     } catch (error) {
@@ -515,16 +957,6 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
     } finally {
       setLoading(false);
     }
-  };
-  const getCurrentDate = () => {
-    const today = new Date();
-    const options: Intl.DateTimeFormatOptions = { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    };
-    return today.toLocaleDateString('en-US', options);
   };
 
   const handleViewPatients = (chamber: DoctorChamber, doctorId: string) => {
@@ -650,10 +1082,24 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
                             {/* Chamber Info */}
                             <div className="flex-1">
                               <div className="flex items-start justify-between mb-4">
-                                <div>
-                                  <h3 className="text-white text-lg font-medium mb-1">
-                                    {chamber.chamberName}
-                                  </h3>
+                                <div className="flex-1">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <h3 className="text-white text-lg font-medium">
+                                      {chamber.chamberName}
+                                    </h3>
+                                    <button
+                                      onClick={() => handleChamberToggle(schedule.doctorId, chamber.id, chamber.isActive)}
+                                      disabled={chambersTogglingState[`${schedule.doctorId}-${chamber.id}`]}
+                                      className={`p-2 rounded-lg transition-all flex items-center gap-2 text-sm font-medium ${
+                                        chamber.isActive
+                                          ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/50'
+                                          : 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/50'
+                                      } disabled:opacity-50`}
+                                    >
+                                      <Power className="w-4 h-4" />
+                                      {chamber.isActive ? 'ON' : 'OFF'}
+                                    </button>
+                                  </div>
                                   <div className="flex items-center gap-2 text-gray-400 text-sm mb-2">
                                     <MapPin className="w-4 h-4" />
                                     <span>{chamber.chamberAddress}</span>
@@ -698,9 +1144,14 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
                             <div className="flex flex-col gap-3">
                               <Button
                                 onClick={() => handleViewPatients(chamber, schedule.doctorId)}
-                                className="bg-blue-600 hover:bg-blue-700 text-white whitespace-nowrap"
+                                disabled={!chamber.isActive}
+                                className={`text-white whitespace-nowrap ${
+                                  chamber.isActive
+                                    ? 'bg-blue-600 hover:bg-blue-700'
+                                    : 'bg-gray-600 cursor-not-allowed opacity-50'
+                                }`}
                               >
-                                VIEW PATIENTS
+                                {chamber.isActive ? 'VIEW PATIENTS' : 'CHAMBER DISABLED'}
                               </Button>
                             </div>
                           </div>
@@ -726,6 +1177,36 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
           onAddPatient={handleAddPatient}
           doctorId={selectedDoctorForPatient.id}
           doctorName={selectedDoctorForPatient.name}
+        />
+      )}
+
+      {/* Chamber Blocking Modal */}
+      {blockingModalOpen && pendingBlockingData && (
+        <ChamberBlockingModal
+          isOpen={blockingModalOpen}
+          onClose={() => {
+            setBlockingModalOpen(false);
+            setPendingBlockingData(null);
+          }}
+          onConfirm={handleBlockChamberConfirm}
+          pendingPatients={pendingBlockingData.pendingPatients}
+          chamberName={pendingBlockingData.chamberName}
+          isLoading={isProcessingBlockConfirm}
+        />
+      )}
+
+      {/* Chamber Restoration Modal */}
+      {restorationModalOpen && pendingRestorationData && (
+        <ChamberRestorationModal
+          isOpen={restorationModalOpen}
+          onClose={() => {
+            setRestorationModalOpen(false);
+            setPendingRestorationData(null);
+          }}
+          onConfirm={handleRestoreChamberConfirm}
+          restoredPatients={pendingRestorationData.restoredPatients}
+          chamberName={pendingRestorationData.chamberName}
+          isLoading={isProcessingRestoreConfirm}
         />
       )}
     </div>

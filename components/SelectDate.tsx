@@ -18,6 +18,19 @@ interface SelectDateProps {
     appliesTo?: 'clinic' | 'doctor';
     clinicId?: string;
   }>;
+  clinicPlannedOffPeriods?: Array<{
+    startDate: string;
+    endDate: string;
+    status: string;
+    clinicId?: string;
+    chamberName?: string;
+    doctorId?: string;
+  }>;
+  chambers?: Array<{
+    clinicId?: string;
+    chamberName?: string;
+    chamberAddress?: string;
+  }>;
   schedules?: Array<{
     days: string[];
     frequency: string;
@@ -28,15 +41,17 @@ interface SelectDateProps {
   doctorPhoto?: string;
   useDrPrefix?: boolean;
   themeColor?: 'emerald' | 'blue';
-  clinicId?: string; // CRITICAL: Pass clinic ID to filter clinic-specific planned off
+  clinicId?: string;
+  doctorId?: string;
 }
 
-export default function SelectDate({ onBack, onContinue, language, maxAdvanceDays = 30, plannedOffPeriods = [], schedules = [], globalBookingEnabled = true, doctorName = '', doctorSpecialty = '', doctorPhoto = '', useDrPrefix = true, themeColor = 'emerald', clinicId }: SelectDateProps) {
+export default function SelectDate({ onBack, onContinue, language, maxAdvanceDays = 30, plannedOffPeriods = [], clinicPlannedOffPeriods = [], chambers = [], schedules = [], globalBookingEnabled = true, doctorName = '', doctorSpecialty = '', doctorPhoto = '', useDrPrefix = true, themeColor = 'emerald', clinicId, doctorId }: SelectDateProps) {
   console.log('📅 SelectDate Props:', { 
     maxAdvanceDays, 
     globalBookingEnabled, 
     plannedOffPeriodsCount: plannedOffPeriods.length,
     clinicId: clinicId || 'NOT_FROM_CLINIC',
+    doctorId: doctorId || 'NOT_SET',
     schedulesCount: schedules.length,
     doctorName,
     doctorSpecialty
@@ -103,40 +118,94 @@ export default function SelectDate({ onBack, onContinue, language, maxAdvanceDay
       return true;
     }
     
-    // Disable dates in planned off periods (only active periods)
-    // CRITICAL: Filter out clinic planned off if not booking through that clinic
+    // ========================================
+    // CLEAR BLOCKING LOGIC (Rebuilt from scratch)
+    // ========================================
+    // DATE PICKER RULES:
+    // 1. Doctor full-day off (appliesTo='doctor', no clinicId, no chamberName) → BLOCK
+    // 2. Chamber-specific off (chamberName set) → DON'T BLOCK (SelectChamber handles)
+    // 3. Clinic-wide off:
+    //    - Clinic QR → BLOCK date (entire clinic affected)
+    //    - Doctor QR → DON'T BLOCK (personal chambers may be available)
+    // ========================================
+    
+    const isClinicQr = !!clinicId;
+    const isDoctorQr = !isClinicQr;
+    
+    // Process doctor's own planned-off periods
     const activePlannedOffPeriods = plannedOffPeriods.filter(p => {
-      // Always include doctor-specific planned off
       if (p.status !== 'active') return false;
-      if (p.appliesTo === 'doctor') return true;
       
-      // For clinic planned off, only include if booking through that specific clinic
-      if (p.appliesTo === 'clinic') {
-        const isMatchingClinic = p.clinicId && clinicId && p.clinicId === clinicId;
-        console.log('🏥 Clinic Planned Off Filter:', {
-          periodClinicId: p.clinicId,
-          currentClinicId: clinicId,
-          isMatchingClinic,
-          included: isMatchingClinic
-        });
-        return isMatchingClinic;
+      // Chamber-specific off → Don't block date (chamber selection handles it)
+      if (p.chamberName) return false;
+      
+      // Doctor full-day off (no clinicId means full personal off)
+      if (p.appliesTo === 'doctor' && !p.clinicId) {
+        return true; // BLOCK date
       }
       
-      // Legacy periods without appliesTo (assume doctor-specific)
-      return true;
+      // Clinic-scoped doctor off → Don't block date (only affects clinic chambers)
+      if (p.clinicId) return false;
+      
+      // Legacy periods without appliesTo → Assume full-day off
+      if (!p.appliesTo) return true;
+      
+      return false;
     });
     
-    console.log(`🔍 SelectDate: Checking if day ${day} is blocked`, {
-      activePlannedOffPeriodsCount: activePlannedOffPeriods.length,
-      checkingDate: date.toDateString(),
-      plannedOffPeriods: activePlannedOffPeriods.map(p => ({
+    // Process clinic planned-off periods
+    const activeClinicPeriods = clinicPlannedOffPeriods.filter(p => {
+      if (p.status !== 'active') return false;
+      
+      // Chamber-specific off → Don't block date (chamber selection handles it)
+      if (p.chamberName) return false;
+      
+      // Doctor-scoped clinic off: only apply to matching doctor
+      if (p.doctorId && doctorId && p.doctorId !== doctorId) {
+        return false; // Different doctor's off period
+      }
+      
+      // Clinic QR mode: Block ALL clinic-wide off periods
+      if (isClinicQr) {
+        // Filter to current clinic only
+        if (p.clinicId && clinicId && p.clinicId !== clinicId) {
+          return false;
+        }
+        return true; // BLOCK date for clinic QR
+      }
+      
+      // Doctor QR mode: NEVER block dates for clinic off
+      // Reason: Doctor may have personal chambers (HOME) available
+      // SelectChamber will filter clinic chambers
+      if (isDoctorQr) {
+        console.log(`🏥 Doctor QR: NOT blocking date for clinic off - chambers will handle filtering`);
+        return false; // DON'T BLOCK date for doctor QR
+      }
+      
+      return false;
+    });
+
+    const allBlockingPeriods = [...activePlannedOffPeriods, ...activeClinicPeriods];
+
+    console.log('📊 Planned off summary:', {
+      activeDoctorPeriodsCount: activePlannedOffPeriods.length,
+      activeClinicPeriodsCount: activeClinicPeriods.length,
+      allBlockingPeriodsCount: allBlockingPeriods.length,
+      checkingDate: date.toDateString()
+    });
+
+    allBlockingPeriods.forEach(p => {
+      console.log('  🧩 Period:', {
         startDate: p.startDate,
         endDate: p.endDate,
+        appliesTo: p.appliesTo,
+        clinicId: p.clinicId,
+        chamberName: p.chamberName,
         status: p.status
-      }))
+      });
     });
     
-    for (const period of activePlannedOffPeriods) {
+    for (const period of allBlockingPeriods) {
       // Handle both string dates and Firestore timestamps
       let startDate: Date;
       let endDate: Date;

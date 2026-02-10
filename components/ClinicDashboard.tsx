@@ -348,16 +348,20 @@ export default function ClinicDashboard() {
                 }
 
                 try {
+                  const todayStr = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split('T')[0];
                   const bookingsQuery = query(
                     collection(db, 'bookings'),
                     where('doctorId', '==', docId),
                     where('chamberId', '==', chamber.id),
-                    where('date', '==', today.toISOString().split('T')[0]),
-                    where('status', 'in', ['pending', 'confirmed'])
+                    where('appointmentDate', '==', todayStr)
                   );
                   
                   const bookingsSnap = await getDocs(bookingsQuery);
-                  const bookingCount = bookingsSnap.size;
+                  // Filter out cancelled bookings
+                  const bookingCount = bookingsSnap.docs.filter(doc => {
+                    const data = doc.data();
+                    return data.isCancelled !== true && data.status !== 'cancelled';
+                  }).length;
 
                   chambers.push({
                     id: chamber.id || '',

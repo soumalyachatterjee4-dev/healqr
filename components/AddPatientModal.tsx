@@ -273,24 +273,25 @@ export default function AddPatientModal({ isOpen, onClose, onAddPatient, doctorI
       // Get today's date string (YYYY-MM-DD)
       const todayStr = new Date().toISOString().split('T')[0];
       
+      // Query ALL bookings for this doctor (same as QR booking side)
       const q = firestoreQuery(
         bookingsRef,
-        where('doctorId', '==', currentDoctorId),
-        where('type', '==', 'walkin_booking')
+        where('doctorId', '==', currentDoctorId)
       );
       
       const querySnapshot = await getDocs(q);
       
-      // Filter for today's bookings only
-      const todaysWalkIns = querySnapshot.docs.filter(doc => {
+      // Filter for today's bookings only (QR + walk-in combined)
+      const todaysBookings = querySnapshot.docs.filter(doc => {
         const bookingData = doc.data();
         const bookingDate = bookingData.date?.toDate ? bookingData.date.toDate() : bookingData.date;
         const bookingDateStr = bookingDate instanceof Date ? bookingDate.toISOString().split('T')[0] : '';
         return bookingDateStr === todayStr;
       });
       
-      // Generate serial token number for today's walk-ins
-      const tokenNumber = `#${todaysWalkIns.length + 1}`;
+      // Generate serial token number (same logic as QR booking side)
+      const tokenNumber = `#${todaysBookings.length + 1}`;
+      const serialNo = todaysBookings.length + 1;
 
       const submissionTimestamp = new Date();
 
@@ -298,6 +299,7 @@ export default function AddPatientModal({ isOpen, onClose, onAddPatient, doctorI
       const bookingDocRef = await addDoc(collection(db, 'bookings'), {
         bookingId,
         tokenNumber,
+        serialNo, // Store numeric serial for consistent sorting with QR bookings
         patientName: formData.patientName,
         whatsappNumber: formData.whatsappNumber.startsWith('+91') 
           ? formData.whatsappNumber 

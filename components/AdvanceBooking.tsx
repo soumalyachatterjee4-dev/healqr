@@ -303,6 +303,33 @@ export default function AdvanceBooking({ onMenuChange, onLogout, activeAddOns = 
         const { db } = await import('../lib/firebase/config');
         const { collection, query, where, getDocs } = await import('firebase/firestore');
 
+        // 🔒 PATIENT DATA ACCESS CONTROL: Build list of clinic IDs from restricted clinics
+        let restrictedClinicIds: string[] = [];
+        try {
+          const clinicsRef = collection(db, 'clinics');
+          const allClinicsSnap = await getDocs(clinicsRef);
+          
+          allClinicsSnap.forEach((clinicDoc) => {
+            const clinicData = clinicDoc.data();
+            const linkedDoctors = clinicData.linkedDoctorsDetails || [];
+            
+            // Check if current doctor is linked to this clinic with restricted access
+            const isRestricted = linkedDoctors.some((d: any) => 
+              d.doctorId === userId && d.restrictPatientDataAccess === true
+            );
+            
+            if (isRestricted) {
+              restrictedClinicIds.push(clinicDoc.id);
+            }
+          });
+
+          if (restrictedClinicIds.length > 0) {
+            console.log('🔒 Restricted clinics for advance booking:', restrictedClinicIds);
+          }
+        } catch (error) {
+          console.error('Error checking clinic access restrictions:', error);
+        }
+
         const bookingsRef = collection(db, 'bookings');
         
         // TEMPORARILY force fallback to debug
@@ -330,6 +357,16 @@ export default function AdvanceBooking({ onMenuChange, onLogout, activeAddOns = 
           
           // Filter by doctorId (in case we used fallback query) and exclude cancelled
           if (data.doctorId === userId && data.status !== 'cancelled') {
+            // 🔒 PATIENT DATA ACCESS CONTROL: Check if booking is from restricted clinic
+            const bookingClinicId = data.clinicId;
+            if (bookingClinicId && restrictedClinicIds.includes(bookingClinicId)) {
+              console.log('🔒 Filtered out booking from restricted clinic:', { 
+                bookingId: doc.id, 
+                clinicId: bookingClinicId 
+              });
+              return; // Skip this booking
+            }
+
             // Store both encrypted and plain fields - decryption happens during display
             const bookingData: any = {
               id: doc.id,

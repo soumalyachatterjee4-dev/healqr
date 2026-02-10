@@ -43,9 +43,20 @@ interface SelectChamberProps {
   doctorDegrees?: string[];
   useDrPrefix?: boolean;
   themeColor?: 'emerald' | 'blue';
+  doctorId?: string;
   clinicId?: string; // Clinic ID for exact chamber matching
   clinicAddress?: string; // Clinic address to filter when clinic is off
-  clinicPlannedOffPeriods?: any[]; // Clinic planned off periods
+  clinicPlannedOffPeriods?: Array<{
+    startDate: string;
+    endDate: string;
+    status: string;
+    clinicId?: string;
+    clinicName?: string;
+    clinicAddress?: string;
+    doctorId?: string;
+    chamberName?: string; // Specific chamber closure (if omitted, applies to all chambers in clinic)
+    appliesTo?: string;
+  }>; // Clinic planned off periods with metadata
 }
 
 export default function SelectChamber({
@@ -63,6 +74,7 @@ export default function SelectChamber({
   doctorDegrees = [],
   useDrPrefix = true,
   themeColor = 'emerald',
+  doctorId,
   clinicId,
   clinicAddress,
   clinicPlannedOffPeriods = [],
@@ -71,18 +83,34 @@ export default function SelectChamber({
   console.log('🏥 SelectChamber received:', { 
     doctorName, 
     doctorSpecialty, 
-    chambersCount: chambers.length,     clinicId,    clinicAddress,
+    chamberscount: chambers.length,
+    chambersDetails: chambers.map(c => ({
+      name: c.chamberName,
+      address: c.chamberAddress,
+      hasClinicId: !!(c as any).clinicId
+    })),
+    clinicId,
+    clinicAddress,
+    doctorId: doctorId || 'NOT_SET',
     selectedDate: selectedDate instanceof Date ? selectedDate.toDateString() : selectedDate,
     clinicPlannedOffPeriodsCount: clinicPlannedOffPeriods.length,
     clinicPlannedOffPeriods: clinicPlannedOffPeriods
   });
   
   // Check if selected date falls in clinic planned off period
-  const isClinicOff = () => {
-    console.log('🔍 isClinicOff CHECK START:', {
+  // Updated to check specific chamber's clinic
+  const isClinicOffForChamber = (chamber: any) => {
+    const chamberClinicId = chamber.clinicId;
+    const chamberAddr = (chamber.chamberAddress || '').toLowerCase().trim();
+    const isHomeChamber = chamber.chamberName?.toLowerCase().includes('home');
+    
+    console.log('🔍 isClinicOffForChamber CHECK:', {
+      chamberName: chamber.chamberName,
+      chamberClinicId: chamberClinicId || 'NONE',
+      chamberAddress: chamberAddr || 'NONE',
+      isHomeChamber,
       selectedDate: selectedDate instanceof Date ? selectedDate.toDateString() : selectedDate,
-      clinicPlannedOffPeriods: clinicPlannedOffPeriods,
-      count: clinicPlannedOffPeriods.length
+      clinicPlannedOffPeriodsCount: clinicPlannedOffPeriods.length
     });
     
     if (!clinicPlannedOffPeriods || clinicPlannedOffPeriods.length === 0) {
@@ -90,13 +118,81 @@ export default function SelectChamber({
       return false;
     }
     
+    // Home chambers are never blocked
+    if (isHomeChamber) {
+      console.log('🏠 Home chamber - never blocked');
+      return false;
+    }
+    
     const date = new Date(selectedDate);
     date.setHours(0, 0, 0, 0);
     
     const activePlannedOffPeriods = clinicPlannedOffPeriods.filter((p: any) => p.status === 'active');
-    console.log('📋 Active clinic planned off periods:', activePlannedOffPeriods.length, activePlannedOffPeriods);
+    console.log('📋 Active clinic planned off periods (all):', activePlannedOffPeriods.length);
     
     for (const period of activePlannedOffPeriods) {
+      if (period.doctorId && doctorId && period.doctorId !== doctorId) {
+        console.log('⏭️ Skipping period for other doctor:', {
+          periodDoctorId: period.doctorId,
+          currentDoctorId: doctorId
+        });
+        continue;
+      }
+
+      let isMatch = false;
+      
+      // Method 1: Match by clinicId (most reliable)
+      if (chamberClinicId && period.clinicId) {
+        isMatch = chamberClinicId === period.clinicId;
+        console.log(`🆔 ClinicId Match: ${isMatch}`, {
+          chamberClinicId,
+          periodClinicId: period.clinicId
+        });
+      }
+      // Method 2: Match by address (fallback for legacy chambers without clinicId)
+      else if (!chamberClinicId && chamberAddr && period.clinicAddress) {
+        const periodAddr = period.clinicAddress.toLowerCase().trim();
+        
+        // Flexible address matching: check if either contains the other
+        const addressMatch = chamberAddr.includes(periodAddr) || periodAddr.includes(chamberAddr);
+        
+        // Also try matching by clinic name if available
+        let nameMatch = false;
+        if (period.clinicName) {
+          const periodName = period.clinicName.toLowerCase().trim();
+          nameMatch = chamberAddr.includes(periodName);
+        }
+        
+        isMatch = addressMatch || nameMatch;
+        console.log(`📍 Address/Name Match: ${isMatch}`, {
+          chamberAddr,
+          periodAddr,
+          periodName: period.clinicName || 'NONE',
+          addressMatch,
+          nameMatch
+        });
+      }
+      
+      if (!isMatch) {
+        continue; // This period doesn't apply to this chamber
+      }
+      
+      // If period specifies a specific chamber, only apply if it matches
+      if (period.chamberName) {
+        const periodChamberName = (period.chamberName || '').toLowerCase().trim();
+        const currentChamberName = (chamber.chamberName || '').toLowerCase().trim();
+        
+        if (periodChamberName !== currentChamberName) {
+          console.log('🔹 Skipping period for different chamber:', {
+            currentChamber: currentChamberName,
+            periodChamber: periodChamberName
+          });
+          continue; // This period targets a different chamber
+        }
+        console.log('✅ Period targets this specific chamber:', currentChamberName);
+      }
+      
+      // Period matches this chamber's clinic - check if date falls in range
       let startDate: Date;
       let endDate: Date;
       
@@ -129,15 +225,18 @@ export default function SelectChamber({
       });
       
       if (date >= startDate && date <= endDate) {
-        console.log('❌❌❌ CLINIC IS OFF on selected date:', {
+        console.log('❌❌❌ CHAMBER BLOCKED - Clinic is OFF on selected date:', {
+          chamberName: chamber.chamberName,
+          clinicId: chamberClinicId || 'LEGACY',
           selectedDate: date.toDateString(),
-          clinicOffPeriod: { start: startDate.toDateString(), end: endDate.toDateString() }
+          clinicOffPeriod: { start: startDate.toDateString(), end: endDate.toDateString() },
+          matchMethod: chamberClinicId ? 'clinicId' : 'address/name'
         });
         return true;
       }
     }
     
-    console.log('✅ Clinic is OPEN on selected date');
+    console.log('✅ Chamber available - Clinic is OPEN on selected date');
     return false;
   };
   
@@ -257,11 +356,11 @@ export default function SelectChamber({
         
         console.log('🔵 CHAMBER FILTERING START:', {
           totalChambers: sortedChambers.length,
-          clinicIsOff: isClinicOff(),
           hasClinicId: !!clinicId,
           clinicId: clinicId,
           hasClinicAddress: !!clinicAddress,
-          clinicAddress: clinicAddress
+          clinicAddress: clinicAddress,
+          clinicPlannedOffPeriodsCount: clinicPlannedOffPeriods.length
         });
         
         // 🔒 CLINIC QR FILTER: If patient scanned a clinic QR (clinicId exists),
@@ -288,50 +387,41 @@ export default function SelectChamber({
           console.log(`✅ Clinic chamber filter complete: ${beforeFilter} → ${sortedChambers.length} chambers (kept only clinic chambers)`);
         }
         
-        // Filter out clinic chambers if clinic is off on selected date
-        if (isClinicOff() && clinicId) {
-          const beforeFilter = sortedChambers.length;
-          console.log('🚫 FILTERING MODE: Clinic is OFF, removing clinic chambers by ID');
+        // Filter out chambers if their specific clinic is off on selected date
+        const beforeClinicOffFilter = sortedChambers.length;
+        console.log('🔍 Checking each chamber for clinic planned off periods...');
+        
+        sortedChambers = sortedChambers.filter(chamber => {
+          const isOff = isClinicOffForChamber(chamber);
           
-          sortedChambers = sortedChambers.filter(chamber => {
-            // Use clinicId for exact matching (primary method)
-            const chamberClinicId = (chamber as any).clinicId;
-            const isClinicChamber = chamberClinicId === clinicId;
-            
-            console.log(`🔍 Chamber check: "${chamber.chamberName}"`, {
-              chamberClinicId: chamberClinicId || 'NONE',
-              matchingClinicId: clinicId,
-              isMatch: isClinicChamber,
-              action: isClinicChamber ? 'REMOVE' : 'KEEP'
-            });
-            
-            if (isClinicChamber) {
-              console.log(`🚫🚫🚫 REMOVING clinic chamber: "${chamber.chamberName}" (clinicId: ${chamberClinicId})`);
-            }
-            
-            return !isClinicChamber; // Keep only NON-clinic chambers
-          });
-          console.log(`✅ Chamber filtering complete: ${beforeFilter} → ${sortedChambers.length} chambers (removed ${beforeFilter - sortedChambers.length} clinic chambers)`);
-        } else if (isClinicOff() && !clinicId && clinicAddress) {
-          // Fallback to address matching ONLY if clinicId not available
-          const beforeFilter = sortedChambers.length;
-          console.log('⚠️ FALLBACK FILTERING: Using address matching (clinicId not available)');
+          if (isOff) {
+            console.log(`🚫 REMOVING chamber: "${chamber.chamberName}" - Clinic is OFF on ${selectedDate.toDateString()}`);
+          } else {
+            console.log(`✅ KEEPING chamber: "${chamber.chamberName}" - Clinic is OPEN`);
+          }
           
-          sortedChambers = sortedChambers.filter(chamber => {
-            const chamberAddr = chamber.chamberAddress?.toLowerCase() || '';
-            const clinicAddr = clinicAddress.toLowerCase();
-            const isClinicChamber = chamberAddr.includes(clinicAddr) || clinicAddr.includes(chamberAddr);
-            
-            if (isClinicChamber) {
-              console.log(`🚫 REMOVING clinic chamber (address match): "${chamber.chamberName}" at "${chamber.chamberAddress}"`);
-            }
-            
-            return !isClinicChamber;
-          });
-          console.log(`✅ Chamber filtering complete: ${beforeFilter} → ${sortedChambers.length} chambers (removed ${beforeFilter - sortedChambers.length} clinic chambers)`);
-        } else {
-          console.log('✅ NO FILTERING: Clinic is open or no clinic ID/address provided');
-        }
+          return !isOff; // Keep chambers whose clinic is NOT off
+        });
+        
+        console.log(`✅ Clinic off filter complete: ${beforeClinicOffFilter} → ${sortedChambers.length} chambers (removed ${beforeClinicOffFilter - sortedChambers.length} due to clinic planned off)`);
+        
+        // Filter out disabled chambers (isActive === false)
+        const beforeIsActiveFilter = sortedChambers.length;
+        console.log('🔍 Checking each chamber for active status...');
+        
+        sortedChambers = sortedChambers.filter(chamber => {
+          const isActive = chamber.isActive !== false; // Default to true if not specified
+          
+          if (!isActive) {
+            console.log(`🚫 REMOVING chamber: "${chamber.chamberName}" - Chamber is DISABLED (isActive=false)`);
+          } else {
+            console.log(`✅ KEEPING chamber: "${chamber.chamberName}" - Chamber is ENABLED`);
+          }
+          
+          return isActive;
+        });
+        
+        console.log(`✅ Active status filter complete: ${beforeIsActiveFilter} → ${sortedChambers.length} chambers (removed ${beforeIsActiveFilter - sortedChambers.length} due to disabled status)`);
         
         setChambersWithCounts(sortedChambers);
       } catch (error) {

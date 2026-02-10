@@ -112,6 +112,33 @@ export default function Report({ onMenuChange, onLogout, activeAddOns = [] }: Re
         const { db } = await import('../lib/firebase/config');
         const { collection, query, where, getDocs } = await import('firebase/firestore');
 
+        // 🔒 PATIENT DATA ACCESS CONTROL: Build list of clinic IDs from restricted clinics
+        let restrictedClinicIds: string[] = [];
+        try {
+          const clinicsRef = collection(db, 'clinics');
+          const allClinicsSnap = await getDocs(clinicsRef);
+          
+          allClinicsSnap.forEach((clinicDoc) => {
+            const clinicData = clinicDoc.data();
+            const linkedDoctors = clinicData.linkedDoctorsDetails || [];
+            
+            // Check if current doctor is linked to this clinic with restricted access
+            const isRestricted = linkedDoctors.some((d: any) => 
+              d.doctorId === userId && d.restrictPatientDataAccess === true
+            );
+            
+            if (isRestricted) {
+              restrictedClinicIds.push(clinicDoc.id);
+            }
+          });
+
+          if (restrictedClinicIds.length > 0) {
+            console.log('🔒 Restricted clinics for reports:', restrictedClinicIds);
+          }
+        } catch (error) {
+          console.error('Error checking clinic access restrictions:', error);
+        }
+
         const bookingsRef = collection(db, 'bookings');
         const q = query(bookingsRef, where('doctorId', '==', userId));
 
@@ -123,6 +150,16 @@ export default function Report({ onMenuChange, onLogout, activeAddOns = [] }: Re
 
         bookingsSnap.docs.forEach(doc => {
           const booking = doc.data();
+
+          // 🔒 PATIENT DATA ACCESS CONTROL: Filter out bookings from restricted clinics
+          const bookingClinicId = booking.clinicId;
+          if (bookingClinicId && restrictedClinicIds.includes(bookingClinicId)) {
+            console.log('🔒 Filtered out booking from restricted clinic in report:', { 
+              bookingId: doc.id, 
+              clinicId: bookingClinicId 
+            });
+            return; // Skip this booking
+          }
           
           // Booking date (when booking was created)
           const bookingDate = booking.createdAt?.toDate() || new Date();

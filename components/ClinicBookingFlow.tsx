@@ -102,23 +102,35 @@ export default function ClinicBookingFlow() {
         if (clinicSnap.exists()) {
           const clinicData = { id: clinicSnap.id, ...clinicSnap.data() } as ClinicData;
           setClinic(clinicData);
+
+          const clinicPlannedOffPeriods = (clinicData as any).plannedOffPeriods || [];
+          const plannedOffPeriodsWithMetadata = clinicPlannedOffPeriods.map((p: any) => ({
+            ...p,
+            clinicId: clinicId,
+            clinicName: clinicData.name,
+            clinicAddress: clinicData.address
+          }));
           
           // Load clinic schedule settings
           const clinicScheduleRef = doc(db, 'clinicSchedules', clinicId);
           const clinicScheduleSnap = await getDoc(clinicScheduleRef);
           if (clinicScheduleSnap.exists()) {
             const scheduleData = clinicScheduleSnap.data();
+
             setClinicSchedule({
               maxAdvanceDays: scheduleData.maxAdvanceDays || 30,
-              plannedOffPeriods: scheduleData.plannedOffPeriods || [],
+              plannedOffPeriods: plannedOffPeriodsWithMetadata,
               globalBookingEnabled: scheduleData.globalBookingEnabled ?? true
             });
-            console.log('📅 Clinic Schedule Settings:', scheduleData);
+            console.log('📅 Clinic Schedule Settings:', {
+              ...scheduleData,
+              plannedOffPeriods: plannedOffPeriodsWithMetadata
+            });
           } else {
             // Default clinic schedule if not found
             setClinicSchedule({
               maxAdvanceDays: 30,
-              plannedOffPeriods: [],
+              plannedOffPeriods: plannedOffPeriodsWithMetadata,
               globalBookingEnabled: true
             });
           }
@@ -428,6 +440,11 @@ export default function ClinicBookingFlow() {
         ...(clinicSchedule?.plannedOffPeriods || []).map((p: any) => ({ ...p, source: 'clinic' })),
         ...(doctorSchedule?.plannedOffPeriods || []).map((p: any) => ({ ...p, source: 'doctor' }))
       ];
+
+      const mergedClinicPlannedOffPeriods = [
+        ...(clinicSchedule?.plannedOffPeriods || []),
+        ...(doctorSchedule?.plannedOffPeriods || []).filter((p: any) => p.clinicId)
+      ];
       
       console.log('📅 Merged Schedule Settings:', {
         clinicMaxDays: clinicSchedule?.maxAdvanceDays,
@@ -449,12 +466,19 @@ export default function ClinicBookingFlow() {
           themeColor="blue"
           maxAdvanceDays={mergedMaxAdvanceDays}
           plannedOffPeriods={mergedPlannedOffPeriods}
+          clinicPlannedOffPeriods={mergedClinicPlannedOffPeriods}
           globalBookingEnabled={(clinicSchedule?.globalBookingEnabled ?? true) && (doctorSchedule?.globalBookingEnabled ?? true)}
           clinicId={clinic?.id}
+          doctorId={selectedDoctor?.uid}
+          chambers={selectedDoctor?.chambers || []}
         />
       );
 
     case 'select-chamber':
+      const mergedClinicPlannedOffForChambers = [
+        ...(clinicSchedule?.plannedOffPeriods || []),
+        ...(doctorSchedule?.plannedOffPeriods || []).filter((p: any) => p.clinicId)
+      ];
       return (
         <SelectChamber
           onChamberSelect={handleChamberSelect}
@@ -465,11 +489,12 @@ export default function ClinicBookingFlow() {
           doctorDegrees={selectedDoctor?.degrees}
           doctorSpecialty={selectedDoctor?.specialties?.[0]}
           doctorPhoto={selectedDoctor?.profilePhoto}
+          doctorId={selectedDoctor?.uid}
           language={language}
           themeColor="blue"
           clinicId={clinic?.id}
           clinicAddress={clinic?.address}
-          clinicPlannedOffPeriods={clinicSchedule?.plannedOffPeriods || []}
+          clinicPlannedOffPeriods={mergedClinicPlannedOffForChambers}
         />
       );
 

@@ -82,6 +82,7 @@ interface LinkedDoctor {
     setBy: string;
     setAt: any;
   };
+  restrictPatientDataAccess?: boolean; // NEW: Clinic controls if doctor can see patient details
 }
 
 const SPECIALTIES = [
@@ -990,6 +991,54 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
     }
   };
 
+  const handleTogglePatientDataAccess = async (doctorId: string, restrict: boolean) => {
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      const clinicRef = doc(db, 'clinics', user.uid);
+      const clinicSnap = await getDoc(clinicRef);
+      
+      if (clinicSnap.exists()) {
+        const data = clinicSnap.data();
+        const updatedDoctors = (data.linkedDoctorsDetails || []).map((d: any) => {
+          if (d.doctorId === doctorId) {
+            return { ...d, restrictPatientDataAccess: restrict };
+          }
+          return d;
+        });
+        
+        await updateDoc(clinicRef, {
+          linkedDoctorsDetails: updatedDoctors
+        });
+
+        // Update local state
+        setLinkedDoctors(prev => prev.map(d => {
+          if (d.uid === doctorId) {
+            return { ...d, restrictPatientDataAccess: restrict };
+          }
+          return d;
+        }));
+
+        const doctor = linkedDoctors.find(d => d.uid === doctorId);
+        toast.success(
+          restrict 
+            ? `Patient data access RESTRICTED for Dr. ${doctor?.name}` 
+            : `Patient data access ENABLED for Dr. ${doctor?.name}`,
+          {
+            description: restrict 
+              ? 'Doctor can only see patients from their personal QR' 
+              : 'Doctor can see all patients at this clinic',
+            duration: 3000
+          }
+        );
+      }
+    } catch (error) {
+      console.error('Error toggling patient data access:', error);
+      toast.error('Failed to update patient data access');
+    }
+  };
+
   const cancelAffectedBookings = async (doctorId: string, startDate: string, endDate: string) => {
     try {
       const { collection, query: fbQuery, where, getDocs } = await import('firebase/firestore');
@@ -1324,6 +1373,32 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
                         />
                       </div>
                     )}
+
+                    {/* Toggle Patient Data Access - For linked doctors only */}
+                    <div className={`flex items-center justify-between py-2 px-3 rounded-lg mb-3 transition-colors ${
+                      !doctor.restrictPatientDataAccess 
+                        ? 'bg-emerald-500/10 border border-emerald-500/20' 
+                        : 'bg-red-500/10 border border-red-500/20'
+                    }`}>
+                      <div className="flex flex-col gap-1">
+                        <Label className="text-gray-300 text-xs cursor-pointer">
+                          Enable Patient Data Access
+                        </Label>
+                        <span className={`text-[10px] ${
+                          !doctor.restrictPatientDataAccess 
+                            ? 'text-emerald-400' 
+                            : 'text-red-400'
+                        }`}>
+                          {!doctor.restrictPatientDataAccess 
+                            ? '✓ Allowed - Doctor can view patient details' 
+                            : '✗ Restricted - Doctor can only see personal QR patients'}
+                        </span>
+                      </div>
+                      <Switch
+                        checked={!doctor.restrictPatientDataAccess}
+                        onCheckedChange={(checked) => handleTogglePatientDataAccess(doctor.uid, !checked)}
+                      />
+                    </div>
 
                     {/* Date Selection UI - Shows when toggle is enabled */}
                     {selectedDoctorForToggle?.id === doctor.uid && !doctor.toggleOffPeriod && (
