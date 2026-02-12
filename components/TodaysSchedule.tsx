@@ -23,12 +23,12 @@ interface TodaysScheduleProps {
 }
 
 // Helper component to load and display patient details
-function PatientDetailsLoader({ 
-  chamber, 
-  onBack, 
+function PatientDetailsLoader({
+  chamber,
+  onBack,
   activeAddOns,
   doctorLanguage = 'english'
-}: { 
+}: {
   chamber: { id: number; name: string; address: string; startTime: string; endTime: string; schedule: string; booked: number; capacity: number };
   onBack: () => void;
   activeAddOns: string[];
@@ -47,7 +47,7 @@ function PatientDetailsLoader({
       try {
         setLoading(true);
         const { db } = await import('../lib/firebase/config');
-        const { collection, query, where, getDocs, doc, getDoc } = await import('firebase/firestore');
+        const { collection, query, where, getDocs } = await import('firebase/firestore');
         const { decrypt } = await import('../utils/encryptionService');
 
         // Get current doctor ID
@@ -60,18 +60,18 @@ function PatientDetailsLoader({
         // 🔒 PATIENT DATA ACCESS CONTROL: Build list of restricted clinic IDs
         let restrictedClinicIds: string[] = [];
         try {
-          const clinicsRef = collection(db, 'clinics');
+          const clinicsRef = collection(db!, 'clinics');
           const allClinicsSnap = await getDocs(clinicsRef);
-          
+
           allClinicsSnap.forEach((clinicDoc) => {
             const clinicData = clinicDoc.data();
             const linkedDoctors = clinicData.linkedDoctorsDetails || [];
-            
+
             // Check if current doctor is linked to this clinic with restricted access
-            const isRestricted = linkedDoctors.some((d: any) => 
+            const isRestricted = linkedDoctors.some((d: any) =>
               d.doctorId === userId && d.restrictPatientDataAccess === true
             );
-            
+
             if (isRestricted) {
               restrictedClinicIds.push(clinicDoc.id);
               console.log('🔒 Restricted clinic:', {
@@ -95,17 +95,17 @@ function PatientDetailsLoader({
         const todayStr = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split('T')[0];
 
         // Query bookings for this chamber (QR bookings only)
-        const bookingsRef = collection(db, 'bookings');
-        
+        const bookingsRef = collection(db!, 'bookings');
+
         // FIX ISSUE #1: Ensure chamberId is numeric for the query (stored as number in Firestore)
         // Chamber IDs are stored as numbers (timestamps) in Firestore, not strings
         let numericChamberId = typeof chamber.id === 'string' ? parseInt(chamber.id, 10) : chamber.id;
-        
+
         // Safety check: If chamberId is invalid (NaN, null, undefined), default to -1
         if (!numericChamberId || isNaN(numericChamberId)) {
           numericChamberId = -1;
         }
-        
+
         // Query by BOTH chamberId AND appointmentDate (efficient with composite index)
         // IMPORTANT: This query gets QR bookings only (excludes walk-ins)
         const qrBookingsQuery = query(
@@ -115,7 +115,7 @@ function PatientDetailsLoader({
         );
 
         const qrBookingsSnap = await getDocs(qrBookingsQuery);
-        
+
         // Transform firestore documents to patient data
         // Filter out walk-in patients (they have type: 'walkin_booking')
         const patients = qrBookingsSnap.docs
@@ -126,10 +126,10 @@ function PatientDetailsLoader({
           })
           .map(doc => {
             const data = doc.data();
-            
+
             // Parse dates - handle both Firestore Timestamp and plain strings/numbers
-            const bookingTime = data.createdAt?.toDate 
-              ? data.createdAt.toDate() 
+            const bookingTime = data.createdAt?.toDate
+              ? data.createdAt.toDate()
               : new Date(data.createdAt);
 
             const buildAppointmentDateTime = (dateValue: any, timeValue: any, fallback: Date) => {
@@ -163,18 +163,18 @@ function PatientDetailsLoader({
 
             const appointmentFallback = data.date?.toDate ? data.date.toDate() : bookingTime;
             const appointmentTime = buildAppointmentDateTime(data.appointmentDate, data.time, appointmentFallback);
-            
+
             // Determine if patient is cancelled - ONLY if explicitly marked as cancelled
             // Default to NOT cancelled (false) unless explicitly set
             const isCancelledStatus = (data.isCancelled === true) || (data.status === 'cancelled');
-            
+
             // 🔓 Decrypt sensitive patient data
             const patientName = decrypt(data.patientName_encrypted || data.patientName || '');
             const whatsappNumber = decrypt(data.whatsappNumber_encrypted || data.whatsappNumber || '');
             const ageDecrypted = decrypt(data.age_encrypted || '');
             const genderDecrypted = decrypt(data.gender_encrypted || data.gender || '');
             const purposeDecrypted = decrypt(data.purposeOfVisit_encrypted || data.purposeOfVisit || '');
-            
+
             // Parse age with proper validation
             let parsedAge = 0;
             if (ageDecrypted) {
@@ -184,7 +184,7 @@ function PatientDetailsLoader({
               const ageNum = typeof data.age === 'number' ? data.age : parseInt(data.age.toString().trim());
               parsedAge = isNaN(ageNum) ? 0 : ageNum;
             }
-            
+
             console.log('🔓 Decrypted patient data:', {
               bookingId: data.bookingId,
               patientName,
@@ -195,7 +195,7 @@ function PatientDetailsLoader({
               hasEncrypted: !!data.patientName_encrypted,
               hasPlain: !!data.patientName
             });
-            
+
             return {
               id: doc.id,
               name: patientName || 'N/A',
@@ -229,24 +229,24 @@ function PatientDetailsLoader({
           .filter(patient => {
             // If no restrictions, show all patients
             if (restrictedClinicIds.length === 0) return true;
-            
+
             // Get booking document to check clinicId
             const bookingDoc = qrBookingsSnap.docs.find(doc => doc.id === patient.id);
             if (!bookingDoc) return true; // Keep patient if booking doc not found (safety)
-            
+
             const bookingData = bookingDoc.data();
             const bookingClinicId = bookingData.clinicId;
-            
+
             // Filter out patient if from restricted clinic
             if (bookingClinicId && restrictedClinicIds.includes(bookingClinicId)) {
-              console.log('🔒 Filtered out patient from restricted clinic:', { 
-                patientName: patient.name, 
+              console.log('🔒 Filtered out patient from restricted clinic:', {
+                patientName: patient.name,
                 clinicId: bookingClinicId,
                 restrictedClinics: restrictedClinicIds
               });
               return false; // Hide this patient
             }
-            
+
             return true; // Show patient (from doctor's own QR or unrestricted clinic)
           })
           // ✅ SORT BY STORED SERIAL NUMBER (booking order)
@@ -303,7 +303,7 @@ function PatientDetailsLoader({
   );
 }
 
-export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients, activeAddOns = [], doctorLanguage = 'english' }: TodaysScheduleProps) {
+export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = [], doctorLanguage = 'english' }: TodaysScheduleProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [addPatientModalOpen, setAddPatientModalOpen] = useState(false);
   const [showPatientsPage, setShowPatientsPage] = useState(false);
@@ -312,10 +312,10 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
   const [deactivateModalOpen, setDeactivateModalOpen] = useState(false);
   const [reactivateModalOpen, setReactivateModalOpen] = useState(false);
   const [selectedChamber, setSelectedChamber] = useState<typeof chambers[0] | null>(null);
-  
+
   // Walk-in patients - Loaded from Firestore
   const [patients, setPatients] = useState<Patient[]>([]);
-  const [loadingWalkIns, setLoadingWalkIns] = useState(true);
+  const [doctorName, setDoctorName] = useState<string>('');
 
   // Chamber schedules - Loaded from Firestore
   const [chambers, setChambers] = useState<Array<{
@@ -328,9 +328,15 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
     booked: number;
     capacity: number;
     isActive: boolean;
+    manualClinicId?: string;
+    clinicPhone?: string;
+    clinicCode?: string;
+    blockedDates: string[];
+    isExpired: boolean;
+    startMinutes: number;
   }>>([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Date change detection for auto-refresh at midnight
   const [currentDate, setCurrentDate] = useState(new Date().toDateString());
 
@@ -348,7 +354,7 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
         const { doc, getDoc, collection, query, where, getDocs } = await import('firebase/firestore');
 
         // Load doctor's chambers from Firestore
-        const doctorRef = doc(db, 'doctors', userId);
+        const doctorRef = doc(db!, 'doctors', userId);
         const doctorSnap = await getDoc(doctorRef);
 
         if (!doctorSnap.exists()) {
@@ -357,13 +363,12 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
         }
 
         const doctorData = doctorSnap.data();
+        setDoctorName(doctorData.fullName || doctorData.name || 'Doctor');
         const allChambers = doctorData.chambers || [];
 
         // Get current date and next 24 hours
         const now = new Date();
-        const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
         const currentDayName = now.toLocaleDateString('en-US', { weekday: 'long' });
-        const tomorrowDayName = tomorrow.toLocaleDateString('en-US', { weekday: 'long' });
         const todayStr = now.toISOString().split('T')[0];
 
         // Filter chambers for today (show all, isExpired will be marked for display)
@@ -397,8 +402,8 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
             // Query QR bookings for this chamber today
             // Use local timezone date format (consistent with booking creation)
             const todayStr = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
-            const bookingsRef = collection(db, 'bookings');
-            
+            const bookingsRef = collection(db!, 'bookings');
+
             // Query 1: QR bookings (have chamberId + appointmentDate)
             // Simplified to avoid composite index - filter status in code
             const qrBookingsQuery = query(
@@ -408,7 +413,7 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
             );
 
             const qrBookingsSnap = await getDocs(qrBookingsQuery);
-            
+
             // Count ALL bookings (including cancelled) - cancelled slots are still booked slots
             // Only count QR bookings that have appointmentDate for today
             const qrBookedCount = qrBookingsSnap.size;
@@ -451,6 +456,9 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
               capacity: chamber.maxCapacity,
               isActive: chamber.isActive !== false, // Default to true if not set
               blockedDates: chamber.blockedDates || [], // Preserve blocked dates array
+              manualClinicId: chamber.manualClinicId, // Needed for Alternative Connect
+              clinicPhone: chamber.clinicPhone, // Needed for WhatsApp
+              clinicCode: chamber.clinicCode, // Needed to distinguish Linked vs Alternative
               startMinutes, // For sorting
               isExpired, // For sorting expired to bottom
             } as any;
@@ -469,21 +477,21 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
         // 🚫 FILTER OUT CLINIC CHAMBERS IF CLINIC IS OFF TODAY
         console.log('🔵 [TODAY\'S SCHEDULE] Checking for clinic off periods...');
         const filteredChambers = [];
-        
+
         for (const chamber of sortedChambers) {
           const originalChamber = allChambers.find((c: any) => c.id === chamber.id);
           const clinicId = originalChamber?.clinicId;
-          
+
           if (clinicId) {
             console.log(`🏥 [TODAY\'S SCHEDULE] Chamber "${chamber.name}" has clinicId: ${clinicId}`);
-            
+
             // Load clinic schedule to check if clinic is off today
             try {
-              const scheduleDoc = await getDoc(doc(db, 'clinicSchedules', clinicId));
+              const scheduleDoc = await getDoc(doc(db!, 'clinicSchedules', clinicId));
               if (scheduleDoc.exists()) {
                 const scheduleData = scheduleDoc.data();
                 const plannedOffPeriods = scheduleData.plannedOffPeriods || [];
-                
+
                 // Check if today falls within any active planned off period
                 let isClinicOff = false;
                 for (const period of plannedOffPeriods) {
@@ -491,7 +499,7 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
                     const periodStart = new Date(period.startDate);
                     const periodEnd = new Date(period.endDate);
                     const today = new Date(todayStr);
-                    
+
                     if (today >= periodStart && today <= periodEnd) {
                       isClinicOff = true;
                       console.log(`🚫 [TODAY\'S SCHEDULE] Clinic ${clinicId} is OFF today (${todayStr}). Removing chamber "${chamber.name}"`);
@@ -499,7 +507,7 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
                     }
                   }
                 }
-                
+
                 if (!isClinicOff) {
                   filteredChambers.push(chamber);
                 }
@@ -536,10 +544,8 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
   useEffect(() => {
     const loadWalkInPatients = async () => {
       try {
-        setLoadingWalkIns(true);
         const userId = localStorage.getItem('userId');
         if (!userId) {
-          setLoadingWalkIns(false);
           return;
         }
 
@@ -550,7 +556,7 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
         const todayStr = new Date().toISOString().split('T')[0];
 
         // Query walk-in bookings for today - simpler query without composite index
-        const bookingsRef = collection(db, 'bookings');
+        const bookingsRef = collection(db!, 'bookings');
         const walkInQuery = query(
           bookingsRef,
           where('doctorId', '==', userId),
@@ -558,7 +564,7 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
         );
 
         const snapshot = await getDocs(walkInQuery);
-        
+
         // Filter for today's bookings in code (avoids composite index)
         const walkInPatients = snapshot.docs
           .map(doc => {
@@ -577,7 +583,7 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
               verificationMethod: data.verificationMethod, // Include verification method (can be undefined)
               isWalkIn: data.isWalkIn !== undefined ? data.isWalkIn : true, // Walk-ins default to true
               timestamp: data.date?.toDate ? data.date.toDate() : new Date(data.date),
-              dateStr: data.date?.toDate 
+              dateStr: data.date?.toDate
                 ? data.date.toDate().toISOString().split('T')[0]
                 : new Date(data.date).toISOString().split('T')[0],
             };
@@ -590,13 +596,13 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
         console.error('❌ Error loading walk-in patients:', error);
         toast.error('Failed to load walk-in patients');
       } finally {
-        setLoadingWalkIns(false);
+        // loading state handled via local state if needed
       }
     };
 
     loadWalkInPatients();
   }, [addPatientModalOpen, currentDate]); // Reload when modal closes (new patient added) OR date changes
-  
+
   // Auto-refresh at midnight - check every minute for date change
   useEffect(() => {
     const interval = setInterval(() => {
@@ -613,11 +619,11 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
   // Get current date
   const getCurrentDate = () => {
     const today = new Date();
-    const options: Intl.DateTimeFormatOptions = { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+    const options: Intl.DateTimeFormatOptions = {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
     };
     return today.toLocaleDateString('en-US', options);
   };
@@ -642,12 +648,11 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
         const { collection, query, where, getDocs } = await import('firebase/firestore');
 
         // Get today's bookings for this chamber
-        const today = new Date();
-        const todayStr = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split('T')[0];
-        
-        const bookingsRef = collection(db, 'bookings');
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        const bookingsRef = collection(db!, 'bookings');
         const numericChamberId = typeof chamber.id === 'string' ? parseInt(chamber.id, 10) : chamber.id;
-        
+
         // Query ALL bookings for this chamber (including cancelled ones for accurate count)
         const chamberBookingsQuery = query(
           bookingsRef,
@@ -656,30 +661,30 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
         );
 
         const allBookingsSnap = await getDocs(chamberBookingsQuery);
-        
+
         // Filter only non-cancelled bookings for validation
         const bookingsSnap = {
           docs: allBookingsSnap.docs.filter(doc => !doc.data().isCancelled)
         };
-        
+
         console.log('🔍 Chamber Toggle Validation:', {
           chamberId: numericChamberId,
           chamberName: chamber.name,
           totalBookings: bookingsSnap.docs.length,
           todayStr,
         });
-        
+
         // Separate seen and non-seen patients with detailed logging
         const seenPatients = bookingsSnap.docs.filter(doc => {
           const isMarkedSeen = doc.data().isMarkedSeen === true;
           return isMarkedSeen;
         });
-        
+
         const nonSeenPatients = bookingsSnap.docs.filter(doc => {
           const isMarkedSeen = doc.data().isMarkedSeen;
           return isMarkedSeen !== true; // Not seen (false, undefined, or null)
         });
-        
+
         // Log each patient's status
         bookingsSnap.docs.forEach(doc => {
           const data = doc.data();
@@ -690,12 +695,12 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
             isCancelled: data.isCancelled,
           });
         });
-        
+
         console.log('📊 Patient Status:', {
           seenCount: seenPatients.length,
           nonSeenCount: nonSeenPatients.length,
         });
-        
+
         // Block toggle only if MIXED state (both seen and non-seen exist)
         if (seenPatients.length > 0 && nonSeenPatients.length > 0) {
           console.log('❌ BLOCKING: Mixed state detected');
@@ -705,7 +710,7 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
           });
           return;
         }
-        
+
         console.log('✅ ALLOWING: All patients same state');
         // Allow if all patients are seen (no cancellations needed) or all non-seen (will cancel all)
 
@@ -739,12 +744,12 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
       const todayStr = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split('T')[0];
 
       // Update chamber to add today's date to blockedDates array
-      const doctorRef = doc(db, 'doctors', userId);
+      const doctorRef = doc(db!, 'doctors', userId);
       const doctorSnap = await getDoc(doctorRef);
-      
+
       if (doctorSnap.exists()) {
         const doctorData = doctorSnap.data();
-        
+
         const updatedChambers = doctorData.chambers.map((c: any) => {
           if (c.id === selectedChamber.id) {
             const blockedDates = c.blockedDates || [];
@@ -756,7 +761,7 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
           }
           return c;
         });
-        
+
         await updateDoc(doctorRef, { chambers: updatedChambers });
       }
 
@@ -773,10 +778,9 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
       }));
 
       // Get all booked patients for this chamber (today's bookings)
-      
-      const bookingsRef = collection(db, 'bookings');
+      const bookingsRef = collection(db!, 'bookings');
       const numericChamberId = typeof selectedChamber.id === 'string' ? parseInt(selectedChamber.id, 10) : selectedChamber.id;
-      
+
       const chamberBookingsQuery = query(
         bookingsRef,
         where('chamberId', '==', numericChamberId),
@@ -791,9 +795,9 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
 
       // Send cancellation notification to each NON-SEEN patient only
       let bookingsCancelled = 0;
-      const patientsToNotify: Array<{ 
-        phone: string; 
-        name: string; 
+      const patientsToNotify: Array<{
+        phone: string;
+        name: string;
         tokenNumber?: string;
         bookingId?: string;
         appointmentTime?: string;
@@ -801,7 +805,7 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
 
       for (const bookingDoc of bookingsSnap.docs) {
         const booking = bookingDoc.data();
-        
+
         // Skip cancellation if patient is already seen (just blocking chamber for new bookings)
         if (booking.isMarkedSeen === true) {
           continue;
@@ -843,8 +847,8 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
           const doctorName = localStorage.getItem('healqr_user_name') || 'Doctor';
           const doctorPhoto = localStorage.getItem('healqr_profile_photo') || '';
           const doctorSpecialty = localStorage.getItem('healqr_specialty') || '';
-          
-          const result = await sendBatchCancellation(
+
+          await sendBatchCancellation(
             patientsToNotify,
             { doctorId, doctorName, doctorPhoto, doctorSpecialty },
             selectedChamber.name,
@@ -892,12 +896,12 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
       const todayStr = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split('T')[0];
 
       // Update chamber to remove today's date from blockedDates array
-      const doctorRef = doc(db, 'doctors', userId);
+      const doctorRef = doc(db!, 'doctors', userId);
       const doctorSnap = await getDoc(doctorRef);
-      
+
       if (doctorSnap.exists()) {
         const doctorData = doctorSnap.data();
-        
+
         const updatedChambers = doctorData.chambers.map((c: any) => {
           if (c.id === selectedChamber.id) {
             const blockedDates = (c.blockedDates || []).filter((date: string) => date !== todayStr);
@@ -905,7 +909,7 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
           }
           return c;
         });
-        
+
         await updateDoc(doctorRef, { chambers: updatedChambers });
       }
 
@@ -919,10 +923,9 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
       }));
 
       // Get all previously booked patients for this chamber (today's bookings, including cancelled ones)
-      
-      const bookingsRef = collection(db, 'bookings');
+      const bookingsRef = collection(db!, 'bookings');
       const numericChamberId = typeof selectedChamber.id === 'string' ? parseInt(selectedChamber.id, 10) : selectedChamber.id;
-      
+
       const chamberBookingsQuery = query(
         bookingsRef,
         where('chamberId', '==', numericChamberId),
@@ -933,8 +936,8 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
 
       // Send restoration notification to each patient
       let affectedBookings = 0;
-      const patientsToNotify: Array<{ 
-        phone: string; 
+      const patientsToNotify: Array<{
+        phone: string;
         name: string;
         tokenNumber?: string;
         bookingId?: string;
@@ -944,7 +947,7 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
       for (const bookingDoc of bookingsSnap.docs) {
         const booking = bookingDoc.data();
         affectedBookings++;
-        
+
         // Only restore if it was cancelled due to chamber toggle
         if (booking.isCancelled && booking.cancellationType === 'CHAMBER TOGGLE') {
           await updateDoc(doc(db!, 'bookings', bookingDoc.id), {
@@ -953,7 +956,7 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
             cancellationType: null,
             restoredAt: new Date(),
           });
-          
+
           if (booking.whatsappNumber || booking.phone) {
             patientsToNotify.push({
               phone: booking.whatsappNumber || booking.phone,
@@ -976,8 +979,8 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
           const doctorName = localStorage.getItem('healqr_user_name') || 'Doctor';
           const doctorPhoto = localStorage.getItem('healqr_profile_photo') || '';
           const doctorSpecialty = localStorage.getItem('healqr_specialty') || '';
-          
-          const result = await sendBatchRestoration(
+
+          await sendBatchRestoration(
             patientsToNotify,
             { doctorId, doctorName, doctorPhoto, doctorSpecialty },
             selectedChamber.name,
@@ -1022,6 +1025,75 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
       timestamp: new Date(),
     };
     setPatients([...patients, newPatient]);
+    setAddPatientModalOpen(false);
+  };
+
+  const handleSendPatientList = async (chamber: any) => {
+    if (!chamber.clinicPhone) {
+      toast.error('Clinic phone number not found');
+      return;
+    }
+
+    try {
+      const { db } = await import('../lib/firebase/config');
+      const { collection, query, where, getDocs } = await import('firebase/firestore');
+
+      // 1. Get today's confirmed patients for this chamber
+      const today = new Date();
+      const todayStr = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+
+      const bookingsRef = collection(db!, 'bookings');
+      const numericChamberId = typeof chamber.id === 'string' ? parseInt(chamber.id, 10) : chamber.id;
+
+      const qrBookingsQuery = query(
+        bookingsRef,
+        where('chamberId', '==', numericChamberId || -1),
+        where('appointmentDate', '==', todayStr)
+      );
+
+      const querySnap = await getDocs(qrBookingsQuery);
+
+      const confirmedPatients = querySnap.docs
+        .map(doc => doc.data())
+        .filter(data => !data.isCancelled && data.status !== 'cancelled')
+        .sort((a, b) => (a.serialNo || 0) - (b.serialNo || 0));
+
+      if (confirmedPatients.length === 0) {
+        toast.info('No patients booked for this chamber today.');
+        return;
+      }
+
+      // 2. Format the message
+      const timeStr = `${chamber.startTime} - ${chamber.endTime}`;
+      const dateDisplay = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+
+      let message = `*PATIENT LIST - HEALQR*\n`;
+      message += `--------------------------\n`;
+      message += `👨‍⚕️ *Dr. ${doctorName}*\n`;
+      message += `🏥 *Clinic:* ${chamber.name}\n`;
+      message += `📅 *Date:* ${dateDisplay}\n`;
+      message += `⏰ *Time:* ${timeStr}\n`;
+      message += `--------------------------\n\n`;
+
+      confirmedPatients.forEach((p, index) => {
+        const token = p.tokenNumber || `#${p.serialNo || index + 1}`;
+        message += `${index + 1}. *${p.patientName || 'N/A'}* (Token: ${token})\n`;
+      });
+
+      message += `\n_Generated via HealQR System_`;
+
+      // 3. Open WhatsApp link
+      const encodedMessage = encodeURIComponent(message);
+      const whatsappUrl = `https://wa.me/${chamber.clinicPhone.replace(/\D/g, '')}?text=${encodedMessage}`;
+
+      window.open(whatsappUrl, '_blank');
+      toast.success('WhatsApp list generated!', {
+        description: 'Opening WhatsApp to send the list to the clinic.'
+      });
+    } catch (error) {
+      console.error('Error generating WhatsApp list:', error);
+      toast.error('Failed to generate patient list');
+    }
   };
 
   const handleViewWalkInPatients = () => {
@@ -1083,7 +1155,7 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
               >
                 <Menu className="w-6 h-6" />
               </Button>
-              
+
               {/* Back Button */}
               <Button
                 variant="ghost"
@@ -1094,7 +1166,7 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
               >
                 <ArrowLeft className="w-5 h-5" />
               </Button>
-              
+
               <div>
                 <h1 className="text-white">Today's Schedule</h1>
                 <p className="text-gray-400 text-sm mt-1">Manage your active chambers for today</p>
@@ -1118,7 +1190,7 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
                   Add Patient
                 </Button>
               </div>
-              
+
               {/* Current Date */}
               <div className="flex items-center gap-2 text-gray-400 text-sm">
                 <Calendar className="w-4 h-4 flex-shrink-0" />
@@ -1187,7 +1259,7 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
               const todayStr = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split('T')[0];
               const isBlockedToday = (chamber as any).blockedDates?.includes(todayStr) || false;
               const isActiveToday = !isBlockedToday;
-              
+
               return (
               <Card key={chamber.id} className="bg-gray-800/50 border-gray-700 p-6">
                 <div className="space-y-4">
@@ -1222,10 +1294,10 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-gray-400">Booking Status:</span>
                         <span className={`font-semibold text-lg ${
-                          chamber.booked >= chamber.capacity 
-                            ? 'text-red-400' 
-                            : chamber.booked >= chamber.capacity * 0.8 
-                            ? 'text-yellow-400' 
+                          chamber.booked >= chamber.capacity
+                            ? 'text-red-400'
+                            : chamber.booked >= chamber.capacity * 0.8
+                            ? 'text-yellow-400'
                             : 'text-emerald-400'
                         }`}>
                           {chamber.booked}/{chamber.capacity}
@@ -1235,22 +1307,38 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
                         )}
                       </div>
                     </div>
-                    <Progress 
-                      value={(chamber.booked / chamber.capacity) * 100} 
+                    <Progress
+                      value={(chamber.booked / chamber.capacity) * 100}
                       className="h-2 bg-gray-700"
                     />
                   </div>
 
                   {/* Action Button */}
-                  <div className="flex items-center justify-between pt-2">
+                  <div className="flex items-center justify-between pt-2 gap-2">
                     <span className="text-emerald-400 text-sm">{chamber.schedule}</span>
-                    <Button
-                      onClick={() => handleViewPatients(chamber)}
-                      disabled={!isActiveToday}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-700"
-                    >
-                      VIEW PATIENTS
-                    </Button>
+                    <div className="flex gap-2">
+                      {/* NEW: Send List via WhatsApp for Non-Linked Clinics */}
+                      {chamber.manualClinicId && !chamber.clinicCode && chamber.clinicPhone && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleSendPatientList(chamber)}
+                          disabled={!isActiveToday || chamber.booked === 0}
+                          className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 h-10 px-3"
+                          title="Send Patient List to Clinic via WhatsApp"
+                        >
+                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.414 0 .004 5.412.001 12.049a11.82 11.82 0 001.611 6.008L0 24l6.102-1.6a11.777 11.777 0 005.941 1.6h.005c6.634 0 12.043-5.412 12.046-12.049a11.795 11.795 0 00-3.486-8.504z"/></svg>
+                        </Button>
+                      )}
+                      <Button
+                        onClick={() => handleViewPatients(chamber)}
+                        disabled={!isActiveToday}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-700 h-10"
+                      >
+                        VIEW PATIENTS
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </Card>
@@ -1261,7 +1349,7 @@ export default function TodaysSchedule({ onMenuChange, onLogout, onViewPatients,
       </div>
 
       {/* Add Patient Modal */}
-      <AddPatientModal 
+      <AddPatientModal
         isOpen={addPatientModalOpen}
         onClose={() => setAddPatientModalOpen(false)}
         onAddPatient={handlePatientAdded}

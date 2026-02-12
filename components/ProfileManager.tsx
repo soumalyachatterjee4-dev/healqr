@@ -3,13 +3,13 @@ import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { Checkbox } from './ui/checkbox';
-import { 
-  Mail, 
-  Calendar, 
-  QrCode, 
-  User, 
-  MapPin, 
-  Plus, 
+import {
+  Mail,
+  Calendar,
+  QrCode,
+  User,
+  MapPin,
+  Plus,
   X,
   Upload,
   Save,
@@ -17,19 +17,20 @@ import {
   Menu,
   Languages,
   Globe,
-  Zap
+  Zap,
+  Stethoscope
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import DashboardSidebar from './DashboardSidebar';
 import { MEDICAL_SPECIALTIES } from '../utils/specialties';
-import { 
-  AlertDialog, 
-  AlertDialogContent, 
-  AlertDialogDescription, 
-  AlertDialogHeader, 
-  AlertDialogTitle 
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle
 } from './ui/alert-dialog';
 import { auth, storage } from '../lib/firebase/config';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -43,6 +44,8 @@ interface ProfileManagerProps {
     degrees: string[];
     specialities: string[];
     language?: 'english' | 'hindi' | 'bengali';
+    linkedClinicCodes?: string[];
+    linkedClinics?: Array<{clinicId: string; clinicCode: string; name: string}>;
   };
   onProfileUpdate?: (data: {
     image: string | null;
@@ -128,8 +131,6 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
         if (data.profileImage) setProfileImage(data.profileImage);
         if (data.clinicServices) setClinicServices(data.clinicServices);
         if (data.clinicServicesLabel) setClinicServicesLabel(data.clinicServicesLabel);
-        if (data.linkedClinicCodes) setLinkedClinicCodes(data.linkedClinicCodes);
-        if (data.linkedClinics) setLinkedClinics(data.linkedClinics);
       } else {
         console.log('ℹ️ No profile found in Firestore, using props/defaults');
       }
@@ -157,22 +158,21 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
   const [bio, setBio] = useState('');
   const [clinicServices, setClinicServices] = useState<string[]>([]);
   const [clinicServicesLabel, setClinicServicesLabel] = useState('Done Here');
-  
-  // Clinic linking
-  const [linkedClinicCodes, setLinkedClinicCodes] = useState<string[]>([]);
-  const [linkedClinics, setLinkedClinics] = useState<Array<{clinicId: string; clinicCode: string; name: string}>>([]);
+
+  // Clinic linking (Legacy - kept if needed for other logic, but section removed)
+  const [linkedClinicCodes] = useState<string[]>(profileData?.linkedClinicCodes || []);
+  const [linkedClinics] = useState<Array<{clinicId: string; clinicCode: string; name: string}>>(profileData?.linkedClinics || []);
 
   // Temporary inputs for adding new items
   const [newDegree, setNewDegree] = useState('');
   const [newSpeciality, setNewSpeciality] = useState('');
   const [newPincode, setNewPincode] = useState('');
   const [newService, setNewService] = useState('');
-  const [newClinicCode, setNewClinicCode] = useState('');
 
   // Confirmation dialog state
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
-  
+
   // Sidebar state for mobile
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -205,7 +205,7 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
       const storageRef = ref(storage, filePath);
       await uploadBytes(storageRef, compressedFile);
       console.log('✅ Upload complete');
-      
+
       const downloadURL = await getDownloadURL(storageRef);
       console.log('✅ Download URL obtained:', downloadURL);
       setProfileImage(downloadURL);
@@ -324,145 +324,7 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
     setClinicServices(clinicServices.filter((_, i) => i !== index));
   };
 
-  const addClinicCode = async () => {
-    if (!newClinicCode.trim()) return;
 
-    // Validate format: HQR-XXXXXX-XXXX-CLN
-    const clinicCodePattern = /^HQR-\d{6}-\d{4}-CLN$/;
-    if (!clinicCodePattern.test(newClinicCode.trim())) {
-      alert('Invalid clinic code format. Expected: HQR-XXXXXX-XXXX-CLN');
-      return;
-    }
-
-    try {
-      const { db } = await import('../lib/firebase/config');
-      const { collection, query, where, getDocs, doc, updateDoc, arrayUnion } = await import('firebase/firestore');
-
-      // Check if clinic exists
-      const clinicsRef = collection(db, 'clinics');
-      const q = query(clinicsRef, where('clinicCode', '==', newClinicCode.trim()));
-      const clinicSnap = await getDocs(q);
-
-      if (clinicSnap.empty) {
-        alert('Clinic not found. Please check the code and try again.');
-        return;
-      }
-
-      const clinicData = clinicSnap.docs[0].data();
-      const clinicId = clinicSnap.docs[0].id;
-
-      // Check if already linked
-      if (linkedClinicCodes.includes(newClinicCode.trim())) {
-        alert('You are already linked to this clinic.');
-        return;
-      }
-
-      const user = auth?.currentUser;
-      if (!user) {
-        alert('Please login to link clinic');
-        return;
-      }
-
-      const userDoctorCode = doctorCode || localStorage.getItem('healqr_doctor_code') || '';
-
-      // Update doctor's document (use setDoc with merge to create if doesn't exist)
-      const doctorDocRef = doc(db, 'doctors', user.uid);
-      const { setDoc } = await import('firebase/firestore');
-      
-      // First check if doctor document exists
-      const { getDoc } = await import('firebase/firestore');
-      const doctorSnap = await getDoc(doctorDocRef);
-      
-      if (!doctorSnap.exists()) {
-        // Create doctor document if it doesn't exist
-        await setDoc(doctorDocRef, {
-          linkedClinicCodes: [newClinicCode.trim()],
-          linkedClinics: [{
-            clinicId,
-            clinicCode: newClinicCode.trim(),
-            name: clinicData.name || 'Unknown Clinic',
-            linkedAt: new Date().toISOString()
-          }],
-          doctorCode: userDoctorCode,
-          email: user.email,
-          uid: user.uid,
-          createdAt: new Date().toISOString()
-        });
-      } else {
-        // Update existing document
-        await updateDoc(doctorDocRef, {
-          linkedClinicCodes: arrayUnion(newClinicCode.trim()),
-          linkedClinics: arrayUnion({
-            clinicId,
-            clinicCode: newClinicCode.trim(),
-            name: clinicData.name || 'Unknown Clinic',
-            linkedAt: new Date().toISOString()
-          })
-        });
-      }
-
-      // Update clinic's document
-      const clinicDocRef = doc(db, 'clinics', clinicId);
-      await updateDoc(clinicDocRef, {
-        linkedDoctorCodes: arrayUnion(userDoctorCode),
-        linkedDoctorsDetails: arrayUnion({
-          doctorId: user.uid,
-          doctorCode: userDoctorCode,
-          name: name || localStorage.getItem('healqr_user_name') || '',
-          email: email || user.email || '',
-          specialities: specialities,
-          profileImage: profileImage || '',
-          bio: bio || '',
-          linkedAt: new Date().toISOString()
-        })
-      });
-
-      // Update local state
-      setLinkedClinicCodes([...linkedClinicCodes, newClinicCode.trim()]);
-      setLinkedClinics([...linkedClinics, {
-        clinicId,
-        clinicCode: newClinicCode.trim(),
-        name: clinicData.name || 'Unknown Clinic'
-      }]);
-
-      setNewClinicCode('');
-      alert(`Successfully linked to ${clinicData.name}!`);
-    } catch (error: any) {
-      console.error('Error linking clinic:', error);
-      const errorMessage = error?.message || 'Unknown error occurred';
-      alert(`Failed to link clinic: ${errorMessage}\n\nPlease ensure:\n1. You are logged in\n2. Your profile is saved\n3. The clinic code is correct`);
-    }
-  };
-
-  const removeClinicLink = async (clinicCode: string, clinicId: string) => {
-    if (!confirm('Are you sure you want to unlink from this clinic?')) return;
-
-    try {
-      const { db } = await import('../lib/firebase/config');
-      const { doc, updateDoc, arrayRemove } = await import('firebase/firestore');
-
-      const user = auth?.currentUser;
-      if (!user) return;
-
-      // Remove from doctor's document
-      const doctorDocRef = doc(db, 'doctors', user.uid);
-      const clinicToRemove = linkedClinics.find(c => c.clinicCode === clinicCode);
-      
-      await updateDoc(doctorDocRef, {
-        linkedClinicCodes: arrayRemove(clinicCode),
-        linkedClinics: arrayRemove(clinicToRemove)
-      });
-
-      // Update local state
-      setLinkedClinicCodes(linkedClinicCodes.filter(c => c !== clinicCode));
-      setLinkedClinics(linkedClinics.filter(c => c.clinicCode !== clinicCode));
-
-      alert('Clinic unlinked successfully');
-    } catch (error) {
-      console.error('Error unlinking clinic:', error);
-      alert('Failed to unlink clinic');
-    }
-  };
 
   const handleSaveChanges = async () => {
     // Validation
@@ -470,7 +332,7 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
       alert('Name and Residential Pincode are required fields');
       return;
     }
-    
+
     try {
       const user = auth?.currentUser;
       if (!user) {
@@ -494,7 +356,8 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
           gender,
           preferredLanguage,
           degrees,
-          specialities,
+          specialties: specialities, // Normalized to 'specialties' (US)
+          specialities: specialities, // Keep legacy field for backward compatibility
           practisingPincodes,
           experience,
           bio,
@@ -537,8 +400,8 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
   return (
     <div className="min-h-screen bg-black text-white flex">
       {/* Sidebar */}
-      <DashboardSidebar 
-        activeMenu="profile" 
+      <DashboardSidebar
+        activeMenu="profile"
         onMenuChange={onMenuChange || (() => {})}
         onLogout={onLogout}
         isOpen={sidebarOpen}
@@ -566,7 +429,7 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
             {/* Profile Image Upload */}
             <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-8 mb-6">
               <h2 className="mb-6">Profile Picture</h2>
-              
+
               <div className="flex items-center gap-6">
                 <div className="relative">
                   {profileImage ? (
@@ -581,7 +444,7 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
                     </div>
                   )}
                 </div>
-                
+
                 <div>
                   <Label htmlFor="image-upload" className="cursor-pointer">
                     <div className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-lg inline-flex items-center gap-2 transition-colors">
@@ -698,6 +561,21 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
                     </div>
                   </div>
                 )}
+
+                {/* Primary Specialty (Read-Only) */}
+                <div>
+                  <Label className="mb-2 block">Medical Specialty (Primary)</Label>
+                  <p className="text-xs text-gray-500 mb-2">Selected during registration</p>
+                  <div className="relative">
+                    <Stethoscope className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-500/50" />
+                    <Input
+                      type="text"
+                      value={specialities[0] || ''}
+                      disabled
+                      className="pl-12 bg-zinc-950 border-zinc-800 text-emerald-500/70 font-medium h-12 rounded-lg cursor-not-allowed"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -722,7 +600,7 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
                       className="pl-12 bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-emerald-500"
                     />
                   </div>
-                  
+
                   {/* Dr. Prefix Checkbox */}
                   <div className="mt-4 flex items-start gap-3 p-4 bg-zinc-800/50 rounded-lg border border-zinc-700">
                     <Checkbox
@@ -846,7 +724,7 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
                 {/* Degrees */}
                 <div>
                   <Label className="mb-2 block">Degree(s)</Label>
-                  
+
                   {/* Display existing degrees */}
                   <div className="flex flex-wrap gap-2 mb-3">
                     {degrees.map((degree, index) => (
@@ -884,20 +762,21 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
                   </div>
                 </div>
 
-                {/* Specialities */}
+                {/* Specialities (Additional) */}
                 <div>
-                  <Label className="mb-2 block">Speciality(s)</Label>
-                  
-                  {/* Display existing specialities */}
+                  <Label className="mb-2 block">Additional Specialties (Optional)</Label>
+                  <p className="text-sm text-gray-400 mb-3">Add more specialties to your profile</p>
+
+                  {/* Display existing specialities (Skipping the first one which is primary) */}
                   <div className="flex flex-wrap gap-2 mb-3">
-                    {specialities.map((speciality, index) => (
+                    {specialities.slice(1).map((speciality, index) => (
                       <div
                         key={index}
                         className="bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 px-4 py-2 rounded-lg flex items-center gap-2"
                       >
                         <span>{speciality}</span>
                         <button
-                          onClick={() => removeSpeciality(index)}
+                          onClick={() => removeSpeciality(index + 1)} // Adjusted index to account for primary
                           className="hover:text-emerald-300"
                         >
                           <X className="w-4 h-4" />
@@ -908,15 +787,15 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
 
                   {/* Add new speciality */}
                   <div className="flex gap-2">
-                    <Select 
-                      value={newSpeciality} 
+                    <Select
+                      value={newSpeciality}
                       onValueChange={(val) => setNewSpeciality(val)}
                     >
                       <SelectTrigger className="bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-emerald-500 w-full">
-                        <SelectValue placeholder="Select speciality" />
+                        <SelectValue placeholder="Add another specialty" />
                       </SelectTrigger>
                       <SelectContent className="bg-zinc-900 border-zinc-800 text-white max-h-[300px]">
-                        {MEDICAL_SPECIALTIES.map((spec) => (
+                        {MEDICAL_SPECIALTIES.filter(s => !specialities.includes(s)).map((spec) => (
                           <SelectItem key={spec} value={spec}>{spec}</SelectItem>
                         ))}
                       </SelectContent>
@@ -933,7 +812,7 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
                 {/* Practising Pin Codes */}
                 <div>
                   <Label className="mb-2 block">Practising Pin Code(s)</Label>
-                  
+
                   {/* Display existing pincodes */}
                   <div className="flex flex-wrap gap-2 mb-3">
                     {practisingPincodes.map((pincode, index) => (
@@ -971,59 +850,6 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
                   </div>
                 </div>
 
-                {/* Attached Clinic Codes - NEW */}
-                <div>
-                  <Label className="mb-2 block">Attached Clinic Code(s) (Optional)</Label>
-                  <p className="text-xs text-gray-400 mb-3">
-                    If you practice at a clinic, add their clinic code to link your profile. You can link to multiple clinics.
-                  </p>
-                  
-                  {/* Display linked clinics */}
-                  {linkedClinics.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      {linkedClinics.map((clinic) => (
-                        <div
-                          key={clinic.clinicCode}
-                          className="bg-blue-500/20 border border-blue-500/30 text-blue-400 px-4 py-2 rounded-lg flex items-center gap-2"
-                        >
-                          <span className="text-sm">
-                            {clinic.name} ({clinic.clinicCode})
-                          </span>
-                          <button
-                            onClick={() => removeClinicLink(clinic.clinicCode, clinic.clinicId)}
-                            className="hover:text-blue-300"
-                            title="Unlink from clinic"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Add new clinic code */}
-                  <div className="flex gap-2">
-                    <Input
-                      type="text"
-                      value={newClinicCode}
-                      onChange={(e) => setNewClinicCode(e.target.value.toUpperCase())}
-                      onKeyPress={(e) => e.key === 'Enter' && addClinicCode()}
-                      placeholder="HQR-XXXXXX-XXXX-CLN"
-                      className="bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-emerald-500 font-mono"
-                    />
-                    <Button
-                      onClick={addClinicCode}
-                      className="bg-blue-500 hover:bg-blue-600 h-12 px-4"
-                      title="Add clinic"
-                    >
-                      <Plus className="w-5 h-5" />
-                    </Button>
-                  </div>
-                  
-                  <p className="text-xs text-gray-500 mt-2">
-                    Format: HQR-[PinCode]-[Number]-CLN (e.g., HQR-700001-0001-CLN)
-                  </p>
-                </div>
 
                 {/* Experience */}
                 <div>
@@ -1046,7 +872,7 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
                   <p className="text-xs text-gray-400 mb-3">
                     Add services available at your clinic (e.g., ECG, ECHO, Pathology, Physiotherapy)
                   </p>
-                  
+
                   {/* Custom Label for Services */}
                   <div className="mb-3">
                     <Label className="mb-2 block text-sm">Service Status Text</Label>
@@ -1061,7 +887,7 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
                       This text will appear once below all service badges
                     </p>
                   </div>
-                  
+
                   {/* Add new service */}
                   <div className="flex gap-2 mb-3">
                     <Input

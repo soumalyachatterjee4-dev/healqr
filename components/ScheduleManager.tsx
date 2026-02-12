@@ -5,12 +5,12 @@ import { Switch } from './ui/switch';
 import { Card } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
-import { Menu, Info, Plus, Minus, Calendar, Pencil, Trash2, Clock, MapPin, Users, CalendarIcon, Check, Eye, AlertTriangle } from 'lucide-react';
+import { Menu, Info, Plus, Minus, Calendar, Pencil, Trash2, Clock, MapPin, Users, CalendarIcon, Check, Eye, AlertTriangle, Phone, Building2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import DashboardSidebar from './DashboardSidebar';
 import { toast } from 'sonner';
 import { db, auth } from '../lib/firebase/config';
-import { doc, getDoc, updateDoc, setDoc, serverTimestamp, Timestamp, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, setDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { decrypt } from '../utils/encryptionService';
 
@@ -23,13 +23,14 @@ interface ScheduleManagerProps {
 export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns = [] }: ScheduleManagerProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [doctorId, setDoctorId] = useState<string>('');
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
+  const [currentTab, setCurrentTab] = useState<'schedules' | 'clinics'>('clinics');
 
   // Load data from Firestore on mount
   useEffect(() => {
     const loadFromFirestore = async (uid: string) => {
       console.log('🔍 ScheduleManager: Loading data for user:', uid);
-      
+
       if (!db) {
         console.error('❌ ScheduleManager: Firestore db not initialized');
         setLoading(false);
@@ -39,13 +40,13 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
       setDoctorId(uid);
 
       try {
-        const doctorDoc = await getDoc(doc(db, 'doctors', uid));
+        const doctorDoc = await getDoc(doc(db!, 'doctors', uid));
         if (doctorDoc.exists()) {
           const data = doctorDoc.data();
-          
+
           // Load global settings
           setMaxAdvanceDays(data.maxAdvanceBookingDays?.toString() || '15');
-          
+
           // Load planned off periods
           if (data.plannedOffPeriods && Array.isArray(data.plannedOffPeriods)) {
             const periods = data.plannedOffPeriods.map((p: any) => ({
@@ -55,10 +56,15 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
             }));
             setAllPeriods(periods);
           }
-          
+
           // Load chambers
           if (data.chambers && Array.isArray(data.chambers)) {
             setDemoSchedules(data.chambers);
+          }
+
+          // Load Manual Clinics
+          if (data.manualClinics && Array.isArray(data.manualClinics)) {
+            setManualClinics(data.manualClinics);
           }
         }
       } catch (error) {
@@ -70,7 +76,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
     };
 
     // Use onAuthStateChanged to ensure we get the user even if there's a delay
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth!, (user) => {
       if (user) {
         loadFromFirestore(user.uid);
       } else {
@@ -81,7 +87,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
 
     return () => unsubscribe();
   }, []);
-  
+
   // State for Planned Off
   const [plannedOffEnabled, setPlannedOffEnabled] = useState(false);
   const [startDate, setStartDate] = useState('');
@@ -90,7 +96,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [periodToDelete, setPeriodToDelete] = useState<number | null>(null);
-  
+
   // All planned off periods (active, completed, deactivated)
   const [allPeriods, setAllPeriods] = useState<Array<{
     id: number;
@@ -101,12 +107,29 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
     status: 'active' | 'completed' | 'deactivated';
     deactivatedDate: string | null;
   }>>([]);
-  
+
   // Check if there are any active periods
   const hasActivePeriods = allPeriods.some(p => p.status === 'active');
-  
+
   // State for Maximum Advance Booking Days
   const [maxAdvanceDays, setMaxAdvanceDays] = useState('15');
+
+  // State for Manual Clinics
+  const [manualClinics, setManualClinics] = useState<Array<{
+    id: string;
+    name: string;
+    address: string;
+    phone: string;
+    clinicCode?: string;
+    createdAt: number;
+  }>>([]);
+  const [editingClinicId, setEditingClinicId] = useState<string | null>(null);
+  const [clinicFormName, setClinicFormName] = useState('');
+  const [clinicFormAddress, setClinicFormAddress] = useState('');
+  const [clinicFormPhone, setClinicFormPhone] = useState('');
+  const [clinicFormCode, setClinicFormCode] = useState('');
+  const [showClinicDeleteModal, setShowClinicDeleteModal] = useState(false);
+  const [clinicToDelete, setClinicToDelete] = useState<string | null>(null);
 
   // State for Schedule Maker (Section 2)
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
@@ -116,6 +139,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
   const [chamberName, setChamberName] = useState('');
   const [chamberAddress, setChamberAddress] = useState('');
   const [clinicCode, setClinicCode] = useState(''); // NEW: Optional clinic code to link chamber
+  const [selectedManualClinicId, setSelectedManualClinicId] = useState<string>(''); // For selecting manual clinic
   const [clinicData, setClinicData] = useState<any>(null); // NEW: Store fetched clinic data
   const [loadingClinic, setLoadingClinic] = useState(false); // NEW: Loading state for clinic fetch
   const [startTime, setStartTime] = useState('');
@@ -134,6 +158,9 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
     chamberAddress: string;
     clinicCode?: string;
     clinicId?: string;
+    clinicName?: string;
+    manualClinicId?: string;
+    clinicPhone?: string;
     startTime: string;
     endTime: string;
     maxCapacity: number;
@@ -164,6 +191,172 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
     }
   };
 
+  // NEW: Handle Manual Clinic Operations
+  const handleSaveManualClinic = async () => {
+    if (!clinicFormName || !clinicFormAddress) {
+      toast.error('Please fill in clinic name and address');
+      return;
+    }
+
+    if (!doctorId || !db) {
+      toast.error('Authentication error');
+      return;
+    }
+
+    try {
+      let resolvedClinicName = '';
+      let resolvedClinicAddress = '';
+
+      // If clinic code is provided, verify it first
+      if (clinicFormCode.trim()) {
+        const clinicsRef = collection(db, 'clinics');
+        const clinicQuery = query(clinicsRef, where('clinicCode', '==', clinicFormCode.trim()));
+        const clinicSnap = await getDocs(clinicQuery);
+
+        if (clinicSnap.empty) {
+          toast.error('Clinic code not found. Please check the code or leave it empty for manual entry.');
+          return;
+        }
+
+        const clinicData = clinicSnap.docs[0].data();
+        resolvedClinicName = clinicData.name || clinicFormName;
+        resolvedClinicAddress = clinicData.address || clinicFormAddress;
+
+        toast.info(`Linked to system clinic: ${resolvedClinicName}`);
+      }
+
+      let updatedClinics;
+
+      if (editingClinicId) {
+        // Update existing clinic
+        updatedClinics = manualClinics.map(clinic =>
+          clinic.id === editingClinicId
+            ? {
+                ...clinic,
+                name: resolvedClinicName || clinicFormName,
+                address: resolvedClinicAddress || clinicFormAddress,
+                phone: clinicFormPhone,
+                clinicCode: clinicFormCode
+              }
+            : clinic
+        );
+        toast.success('Clinic Updated Successfully');
+      } else {
+        // Add new clinic
+        const newClinic = {
+          id: Date.now().toString(),
+          name: resolvedClinicName || clinicFormName,
+          address: resolvedClinicAddress || clinicFormAddress,
+          phone: clinicFormPhone,
+          clinicCode: clinicFormCode,
+          createdAt: Date.now()
+        };
+        updatedClinics = [...manualClinics, newClinic];
+        toast.success('Clinic Added Successfully');
+      }
+
+      setManualClinics(updatedClinics);
+
+      // Save to Firestore
+      await updateDoc(doc(db, 'doctors', doctorId), {
+        manualClinics: updatedClinics,
+        updatedAt: serverTimestamp()
+      });
+
+      handleResetClinicForm();
+    } catch (error) {
+      console.error('Error saving manual clinic:', error);
+      toast.error('Failed to save clinic');
+    }
+  };
+
+  // NEW: Manual Link/Verify Clinic Code in Manage Clinics
+  const handleVerifyClinicFormCode = async () => {
+    if (!clinicFormCode.trim()) {
+      toast.error('Please enter a clinic code first');
+      return;
+    }
+
+    try {
+      setLoadingClinic(true);
+      const clinicsRef = collection(db!, 'clinics');
+      const clinicQuery = query(clinicsRef, where('clinicCode', '==', clinicFormCode.trim()));
+      const clinicSnap = await getDocs(clinicQuery);
+
+      if (clinicSnap.empty) {
+        toast.error('Clinic code not found. Please check and try again.');
+        return;
+      }
+
+      const clinicData = clinicSnap.docs[0].data();
+      setClinicFormName(clinicData.name || '');
+      setClinicFormAddress(clinicData.address || '');
+
+      toast.success('Clinic Linked Successfully!', {
+        description: `Connected to ${clinicData.name}. Click ADD CLINIC to save.`,
+        duration: 4000
+      });
+    } catch (error) {
+      console.error('Error verifying clinic code:', error);
+      toast.error('Failed to verify clinic code');
+    } finally {
+      setLoadingClinic(false);
+    }
+  };
+
+  const handleDeleteManualClinic = async () => {
+    if (!clinicToDelete || !doctorId || !db) return;
+
+    try {
+      const updatedClinics = manualClinics.filter(c => c.id !== clinicToDelete);
+      setManualClinics(updatedClinics);
+
+      await updateDoc(doc(db, 'doctors', doctorId), {
+        manualClinics: updatedClinics,
+        updatedAt: serverTimestamp()
+      });
+
+      toast.success('Clinic Deleted Successfully');
+      setShowClinicDeleteModal(false);
+      setClinicToDelete(null);
+    } catch (error) {
+      console.error('Error deleting manual clinic:', error);
+      toast.error('Failed to delete clinic');
+    }
+  };
+
+  const handleEditManualClinic = (clinic: typeof manualClinics[0]) => {
+    setEditingClinicId(clinic.id);
+    setClinicFormName(clinic.name);
+    setClinicFormAddress(clinic.address);
+    setClinicFormPhone(clinic.phone || '');
+    setClinicFormCode(clinic.clinicCode || '');
+  };
+
+  const handleResetClinicForm = () => {
+    setEditingClinicId(null);
+    setClinicFormName('');
+    setClinicFormAddress('');
+    setClinicFormPhone('');
+    setClinicFormCode('');
+  };
+
+  // NEW: Auto-populate schedule form when manual clinic is selected
+  useEffect(() => {
+    if (selectedManualClinicId) {
+      const clinic = manualClinics.find(c => c.id === selectedManualClinicId);
+      if (clinic) {
+        setChamberName(clinic.name);
+        setChamberAddress(clinic.address);
+        setClinicCode(clinic.clinicCode || '');
+        // We will save the phone number when saving the schedule
+      }
+    } else if (!editingScheduleId && !clinicCode) {
+      // Only clear if not editing and not using clinic code
+      // And only if we just deselected (this logic might need refinement based on UX)
+    }
+  }, [selectedManualClinicId]);
+
   const handleReset = () => {
     setSelectedDays([]);
     setFrequency('Daily');
@@ -172,6 +365,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
     setChamberName('');
     setChamberAddress('');
     setClinicCode('');
+    setSelectedManualClinicId(''); // Reset manual clinic selection
     setClinicData(null); // Reset clinic data
     setStartTime('');
     setEndTime('');
@@ -181,7 +375,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
 
   const handleEditSchedule = (schedule: typeof demoSchedules[0]) => {
     setEditingScheduleId(schedule.id);
-    
+
     // Handle custom dates differently
     if (schedule.frequency === 'Custom') {
       setSelectedDays([]);
@@ -190,12 +384,14 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
       setSelectedDays(schedule.days);
       setCustomDate('');
     }
-    
+
     setFrequency(schedule.frequency);
     setFrequencyStartDate(schedule.frequencyStartDate || '');
     setChamberName(schedule.chamberName);
     setChamberAddress(schedule.chamberAddress);
     setClinicCode(schedule.clinicCode || '');
+    setSelectedManualClinicId(schedule.manualClinicId || ''); // Set manual clinic if exists
+
     // If editing a chamber with clinic, fetch clinic data
     if (schedule.clinicId) {
       fetchClinicDataById(schedule.clinicId);
@@ -206,7 +402,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
 
     // Scroll to form
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    
+
     toast.info('Editing Schedule', {
       description: 'Make your changes and click SAVE SCHEDULE to update.',
       duration: 3000,
@@ -219,7 +415,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
       setLoadingClinic(true);
       const clinicRef = doc(db, 'clinics', clinicId);
       const clinicSnap = await getDoc(clinicRef);
-      
+
       if (clinicSnap.exists()) {
         const data = clinicSnap.data();
         setClinicData({ id: clinicSnap.id, ...data });
@@ -248,16 +444,16 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
       const clinicsRef = collection(db, 'clinics');
       const clinicQuery = query(clinicsRef, where('clinicCode', '==', code.trim()));
       const clinicSnap = await getDocs(clinicQuery);
-      
+
       if (!clinicSnap.empty) {
         const clinicDoc = clinicSnap.docs[0];
         const data = clinicDoc.data();
         setClinicData({ id: clinicDoc.id, ...data });
-        
+
         // Auto-populate chamber name and address from clinic
         setChamberName(data.name || '');
         setChamberAddress(data.address || '');
-        
+
         toast.success('Clinic found!', {
           description: `Chamber will be linked to ${data.name}`,
           duration: 3000,
@@ -294,7 +490,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
   const handleDeleteSchedule = async (id: number) => {
     const updatedSchedules = demoSchedules.filter(s => s.id !== id);
     setDemoSchedules(updatedSchedules);
-    
+
     // Save to Firestore
     if (doctorId && db) {
       try {
@@ -308,7 +504,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
         return;
       }
     }
-    
+
     toast.success('Schedule Deleted Successfully', {
       description: 'The schedule has been removed from your list.',
       duration: 5000,
@@ -383,7 +579,19 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
     // Look up clinic by code if provided
     let resolvedClinicId: string | undefined = undefined;
     let resolvedClinicName: string | undefined = undefined;
-    
+
+    // Manual Clinic Resolution
+    let resolvedManualClinicId: string | undefined = undefined;
+    let resolvedClinicPhone: string | undefined = undefined;
+
+    if (selectedManualClinicId) {
+      const manualClinic = manualClinics.find(c => c.id === selectedManualClinicId);
+      if (manualClinic) {
+        resolvedManualClinicId = manualClinic.id;
+        resolvedClinicPhone = manualClinic.phone;
+      }
+    }
+
     if (clinicData) {
       // Clinic data already fetched and validated
       resolvedClinicId = clinicData.id;
@@ -395,7 +603,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
         const clinicsRef = collection(db, 'clinics');
         const clinicQuery = query(clinicsRef, where('clinicCode', '==', clinicCode.trim()));
         const clinicSnap = await getDocs(clinicQuery);
-        
+
         if (!clinicSnap.empty) {
           resolvedClinicId = clinicSnap.docs[0].id;
           resolvedClinicName = clinicSnap.docs[0].data().name;
@@ -412,10 +620,10 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
     }
 
     // CRITICAL: Check for schedule conflicts with existing chambers
-    const conflictsToCheck = editingScheduleId 
+    const conflictsToCheck = editingScheduleId
       ? demoSchedules.filter(s => s.id !== editingScheduleId && s.isActive !== false)
       : demoSchedules.filter(s => s.isActive !== false);
-    
+
     const conflicts: any[] = [];
 
     console.log('🔍 CONFLICT DETECTION START');
@@ -496,7 +704,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
         `❌ A doctor cannot be in two places at the same time!\n` +
         `Please choose a different day or time slot.`
       );
-      
+
       return;
     }
 
@@ -515,7 +723,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
       isActive: editingScheduleId ? demoSchedules.find(s => s.id === editingScheduleId)?.isActive ?? true : true,
       createdAt: editingScheduleId ? demoSchedules.find(s => s.id === editingScheduleId)?.createdAt : Date.now(),
     };
-    
+
     // Only add optional fields if they have values (Firestore doesn't accept undefined)
     if (frequencyStartDate) {
       newSchedule.frequencyStartDate = frequencyStartDate;
@@ -531,6 +739,14 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
     }
     if (resolvedClinicName) {
       newSchedule.clinicName = resolvedClinicName;
+    }
+
+    // NEW: Save Manual Clinic Data
+    if (resolvedManualClinicId) {
+      newSchedule.manualClinicId = resolvedManualClinicId;
+    }
+    if (resolvedClinicPhone) {
+      newSchedule.clinicPhone = resolvedClinicPhone;
     }
 
     // Add or update schedule
@@ -557,10 +773,13 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
         if (s.customDate) cleanSchedule.customDate = s.customDate;
         if (s.clinicCode) cleanSchedule.clinicCode = s.clinicCode;
         if (s.clinicId) cleanSchedule.clinicId = s.clinicId;
+        if (s.clinicName) cleanSchedule.clinicName = s.clinicName;
+        if (s.manualClinicId) cleanSchedule.manualClinicId = s.manualClinicId;
+        if (s.clinicPhone) cleanSchedule.clinicPhone = s.clinicPhone;
         return cleanSchedule;
       });
       setDemoSchedules(updatedSchedules);
-      
+
       // Save to Firestore
       if (doctorId && db) {
         try {
@@ -580,7 +799,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
         toast.error('Authentication error - Please refresh and try again');
         return;
       }
-      
+
       toast.success('Schedule Updated Successfully', {
         description: `Your ${frequency.toLowerCase()} schedule has been updated.`,
         duration: 5000,
@@ -605,12 +824,15 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
         if (s.customDate) cleanSchedule.customDate = s.customDate;
         if (s.clinicCode) cleanSchedule.clinicCode = s.clinicCode;
         if (s.clinicId) cleanSchedule.clinicId = s.clinicId;
+        if (s.clinicName) cleanSchedule.clinicName = s.clinicName;
+        if (s.manualClinicId) cleanSchedule.manualClinicId = s.manualClinicId;
+        if (s.clinicPhone) cleanSchedule.clinicPhone = s.clinicPhone;
         return cleanSchedule;
       });
-      
+
       updatedSchedules = [...cleanedExisting, newSchedule];
       setDemoSchedules(updatedSchedules);
-      
+
       // Save to Firestore
       if (doctorId && db) {
         try {
@@ -630,7 +852,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
         toast.error('Authentication error - Please refresh and try again');
         return;
       }
-      
+
       toast.success('Schedule Saved Successfully', {
         description: `Your ${frequency.toLowerCase()} schedule has been created and is now active.`,
         duration: 5000,
@@ -706,7 +928,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
       const now = new Date();
       const createdDate = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
       const createdTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-      
+
       // Add new active period to the list
       const newPeriod = {
         id: Date.now(),
@@ -720,7 +942,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
         doctorId: doctorId,
         doctorName: doctorName,
       };
-      
+
       const updatedPeriods = [newPeriod, ...allPeriods];
       setAllPeriods(updatedPeriods);
 
@@ -730,7 +952,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
         globalBookingEnabled: false,
         updatedAt: serverTimestamp()
       });
-      
+
       // Also save to schedules collection for clinic QR flow
       await setDoc(doc(db, 'schedules', doctorId), {
         plannedOffPeriods: updatedPeriods,
@@ -743,22 +965,22 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
       // ============================================
       const { collection, query, where, getDocs } = await import('firebase/firestore');
       const bookingsRef = collection(db, 'bookings');
-      
+
       // Generate all dates in the blocked range
       const start = new Date(startDate);
       const end = new Date(endDate);
       const blockedDates: string[] = [];
-      
+
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
         const dateStr = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split('T')[0];
         blockedDates.push(dateStr);
       }
-      
+
       console.log(`📤 Global Planned Off: Blocking dates:`, blockedDates);
 
       // Query all bookings in the blocked date range
       let totalAffectedBookings = 0;
-      
+
       for (const dateStr of blockedDates) {
         const dateBookingsQuery = query(
           bookingsRef,
@@ -790,7 +1012,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
             // 🔓 Decrypt patient data for notification
             const patientName = decrypt((booking as any).patientName_encrypted || booking.patientName || 'Patient');
             const whatsappNumber = decrypt((booking as any).whatsappNumber_encrypted || booking.whatsappNumber || '');
-            
+
             if (whatsappNumber || booking.phone) {
               patientsToNotify.push({
                 phone: whatsappNumber || booking.phone,
@@ -819,7 +1041,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
             const doctorName = localStorage.getItem('healqr_user_name') || 'Doctor';
             const doctorPhoto = localStorage.getItem('healqr_profile_photo') || '';
             const doctorSpecialty = localStorage.getItem('healqr_specialty') || '';
-            
+
             const result = await sendBatchCancellation(
               patientsToNotify,
               { doctorId, doctorName, doctorPhoto, doctorSpecialty },
@@ -832,14 +1054,14 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
           }
         }
       }
-      
+
       setShowConfirmModal(false);
-      
+
       // Return toggle to OFF/normal stage and reset dates for next entry
       setPlannedOffEnabled(false);
       setStartDate('');
       setEndDate('');
-      
+
       // Show success toast
       toast.success('Global Off Period Saved', {
         description: `Bookings blocked from ${formatDate(startDate)} to ${formatDate(endDate)}. ${totalAffectedBookings} booking(s) marked as cancelled. Patient notifications are temporarily disabled.`,
@@ -853,22 +1075,22 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
 
   const handleDeletePlannedOff = async () => {
     if (periodToDelete === null || !doctorId || !db) return;
-    
+
     try {
       const now = new Date();
       const deactivationDate = now.toLocaleDateString('en-US', { day: '2-digit', month: '2-digit', year: 'numeric' });
-      
+
       // Find the period being deactivated
       const periodToDeactivate = allPeriods.find(p => p.id === periodToDelete);
       if (!periodToDeactivate) return;
-      
+
       // Update the period status to deactivated
-      const updatedPeriods = allPeriods.map(period => 
-        period.id === periodToDelete 
+      const updatedPeriods = allPeriods.map(period =>
+        period.id === periodToDelete
           ? { ...period, status: 'deactivated' as const, deactivatedDate: deactivationDate }
           : period
       );
-      
+
       setAllPeriods(updatedPeriods);
 
       // Check if there are any remaining active periods
@@ -880,7 +1102,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
         globalBookingEnabled: hasActivePeriodsLeft ? false : true,
         updatedAt: serverTimestamp()
       });
-      
+
       // Also save to schedules collection for clinic QR flow
       await setDoc(doc(db, 'schedules', doctorId), {
         plannedOffPeriods: updatedPeriods,
@@ -893,17 +1115,17 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
       // ============================================
       const { collection, query, where, getDocs } = await import('firebase/firestore');
       const bookingsRef = collection(db, 'bookings');
-      
+
       // Generate all dates in the deactivated range
       const start = new Date(periodToDeactivate.startDate);
       const end = new Date(periodToDeactivate.endDate);
       const restoredDates: string[] = [];
-      
+
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
         const dateStr = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split('T')[0];
         restoredDates.push(dateStr);
       }
-      
+
       console.log(`📤 Global Planned Off Deactivated: Restoring dates:`, restoredDates);
 
       // Query all bookings in the restored date range
@@ -924,12 +1146,12 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
 
         bookingsSnap.docs.forEach(bookingDoc => {
           const booking = bookingDoc.data();
-          
+
           // Collect patient info for batch notification
           // 🔓 Decrypt patient data for notification
           const patientName = decrypt((booking as any).patientName_encrypted || booking.patientName || 'Patient');
           const whatsappNumber = decrypt((booking as any).whatsappNumber_encrypted || booking.whatsappNumber || '');
-          
+
           if (whatsappNumber || booking.phone) {
             patientsToNotify.push({
               phone: whatsappNumber || booking.phone,
@@ -955,7 +1177,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
             const doctorName = localStorage.getItem('healqr_user_name') || 'Doctor';
             const doctorPhoto = localStorage.getItem('healqr_profile_photo') || '';
             const doctorSpecialty = localStorage.getItem('healqr_specialty') || '';
-            
+
             const result = await sendBatchRestoration(
               patientsToNotify,
               { doctorId, doctorName, doctorPhoto, doctorSpecialty },
@@ -968,10 +1190,10 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
           }
         }
       }
-      
+
       setShowDeleteModal(false);
       setPeriodToDelete(null);
-      
+
       // Show success toast
       toast.success('Planned Off Period Deactivated', {
         description: `${totalRestorationNotices} booking(s) restored and patients notified. All chambers are now active.`,
@@ -985,7 +1207,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
 
   const handleSaveMaxAdvanceDays = async () => {
     console.log('💾 Attempting to save max advance days:', { doctorId, db: !!db, maxAdvanceDays });
-    
+
     if (!doctorId || !db) {
       console.error('❌ Cannot save max advance days: doctorId or db missing', { doctorId, db: !!db });
       toast.error('Authentication error - Please refresh the page and try again');
@@ -1004,13 +1226,13 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
         maxAdvanceBookingDays: days,
         updatedAt: serverTimestamp()
       });
-      
+
       // Also save to schedules collection for clinic QR flow
       await setDoc(doc(db, 'schedules', doctorId), {
         maxAdvanceDays: days,
         updatedAt: serverTimestamp()
       }, { merge: true });
-      
+
       console.log('✅ Max advance days saved successfully to both collections');
       toast.success('Settings Saved Successfully', {
         description: `Patients can now book appointments up to ${days} days in advance.`,
@@ -1033,16 +1255,16 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
 
     // If turning chamber back ON, just clear the date picker state
     if (chamber.isActive === false) {
-      const updatedSchedules = demoSchedules.map(s => 
+      const updatedSchedules = demoSchedules.map(s =>
         s.id === id ? { ...s, isActive: true } : s
       );
       setDemoSchedules(updatedSchedules);
-      
+
       // Clear date picker state
       const newDates = { ...chamberInactiveDates };
       delete newDates[id];
       setChamberInactiveDates(newDates);
-      
+
       try {
         await updateDoc(doc(db, 'doctors', doctorId), {
           chambers: updatedSchedules,
@@ -1067,10 +1289,10 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
         // Get today's bookings for this chamber
         const today = new Date();
         const todayStr = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split('T')[0];
-        
+
         const bookingsRef = collection(db, 'bookings');
         const numericChamberId = typeof chamber.id === 'string' ? parseInt(chamber.id, 10) : chamber.id;
-        
+
         // Query ALL bookings for this chamber (including cancelled ones for accurate count)
         const chamberBookingsQuery = query(
           bookingsRef,
@@ -1079,30 +1301,30 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
         );
 
         const allBookingsSnap = await getDocs(chamberBookingsQuery);
-        
+
         // Filter only non-cancelled bookings for validation
         const bookingsSnap = {
           docs: allBookingsSnap.docs.filter(doc => !doc.data().isCancelled)
         };
-        
+
         console.log('🔍 [ScheduleManager] Chamber Toggle Validation:', {
           chamberId: numericChamberId,
           chamberName: chamber.chamberName,
           totalBookings: bookingsSnap.docs.length,
           todayStr,
         });
-        
+
         // Separate seen and non-seen patients with detailed logging
         const seenPatients = bookingsSnap.docs.filter(doc => {
           const isMarkedSeen = doc.data().isMarkedSeen === true;
           return isMarkedSeen;
         });
-        
+
         const nonSeenPatients = bookingsSnap.docs.filter(doc => {
           const isMarkedSeen = doc.data().isMarkedSeen;
           return isMarkedSeen !== true; // Not seen (false, undefined, or null)
         });
-        
+
         // Log each patient's status
         bookingsSnap.docs.forEach(doc => {
           const data = doc.data();
@@ -1113,12 +1335,12 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
             isCancelled: data.isCancelled,
           });
         });
-        
+
         console.log('📊 Patient Status:', {
           seenCount: seenPatients.length,
           nonSeenCount: nonSeenPatients.length,
         });
-        
+
         // Block toggle only if MIXED state (both seen and non-seen exist)
         if (seenPatients.length > 0 && nonSeenPatients.length > 0) {
           console.log('❌ BLOCKING: Mixed state detected');
@@ -1128,7 +1350,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
           });
           return;
         }
-        
+
         console.log('✅ ALLOWING: All patients same state');
         // Allow if all patients are seen (no cancellations needed) or all non-seen (will cancel all)
       } catch (error) {
@@ -1140,18 +1362,18 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
 
     // All patients are non-seen, proceed with turning chamber OFF
     // Just toggle the UI - date range will be saved when user fills it and clicks save
-    const updatedSchedules = demoSchedules.map(s => 
+    const updatedSchedules = demoSchedules.map(s =>
       s.id === id ? { ...s, isActive: false } : s
     );
-    
+
     setDemoSchedules(updatedSchedules);
-    
+
     // Initialize date picker state
     setChamberInactiveDates({
       ...chamberInactiveDates,
       [id]: { startDate: '', endDate: '' }
     });
-    
+
     toast.info('Chamber Toggle OFF', {
       description: 'Please select date range to schedule chamber closure.',
       duration: 4000,
@@ -1257,6 +1479,34 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
 
         {/* Content */}
         <div className="px-4 lg:px-8 py-8">
+          {/* Tab Switcher */}
+          <div className="flex space-x-6 mb-8 border-b border-gray-800">
+            <button
+              onClick={() => setCurrentTab('clinics')}
+              className={`pb-3 px-2 text-sm font-medium transition-colors relative ${
+                currentTab === 'clinics' ? 'text-emerald-400' : 'text-gray-400 hover:text-gray-300'
+              }`}
+            >
+              My Clinics
+              {currentTab === 'clinics' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 rounded-t-full" />
+              )}
+            </button>
+            <button
+              onClick={() => setCurrentTab('schedules')}
+              className={`pb-3 px-2 text-sm font-medium transition-colors relative ${
+                currentTab === 'schedules' ? 'text-emerald-400' : 'text-gray-400 hover:text-gray-300'
+              }`}
+            >
+              Schedule Manager
+              {currentTab === 'schedules' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 rounded-t-full" />
+              )}
+            </button>
+          </div>
+
+          {currentTab === 'schedules' && (
+            <>
           {/* Section 1: Global Settings */}
           <div className="mb-8">
             <div className="flex items-start justify-between mb-6">
@@ -1282,7 +1532,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
                 <p className="text-gray-400 text-sm mb-6">
                   {hasActivePeriods
                     ? "You have active planned off periods. View history to manage or deactivate them."
-                    : plannedOffEnabled 
+                    : plannedOffEnabled
                     ? "When enabled, your QR code will be deactivated and new bookings will be disabled"
                     : "When enabled, your QR code will be temporarily deactivated and patients will not be able to book appointments. Use this during vacations or planned leaves."
                   }
@@ -1331,7 +1581,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
                       <div className="flex items-center justify-between pt-2">
                         {/* View History Button - Shows when there are any periods */}
                         {allPeriods.length > 0 && (
-                          <Button 
+                          <Button
                             onClick={() => setShowHistoryModal(true)}
                             variant="outline"
                             className="border-gray-700 text-gray-300 hover:bg-gray-900 hover:text-white"
@@ -1340,7 +1590,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
                             VIEW HISTORY
                           </Button>
                         )}
-                        
+
                         {/* Save Button - Always available when toggle is off */}
                         {!hasActivePeriods && (
                           <Button className="bg-emerald-600 hover:bg-emerald-700 text-white ml-auto">
@@ -1401,7 +1651,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
 
                       {/* Save Button */}
                       <div className="flex justify-end pt-2">
-                        <Button 
+                        <Button
                           onClick={handlePlannedOffSave}
                           className="bg-emerald-600 hover:bg-emerald-700 text-white"
                         >
@@ -1530,7 +1780,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
                     <div className="flex items-start gap-2 py-2 px-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                       <Info className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
                       <p className="text-blue-400 text-sm">
-                        {frequency === 'Bi-Weekly' 
+                        {frequency === 'Bi-Weekly'
                           ? 'This helps the system understand your bi-weekly schedule cycle. For example, if you select Tuesday and set start date as 2/11/25, the next schedule will be on the following Tuesday (2 weeks later).'
                           : 'This helps the system understand your monthly schedule cycle. The schedule will repeat on the same day of the month from this start date.'
                         }
@@ -1562,7 +1812,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
                       </p>
                     </div>
                     <div className="flex justify-end pt-2">
-                      <Button 
+                      <Button
                         onClick={handleSaveSchedule}
                         className="bg-emerald-600 hover:bg-emerald-700 text-white"
                       >
@@ -1572,6 +1822,73 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
                     </div>
                   </div>
                 )}
+
+                {/* Manual Clinic Selection */}
+                <div className="space-y-2">
+                  <Label htmlFor="manual-clinic" className="text-gray-300 text-sm">
+                    Select Clinic
+                  </Label>
+                  <Select
+                    value={selectedManualClinicId || 'none'}
+                    onValueChange={(value) => {
+                      setSelectedManualClinicId(value === 'none' ? '' : value);
+                      if (value && value !== 'none') setClinicCode('');
+                    }}
+                  >
+                    <SelectTrigger id="manual-clinic" className="bg-gray-900/50 border-gray-700 text-white">
+                      <SelectValue placeholder="Select a clinic (Optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None (Enter manually)</SelectItem>
+                      {manualClinics.map((clinic) => (
+                        <SelectItem key={clinic.id} value={clinic.id}>
+                          <div className="flex items-center justify-between w-full gap-4">
+                            <span>{clinic.name}</span>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full border ${
+                              clinic.clinicCode
+                                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                                : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                            }`}>
+                              {clinic.clinicCode ? 'Linked' : 'Alternative Connect'}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {/* Clinic Status Feedback Box */}
+                  {selectedManualClinicId && (
+                    <div className={`p-3 rounded-lg border text-xs space-y-2 ${
+                      manualClinics.find(c => c.id === selectedManualClinicId)?.clinicCode
+                        ? 'bg-emerald-500/5 border-emerald-500/20'
+                        : 'bg-amber-500/5 border-amber-500/20'
+                    }`}>
+                      <div className="flex items-center gap-2">
+                        {manualClinics.find(c => c.id === selectedManualClinicId)?.clinicCode ? (
+                          <>
+                            <Check className="w-3 h-3 text-emerald-500" />
+                            <span className="text-emerald-400 font-medium">System Linked</span>
+                          </>
+                        ) : (
+                          <>
+                            <Info className="w-3 h-3 text-amber-500" />
+                            <span className="text-amber-400 font-medium">Alternative Connect</span>
+                          </>
+                        )}
+                      </div>
+                      <p className="text-gray-400 leading-relaxed">
+                        {manualClinics.find(c => c.id === selectedManualClinicId)?.clinicCode
+                          ? "Dual booking enabled via Doctor & Clinic QR codes. Patient lists synced automatically."
+                          : "Non-linked clinic. System will block Dr. QR during chamber time and send patient lists via SMS/WhatsApp 1 hour prior."}
+                      </p>
+                    </div>
+                  )}
+
+                  <p className="text-gray-500 text-xs px-1">
+                    Select from your added clinics to auto-fill details and manage booking behavior.
+                  </p>
+                </div>
 
                 {/* Chamber Name & Address */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1585,10 +1902,10 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
                       onChange={(e) => setChamberName(e.target.value)}
                       className="bg-gray-900/50 border-gray-700 text-white w-full"
                       placeholder="Enter chamber name"
-                      disabled={!!clinicData}
-                      title={clinicData ? "Auto-filled from clinic data" : "Enter chamber name"}
+                      disabled={!!clinicData || !!selectedManualClinicId}
+                      title={clinicData || selectedManualClinicId ? "Auto-filled from clinic data" : "Enter chamber name"}
                     />
-                    {clinicData && (
+                    {(clinicData || selectedManualClinicId) && (
                       <p className="text-xs text-emerald-500">✓ Auto-filled from clinic</p>
                     )}
                   </div>
@@ -1602,10 +1919,10 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
                       onChange={(e) => setChamberAddress(e.target.value)}
                       className="bg-gray-900/50 border-gray-700 text-white w-full"
                       placeholder="Enter chamber address"
-                      disabled={!!clinicData}
-                      title={clinicData ? "Auto-filled from clinic data" : "Enter chamber address"}
+                      disabled={!!clinicData || !!selectedManualClinicId}
+                      title={clinicData || selectedManualClinicId ? "Auto-filled from clinic data" : "Enter chamber address"}
                     />
-                    {clinicData && (
+                    {(clinicData || selectedManualClinicId) && (
                       <p className="text-xs text-emerald-500">✓ Auto-filled from clinic</p>
                     )}
                   </div>
@@ -1719,7 +2036,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
                   >
                     RESET
                   </Button>
-                  <Button 
+                  <Button
                     onClick={handleSaveSchedule}
                     className="bg-emerald-600 hover:bg-emerald-700 text-white"
                   >
@@ -1940,7 +2257,176 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
                 ))}
               </div>
             )}
+            </div>
+            </>
+          )}
+
+      {currentTab === 'clinics' && (
+        <div className="space-y-8">
+          {/* Section 1: Add/Edit Clinic */}
+          <div>
+            <div className="flex items-start justify-between mb-6">
+              <h2 className="text-white">Manage Clinics</h2>
+              <p className="text-gray-400 text-sm hidden md:block">Add and manage your external clinics</p>
+            </div>
+            <p className="text-gray-400 text-sm md:hidden mb-6">Add and manage your external clinics</p>
+
+            <Card className="bg-gray-800/50 border-gray-700 p-6">
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-gray-300 text-sm">Clinic Name</Label>
+                    <Input
+                      value={clinicFormName}
+                      onChange={(e) => setClinicFormName(e.target.value)}
+                      placeholder="e.g. City Health Center"
+                      className="bg-gray-900/50 border-gray-700 text-white"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-gray-300 text-sm">Clinic Phone</Label>
+                    <Input
+                      value={clinicFormPhone}
+                      onChange={(e) => setClinicFormPhone(e.target.value)}
+                      placeholder="+91 98765 43210"
+                      className="bg-gray-900/50 border-gray-700 text-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-gray-300 text-sm">Clinic Code <span className="text-gray-500 text-xs">(Optional)</span></Label>
+                    <div className="flex gap-2">
+                      <Input
+                        value={clinicFormCode}
+                        onChange={(e) => setClinicFormCode(e.target.value.toUpperCase())}
+                        placeholder="HQR-XXXXXX-XXXX-CLN"
+                        className="bg-gray-900/50 border-gray-700 text-white font-mono flex-1"
+                      />
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        type="button"
+                        onClick={handleVerifyClinicFormCode}
+                        disabled={loadingClinic || !clinicFormCode.trim()}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-4"
+                      >
+                        {loadingClinic ? '...' : 'LINK'}
+                      </Button>
+                    </div>
+                    <p className="text-[10px] text-gray-500 italic">
+                      Linking a code enables dual bookings via Doctor & Clinic QR codes.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-gray-300 text-sm">Address</Label>
+                    <Input
+                      value={clinicFormAddress}
+                      onChange={(e) => setClinicFormAddress(e.target.value)}
+                      placeholder="Full address of the clinic"
+                      className="bg-gray-900/50 border-gray-700 text-white"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end pt-2 gap-3">
+                   {editingClinicId && (
+                    <Button
+                      onClick={handleResetClinicForm}
+                      variant="outline"
+                      className="border-gray-700 text-gray-300 hover:bg-gray-900 hover:text-white"
+                    >
+                      CANCEL
+                    </Button>
+                   )}
+                  <Button
+                    onClick={handleSaveManualClinic}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    {editingClinicId ? 'UPDATE CLINIC' : 'ADD CLINIC'}
+                  </Button>
+                </div>
+              </div>
+            </Card>
           </div>
+
+          {/* Section 2: Your Clinics List */}
+          <div>
+            <div className="flex items-start justify-between mb-6">
+              <h2 className="text-white">Your Clinics</h2>
+            </div>
+
+            {manualClinics.length === 0 ? (
+               <Card className="bg-gray-800/50 border-gray-700 p-12">
+                <div className="flex flex-col items-center justify-center text-center">
+                  <div className="w-16 h-16 mb-4 flex items-center justify-center bg-gray-900/50 rounded-full">
+                    <Building2 className="w-8 h-8 text-gray-600" />
+                  </div>
+                  <h3 className="text-white mb-2">No Clinics Added</h3>
+                  <p className="text-gray-400 text-sm">
+                    Add your practicing clinics to start scheduling chambers there
+                  </p>
+                </div>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {manualClinics.map((clinic) => (
+                  <Card key={clinic.id} className="bg-gray-800/50 border-gray-700 p-6">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-4">
+                        <div className="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                          <Building2 className="w-5 h-5 text-emerald-400" />
+                        </div>
+                        <div>
+                          <h4 className="text-white font-medium text-lg">{clinic.name}</h4>
+                          <div className="flex items-center gap-2 text-gray-400 text-sm mt-1">
+                            <MapPin className="w-4 h-4" />
+                            <span>{clinic.address}</span>
+                          </div>
+                          {clinic.phone && (
+                            <div className="flex items-center gap-2 text-gray-400 text-sm mt-1">
+                              <Phone className="w-4 h-4" />
+                              <span>{clinic.phone}</span>
+                            </div>
+                          )}
+                          {clinic.clinicCode && (
+                            <div className="flex items-center gap-2 text-emerald-400 text-sm mt-1">
+                              <QrCode className="w-4 h-4" />
+                              <span className="font-mono text-xs">Linked: {clinic.clinicCode}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <Button
+                          onClick={() => handleEditManualClinic(clinic)}
+                          variant="ghost"
+                          size="sm"
+                          className="text-gray-400 hover:text-white hover:bg-gray-700"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            setClinicToDelete(clinic.id);
+                            setShowClinicDeleteModal(true);
+                          }}
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
         </div>
       </div>
 
@@ -2045,8 +2531,8 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
             <div className="space-y-3">
               {allPeriods.slice(0, 5).map((period) => (
                 <Card key={period.id} className={`bg-gray-800/50 ${
-                  period.status === 'active' ? 'border-emerald-500/30' : 
-                  period.status === 'deactivated' ? 'border-red-500/20' : 
+                  period.status === 'active' ? 'border-emerald-500/30' :
+                  period.status === 'deactivated' ? 'border-red-500/20' :
                   'border-gray-700'
                 } p-4`}>
                   <div className="flex items-start justify-between mb-3">
@@ -2060,8 +2546,8 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
                         period.status === 'deactivated' ? 'bg-red-500/10 border border-red-500/30 text-red-400' :
                         'bg-gray-700/50 border border-gray-600 text-gray-400'
                       } rounded-full text-sm`}>
-                        {period.status === 'active' ? 'Active' : 
-                         period.status === 'deactivated' ? 'Deactivated' : 
+                        {period.status === 'active' ? 'Active' :
+                         period.status === 'deactivated' ? 'Deactivated' :
                          'Completed'}
                       </span>
                       {period.status === 'active' && (
@@ -2135,7 +2621,7 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
             <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <span className="text-white">
-                  {periodToDelete !== null 
+                  {periodToDelete !== null
                     ? `${formatDate(allPeriods.find(p => p.id === periodToDelete)?.startDate || '')} - ${formatDate(allPeriods.find(p => p.id === periodToDelete)?.endDate || '')}`
                     : 'No period selected'
                   }
@@ -2159,6 +2645,37 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
               className="bg-red-600 hover:bg-red-700 text-white min-w-[120px]"
             >
               GO AHEAD
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Clinic Confirmation Modal */}
+      <Dialog open={showClinicDeleteModal} onOpenChange={setShowClinicDeleteModal}>
+        <DialogContent className="bg-gray-900 border-gray-700 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white">Delete Clinic</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Are you sure you want to delete this clinic? This will not affect existing schedules, but you won't be able to select it for new ones.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-800">
+            <Button
+              onClick={() => {
+                setShowClinicDeleteModal(false);
+                setClinicToDelete(null);
+              }}
+              variant="outline"
+              className="border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
+            >
+              CANCEL
+            </Button>
+            <Button
+              onClick={handleDeleteManualClinic}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              DELETE
             </Button>
           </div>
         </DialogContent>

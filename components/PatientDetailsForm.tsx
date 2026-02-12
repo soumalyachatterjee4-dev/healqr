@@ -16,9 +16,10 @@ import { t, type Language, normalizeIndicNumerals, normalizePatientName } from '
 import { PatientRxUploadModal } from './PatientRxUploadModal';
 import TemplateDisplay from './TemplateDisplay';
 import { db } from '../lib/firebase/config';
-import { doc, getDoc, addDoc, collection, updateDoc, increment, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, addDoc, collection, updateDoc, increment, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { requestNotificationPermission } from '../services/fcm.service';
+import { generateBookingId } from '../utils/idGenerator';
 
 interface PatientDetailsFormProps {
   onBack: () => void;
@@ -54,7 +55,7 @@ export interface PatientFormData {
   purposeOfVisit: string;
   consent1: boolean;
   consent2: boolean;
-  paymentStatus?: 'not_required' | 'paid' | 'pay_later' | 'pending';
+  paymentStatus?: 'not_required' | 'paid' | 'pay_later' | 'pending' | 'completed';
   utrNumber?: string;
   prescriptionUrl?: string | string[]; // Support multiple files
   bookingId?: string;
@@ -62,9 +63,9 @@ export interface PatientFormData {
   serialNo?: number;
 }
 
-export default function PatientDetailsForm({ 
-  onBack, 
-  onSubmit, 
+export default function PatientDetailsForm({
+  onBack,
+  onSubmit,
   language,
   requiresPrepayment = false,
   consultationFee = 500,
@@ -98,6 +99,8 @@ export default function PatientDetailsForm({
   });
 
   const [showSubmit, setShowSubmit] = useState(true);
+  const [submitted, setSubmitted] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
   const [rxUploadOpen, setRxUploadOpen] = useState(false);
   const [uploadedRx, setUploadedRx] = useState(false);
   const [uploadedRxUrl, setUploadedRxUrl] = useState<string>('');
@@ -124,7 +127,7 @@ export default function PatientDetailsForm({
     );
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e?: React.FormEvent | null, paymentStatusOverride?: 'pending' | 'completed') => {
     if (!isFormValid() || isSubmitting) return;
 
     if (isBlocked) {
@@ -138,6 +141,8 @@ export default function PatientDetailsForm({
     }
 
     const bookingCreatedAt = new Date();
+    // Use override if provided, otherwise preserve form state
+    const finalPaymentStatus = paymentStatusOverride || formData.paymentStatus;
 
     setIsSubmitting(true);
 
@@ -147,18 +152,18 @@ export default function PatientDetailsForm({
     if (isTestMode) {
       const demoBookingId = `DEMO-${Date.now().toString().slice(-6)}`;
       const demoTokenNumber = `#DEMO`;
-      
+
       toast.success('Demo booking preview!');
-      
+
       // Show confirmation page with demo data
       onSubmit({
         ...formData,
         bookingId: demoBookingId,
         tokenNumber: demoTokenNumber,
         serialNo: 999,
-        paymentStatus: formData.paymentStatus
+        paymentStatus: finalPaymentStatus
       });
-      
+
       setIsSubmitting(false);
       return;
     }
@@ -182,18 +187,18 @@ export default function PatientDetailsForm({
         setIsSubmitting(false);
         return;
       }
-      
+
       const doctorData = doctorDoc.data();
       const doctorCode = doctorData.doctorCode;
-      
+
       if (!doctorCode) {
         toast.error('Doctor code not found. Please contact support.');
         setIsSubmitting(false);
         return;
       }
-      
+
       // Generate unique booking ID using doctor code
-      const { generateBookingId } = await import('../utils/idGenerator');
+      // Generate unique booking ID using doctor code
       const bookingId = await generateBookingId(doctorCode, selectedDate || new Date());
 
       // ============================================
@@ -201,28 +206,28 @@ export default function PatientDetailsForm({
       // Must resolve chamber before querying bookings
       // ============================================
       let chamberId = -1; // Default to -1 instead of null for better querying
-      
+
       if (doctorDoc.exists()) {
         const doctorData = doctorDoc.data();
-        
+
         if (doctorData.chambers && Array.isArray(doctorData.chambers)) {
           // Try exact match first
           let foundChamber = doctorData.chambers.find((c: any) => c.chamberName === selectedChamber);
-          
+
           // If no exact match, try case-insensitive match
           if (!foundChamber) {
-            foundChamber = doctorData.chambers.find((c: any) => 
+            foundChamber = doctorData.chambers.find((c: any) =>
               c.chamberName?.toLowerCase() === selectedChamber?.toLowerCase()
             );
           }
-          
+
           // If still no match, try partial match (both ways)
           if (!foundChamber && selectedChamber) {
-            foundChamber = doctorData.chambers.find((c: any) => 
+            foundChamber = doctorData.chambers.find((c: any) =>
               c.chamberName?.includes(selectedChamber) || selectedChamber?.includes(c.chamberName)
             );
           }
-          
+
           // Last resort: normalize and compare (remove special chars, spaces)
           if (!foundChamber && selectedChamber) {
             const normalizedSelected = selectedChamber.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
@@ -231,7 +236,7 @@ export default function PatientDetailsForm({
               return normalizedChamber === normalizedSelected;
             });
           }
-          
+
           if (foundChamber) {
             chamberId = foundChamber.id;
             console.log('✅ Chamber resolved:', {
@@ -250,53 +255,64 @@ export default function PatientDetailsForm({
       // 🎯 STEP 2: QUERY CHAMBER-SPECIFIC BOOKINGS
       // Filter by BOTH doctorId AND chamberId for unified serial numbers
       // ============================================
-      const { query: firestoreQuery, where, getDocs } = await import('firebase/firestore');
+      // ============================================
       const bookingsRef = collection(db, 'bookings');
-      
+
       // Format date for appointment saving (YYYY-MM-DD) - using local timezone
-      const appointmentDate = selectedDate 
+      const appointmentDateToSave = selectedDate
         ? new Date(selectedDate.getTime() - selectedDate.getTimezoneOffset() * 60000).toISOString().split('T')[0]
         : new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
-      
-      // Get TODAY'S DATE STRING for filtering
-      const todayStr = new Date().toISOString().split('T')[0];
-      
+
+      // Get TARGET DATE STRING for filtering (same as saved appointmentDate)
+      const todayStr = appointmentDateToSave;
+
       // 🔑 CRITICAL FIX: Query by BOTH doctorId AND chamberId
       // This ensures unified serial numbers per chamber across all booking sources
       // (Doctor QR, Clinic QR, Walk-in all share the same sequence for the same chamber)
-      const q = firestoreQuery(
+      // Prepare chamber IDs to query (handle both string and number types for safety)
+      const chamberIdsToQuery: (string | number)[] = [chamberId, String(chamberId)];
+      if (!isNaN(Number(chamberId))) chamberIdsToQuery.push(Number(chamberId));
+      const uniqueChamberIds = [...new Set(chamberIdsToQuery)];
+
+      const q = query(
         bookingsRef,
         where('doctorId', '==', doctorId),
-        where('chamberId', '==', chamberId)
+        where('chamberId', 'in', uniqueChamberIds)
       );
-      
+
       console.log('🔍 Querying CHAMBER-SPECIFIC bookings for unified serial numbers:', {
         doctorId,
         chamberId,
+        queriedChamberIds: uniqueChamberIds,
         chamberName: selectedChamber,
         todayStr,
-        appointmentDate,
+        appointmentDate: appointmentDateToSave,
         time: selectedTime || 'immediate'
       });
-      
+
       const querySnapshot = await getDocs(q);
-      
+
       // 🔄 FILTER FOR TODAY ONLY
       const todaysBookings = querySnapshot.docs.filter(doc => {
         const bookingData = doc.data();
+
+        // 1️⃣ Plan A: Check explicit string match (Most robust)
+        // This matches exactly how we save it (appointmentDateToSave)
+        if (bookingData.appointmentDate === todayStr) return true;
+        if (bookingData.bookingDate === todayStr) return true;
+
+        // 2️⃣ Plan B: Fallback to Timestamp calculation (Legacy compatibility)
         const bookingDate = bookingData.date?.toDate ? bookingData.date.toDate() : bookingData.date;
         const bookingDateStr = bookingDate instanceof Date ? bookingDate.toISOString().split('T')[0] : '';
         return bookingDateStr === todayStr;
       });
-      
+
       // 🎯 Generate CHAMBER-SPECIFIC serial number
       // All bookings for this chamber today (Dr QR + Clinic QR + Walk-in) share one sequence
       const tokenNumber = `#${todaysBookings.length + 1}`;
       const serialNo = todaysBookings.length + 1;
-      
-      // Store appointmentDate in outer scope for consistent use in save operation
-      const appointmentDateToSave = appointmentDate;
-      
+
+
       console.log('✅ CHAMBER-SPECIFIC Serial Number (UNIFIED across all sources):', {
         serialNo,
         tokenNumber,
@@ -307,34 +323,34 @@ export default function PatientDetailsForm({
         todayStr,
         appointmentDate: appointmentDateToSave
       });
-      
+
       // ============================================
       // 💾 SAVE TO DATABASE IMMEDIATELY (PREVENT RACE CONDITION)
       // Must save BEFORE showing confirmation to ensure correct serial numbers
       // ============================================
-      
+
       // ✅ Validate planned off periods and chamber active status
       if (doctorDoc.exists()) {
         const doctorData = doctorDoc.data();
-        
+
         // Check if selected date falls in a planned off period
         if (doctorData.plannedOffPeriods && Array.isArray(doctorData.plannedOffPeriods) && selectedDate) {
           const activePlannedOffPeriods = doctorData.plannedOffPeriods.filter((p: any) => p.status === 'active');
-          
+
           // Create local date at midnight to avoid timezone issues
           const bookingDate = new Date(selectedDate);
           bookingDate.setHours(0, 0, 0, 0);
-          
+
           console.log('🔍 PatientDetailsForm: Checking planned off periods', {
             bookingDate: bookingDate.toDateString(),
             activePeriods: activePlannedOffPeriods.length
           });
-          
+
           for (const period of activePlannedOffPeriods) {
             // Parse dates as local timezone
             let startDate: Date;
             let endDate: Date;
-            
+
             if (period.startDate?.toDate) {
               startDate = period.startDate.toDate();
             } else if (typeof period.startDate === 'string') {
@@ -343,7 +359,7 @@ export default function PatientDetailsForm({
             } else {
               startDate = new Date(period.startDate);
             }
-            
+
             if (period.endDate?.toDate) {
               endDate = period.endDate.toDate();
             } else if (typeof period.endDate === 'string') {
@@ -352,16 +368,16 @@ export default function PatientDetailsForm({
             } else {
               endDate = new Date(period.endDate);
             }
-            
+
             startDate.setHours(0, 0, 0, 0);
             endDate.setHours(0, 0, 0, 0);
-            
+
             console.log('  📅 Comparing with period:', {
               startDate: startDate.toDateString(),
               endDate: endDate.toDateString(),
               isInRange: bookingDate >= startDate && bookingDate <= endDate
             });
-            
+
             if (bookingDate >= startDate && bookingDate <= endDate) {
               toast.error('This date is unavailable due to planned off period. Please select another date.');
               setIsSubmitting(false);
@@ -369,7 +385,7 @@ export default function PatientDetailsForm({
             }
           }
         }
-        
+
         // Check if chamber is active (already resolved chamberId above)
         if (doctorData.chambers && Array.isArray(doctorData.chambers) && chamberId !== -1) {
           const foundChamber = doctorData.chambers.find((c: any) => c.id === chamberId);
@@ -383,7 +399,7 @@ export default function PatientDetailsForm({
 
       // 🔐 Encrypt sensitive patient data before saving
       const { encrypt } = await import('../utils/encryptionService');
-      
+
       // 🎯 NORMALIZE DATA: Convert Indic numerals and names to English before encryption
       const normalizedName = normalizePatientName(formData.patientName);
       const normalizedAge = normalizeIndicNumerals(formData.age?.toString() || '');
@@ -394,14 +410,14 @@ export default function PatientDetailsForm({
           doctorCode, // Store doctor code for queries
           tokenNumber,
           serialNo, // Store numeric serial for sorting
-          
+
           // 🔐 ENCRYPTED SENSITIVE FIELDS (with normalized data)
           patientName_encrypted: encrypt(normalizedName),
           whatsappNumber_encrypted: encrypt(`+91${formData.whatsappNumber}`),
           age_encrypted: encrypt(normalizedAge),
           gender_encrypted: encrypt(formData.gender || ''),
           purposeOfVisit_encrypted: encrypt(formData.purposeOfVisit || ''),
-          
+
           // Plain searchable fields
           patientPhone: `+91${formData.whatsappNumber}`, // 🔍 SEARCHABLE phone for history queries
           patientName: normalizedName, // 🔍 SEARCHABLE name for queries
@@ -423,7 +439,7 @@ export default function PatientDetailsForm({
           bookingSource: sessionStorage.getItem('booking_source') || 'doctor_qr', // 'clinic_qr' or 'doctor_qr' or 'walkin'
           type: bookingType, // 'qr_booking' or 'walkin_booking'
           status: 'confirmed',
-          paymentStatus: formData.paymentStatus,
+          paymentStatus: finalPaymentStatus,
           utrNumber: formData.utrNumber || null,
           prescriptionUrl: formData.prescriptionUrl || null,
           consultationType: consultationType,
@@ -442,7 +458,7 @@ export default function PatientDetailsForm({
             const scansRef = collection(db, 'qrScans');
             const scanQuery = query(scansRef, where('scanSessionId', '==', scanSessionId));
             const scanSnapshot = await getDocs(scanQuery);
-            
+
             if (!scanSnapshot.empty) {
               const scanDoc = scanSnapshot.docs[0];
               await updateDoc(doc(db, 'qrScans', scanDoc.id), {
@@ -496,7 +512,7 @@ export default function PatientDetailsForm({
       const updatedDoctorDoc = await getDoc(doc(db, 'doctors', doctorId));
       if (updatedDoctorDoc.exists()) {
         const data = updatedDoctorDoc.data();
-        
+
         // Check booking limit
         if (data.bookingsCount >= data.bookingsLimit) {
           await updateDoc(doc(db, 'doctors', doctorId), {
@@ -531,9 +547,9 @@ export default function PatientDetailsForm({
           const trimmed = digits.replace(/^91/, '');
           const phone10 = trimmed.slice(-10);
           const userId = `patient_${phone10}`;
-          
 
-          
+
+
           const token = await requestNotificationPermission(userId, 'patient');
           if (token) {
 
@@ -556,7 +572,7 @@ export default function PatientDetailsForm({
       } else {
 
       }
-      
+
       // ============================================
       // 🔔 BOOKING REMINDER SCHEDULING (1h before, only if booked ≥6h prior)
       // ============================================
@@ -586,7 +602,7 @@ export default function PatientDetailsForm({
             appointmentTime: appointmentDateTime.toISOString(),
             bookingCreatedAt: bookingCreatedAt.toISOString(),
           });
-          
+
           if (result && !result.skipped) {
             reminderScheduled = true;
           }
@@ -594,7 +610,7 @@ export default function PatientDetailsForm({
       } catch (reminderError) {
         // Failed to schedule booking reminder (non-blocking)
       }
-      
+
       // Update the booking document with reminder status
       if (reminderScheduled) {
         try {
@@ -616,28 +632,40 @@ export default function PatientDetailsForm({
           // Failed to update booking with reminder flag
         }
       }
-      
+
       // ============================================
       // ✅ NOW SHOW CONFIRMATION AND NAVIGATE
       // FCM registration completed above
       // ============================================
       toast.success('Booking confirmed successfully!');
-      
+
+      // Show confirmation page
       onSubmit({
         ...formData,
         bookingId,
         tokenNumber,
-        serialNo
+        serialNo,
+        paymentStatus: finalPaymentStatus
       } as any);
-      
-      // Reset submitting state
-      setIsSubmitting(false);
-      
-    } catch (error: any) {
-      console.error('❌ Error saving booking:', error);
-      toast.error('Booking failed. Please try again.');
+
+      setSubmitted(true);
+      setShowConfetti(true);
+    } catch (error) {
+      console.error('Error adding document: ', error);
+      toast.error('Failed to book appointment. Please try again.');
+    } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handlePayLater = (e: React.MouseEvent) => {
+    e.preventDefault();
+    handleSubmit(null, 'pending');
+  };
+
+  const handlePayNow = (e: React.MouseEvent) => {
+    e.preventDefault();
+    handleSubmit(null, 'completed');
   };
 
   return (
@@ -820,7 +848,7 @@ export default function PatientDetailsForm({
                   <div className="flex items-center gap-2 text-green-400 text-sm">
                     <CheckCircle2 className="w-4 h-4" />
                     <span>
-                      {t('prescriptionUploadedSuccess', language)} 
+                      {t('prescriptionUploadedSuccess', language)}
                       {Array.isArray(formData.prescriptionUrl) && formData.prescriptionUrl.length > 1 && (
                         <span className="ml-2">({formData.prescriptionUrl.length} files)</span>
                       )}
@@ -870,7 +898,7 @@ export default function PatientDetailsForm({
         {requiresPrepayment && (
           <div className="bg-[#1a1f2e] rounded-xl p-6 mb-6">
             <h3 className="text-white mb-4">💰 Consultation Fee</h3>
-            
+
             <div className="flex justify-between items-center mb-4 pb-4 border-b border-gray-700">
               <span className="text-gray-400">Consultation Charge:</span>
               <span className="text-2xl text-emerald-500">₹{consultationFee}</span>

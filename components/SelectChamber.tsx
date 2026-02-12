@@ -1,6 +1,4 @@
 import { Button } from './ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { Lightbulb, Star, ChevronDown } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { t, type Language, languageDisplayNames } from '../utils/translations';
 import BookingFlowLayout from './BookingFlowLayout';
@@ -22,6 +20,8 @@ interface Chamber {
   endTime: string;
   isActive?: boolean;
   maxCapacity?: number;
+  clinicId?: string;
+  manualClinicId?: string;
 }
 
 interface ChamberWithBookingCount extends Chamber {
@@ -80,9 +80,9 @@ export default function SelectChamber({
   clinicPlannedOffPeriods = [],
 }: SelectChamberProps) {
   const accentColor = themeColor === 'blue' ? 'blue' : 'emerald';
-  console.log('🏥 SelectChamber received:', { 
-    doctorName, 
-    doctorSpecialty, 
+  console.log('🏥 SelectChamber received:', {
+    doctorName,
+    doctorSpecialty,
     chamberscount: chambers.length,
     chambersDetails: chambers.map(c => ({
       name: c.chamberName,
@@ -96,14 +96,14 @@ export default function SelectChamber({
     clinicPlannedOffPeriodsCount: clinicPlannedOffPeriods.length,
     clinicPlannedOffPeriods: clinicPlannedOffPeriods
   });
-  
+
   // Check if selected date falls in clinic planned off period
   // Updated to check specific chamber's clinic
   const isClinicOffForChamber = (chamber: any) => {
     const chamberClinicId = chamber.clinicId;
     const chamberAddr = (chamber.chamberAddress || '').toLowerCase().trim();
     const isHomeChamber = chamber.chamberName?.toLowerCase().includes('home');
-    
+
     console.log('🔍 isClinicOffForChamber CHECK:', {
       chamberName: chamber.chamberName,
       chamberClinicId: chamberClinicId || 'NONE',
@@ -112,24 +112,24 @@ export default function SelectChamber({
       selectedDate: selectedDate instanceof Date ? selectedDate.toDateString() : selectedDate,
       clinicPlannedOffPeriodsCount: clinicPlannedOffPeriods.length
     });
-    
+
     if (!clinicPlannedOffPeriods || clinicPlannedOffPeriods.length === 0) {
       console.log('⚠️ No clinic planned off periods provided');
       return false;
     }
-    
+
     // Home chambers are never blocked
     if (isHomeChamber) {
       console.log('🏠 Home chamber - never blocked');
       return false;
     }
-    
+
     const date = new Date(selectedDate);
     date.setHours(0, 0, 0, 0);
-    
+
     const activePlannedOffPeriods = clinicPlannedOffPeriods.filter((p: any) => p.status === 'active');
     console.log('📋 Active clinic planned off periods (all):', activePlannedOffPeriods.length);
-    
+
     for (const period of activePlannedOffPeriods) {
       if (period.doctorId && doctorId && period.doctorId !== doctorId) {
         console.log('⏭️ Skipping period for other doctor:', {
@@ -140,7 +140,7 @@ export default function SelectChamber({
       }
 
       let isMatch = false;
-      
+
       // Method 1: Match by clinicId (most reliable)
       if (chamberClinicId && period.clinicId) {
         isMatch = chamberClinicId === period.clinicId;
@@ -152,17 +152,17 @@ export default function SelectChamber({
       // Method 2: Match by address (fallback for legacy chambers without clinicId)
       else if (!chamberClinicId && chamberAddr && period.clinicAddress) {
         const periodAddr = period.clinicAddress.toLowerCase().trim();
-        
+
         // Flexible address matching: check if either contains the other
         const addressMatch = chamberAddr.includes(periodAddr) || periodAddr.includes(chamberAddr);
-        
+
         // Also try matching by clinic name if available
         let nameMatch = false;
         if (period.clinicName) {
           const periodName = period.clinicName.toLowerCase().trim();
           nameMatch = chamberAddr.includes(periodName);
         }
-        
+
         isMatch = addressMatch || nameMatch;
         console.log(`📍 Address/Name Match: ${isMatch}`, {
           chamberAddr,
@@ -172,16 +172,16 @@ export default function SelectChamber({
           nameMatch
         });
       }
-      
+
       if (!isMatch) {
         continue; // This period doesn't apply to this chamber
       }
-      
+
       // If period specifies a specific chamber, only apply if it matches
       if (period.chamberName) {
         const periodChamberName = (period.chamberName || '').toLowerCase().trim();
         const currentChamberName = (chamber.chamberName || '').toLowerCase().trim();
-        
+
         if (periodChamberName !== currentChamberName) {
           console.log('🔹 Skipping period for different chamber:', {
             currentChamber: currentChamberName,
@@ -191,39 +191,39 @@ export default function SelectChamber({
         }
         console.log('✅ Period targets this specific chamber:', currentChamberName);
       }
-      
+
       // Period matches this chamber's clinic - check if date falls in range
       let startDate: Date;
       let endDate: Date;
-      
+
       if (typeof period.startDate === 'string') {
         const [year, month, dayVal] = period.startDate.split('-').map(Number);
         startDate = new Date(year, month - 1, dayVal);
-      } else if (period.startDate?.toDate) {
-        startDate = period.startDate.toDate();
+      } else if ((period.startDate as any)?.toDate) {
+        startDate = (period.startDate as any).toDate();
       } else {
-        startDate = new Date(period.startDate);
+        startDate = new Date(period.startDate as any);
       }
-      
+
       if (typeof period.endDate === 'string') {
         const [year, month, dayVal] = period.endDate.split('-').map(Number);
         endDate = new Date(year, month - 1, dayVal);
-      } else if (period.endDate?.toDate) {
-        endDate = period.endDate.toDate();
+      } else if ((period.endDate as any)?.toDate) {
+        endDate = (period.endDate as any).toDate();
       } else {
-        endDate = new Date(period.endDate);
+        endDate = new Date(period.endDate as any);
       }
-      
+
       startDate.setHours(0, 0, 0, 0);
       endDate.setHours(0, 0, 0, 0);
-      
+
       console.log('🔄 Comparing dates:', {
         checkDate: date.toDateString(),
         periodStart: startDate.toDateString(),
         periodEnd: endDate.toDateString(),
         isInRange: date >= startDate && date <= endDate
       });
-      
+
       if (date >= startDate && date <= endDate) {
         console.log('❌❌❌ CHAMBER BLOCKED - Clinic is OFF on selected date:', {
           chamberName: chamber.chamberName,
@@ -235,14 +235,14 @@ export default function SelectChamber({
         return true;
       }
     }
-    
+
     console.log('✅ Chamber available - Clinic is OPEN on selected date');
     return false;
   };
-  
+
   const [selectedChamber, setSelectedChamber] = useState<ChamberWithBookingCount | null>(null);
-  const [selectedChamberName, setSelectedChamberName] = useState<string>('');
-  const [consultationType, setConsultationType] = useState<'chamber' | 'video'>('chamber');
+  const [, setSelectedChamberName] = useState<string>('');
+  const [consultationType, ] = useState<'chamber' | 'video'>('chamber');
   const [chambersWithCounts, setChambersWithCounts] = useState<ChamberWithBookingCount[]>([]);
   const [loadingCounts, setLoadingCounts] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0); // Force refresh trigger
@@ -271,12 +271,12 @@ export default function SelectChamber({
         }
 
         const { collection, query, where, getDocs, doc, getDoc } = await import('firebase/firestore');
-        
+
         // Reload doctor data to get latest blockedDates
         const doctorRef = doc(db, 'doctors', doctorId);
         const doctorSnap = await getDoc(doctorRef);
         let chambersWithBlockedDates = chambers;
-        
+
         if (doctorSnap.exists()) {
           const doctorData = doctorSnap.data();
           // Update chambers with blockedDates from Firestore
@@ -290,12 +290,12 @@ export default function SelectChamber({
             };
           });
         }
-        
+
         // Get selected date string (YYYY-MM-DD) - Use local timezone to match booking creation
         const selectedDateStr = new Date(selectedDate.getTime() - selectedDate.getTimezoneOffset() * 60000).toISOString().split('T')[0];
-        
+
         console.log(`📅 SelectChamber: Loading bookings for date: ${selectedDateStr} (Local timezone)`);
-        
+
         // Query bookings for each chamber (use chambersWithBlockedDates to get latest blocked status)
         const chambersWithBookingData = await Promise.all(
           chambersWithBlockedDates.map(async (chamber) => {
@@ -306,27 +306,27 @@ export default function SelectChamber({
                 bookingsRef,
                 where('chamberId', '==', chamber.id)
               );
-              
+
               const snapshot = await getDocs(q);
-              
+
               // Filter in JavaScript for date and non-cancelled status
               const allDocs = snapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
               }));
-              
+
               const bookedCount = allDocs.filter((data: any) => {
                 const isMatchingDate = data.appointmentDate === selectedDateStr;
                 // Count ALL bookings (including cancelled) to match Dashboard logic
-                // const isNotCancelled = data.status !== 'cancelled'; 
+                // const isNotCancelled = data.status !== 'cancelled';
                 return isMatchingDate;
               }).length;
-              
+
               console.log(`📊 SelectChamber: "${chamber.chamberName}" (ID: ${chamber.id}): ${bookedCount}/${chamber.maxCapacity || 0} bookings (All Status) for ${selectedDateStr}`);
               console.log(`   Total docs for chamberId ${chamber.id}:`, allDocs.length);
               console.log(`   Matching date (${selectedDateStr}):`, allDocs.filter((d: any) => d.appointmentDate === selectedDateStr).length);
               console.log(`   Sample booking:`, allDocs[0]);
-              
+
               // Convert start time to minutes for sorting
               const [startHour, startMin] = (chamber.startTime || '00:00').split(':').map(Number);
               const startMinutes = startHour * 60 + startMin;
@@ -350,10 +350,10 @@ export default function SelectChamber({
             }
           })
         );
-        
+
         // Sort chambers by start time (earliest first)
         let sortedChambers = chambersWithBookingData.sort((a, b) => (a.startMinutes || 0) - (b.startMinutes || 0));
-        
+
         console.log('🔵 CHAMBER FILTERING START:', {
           totalChambers: sortedChambers.length,
           hasClinicId: !!clinicId,
@@ -362,67 +362,67 @@ export default function SelectChamber({
           clinicAddress: clinicAddress,
           clinicPlannedOffPeriodsCount: clinicPlannedOffPeriods.length
         });
-        
+
         // 🔒 CLINIC QR FILTER: If patient scanned a clinic QR (clinicId exists),
         // ONLY show chambers belonging to THAT specific clinic
         const bookingSource = sessionStorage.getItem('booking_source');
         if (clinicId && bookingSource === 'clinic_qr') {
           const beforeFilter = sortedChambers.length;
           console.log('🏥 CLINIC QR MODE: Filtering to show ONLY clinic chambers with ID:', clinicId);
-          
+
           sortedChambers = sortedChambers.filter(chamber => {
             const chamberClinicId = (chamber as any).clinicId;
             const belongsToClinic = chamberClinicId === clinicId;
-            
+
             console.log(`🔍 Chamber "${chamber.chamberName}":`, {
               chamberClinicId: chamberClinicId || 'NONE',
               targetClinicId: clinicId,
               match: belongsToClinic,
               action: belongsToClinic ? '✅ KEEP' : '❌ REMOVE'
             });
-            
+
             return belongsToClinic; // Keep ONLY chambers matching clinic ID
           });
-          
+
           console.log(`✅ Clinic chamber filter complete: ${beforeFilter} → ${sortedChambers.length} chambers (kept only clinic chambers)`);
         }
-        
+
         // Filter out chambers if their specific clinic is off on selected date
         const beforeClinicOffFilter = sortedChambers.length;
         console.log('🔍 Checking each chamber for clinic planned off periods...');
-        
+
         sortedChambers = sortedChambers.filter(chamber => {
           const isOff = isClinicOffForChamber(chamber);
-          
+
           if (isOff) {
             console.log(`🚫 REMOVING chamber: "${chamber.chamberName}" - Clinic is OFF on ${selectedDate.toDateString()}`);
           } else {
             console.log(`✅ KEEPING chamber: "${chamber.chamberName}" - Clinic is OPEN`);
           }
-          
+
           return !isOff; // Keep chambers whose clinic is NOT off
         });
-        
+
         console.log(`✅ Clinic off filter complete: ${beforeClinicOffFilter} → ${sortedChambers.length} chambers (removed ${beforeClinicOffFilter - sortedChambers.length} due to clinic planned off)`);
-        
+
         // Filter out disabled chambers (isActive === false)
         const beforeIsActiveFilter = sortedChambers.length;
         console.log('🔍 Checking each chamber for active status...');
-        
+
         sortedChambers = sortedChambers.filter(chamber => {
           const isActive = chamber.isActive !== false; // Default to true if not specified
-          
+
           if (!isActive) {
             console.log(`🚫 REMOVING chamber: "${chamber.chamberName}" - Chamber is DISABLED (isActive=false)`);
           } else {
             console.log(`✅ KEEPING chamber: "${chamber.chamberName}" - Chamber is ENABLED`);
           }
-          
+
           return isActive;
         });
-        
+
         console.log(`✅ Active status filter complete: ${beforeIsActiveFilter} → ${sortedChambers.length} chambers (removed ${beforeIsActiveFilter - sortedChambers.length} due to disabled status)`);
-        
+
         setChambersWithCounts(sortedChambers);
       } catch (error) {
         console.error('❌ Error loading booking counts:', error);
@@ -438,20 +438,20 @@ export default function SelectChamber({
   useEffect(() => {
     const doctorId = sessionStorage.getItem('booking_doctor_id');
     if (!doctorId) return;
-    
+
     let timeoutId: NodeJS.Timeout | null = null;
-    
+
     const setupListener = async () => {
       const { db } = await import('../lib/firebase/config');
       if (!db) return;
-      
+
       const { collection, query, where, onSnapshot } = await import('firebase/firestore');
-      
+
       const bookingsQuery = query(
         collection(db, 'bookings'),
         where('doctorId', '==', doctorId)
       );
-      
+
       const unsubscribe = onSnapshot(bookingsQuery, (snapshot) => {
         snapshot.docChanges().forEach((change) => {
           if (change.type === 'added' || change.type === 'modified' || change.type === 'removed') {
@@ -464,15 +464,15 @@ export default function SelectChamber({
           }
         });
       });
-      
+
       return unsubscribe;
     };
-    
+
     let unsub: (() => void) | undefined;
     setupListener().then(unsubscribe => {
       unsub = unsubscribe;
     });
-    
+
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
       if (unsub) unsub();
@@ -519,7 +519,7 @@ export default function SelectChamber({
         <div className="text-center mb-2">
           <h1 className="text-white mb-2">{t('selectChamber', language)}</h1>
           <p className="text-gray-400 text-sm mb-4">{t('choosePreferredLocation', language)}</p>
-          
+
           {/* Selected Date Badge */}
           <div className={`inline-block bg-${accentColor}-500/20 border border-${accentColor}-500/30 backdrop-blur-sm rounded-full px-4 py-2 mb-6`}>
             <p className={`text-${accentColor}-400 text-sm`}>{formatDate(selectedDate)}</p>
@@ -609,101 +609,121 @@ export default function SelectChamber({
                       chamberEndTime.setHours(endHour, endMin, 0, 0);
                       isExpired = chamberEndTime < new Date();
                     }
-                    
+
                     // Check if selected date is blocked (use local timezone)
                     let isBlockedForDate = false;
                     if (selectedDate && (chamber as any).blockedDates) {
                       const selectedDateStr = new Date(selectedDate.getTime() - selectedDate.getTimezoneOffset() * 60000).toISOString().split('T')[0];
                       isBlockedForDate = (chamber as any).blockedDates.includes(selectedDateStr);
-                      console.log(`🔍 Chamber "${chamber.chamberName}" blocked check:`, {
-                        selectedDateStr,
-                        blockedDates: (chamber as any).blockedDates,
-                        isBlockedForDate
-                      });
                     }
-                    
-                    return { ...chamber, isExpired, isBlockedForDate };
+
+                    // NEW: 1-hour booking cutoff for manual clinics
+                    let isCutoff = false;
+                    const manualClinicId = chamber.manualClinicId;
+                    if (manualClinicId && selectedDate) {
+                      const today = new Date();
+                      const isToday = selectedDate.toDateString() === today.toDateString();
+                      if (isToday) {
+                        const [startHour, startMin] = (chamber.startTime || '00:00').split(':').map(Number);
+                        const chamberStartTime = new Date(today);
+                        chamberStartTime.setHours(startHour, startMin, 0, 0);
+
+                        const now = new Date();
+                        const diffInMs = chamberStartTime.getTime() - now.getTime();
+                        const oneHourInMs = 60 * 60 * 1000;
+
+                        if (diffInMs <= oneHourInMs) {
+                          isCutoff = true;
+                        }
+                      }
+                    }
+
+                    return { ...chamber, isExpired, isBlockedForDate, isCutoff };
                   })
                   .sort((a, b) => {
                     // Expired chambers go to bottom
                     if (a.isExpired && !b.isExpired) return 1;
                     if (!a.isExpired && b.isExpired) return -1;
-                    
+
                     // Both active or both expired: sort by start time ascending
-                    return (a.startMinutes || 0) - (b.startMinutes || 0);
+                    return ((a as any).startMinutes || 0) - ((b as any).startMinutes || 0);
                   })
                   .map((chamber, index) => {
-                  const capacity = chamber.maxCapacity || 0;
-                  const booked = chamber.bookedCount || 0;
-                  const isFull = booked >= capacity;
-                  const percentageFull = capacity > 0 ? (booked / capacity) * 100 : 0;
-                  const isExpired = chamber.isExpired;
-                  const isBlockedForDate = (chamber as any).isBlockedForDate || false;
-                  
-                  // Determine status color
-                  let statusColor = `text-${accentColor}-400`;
-                  if (percentageFull >= 100) statusColor = 'text-red-400';
-                  else if (percentageFull >= 80) statusColor = 'text-yellow-400';
-                  
-                  return (
-                    <button
-                      key={chamber.id}
-                      onClick={() => {
-                        if (isBlockedForDate || isFull || isExpired) return;
-                        setSelectedChamber(chamber);
-                        setSelectedChamberName(chamber.chamberName);
-                        // Save clinicId to sessionStorage for booking creation
-                        if (chamber.clinicId) {
-                          sessionStorage.setItem('booking_clinic_id', chamber.clinicId);
-                          console.log('✅ Selected chamber:', chamber.chamberName, '| chamberId:', chamber.id, '| clinicId:', chamber.clinicId);
-                        } else {
-                          sessionStorage.removeItem('booking_clinic_id');
-                          console.log('✅ Selected chamber:', chamber.chamberName, '| chamberId:', chamber.id, '| (Solo chamber)');
-                        }
-                      }}
-                      disabled={isBlockedForDate || isFull || isExpired}
-                      className={`w-full text-left border-2 rounded-2xl p-5 mb-3 transition-all ${
-                        isBlockedForDate || isFull || isExpired
-                          ? 'border-gray-800 bg-gray-900/50 opacity-50 cursor-not-allowed'
-                          : selectedChamber?.id === chamber.id
-                          ? `border-${accentColor}-500 bg-${accentColor}-500/10`
-                          : 'border-gray-700 bg-[#0f1419] hover:border-gray-600'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <h4 className={`${isBlockedForDate || isFull || isExpired ? 'text-gray-600' : 'text-white'}`}>
-                          {chamber.chamberName}
-                        </h4>
-                        {isBlockedForDate ? (
-                          <span className="text-xs text-red-400">(Unavailable)</span>
-                        ) : !isExpired && (
-                          <div className="flex items-center gap-2">
-                            <span className={`text-sm font-medium ${statusColor}`}>
-                              {booked}/{capacity}
-                            </span>
-                            {isFull && (
-                              <Badge className="bg-red-500 text-white text-xs">FULL</Badge>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      <p className="text-sm text-gray-400 mb-1">{chamber.chamberAddress}</p>
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm text-gray-400">{chamber.startTime} - {chamber.endTime}</p>
-                        {isExpired && (
-                          <Badge className="bg-red-600 text-white text-xs">CHAMBER TIME OVER</Badge>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })
+                    const capacity = chamber.maxCapacity || 0;
+                    const booked = chamber.bookedCount || 0;
+                    const isFull = booked >= capacity;
+                    const percentageFull = capacity > 0 ? (booked / capacity) * 100 : 0;
+                    const isExpired = (chamber as any).isExpired;
+                    const isCutoff = (chamber as any).isCutoff || false;
+                    const isBlockedForDate = (chamber as any).isBlockedForDate || false;
+
+                    const isDisabled = isBlockedForDate || isFull || isExpired || isCutoff;
+
+                    // Determine status color
+                    let statusColor = `text-${accentColor}-400`;
+                    if (percentageFull >= 100) statusColor = 'text-red-400';
+                    else if (percentageFull >= 80) statusColor = 'text-yellow-400';
+
+                    return (
+                      <button
+                        key={chamber.id}
+                        onClick={() => {
+                          if (isDisabled) return;
+                          setSelectedChamber(chamber as any);
+                          setSelectedChamberName(chamber.chamberName);
+                          // Save clinicId to sessionStorage for booking creation
+                          if (chamber.clinicId) {
+                            sessionStorage.setItem('booking_clinic_id', chamber.clinicId);
+                            console.log('✅ Selected chamber:', chamber.chamberName, '| chamberId:', chamber.id, '| clinicId:', chamber.clinicId);
+                          } else {
+                            sessionStorage.removeItem('booking_clinic_id');
+                            console.log('✅ Selected chamber:', chamber.chamberName, '| chamberId:', chamber.id, '| (Solo chamber)');
+                          }
+                        }}
+                        disabled={isDisabled}
+                        className={`w-full text-left border-2 rounded-2xl p-5 mb-3 transition-all ${
+                          isDisabled
+                            ? 'border-gray-800 bg-gray-900/50 opacity-50 cursor-not-allowed'
+                            : selectedChamber?.id === chamber.id
+                            ? `border-${accentColor}-500 bg-${accentColor}-500/10`
+                            : 'border-gray-700 bg-[#0f1419] hover:border-gray-600'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <h4 className={`${isDisabled ? 'text-gray-600' : 'text-white'}`}>
+                            {chamber.chamberName}
+                          </h4>
+                          {isBlockedForDate ? (
+                            <span className="text-xs text-red-400">(Unavailable)</span>
+                          ) : (isFull && !isExpired && !isCutoff) ? (
+                            <Badge className="bg-red-500 text-white text-xs">FULL</Badge>
+                          ) : (!isExpired && !isCutoff) && (
+                            <div className="flex items-center gap-2">
+                              <span className={`text-sm font-medium ${statusColor}`}>
+                                {booked}/{capacity}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-400 mb-1">{chamber.chamberAddress}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm text-gray-400">{chamber.startTime} - {chamber.endTime}</p>
+                          {isExpired && (
+                            <Badge className="bg-red-600 text-white text-xs">CHAMBER TIME OVER</Badge>
+                          )}
+                          {isCutoff && !isExpired && (
+                            <Badge className="bg-orange-600 text-white text-xs">BOOKINGS CLOSED</Badge>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })
               ) : (
                 <>
-                  {/* Fallback demo chambers if no chambers data */}
                   <button
-                onClick={() => setSelectedChamber('main')}
+                onClick={() => setSelectedChamber('main' as any)}
                 className={`w-full text-left border-2 rounded-2xl p-5 mb-3 transition-all ${
-                  selectedChamber === 'main'
+                  (selectedChamber as any) === 'main'
                   ? `border-${accentColor}-500 bg-${accentColor}-500/10`
                   : 'border-gray-700 bg-[#0f1419] hover:border-gray-600'
                 }`}
@@ -713,9 +733,9 @@ export default function SelectChamber({
                 <p className="text-sm text-gray-400">06:00 - 17:00</p>
               </button>
               <button
-                onClick={() => setSelectedChamber('secondary')}
+                onClick={() => setSelectedChamber('secondary' as any)}
                 className={`w-full text-left border-2 rounded-2xl p-5 mb-3 transition-all ${
-                  selectedChamber === 'secondary'
+                  (selectedChamber as any) === 'secondary'
                   ? `border-${accentColor}-500 bg-${accentColor}-500/10`
                   : 'border-gray-700 bg-[#0f1419] hover:border-gray-600'
                 }`}

@@ -80,6 +80,11 @@ const ClinicLogin = lazy(() => import("./components/ClinicLogin"));
 const ClinicDashboard = lazy(() => import("./components/ClinicDashboard"));
 const PatientLogin = lazy(() => import("./components/PatientLogin"));
 const PatientDashboardNew = lazy(() => import("./components/PatientDashboardNew"));
+const MonthlyPlanner = lazy(() => import("./components/MonthlyPlanner"));
+const DoctorPatientChatManager = lazy(() => import("./components/DoctorPatientChatManager"));
+const PatientChatInterface = lazy(() => import("./components/PatientChatInterface"));
+const VideoConsultationManager = lazy(() => import("./components/VideoConsultationManager"));
+const AIRXReaderManager = lazy(() => import("./components/AIRXReaderManager"));
 
 // Loading Component
 const PageLoader = () => (
@@ -172,6 +177,13 @@ export default function App() {
     | "patient-login"
     | "patient-dashboard"
     | "patient-history"
+    | "monthly-planner"
+    | "patient-chat"
+    | "doctor-patient-chat"
+    | "video-consultation"
+    | "ai-rx-reader"
+    | "advertiser-gateway"
+    | "purchase-history"
   >("landing");
   const [notifData, setNotifData] = useState<{
     bookingId?: string; // For smart data fetching from Firestore
@@ -223,6 +235,7 @@ export default function App() {
 
   const [patientNewRxViewerOpen, setPatientNewRxViewerOpen] =
     useState(false);
+  const [qrManagerInitialTab, setQrManagerInitialTab] = useState('qr-generator');
   const [patientNewRxData, setPatientNewRxData] = useState<{
     name: string;
     language: "english" | "hindi" | "bengali";
@@ -289,7 +302,7 @@ export default function App() {
                 profileImage: data.profileImage || "",
                 name: data.name || userName || "Doctor Name",
                 degrees: data.degrees || [],
-                specialities: data.specialities || []
+                specialities: data.specialties || data.specialities || []
               });
 
               // Load Dr. prefix preference
@@ -434,30 +447,30 @@ export default function App() {
   // Helper: Load clinic planned off periods from clinic documents
   const loadClinicSchedules = async (chambers: any[], db: any) => {
     console.log('🏥 [LOAD CLINICS] Loading for', chambers.length, 'chambers');
-    
+
     const { doc: firestoreDoc, getDoc } = await import('firebase/firestore');
     const clinicIds = new Set<string>();
-    
+
     // Collect unique clinic IDs
     for (const chamber of chambers) {
       if (chamber.clinicId) {
         clinicIds.add(chamber.clinicId);
       }
     }
-    
+
     console.log('🆔 [LOAD CLINICS] Unique clinic IDs:', Array.from(clinicIds));
-    
+
     const allClinicPeriods: any[] = [];
-    
+
     for (const clinicId of Array.from(clinicIds)) {
       try {
         const clinicDoc = await getDoc(firestoreDoc(db, 'clinics', clinicId));
-        
+
         if (clinicDoc.exists()) {
           const clinicData = clinicDoc.data();
           const clinicName = clinicData.name || clinicData.clinicName || '';
           const clinicAddress = clinicData.address || '';
-          
+
           if (clinicData.plannedOffPeriods && Array.isArray(clinicData.plannedOffPeriods)) {
             const activePeriods = clinicData.plannedOffPeriods
               .filter((p: any) => p.status === 'active')
@@ -474,7 +487,7 @@ export default function App() {
                 chamberName: p.chamberName || '',
                 chamberAddress: p.chamberAddress || ''
               }));
-            
+
             allClinicPeriods.push(...activePeriods);
             console.log(`✅ [LOAD CLINICS] ${clinicName}: ${activePeriods.length} periods`);
           }
@@ -483,7 +496,7 @@ export default function App() {
         console.error(`❌ [LOAD CLINICS] Error loading clinic ${clinicId}:`, e);
       }
     }
-    
+
     console.log(`📊 [LOAD CLINICS] Total: ${allClinicPeriods.length} periods`);
     return allClinicPeriods;
   };
@@ -766,7 +779,7 @@ export default function App() {
             // Track QR scan immediately (separate from booking)
             const scanSessionId = `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
             sessionStorage.setItem('scan_session_id', scanSessionId);
-            
+
             try {
               const { addDoc, serverTimestamp } = await import('firebase/firestore');
               await addDoc(collection(db, 'qrScans'), {
@@ -793,7 +806,7 @@ export default function App() {
             if (data.chambers && data.chambers.length > 0) {
               console.log('🏥 [QR PATH] LOADING CHAMBERS:', data.chambers);
               setDoctorChambers(data.chambers);
-              
+
               // Load clinic planned off periods from clinic documents
               try {
                 const clinicPeriods = await loadClinicSchedules(data.chambers, db);
@@ -844,7 +857,7 @@ export default function App() {
         // Track QR scan immediately (separate from booking)
         const scanSessionId = `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         sessionStorage.setItem('scan_session_id', scanSessionId);
-        
+
         if (db) {
           try {
             const { addDoc, serverTimestamp } = await import('firebase/firestore');
@@ -876,7 +889,7 @@ export default function App() {
             if (data.chambers && data.chambers.length > 0) {
               console.log('🏥 [DIRECT ID PATH] LOADING CHAMBERS:', data.chambers);
               setDoctorChambers(data.chambers);
-              
+
               // Load clinic planned off periods from clinic documents
               try {
                 const clinicPeriods = await loadClinicSchedules(data.chambers, db);
@@ -997,14 +1010,14 @@ export default function App() {
       if (user) {
         // Check localStorage first for quick routing (set by VerifyLogin)
         const isClinicFromStorage = localStorage.getItem('healqr_is_clinic') === 'true';
-        
+
         if (isClinicFromStorage) {
           console.log('✅ Clinic user detected from localStorage - routing to clinic dashboard');
           setCurrentPage('clinic-dashboard');
           setIsAuthInitialized(true);
           return;
         }
-        
+
         // Check if user is a clinic in Firestore (fallback if localStorage not set)
         if (db) {
           try {
@@ -1942,7 +1955,14 @@ export default function App() {
     if (menu === "dashboard") setCurrentPage("dashboard");
     else if (menu === "profile")
       setCurrentPage("profile-manager");
-    else if (menu === "qr") setCurrentPage("qr-manager");
+    else if (menu === "qr") {
+      setQrManagerInitialTab('qr-generator');
+      setCurrentPage("qr-manager");
+    }
+    else if (menu === "qr-social-media") {
+      setQrManagerInitialTab('social-media');
+      setCurrentPage("qr-manager");
+    }
     else if (menu === "schedule")
       setCurrentPage("schedule-manager");
     else if (menu === "todays-schedule")
@@ -1978,6 +1998,8 @@ export default function App() {
       setCurrentPage("video-consultation");
     else if (menu === "ai-rx-reader")
       setCurrentPage("ai-rx-reader");
+    else if (menu === "monthly-planner")
+      setCurrentPage("monthly-planner");
   };
 
   // Proper logout handler with Firebase signOut
@@ -2075,13 +2097,13 @@ export default function App() {
             const storedEmail = localStorage.getItem('healqr_user_email');
             const storedName = localStorage.getItem('healqr_user_name');
             const storedUserId = localStorage.getItem('userId');
-            
+
             if (storedEmail) setUserEmail(storedEmail);
             if (storedName) setUserName(storedName);
-            
+
             console.log('✅ Verification complete, redirecting to QR success page');
             console.log('User:', storedName, storedEmail, storedUserId);
-            
+
             setCurrentPage("qr-success");
           }}
           onError={() => setCurrentPage("landing")}
@@ -2095,10 +2117,10 @@ export default function App() {
             const storedName = localStorage.getItem('healqr_user_name');
             const isClinic = localStorage.getItem('healqr_is_clinic') === 'true';
             const isAssistant = localStorage.getItem('healqr_is_assistant') === 'true';
-            
+
             if (storedEmail) setUserEmail(storedEmail);
             if (storedName) setUserName(storedName);
-            
+
             // Route based on user type
             if (isClinic) {
               setCurrentPage("clinic-dashboard");
@@ -2232,7 +2254,18 @@ export default function App() {
             setCurrentPage("booking-language");
           }}
           activeAddOns={activeAddOns}
+          initialTab={qrManagerInitialTab}
         />
+      )}
+
+      {currentPage === "monthly-planner" && (
+        <Suspense fallback={<PageLoader />}>
+          <MonthlyPlanner
+            onMenuChange={menuChangeHandler}
+            onLogout={handleLogout}
+            activeAddOns={activeAddOns}
+          />
+        </Suspense>
       )}
 
       {currentPage === "schedule-manager" && (

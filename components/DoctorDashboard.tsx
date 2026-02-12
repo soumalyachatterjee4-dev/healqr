@@ -1,12 +1,12 @@
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { 
-  Star, 
-  Share2, 
+import {
+  Star,
+  Share2,
   Video,
-  Copy, 
-  Bell, 
+  Copy,
+  Bell,
   User,
   BarChart3,
   Calendar,
@@ -33,6 +33,7 @@ import NotificationCenter from './NotificationCenter';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import BirthdayCardNotification from './BirthdayCardNotification';
 import DashboardPromoDisplay from './DashboardPromoDisplay';
+import SocialMediaPromoBanner from './SocialMediaPromoBanner';
 
 interface Review {
   id: number;
@@ -87,7 +88,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
   const [activeMenu, setActiveMenu] = useState('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
-  
+
   // Check if user is assistant and get allowed pages
   const isAssistant = !!localStorage.getItem('healqr_is_assistant');
   const assistantPagesStr = localStorage.getItem('healqr_assistant_pages');
@@ -108,7 +109,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
 
       const today = new Date();
       const todayStr = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split('T')[0];
-      
+
       logs.push(`📅 TODAY'S DATE: ${todayStr}`);
       logs.push(`🕐 CURRENT TIME: ${today.toISOString()}`);
       logs.push(`🌍 TIMEZONE OFFSET: ${today.getTimezoneOffset()} minutes\n`);
@@ -141,10 +142,10 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
       // ============================================
       logs.push(`\n\n🔔 FCM TOKEN STATUS:`);
       logs.push(`════════════════════════════════════════\n`);
-      
+
       const tokensRef = collection(db, 'fcmTokens');
       const tokensSnap = await getDocs(tokensRef);
-      
+
       if (tokensSnap.empty) {
         logs.push(`⚠️  NO FCM TOKENS REGISTERED`);
         logs.push(`   Patients need to:`);
@@ -172,6 +173,9 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
   const [shareMenuOpen, setShareMenuOpen] = useState(false);
   const [reviewsOpen, setReviewsOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
+
+  // Promo state
+  const [showSocialKitPromo, setShowSocialKitPromo] = useState(true);
 
   // Birthday card state
   const [isBirthday, setIsBirthday] = useState(false);
@@ -207,11 +211,11 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
         const registerFCM = async () => {
           try {
             const { requestNotificationPermission } = await import('../services/fcm.service');
-            
+
             // Check current notification permission status
             const permission = Notification.permission;
             console.log('🔔 Current notification permission:', permission);
-            
+
             if (permission === 'default') {
               // Not yet asked - prompt the doctor
               console.log('📢 Prompting doctor for notification permission...');
@@ -233,28 +237,28 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
         // Load doctor's DOB from Firestore
         const { db } = await import('../lib/firebase/config');
         const { doc, getDoc, updateDoc } = await import('firebase/firestore');
-        
+
         const doctorRef = doc(db, 'doctors', userId);
         const doctorSnap = await getDoc(doctorRef);
-        
+
         if (!doctorSnap.exists()) return;
-        
+
         const doctorData = doctorSnap.data();
         const dob = doctorData.dob; // Format: DD-MM-YYYY or MM-DD-YYYY
-        
+
         if (!dob) return;
 
         // Parse DOB and check if today is birthday
         const today = new Date();
         const todayMonth = today.getMonth() + 1; // 1-12
         const todayDay = today.getDate(); // 1-31
-        
+
         // Handle multiple date formats: DD-MM-YYYY, MM-DD-YYYY, YYYY-MM-DD
         let birthMonth: number, birthDay: number;
-        
+
         if (dob.includes('-')) {
           const parts = dob.split('-');
-          
+
           // Check if YYYY-MM-DD format (year is 4 digits)
           if (parts[0].length === 4) {
             // YYYY-MM-DD format
@@ -280,16 +284,16 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
         if (isTodayBirthday) {
           // Load birthday card template from adminProfiles global templates
           let templates: any[] = [];
-          
+
           console.log('🎂 Birthday detected! Loading birthday card template...');
-          
+
           try {
             const { doc: firestoreDoc, getDoc: firestoreGetDoc } = await import('firebase/firestore');
-            
+
             // Load from adminProfiles/super_admin/globalTemplates
             const adminRef = firestoreDoc(db, 'adminProfiles', 'super_admin');
             const adminSnap = await firestoreGetDoc(adminRef);
-            
+
             if (adminSnap.exists()) {
               const adminData = adminSnap.data();
               if (adminData.globalTemplates && Array.isArray(adminData.globalTemplates)) {
@@ -309,7 +313,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
           const birthdayCard = templates.find(
             (t: any) => t.category === 'birthday-card' && t.isPublished
           );
-          
+
           console.log('🔍 Birthday card search result:', birthdayCard ? 'Found!' : 'Not found');
 
           if (birthdayCard) {
@@ -324,7 +328,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
             // First time showing today - save delivery timestamp
             const deliveryTimestamp = new Date().toISOString();
             setBirthdayCardDeliveryTime(deliveryTimestamp);
-            
+
             await updateDoc(doctorRef, {
               birthdayCardDelivery: deliveryTimestamp
             });
@@ -375,7 +379,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
         // Filter chambers for today (show all, isExpired will be marked for display)
         const todaysChambers = allChambers.filter((chamber: any) => {
           // Don't filter by end-time here - we'll show all chambers with CHAMBER TIME OVER badge if expired
-          
+
           if (chamber.frequency === 'Daily') {
             return true;
           }
@@ -408,7 +412,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
             const qrBookingsSnap = await getDocs(qrBookingsQuery);
             // Count ALL bookings (including cancelled) - cancelled slots are still booked slots
             const qrBookedCount = qrBookingsSnap.size;
-            
+
             // Only count QR bookings for chamber booking status
             // Walk-in patients are shown separately in "Walk-In Patients" section
 
@@ -464,21 +468,21 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
         // 🚫 FILTER OUT CLINIC CHAMBERS IF CLINIC IS OFF TODAY
         console.log('🔵 [DASHBOARD] Checking for clinic off periods...');
         const filteredChambers = [];
-        
+
         for (const chamber of sortedChambers) {
           const originalChamber = allChambers.find((c: any) => c.id === chamber.id);
           const clinicId = originalChamber?.clinicId;
-          
+
           if (clinicId) {
             console.log(`🏥 [DASHBOARD] Chamber "${chamber.name}" has clinicId: ${clinicId}`);
-            
+
             // Load clinic schedule to check if clinic is off today
             try {
               const scheduleDoc = await getDoc(doc(db, 'clinicSchedules', clinicId));
               if (scheduleDoc.exists()) {
                 const scheduleData = scheduleDoc.data();
                 const plannedOffPeriods = scheduleData.plannedOffPeriods || [];
-                
+
                 // Check if today falls within any active planned off period
                 let isClinicOff = false;
                 for (const period of plannedOffPeriods) {
@@ -486,7 +490,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
                     const periodStart = new Date(period.startDate);
                     const periodEnd = new Date(period.endDate);
                     const today = new Date(todayStr);
-                    
+
                     if (today >= periodStart && today <= periodEnd) {
                       isClinicOff = true;
                       console.log(`🚫 [DASHBOARD] Clinic ${clinicId} is OFF today (${todayStr}). Removing chamber "${chamber.name}"`);
@@ -494,7 +498,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
                     }
                   }
                 }
-                
+
                 if (!isClinicOff) {
                   filteredChambers.push(chamber);
                 }
@@ -573,8 +577,8 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
   // Reviews data - Calculate from actual arrays (Patient + Self-Created)
   const allReviews = [...incomingReviews, ...selfCreatedReviews];
   const totalReviews = allReviews.length;
-  const averageRating = totalReviews > 0 
-    ? allReviews.reduce((sum, review) => sum + review.rating, 0) / totalReviews 
+  const averageRating = totalReviews > 0
+    ? allReviews.reduce((sum, review) => sum + review.rating, 0) / totalReviews
     : 0;
 
   // 🎯 FREE TRIAL DATA - Using real subscription data from Firestore
@@ -647,9 +651,9 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
         // Get doctor data for sync check
         const doctorRef = doc(db, 'doctors', userId);
         const doctorSnap = await getDoc(doctorRef);
-        
+
         if (!doctorSnap.exists()) return;
-        
+
         const doctorData = doctorSnap.data();
 
         // Query bookings collection for all metrics
@@ -660,50 +664,50 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
         );
 
         const bookingsSnap = await getDocs(bookingsQuery);
-        
+
         let qrBookings = 0;
         let walkinBookings = 0;
         let dropOuts = 0;
         let cancelled = 0;
 
         let totalScans = 0;
-        
+
         bookingsSnap.docs.forEach(doc => {
           const data = doc.data();
           const bookingDate = data.createdAt?.toDate() || data.date?.toDate();
-          
+
           // Only count bookings within current month
           if (bookingDate && bookingDate >= monthStart && bookingDate <= monthEnd) {
             // Count total scans (all QR bookings = scans, regardless of status)
             if (data.type !== 'walkin_booking') {
               totalScans++;
             }
-            
+
             // Count QR bookings (non-cancelled)
             if (data.type !== 'walkin_booking') {
               if (data.status !== 'cancelled' && !data.isCancelled) {
                 qrBookings++;
               }
             }
-            
+
             // Count walk-in bookings
             if (data.type === 'walkin_booking') {
               if (data.status !== 'cancelled' && !data.isCancelled) {
                 walkinBookings++;
               }
             }
-            
+
             // Count drop-outs (booked but not seen - Eye icon not pressed)
             const appointmentDate = data.appointmentDate || (data.date?.toDate?.() ? data.date.toDate().toISOString().split('T')[0] : null);
             const today = new Date().toISOString().split('T')[0];
-            
+
             if (appointmentDate && appointmentDate < today) {
               // Past appointments
               if (data.status !== 'cancelled' && !data.isCancelled && !data.isMarkedSeen) {
                 dropOuts++;
               }
             }
-            
+
             // Count cancelled bookings
             if (data.status === 'cancelled' || data.isCancelled === true) {
               cancelled++;
@@ -765,7 +769,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
     }));
 
   const hasChambers = upcomingChambers.length > 0;
-  
+
   // usagePercentage for display purposes
   // usagePercentage removed: no longer needed in free mode
   // isBookingBlocked removed: no longer needed in free mode
@@ -773,7 +777,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
   return (
     <div className="min-h-screen bg-black text-white flex flex-col lg:flex-row">
       {/* Sidebar - Works for both mobile and desktop */}
-      <DashboardSidebar 
+      <DashboardSidebar
         activeMenu={activeMenu}
         onMenuChange={(menu) => {
           setActiveMenu(menu);
@@ -796,7 +800,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
         <header className="bg-black border-b border-gray-900 px-4 md:px-8 py-4 flex items-center justify-between sticky top-0 z-50">
           <div className="flex items-center gap-3">
             {/* Mobile Menu Button - 3 Lines Hamburger */}
-            <button 
+            <button
               onClick={() => setMobileMenuOpen(true)}
               className="lg:hidden w-10 h-10 bg-zinc-900 hover:bg-zinc-800 rounded-lg flex items-center justify-center transition-colors"
             >
@@ -804,7 +808,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
             </button>
             <h2 className="text-lg md:text-xl">Dashboard</h2>
           </div>
-          
+
           <div className="flex items-center gap-2 md:gap-3">
             {/* Share Button with Popover */}
             <Popover open={shareMenuOpen} onOpenChange={setShareMenuOpen}>
@@ -819,7 +823,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
                     <h3 className="text-white mb-1">Share HealQR</h3>
                     <p className="text-gray-400 text-sm">Share www.healqr.com with others</p>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={() => handleShare('facebook')}
@@ -828,7 +832,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
                       <Facebook className="w-4 h-4" />
                       <span className="text-sm">Facebook</span>
                     </button>
-                    
+
                     <button
                       onClick={() => handleShare('twitter')}
                       className="flex items-center gap-2 px-3 py-2 bg-sky-600/20 hover:bg-sky-600/30 text-sky-400 rounded-lg transition-colors"
@@ -836,7 +840,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
                       <Twitter className="w-4 h-4" />
                       <span className="text-sm">Twitter</span>
                     </button>
-                    
+
                     <button
                       onClick={() => handleShare('linkedin')}
                       className="flex items-center gap-2 px-3 py-2 bg-blue-700/20 hover:bg-blue-700/30 text-blue-400 rounded-lg transition-colors"
@@ -844,7 +848,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
                       <Linkedin className="w-4 h-4" />
                       <span className="text-sm">LinkedIn</span>
                     </button>
-                    
+
                     <button
                       onClick={() => handleShare('whatsapp')}
                       className="flex items-center gap-2 px-3 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-400 rounded-lg transition-colors"
@@ -852,7 +856,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
                       <MessageCircle className="w-4 h-4" />
                       <span className="text-sm">WhatsApp</span>
                     </button>
-                    
+
                     <button
                       onClick={() => handleShare('email')}
                       className="flex items-center gap-2 px-3 py-2 bg-gray-700/20 hover:bg-gray-700/30 text-gray-400 rounded-lg transition-colors"
@@ -860,7 +864,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
                       <Mail className="w-4 h-4" />
                       <span className="text-sm">Email</span>
                     </button>
-                    
+
                     <button
                       onClick={() => handleShare('copy')}
                       className="flex items-center gap-2 px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 rounded-lg transition-colors"
@@ -869,7 +873,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
                       <span className="text-sm">Copy Link</span>
                     </button>
                   </div>
-                  
+
                   <div className="pt-3 border-t border-zinc-800">
                     <div className="flex items-center gap-2 bg-zinc-950 rounded px-3 py-2">
                       <span className="text-gray-400 text-sm flex-1 truncate">{websiteUrl}</span>
@@ -886,7 +890,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
             </Popover>
 
             {/* Video Tutorial Button */}
-            <button 
+            <button
               onClick={handleVideoTutorialClick}
               className="w-9 h-9 md:w-10 md:h-10 bg-zinc-900 hover:bg-zinc-800 rounded-lg flex items-center justify-center transition-colors"
               title="Video Tutorials"
@@ -895,7 +899,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
             </button>
 
             {/* Notification Button */}
-            <button 
+            <button
               onClick={() => setNotificationOpen(true)}
               className="w-9 h-9 md:w-10 md:h-10 bg-zinc-900 hover:bg-zinc-800 rounded-lg flex items-center justify-center transition-colors relative"
             >
@@ -923,21 +927,21 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
             <h1 className="text-2xl md:text-3xl mb-4">
               Welcome Back, {useDrPrefix ? 'Dr. ' : ''}{doctorName}!
             </h1>
-            
+
             <div className="flex items-center gap-4 mb-4">
               {/* Star Rating */}
               <div className="flex items-center gap-2">
                 {[...Array(5)].map((_, i) => {
                   const isFilled = i < Math.floor(averageRating);
                   return (
-                    <Star 
-                      key={i} 
-                      className={`w-5 h-5 ${isFilled ? 'fill-yellow-500 text-yellow-500' : 'text-gray-600'}`} 
+                    <Star
+                      key={i}
+                      className={`w-5 h-5 ${isFilled ? 'fill-yellow-500 text-yellow-500' : 'text-gray-600'}`}
                     />
                   );
                 })}
                 <span className="ml-2">{averageRating.toFixed(1)}/5</span>
-                <button 
+                <button
                   onClick={() => setReviewsOpen(true)}
                   className="text-emerald-500 text-sm hover:text-emerald-400 hover:underline transition-colors cursor-pointer"
                 >
@@ -954,25 +958,50 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
             </div>
           </div>
 
+
+
           {/* Single Column Layout */}
           <div className="max-w-4xl mx-auto space-y-6 md:space-y-8">
-            {/* Plan Card - Dynamic color based on booking usage */}
-            {/* Green Card - Free, Monthly Bookings */}
-            <div style={{ background: 'linear-gradient(to bottom right, rgb(16, 185, 129), rgb(5, 150, 105))' }} className="text-white rounded-xl p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Badge className="bg-white/20 text-white border-0 hover:bg-white/30">
-                  Free
-                </Badge>
-                <Badge className="bg-green-700 text-white border-0 hover:bg-green-800">
-                  Active
-                </Badge>
-              </div>
-              <div className="mb-4">
-                <div className="text-2xl md:text-3xl mb-1">
-                  {analyticsData.totalBookings} Bookings
-                </div>
-                <div className="text-sm mb-2">As of booking {firstOfMonthStr} – {lastOfMonthStr}</div>
-              </div>
+
+            <div style={{ background: 'linear-gradient(to bottom right, rgb(16, 185, 129), rgb(5, 150, 105))' }} className="text-white rounded-xl p-6 relative overflow-hidden">
+               <div className="flex flex-col md:flex-row gap-6 md:gap-8 relative z-10">
+                 {/* Left Side (40%) - Booking Info */}
+                 <div className="md:w-[40%] flex flex-col justify-center border-b md:border-b-0 md:border-r border-white/20 pb-4 md:pb-0 md:pr-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Badge className="bg-white/20 text-white border-0 hover:bg-white/30">
+                        Free
+                      </Badge>
+                      <Badge className="bg-green-700 text-white border-0 hover:bg-green-800">
+                        Active
+                      </Badge>
+                    </div>
+                    <div>
+                      <div className="text-2xl md:text-3xl font-bold mb-1">
+                        {analyticsData.totalBookings} Bookings
+                      </div>
+                      <div className="text-xs text-emerald-100 opacity-80">
+                         {firstOfMonthStr} – {lastOfMonthStr}
+                      </div>
+                    </div>
+                 </div>
+
+                 {/* Right Side (60%) - Social Media Promo */}
+                 <div className="md:w-[60%] pl-0 md:pl-12">
+                    {showSocialKitPromo && (
+                      <SocialMediaPromoBanner
+                        compact={true}
+                        onNavigate={() => {
+                          console.log('🔘 Social Kit Button Clicked! Navigating to QR Manager...');
+                          if (onMenuChange) {
+                            onMenuChange('qr-social-media');
+                          } else {
+                            console.error('❌ onMenuChange is missing!');
+                          }
+                        }}
+                      />
+                    )}
+                 </div>
+               </div>
             </div>
 
             {/* Birthday Card Notification - Only shows if uploaded image exists, displays for 24 hours */}
@@ -1002,7 +1031,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
                     {practiceOverviewData.map((item, index) => {
                       const maxValue = Math.max(...practiceOverviewData.map(d => d.value), 1);
                       const percentage = (item.value / maxValue) * 100;
-                      
+
                       return (
                         <div key={index} className="space-y-2">
                           <div className="flex justify-between items-center">
@@ -1010,7 +1039,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
                             <span className="text-white font-bold text-lg">{item.value}</span>
                           </div>
                           <div className="relative h-8 bg-zinc-900 rounded-lg overflow-hidden">
-                            <div 
+                            <div
                               className="absolute top-0 left-0 h-full rounded-lg transition-all duration-1000 ease-out"
                               style={{
                                 width: `${percentage}%`,
@@ -1023,7 +1052,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
                       );
                     })}
                   </div>
-                  
+
                   {/* Summary Stats */}
                   <div className="grid grid-cols-3 gap-4 mt-8 pt-6 border-t border-zinc-800">
                     <div className="text-center">
@@ -1073,17 +1102,17 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
                   // Chambers List - Already sorted: active by time, then expired at bottom
                   <div className="space-y-4">
                     {upcomingChambers.map((chamber) => (
-                      <div 
+                      <div
                         key={chamber.id}
                         className={`bg-zinc-800 border border-zinc-700 rounded-lg p-4 hover:border-emerald-500/50 transition-colors ${chamber.isExpired ? 'opacity-60' : ''}`}
                       >
                         {/* Chamber Name & Date Badge */}
                         <div className="flex items-center justify-between mb-3">
                           <h3 className="text-white">{chamber.chamberName}</h3>
-                          <Badge 
+                          <Badge
                             className={`${
-                              chamber.date === 'today' 
-                                ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' 
+                              chamber.date === 'today'
+                                ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
                                 : 'bg-blue-500/20 text-blue-400 border-blue-500/30'
                             } capitalize shrink-0`}
                           >
@@ -1115,7 +1144,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
                             <span className="text-sm text-white">
                               {chamber.booked} / {chamber.capacity}
                             </span>
-                            <Badge 
+                            <Badge
                               variant="outline"
                               className={`${
                                 chamber.booked >= chamber.capacity
@@ -1146,7 +1175,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
       </div>
 
       {/* Floating Support Button */}
-      <button 
+      <button
         onClick={() => setSupportOpen(true)}
         className="fixed bottom-6 right-6 md:bottom-8 md:right-8 w-12 h-12 md:w-14 md:h-14 bg-emerald-500 hover:bg-emerald-600 rounded-full flex items-center justify-center shadow-lg transition-colors z-50"
       >

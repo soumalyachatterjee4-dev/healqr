@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase/config';
 import { translateDataValue, transliterateName, type Language } from '../utils/translations';
+import { sendAppointmentRestored, sendAppointmentCancelled } from '../services/notificationService';
 
 interface Patient {
   id: string;
@@ -38,6 +39,10 @@ interface Patient {
   prescriptionUrl?: string | string[]; // Patient's old RX URL(s) - Can be single or multiple files
   prescriptionReviewed?: boolean; // Whether doctor has reviewed the old RX
   language?: Language; // Patient's preferred language
+  isWalkIn?: boolean;
+  serialNumber?: string | number;
+  tokenNumber?: string;
+  chamber?: string;
 }
 
 interface PatientDetailsProps {
@@ -97,7 +102,7 @@ export default function PatientDetails({
         // 1. Get Doctor's Clinic ID
         const doctorRef = doc(db, 'doctors', userId);
         const doctorSnap = await getDoc(doctorRef);
-        
+
         if (doctorSnap.exists()) {
           const doctorData = doctorSnap.data();
           const clinicId = doctorData.clinicId;
@@ -106,7 +111,7 @@ export default function PatientDetails({
             // 2. Get Clinic Settings
             const clinicRef = doc(db, 'clinics', clinicId);
             const clinicSnap = await getDoc(clinicRef);
-            
+
             if (clinicSnap.exists() && clinicSnap.data().centralizedReviews) {
 
               setIsReviewRestricted(true);
@@ -124,7 +129,7 @@ export default function PatientDetails({
   const [patientStates, setPatientStates] = useState<PatientButtonStates>(() => {
     const initialStates: PatientButtonStates = {};
     const now = new Date();
-    
+
     patients.forEach(patient => {
       // Calculate if reminder is eligible (booking done 6+ hours before appointment)
       const timeDifference = patient.appointmentTime.getTime() - patient.bookingTime.getTime();
@@ -167,7 +172,7 @@ export default function PatientDetails({
   const [oldRxViewerOpen, setOldRxViewerOpen] = useState(false);
   const [selectedPatientForRxView, setSelectedPatientForRxView] = useState<Patient | null>(null);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
-  
+
   // Get current doctor info from Firebase auth
   const [doctorInfo, setDoctorInfo] = useState<{ id: string; name: string }>({
     id: '',
@@ -178,7 +183,7 @@ export default function PatientDetails({
     const loadDoctorInfo = async () => {
       try {
         let docId = doctorId;
-        
+
         // If doctorId not provided, try to get current user
         if (!docId) {
           const user = auth.currentUser;
@@ -206,30 +211,30 @@ export default function PatientDetails({
   useEffect(() => {
     const checkUnmarkedPatients = async () => {
       const now = new Date();
-      
+
       // Parse chamber end time (e.g., "17:00" from "15:00 - 17:00")
       const endTimeStr = scheduleTime.split(' - ')[1]; // Get "17:00"
       if (!endTimeStr) return;
-      
+
       const [endHour, endMin] = endTimeStr.split(':').map(Number);
       const chamberEndTime = new Date();
       chamberEndTime.setHours(endHour, endMin, 0, 0);
-      
+
       // Calculate time since chamber ended (in minutes)
       const timeSinceChamberEnd = (now.getTime() - chamberEndTime.getTime()) / (1000 * 60);
-      
+
       // Skip if chamber hasn't ended yet
       if (timeSinceChamberEnd < 0) return;
-      
+
       // Collect unmarked patients for alert
       const unmarkedPatients: Array<{ name: string; phone: string; appointmentTime: string; patientId: string }> = [];
-      
+
       patients.forEach(async (patient) => {
         const state = patientStates[patient.id];
-        
+
         // Skip if already marked seen or cancelled
         if (state.isMarkedSeen || state.isCancelled) return;
-        
+
         // RULE 1: After 1 hour of chamber end time → Alert Doctor (Admin notification)
         if (timeSinceChamberEnd >= 60 && timeSinceChamberEnd < 1440) { // Between 1 hour and 24 hours
           unmarkedPatients.push({
@@ -239,19 +244,19 @@ export default function PatientDetails({
             patientId: patient.id
           });
         }
-        
+
         // RULE 2: After 23:59 (end of day) → Treat as "drop-out"
         const endOfDay = new Date(chamberEndTime);
         endOfDay.setHours(23, 59, 59, 999);
-        
+
         if (now > endOfDay) {
           // Mark as dropout in Firestore
           try {
             const { db } = await import('../lib/firebase/config');
             const { doc, updateDoc } = await import('firebase/firestore');
-            
+
             if (!db) return;
-            
+
             await updateDoc(doc(db, 'bookings', patient.id), {
               status: 'dropout',
               dropoutReason: 'not_seen_by_midnight',
@@ -264,23 +269,23 @@ export default function PatientDetails({
           }
         }
       });
-      
+
       // Send admin alert if there are unmarked patients (only once per chamber session)
       if (unmarkedPatients.length > 0 && timeSinceChamberEnd >= 60 && timeSinceChamberEnd < 65) {
         try {
           const { sendAdminAlert } = await import('../services/notificationService');
           const doctorId = localStorage.getItem('userId') || '';
           const doctorName = localStorage.getItem('healqr_user_name') || 'Doctor';
-          
+
           await sendAdminAlert({
             doctorId,
             doctorName,
             eventType: 'System Alert',
             severity: 'High',
-            unmarkedPatients: unmarkedPatients.map(p => ({ 
-              name: p.name, 
-              phone: p.phone, 
-              appointmentTime: p.appointmentTime 
+            unmarkedPatients: unmarkedPatients.map(p => ({
+              name: p.name,
+              phone: p.phone,
+              appointmentTime: p.appointmentTime
             })),
             chamberName,
             chamberEndTime: endTimeStr
@@ -293,10 +298,10 @@ export default function PatientDetails({
 
     // Check every 5 minutes for unmarked patients
     const interval = setInterval(checkUnmarkedPatients, 5 * 60000);
-    
+
     // Check immediately on mount
     checkUnmarkedPatients();
-    
+
     return () => clearInterval(interval);
   }, [patients, patientStates, scheduleTime, chamberName]);
 
@@ -316,7 +321,7 @@ export default function PatientDetails({
       const doctorSpecialty = localStorage.getItem('healqr_specialty') || '';
       const doctorPhoto = localStorage.getItem('healqr_profile_photo') || '';
       const markedBy = isAssistant ? localStorage.getItem('healqr_user_email') : userId; // Track who marked it
-      
+
       if (!userId) {
         throw new Error('User ID not found');
       }
@@ -326,16 +331,16 @@ export default function PatientDetails({
       // ============================================
       const { doc: firestoreDoc, getDoc } = await import('firebase/firestore');
       const { db } = await import('../lib/firebase/config');
-      
+
       // Normalize phone number to match notificationService logic
       const digits = (patient.phone || '').replace(/\D/g, '');
       const trimmed = digits.replace(/^91/, '');
       const phone10 = trimmed.slice(-10);
-      
+
       // 1. Try standard ID format
       let fcmUserId = `patient_${phone10}`;
       let tokenDoc = await getDoc(firestoreDoc(db, 'fcmTokens', fcmUserId));
-      
+
       // 2. Fallback: Try with +91 prefix if standard fails
       if (!tokenDoc.exists()) {
 
@@ -356,11 +361,11 @@ export default function PatientDetails({
           // Found in legacy, we can use this token but we need to adapt the logic
           // The notification service might expect it in fcmTokens, but let's see if we can just use the token
 
-          // We might need to migrate it or just use it. 
+          // We might need to migrate it or just use it.
           // For now, let's just proceed and let the notification service handle it if it looks up by ID.
           // Actually, the notification service (cloud function) likely looks up by ID.
           // If the cloud function expects it in 'fcmTokens', we might be stuck unless we migrate it here.
-          
+
           // Let's try to migrate it on the fly!
           const legacyData = legacyDoc.data();
           if (legacyData?.token) {
@@ -379,7 +384,7 @@ export default function PatientDetails({
           }
         }
       }
-      
+
       if (!tokenDoc.exists()) {
         console.error('❌ NO FCM TOKEN FOUND for patient:', fcmUserId);
         console.error('   Patient never registered for notifications!');
@@ -412,7 +417,7 @@ export default function PatientDetails({
 
       // Update Firestore booking document (use patient.id which is the Firestore doc ID)
       const bookingRef = doc(db, 'bookings', patient.id);
-      
+
       await updateDoc(bookingRef, {
         isMarkedSeen: true,
         markedSeenAt: seenTimestamp,
@@ -441,7 +446,7 @@ export default function PatientDetails({
       // ============================================
       try {
         const { sendConsultationCompleted, scheduleReviewRequest } = await import('../services/notificationService');
-        
+
         // Send immediate "Consultation Completed" notification
         const now = new Date();
         const result = await sendConsultationCompleted({
@@ -459,7 +464,7 @@ export default function PatientDetails({
           chamber: patient.chamber || 'Chamber',
           language: patient.language || 'english',
         });
-        
+
         if (result?.success) {
            toast.success('Patient notified via App');
         }
@@ -473,11 +478,11 @@ export default function PatientDetails({
               doctorName: doctorName,
               doctorId: userId, // Pass doctorId for deep linking
               bookingId: patient.id,
-              consultationDate: new Date().toLocaleDateString('en-IN', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
+              consultationDate: new Date().toLocaleDateString('en-IN', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
               }),
               language: patient.language || 'english', // Pass patient's chosen language
             },
@@ -508,20 +513,20 @@ export default function PatientDetails({
   useEffect(() => {
     const checkAndSendVideoLinks = () => {
       const now = new Date();
-      
+
       patients.forEach(patient => {
         const state = patientStates[patient.id];
-        
+
         // Only for video consultation patients
         if (patient.consultationType !== 'video') return;
-        
+
         // Skip if link already sent or appointment cancelled
         if (state.videoLinkSent || state.isCancelled) return;
-        
+
         // Calculate time until appointment
         const timeUntilAppointment = patient.appointmentTime.getTime() - now.getTime();
         const minutesUntilAppointment = timeUntilAppointment / (1000 * 60);
-        
+
         // Auto-send link if within 30 minute window
         if (minutesUntilAppointment <= 30 && minutesUntilAppointment > 0) {
           setPatientStates(prev => ({
@@ -531,7 +536,7 @@ export default function PatientDetails({
               videoLinkSent: true,
             }
           }));
-          
+
           // Simulate patient clicking link after 3-8 seconds (for demo purposes)
           setTimeout(() => {
             setPatientStates(prev => ({
@@ -548,10 +553,10 @@ export default function PatientDetails({
 
     // Check every 5 seconds for demo (in production, use 60000 for every minute)
     const interval = setInterval(checkAndSendVideoLinks, 5000);
-    
+
     // Check immediately on mount
     checkAndSendVideoLinks();
-    
+
     return () => clearInterval(interval);
   }, [patients, patientStates]);
 
@@ -560,13 +565,13 @@ export default function PatientDetails({
     const simulatePatientWaiting = () => {
       patients.forEach(patient => {
         const state = patientStates[patient.id];
-        
+
         // Only for video consultation patients
         if (patient.consultationType !== 'video') return;
-        
+
         // Skip if already waiting or link not sent
         if (state.patientWaiting || !state.videoLinkSent) return;
-        
+
         // Simulate patient clicking link after 3-8 seconds
         setTimeout(() => {
           setPatientStates(prev => ({
@@ -608,15 +613,15 @@ export default function PatientDetails({
         const doctorId = localStorage.getItem('userId') || '';
         const doctorSpecialty = localStorage.getItem('healqr_specialty') || '';
         const doctorPhoto = localStorage.getItem('healqr_profile_photo') || '';
-        
+
         // Calculate follow-up date (when patient should come)
         const followUpDate = new Date();
         followUpDate.setDate(followUpDate.getDate() + days);
-        
+
         // Calculate notification date (3 days before follow-up date)
         const notificationDate = new Date(followUpDate);
         notificationDate.setDate(notificationDate.getDate() - 3);
-        
+
         // Update Firestore with follow-up schedule (use patient.id which is the Firestore doc ID)
         const bookingRef = doc(db, 'bookings', selectedPatient.id);
         await updateDoc(bookingRef, {
@@ -625,10 +630,10 @@ export default function PatientDetails({
           doctorFollowUpMessage: message,
           followUpScheduledAt: new Date()
         });
-        
+
         // Store scheduled follow-up in Firestore (for Cloud Scheduler to process)
         const { collection, addDoc, serverTimestamp } = await import('firebase/firestore');
-        
+
         await addDoc(collection(db, 'scheduledFollowUps'), {
           patientPhone: selectedPatient.phone,
           patientName: selectedPatient.name,
@@ -643,7 +648,7 @@ export default function PatientDetails({
           status: 'pending', // pending, sent, failed
           createdAt: serverTimestamp(),
         });
-        
+
         // ============================================
         // 🔔 SEND FOLLOW-UP NOTIFICATION IMMEDIATELY
         // Per roadmap: Follow-up commitment is PERMANENT
@@ -651,7 +656,7 @@ export default function PatientDetails({
         // ============================================
         try {
           const { sendFollowUp } = await import('../services/notificationService');
-          
+
           await sendFollowUp({
             patientPhone: selectedPatient.phone,
             patientName: selectedPatient.name,
@@ -674,7 +679,7 @@ export default function PatientDetails({
         } catch (notifError) {
           // Follow-up notification error (non-blocking)
         }
-        
+
         // Update local state to show green checkmark
         setPatientStates((prev: any) => ({
           ...prev,
@@ -683,7 +688,7 @@ export default function PatientDetails({
             followUpScheduled: true,
           }
         }));
-        
+
         // Success toast
         const notifyDateStr = notificationDate.toLocaleDateString();
         const followUpDateStr = followUpDate.toLocaleDateString();
@@ -702,7 +707,7 @@ export default function PatientDetails({
   const handleViewOldRx = (patient: Patient) => {
     setSelectedPatientForRxView(patient);
     setOldRxViewerOpen(true);
-    
+
     // Show toast to confirm button click
     toast.success('Opening AI RX Viewer...', {
       description: activeAddOns.includes('ai-rx-reader') ? '🤖 AI Translation Enabled' : 'Basic Viewer',
@@ -790,11 +795,11 @@ export default function PatientDetails({
       // Update Firebase
       const { db } = await import('../lib/firebase/config');
       const { doc, updateDoc } = await import('firebase/firestore');
-      
+
       if (!db) {
         throw new Error('Firebase not initialized');
       }
-      
+
       // Use patient.id which is the Firestore document ID
       await updateDoc(doc(db!, 'bookings', patient.id), {
         isCancelled: true,
@@ -807,12 +812,11 @@ export default function PatientDetails({
       // 🔔 SEND CANCELLATION NOTIFICATION
       // ============================================
       try {
-        const { sendAppointmentCancelled } = await import('../services/notificationService');
         const doctorId = localStorage.getItem('userId') || '';
         const doctorName = localStorage.getItem('healqr_user_name') || 'Doctor';
         const doctorPhoto = localStorage.getItem('healqr_profile_photo') || '';
         const doctorSpecialty = localStorage.getItem('healqr_specialty') || '';
-        
+
         // Format appointment date - Use today's date as scheduleDate is schedule text like "Every Day" not a date
         const appointmentDate = new Date();
         const formattedDate = appointmentDate.toLocaleDateString('en-US', {
@@ -820,16 +824,16 @@ export default function PatientDetails({
           day: 'numeric',
           year: 'numeric'
         });
-        
+
         // Format appointment time
         const formattedTime = patient.appointmentTime ? patient.appointmentTime.toLocaleTimeString('en-US', {
           hour: 'numeric',
           minute: '2-digit',
           hour12: true
         }) : scheduleTime.split(' - ')[0] || '10:00 AM'; // Get start time from schedule
-        
+
         const cancelledDate = new Date(appointmentDate.getTime() - appointmentDate.getTimezoneOffset() * 60000).toISOString().split('T')[0]; // YYYY-MM-DD
-        
+
         const notifResult = await sendAppointmentCancelled({
           patientPhone: patient.phone,
           patientName: patient.name,
@@ -850,7 +854,7 @@ export default function PatientDetails({
           message: 'Your appointment has been cancelled by the doctor. Please contact the clinic for rescheduling.',
           language: (patient as any).language || 'english',
         });
-        
+
 
       } catch (notifError) {
         console.error('❌ Failed to send cancellation notification:', notifError);
@@ -860,7 +864,7 @@ export default function PatientDetails({
       toast.success(`Appointment cancelled for ${patient.name}`, {
         description: 'Patient has been notified - Slot is now available',
       });
-      
+
       // Refresh patient list
       if (onRefresh) {
         onRefresh();
@@ -901,11 +905,11 @@ export default function PatientDetails({
       // Update Firebase
       const { db } = await import('../lib/firebase/config');
       const { doc, updateDoc } = await import('firebase/firestore');
-      
+
       if (!db) {
         throw new Error('Firebase not initialized');
       }
-      
+
       // Use patient.id which is the Firestore document ID
       await updateDoc(doc(db!, 'bookings', patient.id), {
         isCancelled: false,
@@ -917,12 +921,11 @@ export default function PatientDetails({
       // 🔔 SEND RESTORATION NOTIFICATION
       // ============================================
       try {
-        const { sendAppointmentRestored } = await import('../services/notificationService');
         const doctorId = localStorage.getItem('userId') || '';
         const doctorName = localStorage.getItem('healqr_user_name') || 'Doctor';
         const doctorPhoto = localStorage.getItem('healqr_profile_photo') || '';
         const doctorSpecialty = localStorage.getItem('healqr_specialty') || '';
-        
+
         // Format appointment date - Use today's date as scheduleDate is schedule text like "Every Day" not a date
         const appointmentDate = new Date();
         const formattedDate = appointmentDate.toLocaleDateString('en-US', {
@@ -930,23 +933,24 @@ export default function PatientDetails({
           day: 'numeric',
           year: 'numeric'
         });
-        
+
         // Format appointment time
         const formattedTime = patient.appointmentTime ? patient.appointmentTime.toLocaleTimeString('en-US', {
           hour: 'numeric',
           minute: '2-digit',
           hour12: true
         }) : scheduleTime.split(' - ')[0] || '10:00 AM'; // Get start time from schedule
-        
+
         // Get doctor initials
         const doctorInitials = doctorName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-        
+
         // 🎯 USE THE ORIGINAL TOKEN NUMBER FROM DATABASE
         // Don't recalculate - the token number was assigned at booking time and should remain the same
-        // Extract the number from tokenNumber (e.g., "#4" -> "4")
-        const originalTokenNumber = (patient as any).tokenNumber || `#${(patient as any).serialNo || 1}`;
+        // Fallback chain: tokenNumber -> serialNo -> list position (instead of hardcoded #1)
+        const patientIndex = patients.findIndex(p => p.id === patient.id);
+        const originalTokenNumber = (patient as any).tokenNumber || `#${(patient as any).serialNo || patientIndex + 1}`;
         const restoredDate = new Date(appointmentDate.getTime() - appointmentDate.getTimezoneOffset() * 60000).toISOString().split('T')[0]; // YYYY-MM-DD
-        
+
         // Use the ORIGINAL token number assigned at booking time
         const notifResult = await sendAppointmentRestored({
           patientPhone: patient.phone,
@@ -968,7 +972,7 @@ export default function PatientDetails({
           message: 'Your appointment has been restored and confirmed. You can track it live.',
           language: (patient as any).language || 'english',
         });
-        
+
 
       } catch (notifError) {
         console.error('❌ Failed to send restoration notification:', notifError);
@@ -978,7 +982,7 @@ export default function PatientDetails({
       toast.success(`Appointment restored for ${patient.name}`, {
         description: 'All buttons are now active - Patient has been notified',
       });
-      
+
       // Refresh patient list
       if (onRefresh) {
         onRefresh();
@@ -1069,7 +1073,7 @@ export default function PatientDetails({
             style={{ width: `${(currentPatients / totalPatients) * 100}%` }}
           />
         </div>
-        
+
         {/* Booking Status Text */}
         <div className="flex items-center justify-between mt-2">
           <span className="text-emerald-400 text-sm">{currentPatients} / {totalPatients}</span>
@@ -1084,11 +1088,11 @@ export default function PatientDetails({
           .sort((a, b) => {
             const aState = patientStates[a.id];
             const bState = patientStates[b.id];
-            
+
             // Priority 1: Yet to seen patients first
             if (!aState?.isMarkedSeen && bState?.isMarkedSeen) return -1;
             if (aState?.isMarkedSeen && !bState?.isMarkedSeen) return 1;
-            
+
             // Priority 2: Within same group, maintain original order (by serial number)
             return 0;
           })
@@ -1102,7 +1106,7 @@ export default function PatientDetails({
               <div className="flex items-center gap-3">
                 {/* Serial Number */}
                 <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <span className="text-white">{(patient as any).serialNo || index + 1}</span>
+                  <span className="text-white">{(patient as any).serialNo || (patient as any).tokenNumber?.replace('#', '') || index + 1}</span>
                 </div>
 
                 {/* Patient Info */}
@@ -1122,13 +1126,13 @@ export default function PatientDetails({
                       </span>
                     )}
                   </div>
-                  
+
                   <div className="flex items-center gap-2 flex-wrap">
                     {/* Phone */}
                     <div className="flex items-center gap-1 text-gray-400 text-sm">
                       <Phone className="w-3 h-3" />
                       <span>{patient.phone}</span>
-                      
+
                       {/* Enable Notifications Button */}
                       <button
                         onClick={() =>
@@ -1262,11 +1266,11 @@ export default function PatientDetails({
                         >
                           <Sparkles className={`w-3.5 h-3.5 ${state.prescriptionUploaded ? 'text-emerald-300' : 'text-purple-300'} mb-0.5`} />
                           {/* Upward Arrow */}
-                          <svg 
+                          <svg
                             className={`w-2.5 h-2.5 ${state.prescriptionUploaded ? 'text-emerald-300' : 'text-purple-300'}`}
-                            fill="none" 
-                            stroke="currentColor" 
-                            strokeWidth="2.5" 
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.5"
                             viewBox="0 0 24 24"
                           >
                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 19V5m0 0l-7 7m7-7l7 7" />
@@ -1280,7 +1284,7 @@ export default function PatientDetails({
                       </>
                     )}
 
-                    {/* AI Upload Button - TEMPORARILY HIDDEN - Will be shown when feature is functional 
+                    {/* AI Upload Button - TEMPORARILY HIDDEN - Will be shown when feature is functional
                     {activeAddOns.includes('ai-rx-reader') && (
                       <button
                         onClick={() => handleAIUploadPrescription(patient)}
@@ -1296,11 +1300,11 @@ export default function PatientDetails({
                           <span className="text-[8px] font-bold text-white leading-none tracking-tight">AI</span>
                           <Sparkles className="w-2 h-2 text-yellow-300" />
                         </div>
-                        <svg 
-                          className="w-3 h-3 text-white" 
-                          fill="none" 
-                          stroke="currentColor" 
-                          strokeWidth="2.5" 
+                        <svg
+                          className="w-3 h-3 text-white"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
                           viewBox="0 0 24 24"
                         >
                           <path strokeLinecap="round" strokeLinejoin="round" d="M12 19V5m0 0l-7 7m7-7l7 7" />
@@ -1558,10 +1562,10 @@ export default function PatientDetails({
           hasAIRxReader={activeAddOns.includes('ai-rx-reader')}
           doctorLanguage={doctorLanguage}
           oldRXFiles={
-            Array.isArray(selectedPatientForRxView?.prescriptionUrl) 
-              ? selectedPatientForRxView.prescriptionUrl 
-              : selectedPatientForRxView?.prescriptionUrl 
-                ? [selectedPatientForRxView.prescriptionUrl] 
+            Array.isArray(selectedPatientForRxView?.prescriptionUrl)
+              ? selectedPatientForRxView.prescriptionUrl
+              : selectedPatientForRxView?.prescriptionUrl
+                ? [selectedPatientForRxView.prescriptionUrl]
                 : []
           }
         /> */}

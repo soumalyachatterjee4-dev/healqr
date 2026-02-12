@@ -1,4 +1,4 @@
-import { 
+import {
   BarChart3,
   User,
   QrCode,
@@ -44,11 +44,11 @@ interface DashboardSidebarProps {
   assistantAllowedPages?: string[]; // Pages assistant can access
 }
 
-export default function DashboardSidebar({ 
-  activeMenu = 'dashboard', 
-  onMenuChange, 
-  onLogout, 
-  isOpen = true, 
+export default function DashboardSidebar({
+  activeMenu = 'dashboard',
+  onMenuChange,
+  onLogout,
+  isOpen = true,
   onClose,
   activeAddOns = [],
   isBookingBlocked = false,
@@ -88,23 +88,23 @@ export default function DashboardSidebar({
         if (doctorDoc.exists()) {
           const data = doctorDoc.data();
           const plannedOffPeriods = data.plannedOffPeriods || [];
-          
+
           // Get today's date in YYYY-MM-DD format
           const today = new Date();
           const todayStr = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split('T')[0];
-          
+
           // Check if today falls within any active planned off period
           const isBlocked = plannedOffPeriods.some((period: any) => {
             if (period.status !== 'active') return false;
-            
+
             const startDate = period.startDate?.toDate?.() || new Date(period.startDate);
             const endDate = period.endDate?.toDate?.() || new Date(period.endDate);
             const todayDate = new Date(todayStr);
-            
-            return todayDate >= new Date(startDate.toISOString().split('T')[0]) && 
+
+            return todayDate >= new Date(startDate.toISOString().split('T')[0]) &&
                    todayDate <= new Date(endDate.toISOString().split('T')[0]);
           });
-          
+
           setIsTodayBlocked(isBlocked);
         }
       } catch (error) {
@@ -124,7 +124,8 @@ export default function DashboardSidebar({
   const practiceEnhancerTools = [
     { id: 'todays-schedule', label: "Today's Schedule", icon: Calendar },
     { id: 'advance-booking', label: 'Advance Booking', icon: CalendarClock },
-    { id: 'analytics', label: 'Analytics', icon: TrendingUp },
+    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'monthly-planner', label: 'Monthly Planner', icon: Calendar },
     { id: 'reports', label: 'Reports', icon: FileText },
   ];
 
@@ -134,40 +135,40 @@ export default function DashboardSidebar({
   ];
 
   const premiumAddOnPages = [
-    { 
-      id: 'assistant-access', 
-      label: 'Assistant Access', 
+    {
+      id: 'assistant-access',
+      label: 'Assistant Access',
       icon: Users,
       addonKey: 'assistant-access'
     },
-    { 
-      id: 'lab-referral-tracking', 
-      label: 'Lab Referral Tracking', 
+    {
+      id: 'lab-referral-tracking',
+      label: 'Lab Referral Tracking',
       icon: FileBarChart,
       addonKey: 'lab-referral-tracking'
     },
-    { 
-      id: 'personalized-templates', 
-      label: 'Personalized Templates', 
+    {
+      id: 'personalized-templates',
+      label: 'Personalized Templates',
       icon: FileTextIcon,
       addonKey: 'personalized-templates'
     },
-    { 
-      id: 'emergency-button', 
-      label: 'Emergency Button', 
+    {
+      id: 'emergency-button',
+      label: 'Emergency Button',
       icon: AlertCircle,
       addonKey: 'emergency-button'
     },
-    { 
-      id: 'ai-rx-reader', 
-      label: 'AI RX Reader', 
+    {
+      id: 'ai-rx-reader',
+      label: 'AI RX Reader',
       icon: Scan,
       addonKey: 'ai-rx-reader',
       disabled: true // Paid service - Coming Soon
     },
-    { 
-      id: 'video-consultation', 
-      label: 'Video Consultation', 
+    {
+      id: 'video-consultation',
+      label: 'Video Consultation',
       icon: Video,
       addonKey: 'video-consultation',
       disabled: true // Paid service - Coming Soon
@@ -190,12 +191,12 @@ export default function DashboardSidebar({
     // Users can only access these features through:
     // 1. Doctor pays → page activated → green → clickable (ONLY from premium store)
     // 2. Doctor press DEMO → page activated → yellow → clickable (ONLY demo surfing)
-    // 
+    //
     // BUT NOT CLICKABLE DIRECTLY FROM SIDEBAR
-    // 
+    //
     // This function should never be called as premium items render as non-clickable divs
     // ============================================================================
-    
+
     // Do nothing - premium items are not clickable from sidebar
     return;
   };
@@ -210,10 +211,10 @@ export default function DashboardSidebar({
         isPaid: true // Show as green/activated
       };
     }
-    
+
     // Check if paid - also check localStorage directly as fallback
     let isPaid = activeAddOns.includes(addonKey);
-    
+
     // FALLBACK: If not in activeAddOns prop, check localStorage directly
     // This fixes the race condition after logout/login
     if (!isPaid) {
@@ -227,7 +228,7 @@ export default function DashboardSidebar({
         isPaid = false;
       }
     }
-    
+
     // Check if in demo mode
     let isDemo = false;
     try {
@@ -237,7 +238,7 @@ export default function DashboardSidebar({
     } catch {
       isDemo = false;
     }
-    
+
     return {
       accessible: isPaid || isDemo,
       isDemo,
@@ -249,7 +250,7 @@ export default function DashboardSidebar({
     <>
       {/* Mobile Overlay */}
       {isOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={onClose}
         />
@@ -281,8 +282,8 @@ export default function DashboardSidebar({
           <button
             onClick={() => handleMenuClick('dashboard')}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg mb-3 transition-colors ${
-              activeMenu === 'dashboard' 
-                ? 'bg-emerald-500 text-white' 
+              activeMenu === 'dashboard'
+                ? 'bg-emerald-500 text-white'
                 : 'text-gray-400 hover:bg-zinc-900 hover:text-white'
             }`}
           >
@@ -315,8 +316,8 @@ export default function DashboardSidebar({
                     key={item.id}
                     onClick={() => handleMenuClick(item.id)}
                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-                      activeMenu === item.id 
-                        ? 'bg-emerald-500 text-white' 
+                      activeMenu === item.id
+                        ? 'bg-emerald-500 text-white'
                         : 'text-gray-400 hover:bg-zinc-900 hover:text-white'
                     }`}
                   >
@@ -348,7 +349,7 @@ export default function DashboardSidebar({
                 {practiceEnhancerTools.filter(item => isPageAccessible(item.id)).map((item) => {
                   // Check if Today's Schedule should be blocked due to planned off
                   const isBlockedItem = item.id === 'todays-schedule' && isTodayBlocked;
-                  
+
                   return (
                     <button
                       key={item.id}
@@ -357,8 +358,8 @@ export default function DashboardSidebar({
                       className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
                         isBlockedItem
                           ? 'text-gray-600 cursor-not-allowed opacity-50'
-                          : activeMenu === item.id 
-                          ? 'bg-emerald-500 text-white' 
+                          : activeMenu === item.id
+                          ? 'bg-emerald-500 text-white'
                           : 'text-gray-400 hover:bg-zinc-900 hover:text-white'
                       }`}
                       title={isBlockedItem ? 'Access blocked during planned off period' : undefined}
@@ -395,8 +396,8 @@ export default function DashboardSidebar({
                     key={item.id}
                     onClick={() => handleMenuClick(item.id)}
                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-                      activeMenu === item.id 
-                        ? 'bg-emerald-500 text-white' 
+                      activeMenu === item.id
+                        ? 'bg-emerald-500 text-white'
                         : 'text-gray-400 hover:bg-zinc-900 hover:text-white'
                     }`}
                   >
@@ -409,6 +410,7 @@ export default function DashboardSidebar({
           </div>
 
           {/* PREMIUM ADD-ON SERVICE */}
+          <div className="border-t border-zinc-800 my-4" />
           <div className="mb-3">
             <button
               onClick={() => setIsPremiumOpen(!isPremiumOpen)}
@@ -424,7 +426,7 @@ export default function DashboardSidebar({
               )}
             </button>
             {isPremiumOpen && (
-              <div className="mt-1 space-y-0.5">
+              <div className="mt-2 space-y-1">
                 {/* ====================================================================== */}
                 {/* 🎯 PREMIUM ADD-ON ITEMS - SIMPLE RULE                                 */}
                 {/* ====================================================================== */}
@@ -442,8 +444,8 @@ export default function DashboardSidebar({
                   // If DISABLED → render as GRAY and NOT CLICKABLE
                   if (isDisabled) {
                     return (
-                      <div 
-                        key={item.id} 
+                      <div
+                        key={item.id}
                         className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-gray-600 opacity-40 pointer-events-none"
                       >
                         <item.icon className="w-4 h-4" />
@@ -476,8 +478,8 @@ export default function DashboardSidebar({
 
                   // If NOT PAID → render as GRAY and NOT CLICKABLE
                   return (
-                    <div 
-                      key={item.id} 
+                    <div
+                      key={item.id}
                       className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-gray-600 opacity-60 pointer-events-none"
                     >
                       <item.icon className="w-4 h-4" />
@@ -494,7 +496,7 @@ export default function DashboardSidebar({
         {/* Logout */}
         {!isAssistant && (
           <div className="p-4 border-t border-zinc-900 flex-shrink-0">
-            <button 
+            <button
               onClick={() => {
                 if (onLogout) onLogout();
                 if (onClose) onClose();

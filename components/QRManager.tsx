@@ -1,7 +1,7 @@
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { 
+import {
   Menu,
   Download,
   Palette,
@@ -9,13 +9,16 @@ import {
   GraduationCap,
   Stethoscope,
   Image as ImageIcon,
-  Zap
+  Zap,
+  QrCode
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { Slider } from './ui/slider';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import DashboardSidebar from './DashboardSidebar';
 import QRCode from 'qrcode';
 import { toast } from 'sonner';
+import SocialMediaKit from './SocialMediaKit';
 
 interface QRManagerProps {
   onMenuChange?: (menu: string) => void;
@@ -28,6 +31,7 @@ interface QRManagerProps {
     specialities: string[];
   };
   activeAddOns?: string[];
+  initialTab?: string;
 }
 
 type DownloadSize = {
@@ -37,7 +41,7 @@ type DownloadSize = {
   description: string;
 };
 
-export default function QRManager({ onMenuChange, onLogout, onTestBooking, profileData, activeAddOns = [] }: QRManagerProps) {
+export default function QRManager({ onMenuChange, onLogout, onTestBooking, profileData, activeAddOns = [], initialTab = 'qr-generator' }: QRManagerProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Subscription status state
@@ -46,11 +50,11 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
   const [assignedQrCode, setAssignedQrCode] = useState<string>('');
 
   // Doctor Information
-  const doctorImage = profileData?.profileImage || profileData?.image || null;
+  const doctorImage = profileData?.image || null;
   const doctorName = profileData?.name || 'Doctor Name';
   const degree = (profileData?.degrees && profileData.degrees.length > 0) ? profileData.degrees.join(', ') : 'MBBS';
   const speciality = (profileData?.specialities && profileData.specialities.length > 0) ? profileData.specialities.join(', ') : 'General Physician';
-  
+
   console.log('🩺 QR Manager Profile Data:', {
     hasImage: !!doctorImage,
     imageSrc: doctorImage?.substring(0, 50) + '...',
@@ -91,7 +95,7 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
     try {
       // Get user ID from localStorage (works for both doctors and assistants)
       const userId = localStorage.getItem('userId');
-      
+
       if (!userId) {
         console.log('⚠️ No userId found in localStorage');
         setLoadingSubscription(false);
@@ -116,12 +120,12 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
       if (doctorDoc.exists()) {
         const data = doctorDoc.data();
         setSubscriptionData(data);
-        
+
         // Set assigned activation QR code
         if (data.activationQrCode) {
           setAssignedQrCode(data.activationQrCode);
         }
-        
+
         // Calculate days remaining
         if (data.trialEndDate) {
           const today = new Date();
@@ -129,7 +133,7 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
           const daysLeft = Math.max(0, Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
           setSubscriptionData({...data, calculatedDaysRemaining: daysLeft});
         }
-        
+
         console.log('✅ Loaded subscription data:', data);
         console.log('✅ Assigned QR Code:', data.activationQrCode);
       }
@@ -156,9 +160,6 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
           light: qrBackgroundColor,
         },
         type: 'image/png',
-        rendererOpts: {
-          quality: 1, // Maximum quality
-        },
       });
       setQrCodeDataUrl(dataUrl);
     } catch (error) {
@@ -208,7 +209,7 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
     // Subtle decorative corner elements
     const cornerSize = width * 0.08;
     const accentColor = '#10b981'; // Emerald-500
-    
+
     // Top-left corner accent
     ctx.fillStyle = accentColor;
     ctx.beginPath();
@@ -256,17 +257,17 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
     const imageSize = headerHeight * 0.72;
     const imageX = padding + (width * 0.06);
     const imageY = headerY + (headerHeight - imageSize) / 2;
-    
+
     // Doctor image with professional styling
     if (doctorImageElement) {
       ctx.save();
-      
+
       // Clip to circle
       ctx.beginPath();
       ctx.arc(imageX + imageSize / 2, imageY + imageSize / 2, imageSize / 2, 0, Math.PI * 2);
       ctx.closePath();
       ctx.clip();
-      
+
       // Draw image
       ctx.drawImage(doctorImageElement, imageX, imageY, imageSize, imageSize);
       ctx.restore();
@@ -278,7 +279,7 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
       );
       borderGradient.addColorStop(0, '#10b981');
       borderGradient.addColorStop(1, '#059669');
-      
+
       ctx.strokeStyle = borderGradient;
       ctx.lineWidth = Math.max(5, width * 0.006);
       ctx.beginPath();
@@ -292,19 +293,19 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
       );
       placeholderGradient.addColorStop(0, '#d1fae5');
       placeholderGradient.addColorStop(1, '#a7f3d0');
-      
+
       ctx.fillStyle = placeholderGradient;
       ctx.beginPath();
       ctx.arc(imageX + imageSize / 2, imageY + imageSize / 2, imageSize / 2, 0, Math.PI * 2);
       ctx.fill();
-      
+
       // Emerald border
       ctx.strokeStyle = '#10b981';
       ctx.lineWidth = Math.max(5, width * 0.006);
       ctx.beginPath();
       ctx.arc(imageX + imageSize / 2, imageY + imageSize / 2, imageSize / 2, 0, Math.PI * 2);
       ctx.stroke();
-      
+
       // Draw user icon in placeholder
       ctx.fillStyle = '#10b981';
       ctx.font = `${imageSize * 0.4}px Arial`;
@@ -324,11 +325,11 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
     ctx.font = `bold ${nameFontSize}px system-ui, -apple-system, sans-serif`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    
+
     const nameText = doctorName.toUpperCase();
     let nameLine1 = nameText;
     let nameLine2 = '';
-    
+
     // Check if name needs wrapping
     const nameMetrics = ctx.measureText(nameText);
     if (nameMetrics.width > maxTextWidth) {
@@ -336,13 +337,13 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
       nameLine1 = '';
       nameLine2 = '';
       let currentLine = 1;
-      
+
       for (const word of words) {
-        const testLine = currentLine === 1 ? 
+        const testLine = currentLine === 1 ?
           (nameLine1 ? nameLine1 + ' ' + word : word) :
           (nameLine2 ? nameLine2 + ' ' + word : word);
         const testMetrics = ctx.measureText(testLine);
-        
+
         if (testMetrics.width > maxTextWidth && currentLine === 1) {
           currentLine = 2;
           nameLine2 = word;
@@ -352,7 +353,7 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
         }
       }
     }
-    
+
     ctx.fillText(nameLine1, textX, headerTextY);
     if (nameLine2) {
       ctx.fillText(nameLine2, textX, headerTextY + (height * 0.048));
@@ -363,7 +364,7 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
     ctx.fillStyle = '#059669';
     ctx.font = `600 ${height * 0.026}px system-ui, -apple-system, sans-serif`;
     const credentialsText = degree && speciality ? `${degree.toUpperCase()} • ${speciality.toUpperCase()}` : (degree || speciality).toUpperCase();
-    
+
     // Wrap credentials if too long
     const credMetrics = ctx.measureText(credentialsText);
     if (credMetrics.width > maxTextWidth) {
@@ -379,7 +380,7 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
 
     // MIDDLE SECTION - Elegant call to action
     let currentY = headerY + headerHeight + (height * 0.08);
-    
+
     // "BOOK YOUR APPOINTMENT" text - modern typography
     ctx.fillStyle = '#1f2937';
     ctx.font = `600 ${height * 0.032}px system-ui, -apple-system, sans-serif`;
@@ -445,7 +446,7 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
 
     // FOOTER - Minimalist branding
     const footerY = height - padding - footerHeight;
-    
+
     // Subtle divider line
     ctx.strokeStyle = '#d1fae5';
     ctx.lineWidth = Math.max(2, width * 0.002);
@@ -459,7 +460,7 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
     ctx.font = `500 ${height * 0.024}px system-ui, -apple-system, sans-serif`;
     ctx.textAlign = 'center';
     ctx.fillText('Powered by', width / 2, footerY + footerHeight * 0.55);
-    
+
     // HealQR branding - emerald color
     ctx.fillStyle = '#10b981';
     ctx.font = `700 ${height * 0.028}px system-ui, -apple-system, sans-serif`;
@@ -498,10 +499,16 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
     { name: 'Red', value: '#ef4444' },
   ];
 
+  const [currentTab, setCurrentTab] = useState(initialTab);
+
+  useEffect(() => {
+    setCurrentTab(initialTab);
+  }, [initialTab]);
+
   return (
     <div className="min-h-screen bg-black text-white flex">
-      <DashboardSidebar 
-        activeMenu="qr" 
+      <DashboardSidebar
+        activeMenu="qr"
         onMenuChange={onMenuChange || (() => {})}
         onLogout={onLogout}
         isOpen={sidebarOpen}
@@ -521,7 +528,28 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
         </div>
 
         <div className="p-6">
-          <div className="max-w-7xl mx-auto">
+          <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">
+            <div className="max-w-7xl mx-auto mb-6">
+              <TabsList className="grid w-full max-w-md grid-cols-2 bg-zinc-900 border border-zinc-800">
+                <TabsTrigger
+                  value="qr-generator"
+                  className="data-[state=active]:bg-emerald-500 data-[state=active]:text-white text-gray-400"
+                >
+                  <QrCode className="w-4 h-4 mr-2" />
+                  QR Generator
+                </TabsTrigger>
+                <TabsTrigger
+                  value="social-media"
+                  className="data-[state=active]:bg-emerald-500 data-[state=active]:text-white text-gray-400"
+                >
+                  <Palette className="w-4 h-4 mr-2" />
+                  Social Media Kit
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+            <TabsContent value="qr-generator" className="mt-0">
+              <div className="max-w-7xl mx-auto">
             {/* Assigned QR Code Notice */}
             {assignedQrCode && (
               <div className="mb-6 bg-emerald-500/10 border border-emerald-500 rounded-xl p-6">
@@ -554,9 +582,9 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
 
                   <div className="bg-white rounded-lg p-8 flex items-center justify-center min-h-[400px]">
                     {qrCodeDataUrl ? (
-                      <img 
-                        src={qrCodeDataUrl} 
-                        alt="QR Code" 
+                      <img
+                        src={qrCodeDataUrl}
+                        alt="QR Code"
                         className="max-w-full h-auto"
                       />
                     ) : (
@@ -749,7 +777,7 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
                     <Zap className="w-5 h-5 text-emerald-400" />
                     <h3 className="text-emerald-400">Preview Booking Flow</h3>
                   </div>
-                  
+
                   <p className="text-gray-300 text-sm mb-4">
                     Test the patient booking experience that starts when your QR code is scanned
                   </p>
@@ -768,9 +796,22 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
                 </div>
               </div>
             </div>
-          </div>
-        </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="social-media" className="mt-0">
+            <SocialMediaKit
+              doctorName={doctorName}
+              degree={degree}
+              speciality={speciality}
+              qrUrl={qrUrl}
+              profileImage={doctorImage}
+            />
+          </TabsContent>
+
+        </Tabs>
       </div>
+    </div>
 
       <canvas ref={canvasRef} style={{ display: 'none' }} />
     </div>
