@@ -5,7 +5,7 @@ import { Switch } from './ui/switch';
 import { Card } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
-import { Menu, Info, Plus, Minus, Calendar, Pencil, Trash2, Clock, MapPin, Users, CalendarIcon, Check, Eye, AlertTriangle, Phone, Building2 } from 'lucide-react';
+import { Menu, Info, Plus, Minus, Calendar, Pencil, Trash2, Clock, MapPin, Users, CalendarIcon, Check, Eye, AlertTriangle, Phone, Building2, QrCode } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import DashboardSidebar from './DashboardSidebar';
 import { toast } from 'sonner';
