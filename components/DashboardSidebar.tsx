@@ -4,30 +4,24 @@ import {
   QrCode,
   CalendarDays,
   Calendar,
-  TrendingUp,
   FileText,
-  ShoppingCart,
   Eye,
   LogOut,
   X,
-  Sparkles,
   ChevronDown,
   ChevronRight,
   Lock,
   Check,
   FileText as FileTextIcon,
-  ShoppingBag,
-  DollarSign,
-  MessageSquare,
   FileBarChart,
   Users,
-  Bot,
   Video,
   Scan,
-  Eye as EyeIcon,
   CalendarClock,
   AlertCircle,
-  History
+  History,
+  Apple,
+  Share2
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import healqrLogo from '../assets/healqr-logo.png';
@@ -127,6 +121,7 @@ export default function DashboardSidebar({
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'monthly-planner', label: 'Monthly Planner', icon: Calendar },
     { id: 'reports', label: 'Reports', icon: FileText },
+    { id: 'social-kit', label: 'Social Kit & Offers', icon: Share2 },
   ];
 
   const generalTools = [
@@ -158,6 +153,12 @@ export default function DashboardSidebar({
       label: 'Emergency Button',
       icon: AlertCircle,
       addonKey: 'emergency-button'
+    },
+    {
+      id: 'ai-diet-chart',
+      label: 'AI Diet Chart',
+      icon: Apple,
+      addonKey: 'ai-diet-chart'
     },
     {
       id: 'ai-rx-reader',
@@ -203,8 +204,8 @@ export default function DashboardSidebar({
 
   // Check if a premium feature is accessible (paid or demo mode)
   const isPremiumFeatureAccessible = (addonKey: string): { accessible: boolean; isDemo: boolean; isPaid: boolean } => {
-    // Emergency Button & Assistant Access are always FREE and accessible
-    if (addonKey === 'emergency-button' || addonKey === 'assistant-access') {
+    // Emergency Button, Assistant Access & AI Diet Chart are always accessible in the sidebar
+    if (addonKey === 'emergency-button' || addonKey === 'assistant-access' || addonKey === 'ai-diet-chart') {
       return {
         accessible: true,
         isDemo: false,

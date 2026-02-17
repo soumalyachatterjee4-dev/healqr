@@ -3,7 +3,7 @@
 import { getFirestore, collection, addDoc, query, where, orderBy, limit, getDocs, deleteDoc, doc, Timestamp } from 'firebase/firestore';
 import { app } from '../lib/firebase/config';
 
-const db = getFirestore(app);
+const db = getFirestore(app!);
 
 export interface NotificationRecord {
   id?: string;
@@ -32,7 +32,7 @@ export interface NotificationRecord {
   doctorId?: string;
   isWalkIn?: boolean;
   walkInVerified?: boolean;
-  
+
   // 🆕 120-DAY TEMPLATE STORAGE
   templateType?: 'consultation_completed' | 'review_request' | 'prescription_ready' | 'appointment_cancelled' | 'follow_up' | 'appointment_reminder';
   templateData?: {
@@ -64,7 +64,7 @@ export interface NotificationRecord {
   prescriptionUrls?: string[];
   decodedRxText?: string;
   ocrConfidence?: number;
-  
+
   // 🆕 INTERACTIVE USER ACTIONS
   userActions?: {
     reviewSubmitted?: boolean;
@@ -76,7 +76,7 @@ export interface NotificationRecord {
     opened?: boolean;
     openedAt?: Date;
   };
-  
+
   // 🆕 120-DAY EXPIRY
   expiresAt?: Date;
   isExpired?: boolean;
@@ -101,13 +101,13 @@ export interface ConsultationHistory {
   isWalkIn?: boolean; // Whether patient is walk-in
   verificationMethod?: 'qr_scan' | 'manual_override'; // How patient was verified
   notifications: {
-    reminder?: { status: 'sent' | 'failed' | 'pending'; timestamp?: Date };
-    appointmentConfirmed?: { status: 'sent' | 'failed' | 'pending'; timestamp?: Date };
-    consultationCompleted?: { status: 'sent' | 'failed' | 'pending'; timestamp?: Date };
-    cancelled?: { status: 'sent' | 'failed' | 'pending'; timestamp?: Date };
-    restored?: { status: 'sent' | 'failed' | 'pending'; timestamp?: Date };
-    followUp?: { status: 'sent' | 'failed' | 'pending'; timestamp?: Date };
-    reviewRequest?: { status: 'sent' | 'failed' | 'pending'; timestamp?: Date };
+    reminder?: { status: 'delivered' | 'failed' | 'not_allowed' | 'pending' | 'sent'; timestamp?: Date };
+    appointmentConfirmed?: { status: 'delivered' | 'failed' | 'not_allowed' | 'pending' | 'sent'; timestamp?: Date };
+    consultationCompleted?: { status: 'delivered' | 'failed' | 'not_allowed' | 'pending' | 'sent'; timestamp?: Date };
+    cancelled?: { status: 'delivered' | 'failed' | 'not_allowed' | 'pending' | 'sent'; timestamp?: Date };
+    restored?: { status: 'delivered' | 'failed' | 'not_allowed' | 'pending' | 'sent'; timestamp?: Date };
+    followUp?: { status: 'delivered' | 'failed' | 'not_allowed' | 'pending' | 'sent'; timestamp?: Date };
+    reviewRequest?: { status: 'delivered' | 'failed' | 'not_allowed' | 'pending' | 'sent'; timestamp?: Date };
   };
 }
 
@@ -124,50 +124,28 @@ export const saveNotificationHistory = async (record: Omit<NotificationRecord, '
       notificationType: record.notificationType,
       bookingStatus: record.bookingStatus
     });
-    
+
     // Normalize phone number
     const phone10 = record.patientPhone.replace(/\D/g, '').slice(-10);
     console.log('📞 Normalized phone:', phone10);
-    
-    // Remove undefined fields to prevent Firestore errors
-    const cleanRecord = { ...record };
-    if (cleanRecord.clinicName === undefined) delete cleanRecord.clinicName;
-    if (cleanRecord.chamber === undefined) delete cleanRecord.chamber;
-    if (cleanRecord.age === undefined) delete cleanRecord.age;
-    if (cleanRecord.sex === undefined) delete cleanRecord.sex;
-    if (cleanRecord.purpose === undefined) delete cleanRecord.purpose;
-    if (cleanRecord.messageId === undefined) delete cleanRecord.messageId;
-    if (cleanRecord.serialNumber === undefined) delete cleanRecord.serialNumber;
-    if (cleanRecord.message === undefined) delete cleanRecord.message;
-    if (cleanRecord.nextSteps === undefined) delete cleanRecord.nextSteps;
-    if (cleanRecord.queuePosition === undefined) delete cleanRecord.queuePosition;
-    if (cleanRecord.isWalkIn === undefined) delete cleanRecord.isWalkIn;
-    if (cleanRecord.walkInVerified === undefined) delete cleanRecord.walkInVerified;
-    // New fields
-    if (cleanRecord.deliveryStatus === undefined) delete cleanRecord.deliveryStatus;
-    if (cleanRecord.failureReason === undefined) delete cleanRecord.failureReason;
-    if (cleanRecord.templateType === undefined) delete cleanRecord.templateType;
-    if (cleanRecord.templateData === undefined) delete cleanRecord.templateData;
-    if (cleanRecord.doctorPhoto === undefined) delete cleanRecord.doctorPhoto;
-    if (cleanRecord.doctorSpecialty === undefined) delete cleanRecord.doctorSpecialty;
-    if (cleanRecord.doctorInitials === undefined) delete cleanRecord.doctorInitials;
-    if (cleanRecord.prescriptionUrls === undefined) delete cleanRecord.prescriptionUrls;
-    if (cleanRecord.decodedRxText === undefined) delete cleanRecord.decodedRxText;
-    if (cleanRecord.ocrConfidence === undefined) delete cleanRecord.ocrConfidence;
-    if (cleanRecord.userActions === undefined) delete cleanRecord.userActions;
-    if (cleanRecord.expiresAt === undefined) delete cleanRecord.expiresAt;
-    if (cleanRecord.isExpired === undefined) delete cleanRecord.isExpired;
-    if (cleanRecord.readStatus === undefined) delete cleanRecord.readStatus;
-    
+
+    // Remove ALL undefined fields to prevent Firestore errors (generically)
+    const cleanRecord = { ...record } as any;
+    Object.keys(cleanRecord).forEach(key => {
+      if (cleanRecord[key] === undefined) {
+        delete cleanRecord[key];
+      }
+    });
+
     const docToSave = {
       ...cleanRecord,
       patientPhone: phone10,
       timestamp: Timestamp.fromDate(record.timestamp),
       createdAt: Timestamp.now()
     };
-    
+
     console.log('📝 Document to save:', docToSave);
-    
+
     // Save new notification
     const docRef = await addDoc(collection(db, 'notificationHistory'), docToSave);
     console.log('✅ Notification history saved successfully!', {
@@ -198,7 +176,7 @@ const cleanupOldNotifications = async (patientPhone: string): Promise<void> => {
     const RETENTION_DAYS = 120;
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - RETENTION_DAYS);
-    
+
     const q = query(
       collection(db, 'notificationHistory'),
       where('patientPhone', '==', patientPhone),
@@ -213,7 +191,7 @@ const cleanupOldNotifications = async (patientPhone: string): Promise<void> => {
       const timestamp = doc.data().timestamp?.toDate() || new Date(0);
       return timestamp < cutoffDate;
     });
-    
+
     if (toDelete.length > 0) {
       for (const docToDelete of toDelete) {
         await deleteDoc(doc(db, 'notificationHistory', docToDelete.id));
@@ -231,7 +209,7 @@ const cleanupOldNotifications = async (patientPhone: string): Promise<void> => {
 export const getPatientNotificationHistory = async (patientPhone: string): Promise<NotificationRecord[]> => {
   try {
     const phone10 = patientPhone.replace(/\D/g, '').slice(-10);
-    
+
     const q = query(
       collection(db, 'notificationHistory'),
       where('patientPhone', '==', phone10),
@@ -240,7 +218,7 @@ export const getPatientNotificationHistory = async (patientPhone: string): Promi
     );
 
     const snapshot = await getDocs(q);
-    
+
     return snapshot.docs.map(doc => {
       const data = doc.data();
       return {
@@ -268,7 +246,7 @@ export const getDoctorNotificationHistory = async (doctorId: string): Promise<No
     );
 
     const snapshot = await getDocs(q);
-    
+
     return snapshot.docs.map(doc => {
       const data = doc.data();
       return {
@@ -289,14 +267,14 @@ export const getDoctorNotificationHistory = async (doctorId: string): Promise<No
 export const searchPatientConsultationHistory = async (patientPhone: string, doctorId?: string): Promise<ConsultationHistory[]> => {
   try {
     const phone10 = patientPhone.replace(/\D/g, '').slice(-10);
-    
+
     console.log('🔍 searchPatientConsultationHistory called with:', {
       originalPhone: patientPhone,
       normalized: phone10,
       doctorId: doctorId,
       hasDoctorId: !!doctorId
     });
-    
+
     let q;
     if (doctorId) {
       q = query(
@@ -327,50 +305,50 @@ export const searchPatientConsultationHistory = async (patientPhone: string, doc
 
     // Group by bookingId with improved deduplication
     const consultationMap = new Map<string, ConsultationHistory>();
-    
+
     // Helper to normalize time format for comparison (e.g., "07:24 pm" -> "07:24 PM")
     const normalizeTime = (time: string | undefined): string => {
       if (!time) return '';
       return time.toLowerCase().trim().replace(/\s+/g, ' ');
     };
-    
+
     // Helper to normalize date for comparison
     const normalizeDate = (date: string | undefined): string => {
       if (!date) return '';
       return date.toLowerCase().trim();
     };
-    
+
     records.forEach(record => {
       // Prefer actual bookingId, but create a robust fallback based on normalized date+time
       let bookingId = record.bookingId;
-      
+
       if (!bookingId) {
         // Create normalized fallback ID
         const normalizedDate = normalizeDate(record.consultationDate);
         const normalizedTime = normalizeTime(record.consultationTime);
         bookingId = `${normalizedDate}__${normalizedTime}`;
       }
-      
+
       // Check if we already have a consultation for this normalized date+time
       // This prevents duplicates even when some records have bookingId and others don't
       let existingKey = bookingId;
-      
+
       if (!consultationMap.has(bookingId)) {
         // Search for existing consultation with same date+time (different key)
         const normalizedDate = normalizeDate(record.consultationDate);
         const normalizedTime = normalizeTime(record.consultationTime);
-        
+
         for (const [key, existing] of consultationMap.entries()) {
           const existingNormDate = normalizeDate(existing.consultationDate);
           const existingNormTime = normalizeTime(existing.consultationTime);
-          
+
           if (existingNormDate === normalizedDate && existingNormTime === normalizedTime) {
             existingKey = key;
             break;
           }
         }
       }
-      
+
       if (!consultationMap.has(existingKey)) {
         consultationMap.set(existingKey, {
           bookingId: record.bookingId || existingKey, // Prefer actual bookingId if available
@@ -388,19 +366,19 @@ export const searchPatientConsultationHistory = async (patientPhone: string, doc
           currentStatus: record.bookingStatus,
           timestamp: record.timestamp,
           isWalkIn: record.isWalkIn, // Track if walk-in
-          verificationMethod: record.isWalkIn 
+          verificationMethod: record.isWalkIn
             ? (record.walkInVerified ? 'qr_scan' : 'manual_override')
             : 'qr_scan', // QR bookings are always qr_scan
           notifications: {}
         });
       }
-      
+
       const consultation = consultationMap.get(existingKey)!;
-      
+
       // Update patient details if available (prioritize non-generic values)
       // We iterate Newest -> Oldest, so we want to keep the newest VALID data
       // but allow older data to fill in gaps or replace generic defaults
-      
+
       const isGenericPurpose = (p: string | undefined) => {
         if (!p) return true;
         const lower = String(p).toLowerCase().trim();
@@ -434,17 +412,17 @@ export const searchPatientConsultationHistory = async (patientPhone: string, doc
       if (!hasValue(consultation.chamber) && hasValue(record.chamber)) consultation.chamber = record.chamber;
       if (!hasValue(consultation.clinicName) && hasValue(record.clinicName)) consultation.clinicName = record.clinicName;
       if (!hasValue(consultation.serialNumber) && hasValue(record.serialNumber)) consultation.serialNumber = record.serialNumber;
-      
+
       // Update to latest status (timestamp check handles this correctly already)
       // Since current logic overwrites, it correctly sets status from Newest record (first iter)
       // But we loop Newest -> Oldest. The loop logic for status below was:
       // if (record.timestamp > consultation.timestamp)
       // Since first record is Newest, this condition is only True for the first record.
       // So status is locked to the Newest. Correct.
-      
+
       // Aggregate notification statuses
       const notifStatus = { status: record.notificationStatus, timestamp: record.timestamp };
-      
+
       switch (record.notificationType) {
         case 'reminder':
           consultation.notifications.reminder = notifStatus;
@@ -470,26 +448,26 @@ export const searchPatientConsultationHistory = async (patientPhone: string, doc
           break;
       }
     });
-    
+
     // HISTORY RULE: Show consultations from YESTERDAY and before, NOT TODAY
     // Today's appointments (regardless of status) become history from tomorrow 00:00
     // This applies to both QR/advance bookings and walk-in patients
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Reset to midnight
-    
+
     // Helper function to normalize date for comparison
     const isSameDate = (dateStr: string | undefined): boolean => {
       if (!dateStr) return false;
-      
+
       // Try parsing various date formats
       // Format 1: "2026-01-26" (YYYY-MM-DD)
       // Format 2: "26/01/2026" (DD/MM/YYYY)
       // Format 3: "26-01-2026" (DD-MM-YYYY)
       // Format 4: "Monday, 26 January 2026" (Day, DD Month YYYY)
       // Format 5: "26 January 2026" (DD Month YYYY)
-      
+
       let consultDate: Date | null = null;
-      
+
       if (dateStr.includes('-') && dateStr.split('-')[0].length === 4) {
         // YYYY-MM-DD format
         consultDate = new Date(dateStr);
@@ -507,24 +485,24 @@ export const searchPatientConsultationHistory = async (patientPhone: string, doc
         const cleanedDate = dateStr.replace(/^[A-Za-z]+,\s*/, '');
         consultDate = new Date(cleanedDate);
       }
-      
+
       if (!consultDate || isNaN(consultDate.getTime())) return false;
-      
+
       consultDate.setHours(0, 0, 0, 0);
       return consultDate.getTime() === today.getTime();
     };
-    
+
     const filteredConsultations = Array.from(consultationMap.values()).filter(consultation => {
       const consultationDateStr = consultation.consultationDate;
-      
+
       // If no date, exclude it
       if (!consultationDateStr) {
         console.log('⚠️ Consultation has no date, excluding:', consultation.patientName);
         return false;
       }
-      
+
       const isTodayDate = isSameDate(consultationDateStr);
-      
+
       // Debug logging for TODAY's check
       if (isTodayDate) {
         console.log('🚫 EXCLUDING TODAY\'S appointment:', {
@@ -533,16 +511,16 @@ export const searchPatientConsultationHistory = async (patientPhone: string, doc
           today: today.toISOString().split('T')[0]
         });
       }
-      
+
       // EXCLUDE all today's appointments - they become history from tomorrow
       // INCLUDE all past appointments (yesterday and before)
       return !isTodayDate;
     })
       .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-    
+
     console.log('✅ Total consultations:', consultationMap.size, '| History (past only):', filteredConsultations.length);
     return filteredConsultations;
-    
+
   } catch (error) {
     const err = error as Error;
     console.error('❌ Failed to search patient consultation history:', err?.message || 'Unknown error');
@@ -556,14 +534,14 @@ export const searchPatientConsultationHistory = async (patientPhone: string, doc
 export const searchPatientHistory = async (patientPhone: string, doctorId?: string): Promise<NotificationRecord[]> => {
   try {
     const phone10 = patientPhone.replace(/\D/g, '').slice(-10);
-    
+
     console.log('🔍 searchPatientHistory called with:', {
       originalPhone: patientPhone,
       normalized: phone10,
       doctorId: doctorId,
       hasDoctorId: !!doctorId
     });
-    
+
     let q;
     if (doctorId) {
       // Doctor-specific search
@@ -574,7 +552,7 @@ export const searchPatientHistory = async (patientPhone: string, doctorId?: stri
         orderBy: 'timestamp desc',
         limit: 50
       });
-      
+
       q = query(
         collection(db, 'notificationHistory'),
         where('patientPhone', '==', phone10),
@@ -590,7 +568,7 @@ export const searchPatientHistory = async (patientPhone: string, doctorId?: stri
         orderBy: 'timestamp desc',
         limit: 50
       });
-      
+
       q = query(
         collection(db, 'notificationHistory'),
         where('patientPhone', '==', phone10),
@@ -605,11 +583,11 @@ export const searchPatientHistory = async (patientPhone: string, doctorId?: stri
       docsFound: snapshot.docs.length,
       empty: snapshot.empty
     });
-    
+
     if (snapshot.docs.length > 0) {
       console.log('📄 First record sample:', snapshot.docs[0].data());
     }
-    
+
     const results = snapshot.docs.map(doc => {
       const data = doc.data();
       return {
@@ -618,7 +596,7 @@ export const searchPatientHistory = async (patientPhone: string, doctorId?: stri
         timestamp: data.timestamp?.toDate() || new Date(),
       } as NotificationRecord;
     });
-    
+
     console.log('✅ Returning results:', results.length);
     return results;
   } catch (error) {

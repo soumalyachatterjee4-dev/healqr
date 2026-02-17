@@ -25,6 +25,7 @@ interface Doctor {
   rating?: number;
   pinCode?: string;
   clinicName?: string;
+  landmark?: string;
 }
 
 export default function PatientSearch() {
@@ -39,37 +40,61 @@ export default function PatientSearch() {
   const [geocodingLoading, setGeocodingLoading] = useState(false);
 
   // Google Geocoding API to convert area name to pincode
-  const handleAreaSearch = async () => {
-    if (!areaInput || isAreaLocked) return;
-    
+  const handleAreaSearch = async (): Promise<string | null> => {
+    if (!areaInput || isAreaLocked) return pinCode;
+
     setGeocodingLoading(true);
     try {
+      // Smart Logic: Strip intent-based keywords from the query before geocoding
+      // e.g., "ent dr near moulali" -> "moulali"
+      const intentKeywords = [
+        'doctor', 'dr', 'dentist', 'near', 'specialist', 'clinic', 'hospital',
+        'best', 'top', 'in', 'at', 'specialty', 'physician', 'surgeon',
+        'medical', 'center', 'centre', 'lookup', 'find', 'search'
+      ];
+
+      let cleanQuery = areaInput.toLowerCase();
+      intentKeywords.forEach(keyword => {
+        // Use word boundary to avoid stripping partial matches (e.g., "Indira" -> "ira" if "in" is stripped)
+        const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
+        cleanQuery = cleanQuery.replace(regex, '');
+      });
+
+      // Clean up multiple spaces and trim
+      cleanQuery = cleanQuery.replace(/\s+/g, ' ').trim();
+
+      console.log('🔍 Geocoding cleaned query:', cleanQuery, '(Original:', areaInput + ')');
+
       // Use Firebase API key - already has Geocoding API enabled
-      const apiKey = 'AIzaSyB1AVXeao1bqTah8cD1bGAiAQMbZ5nw0WI'; 
+      const apiKey = 'AIzaSyB1AVXeao1bqTah8cD1bGAiAQMbZ5nw0WI';
       const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(areaInput)}, India&key=${apiKey}`
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(cleanQuery || areaInput)}, India&key=${apiKey}`
       );
       const data = await response.json();
-      
+
       if (data.results && data.results.length > 0) {
         // Extract pincode from address components
         const addressComponents = data.results[0].address_components;
-        const postalCode = addressComponents.find((component: any) => 
+        const postalCode = addressComponents.find((component: any) =>
           component.types.includes('postal_code')
         );
-        
+
         if (postalCode) {
           setPinCode(postalCode.long_name);
           setIsAreaLocked(true);
+          return postalCode.long_name;
         } else {
           alert('Could not find pincode for this area. Please try a more specific location.');
+          return null;
         }
       } else {
         alert('Location not found. Please try again.');
+        return null;
       }
     } catch (error) {
       console.error('Geocoding error:', error);
       alert('Error finding location. Please enter pincode manually.');
+      return null;
     } finally {
       setGeocodingLoading(false);
     }
@@ -104,40 +129,54 @@ export default function PatientSearch() {
   };
 
   const handleSearch = async () => {
-    if (!pinCode && !specialty && !doctorName) return;
-    
+    let searchPinCode = pinCode;
+
+    // If no pinCode but areaInput exists (and it's not a numeric pincode), try geocoding automatically
+    if (!searchPinCode && areaInput && !/^\d{6}$/.test(areaInput)) {
+      console.log('🔄 Triggering auto-geocoding for search...');
+      const resolvedPin = await handleAreaSearch();
+      if (!resolvedPin) return; // Geocoding failed or alerted
+      searchPinCode = resolvedPin;
+    }
+
+    if (!searchPinCode && !specialty && !doctorName) return;
+
     setLoading(true);
     setSearched(true);
-    
+
     try {
       const { db } = await import('../lib/firebase/config');
+      if (!db) {
+        setLoading(false);
+        return;
+      }
       const { collection, query, where, getDocs } = await import('firebase/firestore');
-      
+
       const doctorsRef = collection(db, 'doctors');
       let q = query(doctorsRef);
-      
+
       // Query by pinCode if provided
-      if (pinCode) {
-        q = query(doctorsRef, where('pinCode', '==', pinCode));
+      if (searchPinCode) {
+        q = query(doctorsRef, where('pinCode', '==', searchPinCode));
       }
-      
+
       const snapshot = await getDocs(q);
       let doctors = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Doctor[];
-      
+
       // Filter by specialty if provided
       if (specialty) {
-        doctors = doctors.filter(doc => 
+        doctors = doctors.filter(doc =>
           doc.specialities?.some(s => s.toLowerCase().includes(specialty.toLowerCase()))
         );
       }
-      
+
       // Filter by doctor name if provided
       if (doctorName) {
-        doctors = doctors.filter(doc => 
+        doctors = doctors.filter(doc =>
           doc.name?.toLowerCase().includes(doctorName.toLowerCase())
         );
       }
-      
+
       setResults(doctors);
     } catch (error) {
       console.error("Search error:", error);
@@ -151,9 +190,9 @@ export default function PatientSearch() {
       {/* Header */}
       <div className="bg-zinc-900 border-b border-zinc-800 p-4 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto flex items-center gap-4">
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => window.location.href = '/'}
             className="text-gray-400 hover:text-white hover:bg-zinc-800"
           >
@@ -186,8 +225,8 @@ export default function PatientSearch() {
               {/* Area/Pincode Input with Lock */}
               <div className="relative">
                 <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                <Input 
-                  placeholder={isAreaLocked ? pinCode : "Enter area (e.g., 'ent dr near moulali') or pincode"} 
+                <Input
+                  placeholder={isAreaLocked ? pinCode : "Enter area (e.g., 'ent dr near moulali') or pincode"}
                   className="pl-10 pr-20 h-12 text-base bg-zinc-800 border-zinc-700 text-white placeholder:text-gray-400"
                   value={isAreaLocked ? `${areaInput} (${pinCode})` : areaInput}
                   onChange={(e) => !isAreaLocked && handleAreaInputChange(e.target.value)}
@@ -247,12 +286,12 @@ export default function PatientSearch() {
                   )}
                 </div>
               </div>
-              
+
               {/* Doctor Name Input with Clear */}
               <div className="relative">
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                <Input 
-                  placeholder="Search by Doctor Name (optional)" 
+                <Input
+                  placeholder="Search by Doctor Name (optional)"
                   className="pl-10 pr-10 h-12 text-base bg-zinc-800 border-zinc-700 text-white placeholder:text-gray-400"
                   value={doctorName}
                   onChange={(e) => setDoctorName(e.target.value)}
@@ -269,7 +308,7 @@ export default function PatientSearch() {
                   </Button>
                 )}
               </div>
-              
+
               {/* Specialty Select with Clear */}
               <div className="relative">
                 <Stethoscope className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5 z-10" />
@@ -298,7 +337,7 @@ export default function PatientSearch() {
                 )}
               </div>
             </div>
-            <Button 
+            <Button
               className="w-full mt-4 h-12 text-base bg-orange-600 hover:bg-orange-700 text-white"
               onClick={handleSearch}
               disabled={loading}
@@ -314,10 +353,10 @@ export default function PatientSearch() {
             <h2 className="text-xl font-semibold text-white mb-4">
               {results.length} Doctors Found
             </h2>
-            
+
             {results.map((doctor) => (
-              <Card 
-                key={doctor.id} 
+              <Card
+                key={doctor.id}
                 className="bg-zinc-900 border border-zinc-800 hover:border-orange-500 transition-all cursor-pointer"
                 onClick={() => window.location.href = `/?doctorId=${doctor.id}`}
               >
@@ -328,7 +367,7 @@ export default function PatientSearch() {
                       {doctor.name.substring(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
-                  
+
                   <div className="flex-1">
                     <div className="flex justify-between items-start">
                       <div>
@@ -341,7 +380,7 @@ export default function PatientSearch() {
                         {doctor.rating || 'New'}
                       </Badge>
                     </div>
-                    
+
                     <div className="mt-4 flex items-center justify-between">
                       <div className="text-sm text-gray-400">
                         <span className="flex items-center gap-1">

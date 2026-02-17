@@ -41,9 +41,7 @@ export default function AddPatientModal({ isOpen, onClose, onAddPatient, doctorI
     consent1: true,
     consent2: true,
   });
-  
-  const [isBlocked, setIsBlocked] = useState(false);
-  const [blockMessage, setBlockMessage] = useState('');
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadedDoctorName, setLoadedDoctorName] = useState('');
   const [showManualConfirmation, setShowManualConfirmation] = useState(false);
@@ -57,30 +55,30 @@ export default function AddPatientModal({ isOpen, onClose, onAddPatient, doctorI
   useEffect(() => {
     if (!showQrStep || !currentBookingId) return;
 
-    const unsubscribe = onSnapshot(doc(db, 'bookings', currentBookingId), async (docSnapshot) => {
+    const unsubscribe = onSnapshot(doc(db!, 'bookings', currentBookingId), async (docSnapshot) => {
       if (docSnapshot.exists()) {
         const data = docSnapshot.data();
         if (data.verifiedByPatient) {
           setIsVerified(true);
-          
+
           // 🔔 SCHEDULE CONFIRMATION NOTIFICATION (30 mins delay)
           try {
              const { scheduleConsultationConfirmation } = await import('../services/notificationService');
              await scheduleConsultationConfirmation({
-                patientPhone: formData.whatsappNumber.startsWith('+91') 
-                  ? formData.whatsappNumber 
+                patientPhone: formData.whatsappNumber.startsWith('+91')
+                  ? formData.whatsappNumber
                   : `+91${formData.whatsappNumber.replace(/^\+91\s*/, '')}`,
                 patientName: formData.patientName,
                 doctorName: doctorName || loadedDoctorName,
                 bookingId: currentBookingId,
-                consultationDate: new Date().toLocaleDateString('en-US', { 
-                  weekday: 'long', 
-                  year: 'numeric', 
-                  month: 'long', 
-                  day: 'numeric' 
+                consultationDate: new Date().toLocaleDateString('en-US', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
                 }),
-                consultationTime: new Date().toLocaleTimeString('en-US', { 
-                  hour: '2-digit', 
+                consultationTime: new Date().toLocaleTimeString('en-US', {
+                  hour: '2-digit',
                   minute: '2-digit',
                   hour12: true
                 }),
@@ -89,7 +87,7 @@ export default function AddPatientModal({ isOpen, onClose, onAddPatient, doctorI
                 age: formData.age !== undefined && formData.age !== '' ? String(formData.age) : undefined,
                 sex: formData.gender || undefined,
                 purpose: formData.purposeOfVisit || undefined,
-                doctorId: doctorId, // Use doctorId prop (currentDoctorId not in scope here)
+                doctorId: doctorId || auth!.currentUser?.uid, // Fallback to current user if prop missing
                 clinicName: 'Walk-In Clinic' // Fallback
              });
              console.log('✅ Confirmation scheduled for 30 mins after verification');
@@ -100,7 +98,7 @@ export default function AddPatientModal({ isOpen, onClose, onAddPatient, doctorI
           // Auto close after 2 seconds
           setTimeout(() => {
             if (onAddPatient) {
-               onAddPatient(formData as PatientFormData); 
+               onAddPatient(formData as PatientFormData);
             }
             // Reset and close
             setFormData({
@@ -125,66 +123,25 @@ export default function AddPatientModal({ isOpen, onClose, onAddPatient, doctorI
     return () => unsubscribe();
   }, [showQrStep, currentBookingId, onClose, onAddPatient, formData, doctorName]);
 
-  // Check if doctor booking is blocked
+  // Load doctor data
   useEffect(() => {
-    const checkDoctorStatus = async () => {
-      if (!doctorId) {
-        // Get from auth if not passed
-        const user = auth.currentUser;
-        if (!user) return;
-        
-        try {
-          const doctorDoc = await getDoc(doc(db, 'doctors', user.uid));
-          if (doctorDoc.exists()) {
-            const data = doctorDoc.data();
-            setLoadedDoctorName(data.name || 'Doctor');
-            
-            // FREE FOREVER: Disable blocking logic
-            /*
-            if (data.bookingBlocked) {
-              setIsBlocked(true);
-              if (data.blockReason === 'booking_limit') {
-                setBlockMessage('You have reached your booking limit. Please upgrade your subscription to continue.');
-              } else if (data.blockReason === 'trial_expired') {
-                setBlockMessage('Your trial has expired. Please subscribe to continue accepting bookings.');
-              } else {
-                setBlockMessage('Booking is currently unavailable.');
-              }
-            }
-            */
-          }
-        } catch (error) {
-          console.error('Error checking doctor status:', error);
+    const loadDoctorData = async () => {
+      const currentDoctorId = doctorId || auth!.currentUser?.uid;
+      if (!currentDoctorId) return;
+
+      try {
+        const doctorDoc = await getDoc(doc(db!, 'doctors', currentDoctorId));
+        if (doctorDoc.exists()) {
+          const data = doctorDoc.data();
+          setLoadedDoctorName(data.name || 'Doctor');
         }
-      } else {
-        try {
-          const doctorDoc = await getDoc(doc(db, 'doctors', doctorId));
-          if (doctorDoc.exists()) {
-            const data = doctorDoc.data();
-            setLoadedDoctorName(data.name || 'Doctor');
-            
-            // FREE FOREVER: Disable blocking logic
-            /*
-            if (data.bookingBlocked) {
-              setIsBlocked(true);
-              if (data.blockReason === 'booking_limit') {
-                setBlockMessage('You have reached your booking limit. Please upgrade your subscription to continue.');
-              } else if (data.blockReason === 'trial_expired') {
-                setBlockMessage('Your trial has expired. Please subscribe to continue accepting bookings.');
-              } else {
-                setBlockMessage('Booking is currently unavailable.');
-              }
-            }
-            */
-          }
-        } catch (error) {
-          console.error('Error checking doctor status:', error);
-        }
+      } catch (error) {
+        console.error('Error loading doctor data:', error);
       }
     };
 
     if (isOpen) {
-      checkDoctorStatus();
+      loadDoctorData();
     }
   }, [doctorId, isOpen]);
 
@@ -206,22 +163,15 @@ export default function AddPatientModal({ isOpen, onClose, onAddPatient, doctorI
       return;
     }
 
-    if (isBlocked) {
-      toast.error('Booking Blocked', {
-        description: blockMessage,
-        duration: 4000,
-      });
-      return;
-    }
 
     setIsSubmitting(true);
 
     try {
       // Get clinic ID and doctor ID
-      const user = auth.currentUser;
+      const user = auth!.currentUser;
       const clinicId = user?.uid; // Current logged-in clinic
       const currentDoctorId = doctorId || user?.uid;
-      
+
       if (!currentDoctorId) {
         toast.error('Authentication Error', {
           description: 'Please log in again.',
@@ -232,7 +182,7 @@ export default function AddPatientModal({ isOpen, onClose, onAddPatient, doctorI
       }
 
       // Fetch doctor's doctorCode for proper booking ID generation
-      const doctorDoc = await getDoc(doc(db, 'doctors', currentDoctorId));
+      const doctorDoc = await getDoc(doc(db!, 'doctors', currentDoctorId));
       if (!doctorDoc.exists()) {
         toast.error('Doctor not found', {
           description: 'Please contact support.',
@@ -269,18 +219,18 @@ export default function AddPatientModal({ isOpen, onClose, onAddPatient, doctorI
 
       const { query: firestoreQuery, where, getDocs } = await import('firebase/firestore');
       const bookingsRef = collection(db, 'bookings');
-      
+
       // Get today's date string (YYYY-MM-DD)
       const todayStr = new Date().toISOString().split('T')[0];
-      
+
       // Query ALL bookings for this doctor (same as QR booking side)
       const q = firestoreQuery(
         bookingsRef,
         where('doctorId', '==', currentDoctorId)
       );
-      
+
       const querySnapshot = await getDocs(q);
-      
+
       // Filter for today's bookings only (QR + walk-in combined)
       const todaysBookings = querySnapshot.docs.filter(doc => {
         const bookingData = doc.data();
@@ -288,7 +238,7 @@ export default function AddPatientModal({ isOpen, onClose, onAddPatient, doctorI
         const bookingDateStr = bookingDate instanceof Date ? bookingDate.toISOString().split('T')[0] : '';
         return bookingDateStr === todayStr;
       });
-      
+
       // Generate serial token number (same logic as QR booking side)
       const tokenNumber = `#${todaysBookings.length + 1}`;
       const serialNo = todaysBookings.length + 1;
@@ -296,13 +246,13 @@ export default function AddPatientModal({ isOpen, onClose, onAddPatient, doctorI
       const submissionTimestamp = new Date();
 
       // Save booking to Firestore
-      const bookingDocRef = await addDoc(collection(db, 'bookings'), {
+      const bookingDocRef = await addDoc(collection(db!, 'bookings'), {
         bookingId,
         tokenNumber,
         serialNo, // Store numeric serial for consistent sorting with QR bookings
         patientName: formData.patientName,
-        whatsappNumber: formData.whatsappNumber.startsWith('+91') 
-          ? formData.whatsappNumber 
+        whatsappNumber: formData.whatsappNumber.startsWith('+91')
+          ? formData.whatsappNumber
           : `+91${formData.whatsappNumber.replace(/^\+91\s*/, '')}`,
         age: formData.age || null,
         gender: formData.gender || null,
@@ -352,21 +302,21 @@ export default function AddPatientModal({ isOpen, onClose, onAddPatient, doctorI
 
         if (!isReviewRestricted) {
           const { scheduleReviewRequest } = await import('../services/notificationService');
-          
+
           await scheduleReviewRequest(
             {
-              patientPhone: formData.whatsappNumber.startsWith('+91') 
-                ? formData.whatsappNumber 
+              patientPhone: formData.whatsappNumber.startsWith('+91')
+                ? formData.whatsappNumber
                 : `+91${formData.whatsappNumber.replace(/^\+91\s*/, '')}`,
               patientName: formData.patientName,
               doctorName: doctorName,
               doctorId: currentDoctorId,
               bookingId: bookingId, // Use the generated bookingId variable (HQL-...)
-              consultationDate: new Date().toLocaleDateString('en-IN', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
+              consultationDate: new Date().toLocaleDateString('en-IN', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
               }),
               language: 'english', // Walk-in patients default to English (can be enhanced later)
             },
@@ -390,14 +340,14 @@ export default function AddPatientModal({ isOpen, onClose, onAddPatient, doctorI
       const updatedDoctorDoc = await getDoc(doc(db, 'doctors', currentDoctorId));
       if (updatedDoctorDoc.exists()) {
         const data = updatedDoctorDoc.data();
-        
+
         // Check booking limit
         if (data.bookingsCount >= data.bookingsLimit) {
           await updateDoc(doc(db, 'doctors', currentDoctorId), {
             bookingBlocked: true,
             blockReason: 'booking_limit'
           });
-          
+
           toast.warning('Booking Limit Reached!', {
             description: 'You have reached your booking limit. Please upgrade your subscription.',
             duration: 5000,
@@ -420,7 +370,7 @@ export default function AddPatientModal({ isOpen, onClose, onAddPatient, doctorI
 
       if (skipQr) {
         // Manual verification flow
-        
+
         // Log history for manual walk-in (since no notification is sent)
         try {
           const normalizedPhone = formData.whatsappNumber.replace(/\D/g, '').slice(-10);
@@ -431,7 +381,7 @@ export default function AddPatientModal({ isOpen, onClose, onAddPatient, doctorI
             doctorName: doctorName || loadedDoctorName,
             bookingId: bookingId // Use the generated bookingId variable (HQL-...)
           });
-          
+
           const now = new Date();
           await saveNotificationHistory({
             patientPhone: normalizedPhone,
@@ -467,7 +417,7 @@ export default function AddPatientModal({ isOpen, onClose, onAddPatient, doctorI
         }
 
         if (onAddPatient) {
-           onAddPatient(formData as PatientFormData); 
+           onAddPatient(formData as PatientFormData);
         }
         toast.success('Patient Added Manually', {
           description: 'Patient has been added without QR verification.',
@@ -525,28 +475,12 @@ export default function AddPatientModal({ isOpen, onClose, onAddPatient, doctorI
             {showQrStep ? 'Verify Patient Visit' : 'Patient Information'}
           </DialogTitle>
           <DialogDescription className="text-emerald-400 text-center text-sm">
-            {showQrStep 
-              ? 'Ask the patient to scan this QR code to verify their visit' 
+            {showQrStep
+              ? 'Ask the patient to scan this QR code to verify their visit'
               : 'Please fill in the patient details below'}
           </DialogDescription>
         </DialogHeader>
 
-        {/* Blocked Alert */}
-        {!showQrStep && isBlocked && (
-          <div className="bg-red-500/10 border border-red-500 rounded-lg p-4 mt-4">
-            <div className="flex items-start gap-3">
-              <div className="bg-red-500 rounded-full p-1 flex-shrink-0 mt-0.5">
-                <svg className="w-4 h-4 text-white" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
-                  <path d="M6 18L18 6M6 6l12 12"></path>
-                </svg>
-              </div>
-              <div>
-                <h4 className="text-red-400 font-semibold mb-1">Cannot Add Patients</h4>
-                <p className="text-sm text-gray-300">{blockMessage}</p>
-              </div>
-            </div>
-          </div>
-        )}
 
         {showQrStep ? (
           <div className="flex flex-col items-center justify-center py-6 space-y-6 animate-in fade-in zoom-in duration-300">
@@ -579,8 +513,8 @@ export default function AddPatientModal({ isOpen, onClose, onAddPatient, doctorI
                     <span className="text-yellow-500">Waiting for patient to scan & confirm...</span>
                   </div>
                 </div>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={handleCancel}
                   className="mt-4 border-gray-700 text-gray-400 hover:text-white hover:bg-gray-800"
                 >
@@ -601,14 +535,14 @@ export default function AddPatientModal({ isOpen, onClose, onAddPatient, doctorI
                </p>
              </div>
              <div className="flex gap-3 w-full max-w-xs">
-               <Button 
-                 variant="outline" 
+               <Button
+                 variant="outline"
                  onClick={() => setShowManualConfirmation(false)}
                  className="flex-1 border-gray-700 text-gray-300 hover:bg-gray-800"
                >
                  Cancel
                </Button>
-               <Button 
+               <Button
                  onClick={() => processSubmission(true)}
                  disabled={isSubmitting}
                  className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white"
@@ -831,10 +765,10 @@ export default function AddPatientModal({ isOpen, onClose, onAddPatient, doctorI
               </Button>
               <Button
                 type="submit"
-                disabled={isBlocked || isSubmitting}
-                className={`${isBlocked || isSubmitting 
-                  ? 'bg-gray-700 text-gray-500 cursor-not-allowed' 
-                  : 'bg-emerald-600 hover:bg-emerald-700'} text-white`}
+                disabled={isSubmitting}
+                className={isSubmitting
+                  ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white'}
               >
                 {isSubmitting ? 'Submitting...' : '+ Submit & Verify'}
               </Button>

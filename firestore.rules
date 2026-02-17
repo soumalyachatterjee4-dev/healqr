@@ -125,6 +125,14 @@ service cloud.firestore {
       match /planner_meta/{metaId} {
         allow read, write: if isOwner(doctorId);
       }
+
+      // ============================================
+      // NOTIFICATIONS SUBCOLLECTION
+      // ============================================
+
+      match /notifications/{notificationId} {
+        allow read, write: if isOwner(doctorId);
+      }
     }
 
     // ============================================

@@ -1,5 +1,4 @@
-import { ArrowLeft, Calendar, MapPin, Clock, Bell, Eye, Star, Phone, X, Check, RotateCcw, CheckCircle2, Video, Send, UserCircle, Upload, FileText, Download, Sparkles, History, Lock } from 'lucide-react';
-import { Button } from './ui/button';
+import { ArrowLeft, Calendar, MapPin, Clock, Bell, Eye, Star, Apple, Phone, X, Check, RotateCcw, CheckCircle2, Video, Send, UserCircle, Sparkles } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import FollowUpModal from './FollowUpModal';
 import CancellationModal from './CancellationModal';
@@ -54,6 +53,7 @@ interface PatientDetailsProps {
   totalPatients: number;
   patients: Patient[];
   onBack: () => void;
+  onMenuChange?: (menu: string) => void;
   onRefresh?: () => void; // Callback to refresh patient list after cancel/restore
   prepaymentActive?: boolean; // Whether doctor has pre-payment collection feature activated
   activeAddOns?: string[]; // Active premium add-ons purchased by doctor
@@ -84,12 +84,14 @@ export default function PatientDetails({
   totalPatients,
   patients,
   onBack,
+  onMenuChange,
   onRefresh,
   prepaymentActive = false,
   doctorLanguage = 'english',
   activeAddOns = [],
   doctorId,
 }: PatientDetailsProps) {
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [isReviewRestricted, setIsReviewRestricted] = useState(false);
 
   // Check for Clinic Restrictions on Mount
@@ -100,7 +102,7 @@ export default function PatientDetails({
         if (!userId) return;
 
         // 1. Get Doctor's Clinic ID
-        const doctorRef = doc(db, 'doctors', userId);
+        const doctorRef = doc(db!, 'doctors', userId);
         const doctorSnap = await getDoc(doctorRef);
 
         if (doctorSnap.exists()) {
@@ -109,7 +111,7 @@ export default function PatientDetails({
 
           if (clinicId) {
             // 2. Get Clinic Settings
-            const clinicRef = doc(db, 'clinics', clinicId);
+            const clinicRef = doc(db!, 'clinics', clinicId);
             const clinicSnap = await getDoc(clinicRef);
 
             if (clinicSnap.exists() && clinicSnap.data().centralizedReviews) {
@@ -166,11 +168,6 @@ export default function PatientDetails({
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [followUpModalOpen, setFollowUpModalOpen] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
-  const [uploadModalOpen, setUploadModalOpen] = useState(false);
-  const [aiUploadModalOpen, setAiUploadModalOpen] = useState(false);
-  const [uploadTargetPatient, setUploadTargetPatient] = useState<Patient | null>(null);
-  const [oldRxViewerOpen, setOldRxViewerOpen] = useState(false);
-  const [selectedPatientForRxView, setSelectedPatientForRxView] = useState<Patient | null>(null);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
 
   // Get current doctor info from Firebase auth
@@ -186,12 +183,12 @@ export default function PatientDetails({
 
         // If doctorId not provided, try to get current user
         if (!docId) {
-          const user = auth.currentUser;
+          const user = auth!.currentUser;
           if (!user) return;
           docId = user.uid;
         }
 
-        const doctorDoc = await getDoc(doc(db, 'doctors', docId));
+        const doctorDoc = await getDoc(doc(db!, 'doctors', docId));
         if (doctorDoc.exists()) {
           setDoctorInfo({
             id: docId,
@@ -318,8 +315,6 @@ export default function PatientDetails({
       const isAssistant = localStorage.getItem('healqr_is_assistant') === 'true';
       const userId = localStorage.getItem('userId'); // For assistants, this is the doctor's ID
       const doctorName = localStorage.getItem('healqr_user_name') || localStorage.getItem('doctorName') || 'Doctor';
-      const doctorSpecialty = localStorage.getItem('healqr_specialty') || '';
-      const doctorPhoto = localStorage.getItem('healqr_profile_photo') || '';
       const markedBy = isAssistant ? localStorage.getItem('healqr_user_email') : userId; // Track who marked it
 
       if (!userId) {
@@ -339,13 +334,13 @@ export default function PatientDetails({
 
       // 1. Try standard ID format
       let fcmUserId = `patient_${phone10}`;
-      let tokenDoc = await getDoc(firestoreDoc(db, 'fcmTokens', fcmUserId));
+      let tokenDoc = await getDoc(firestoreDoc(db!, 'fcmTokens', fcmUserId));
 
       // 2. Fallback: Try with +91 prefix if standard fails
       if (!tokenDoc.exists()) {
 
         const fallbackId = `patient_+91${phone10}`;
-        const fallbackDoc = await getDoc(firestoreDoc(db, 'fcmTokens', fallbackId));
+        const fallbackDoc = await getDoc(firestoreDoc(db!, 'fcmTokens', fallbackId));
         if (fallbackDoc.exists()) {
           fcmUserId = fallbackId;
           tokenDoc = fallbackDoc;
@@ -356,7 +351,7 @@ export default function PatientDetails({
       // 3. Fallback: Try legacy collection (patientFCMTokens)
       if (!tokenDoc.exists()) {
 
-        const legacyDoc = await getDoc(firestoreDoc(db, 'patientFCMTokens', phone10));
+        const legacyDoc = await getDoc(firestoreDoc(db!, 'patientFCMTokens', phone10));
         if (legacyDoc.exists()) {
           // Found in legacy, we can use this token but we need to adapt the logic
           // The notification service might expect it in fcmTokens, but let's see if we can just use the token
@@ -370,7 +365,7 @@ export default function PatientDetails({
           const legacyData = legacyDoc.data();
           if (legacyData?.token) {
              await import('firebase/firestore').then(({ setDoc, doc }) => {
-                setDoc(doc(db, 'fcmTokens', `patient_${phone10}`), {
+                setDoc(doc(db!, 'fcmTokens', `patient_${phone10}`), {
                   userId: `patient_${phone10}`,
                   token: legacyData.token,
                   userType: 'patient',
@@ -380,7 +375,7 @@ export default function PatientDetails({
              });
              // Now re-fetch
              fcmUserId = `patient_${phone10}`;
-             tokenDoc = await getDoc(firestoreDoc(db, 'fcmTokens', fcmUserId));
+             tokenDoc = await getDoc(firestoreDoc(db!, 'fcmTokens', fcmUserId));
           }
         }
       }
@@ -416,7 +411,7 @@ export default function PatientDetails({
       const seenTimestamp = new Date();
 
       // Update Firestore booking document (use patient.id which is the Firestore doc ID)
-      const bookingRef = doc(db, 'bookings', patient.id);
+      const bookingRef = doc(db!, 'bookings', patient.id);
 
       await updateDoc(bookingRef, {
         isMarkedSeen: true,
@@ -663,7 +658,7 @@ export default function PatientDetails({
             age: selectedPatient.age,
             sex: selectedPatient.gender,
             purpose: selectedPatient.visitType,
-            chamber: selectedChamber,
+            chamber: chamberName,
             clinicName: chamberName,
             doctorId: doctorId,
             doctorName: doctorName,
@@ -704,70 +699,58 @@ export default function PatientDetails({
     }
   };
 
-  const handleViewOldRx = (patient: Patient) => {
-    setSelectedPatientForRxView(patient);
-    setOldRxViewerOpen(true);
 
-    // Show toast to confirm button click
-    toast.success('Opening AI RX Viewer...', {
-      description: activeAddOns.includes('ai-rx-reader') ? '🤖 AI Translation Enabled' : 'Basic Viewer',
-    });
-  };
 
-  const handleMarkOldRxViewed = () => {
-    if (selectedPatientForRxView) {
-      // Update patient's prescriptionReviewed status
-      toast.success('Marked as viewed');
-    }
-  };
-
-  // Normal Upload Handler - Always opens normal upload modal (for Video Consultation)
   const handleNormalUploadPrescription = (patient: Patient) => {
-    setUploadTargetPatient(patient);
+    setSelectedPatient(patient);
     setUploadModalOpen(true);
   };
 
-  // AI Upload Handler - Always opens AI upload modal (for AI RX Reader)
-  const handleAIUploadPrescription = (patient: Patient) => {
-    setUploadTargetPatient(patient);
-    setAiUploadModalOpen(true);
-  };
-
-  const handleUploadSuccess = (data: {
-    fileName: string;
-    fileUrl: string;
-    ocrText: string;
-    translations: {
-      english: string;
-      hindi: string;
-      bengali: string;
-    };
-  }) => {
-    if (uploadTargetPatient) {
+  const handleUploadSuccess = () => {
+    if (selectedPatient) {
       setPatientStates(prev => ({
         ...prev,
-        [uploadTargetPatient.id]: {
-          ...prev[uploadTargetPatient.id],
+        [selectedPatient.id]: {
+          ...prev[selectedPatient.id],
           prescriptionUploaded: true,
         }
       }));
-      toast.success(`Prescription uploaded for ${uploadTargetPatient.name}`, {
+      toast.success(`Prescription uploaded for ${selectedPatient.name}`, {
         description: 'Patient notified with download link',
       });
     }
     setUploadModalOpen(false);
-    setUploadTargetPatient(null);
+    setSelectedPatient(null);
   };
 
-  const handleReminder = (patientId: string) => {
-    // System controlled - No manual trigger
-    // Automatic: Sends 1 hour before appointment if booking done 6+ hours prior
+  const handleCreateDietChart = (patient: Patient) => {
+    try {
+      // Pre-fill data for AI Diet Chart
+      const prefilledData = {
+        name: patient.name,
+        age: patient.age,
+        gender: patient.gender,
+        phone: patient.phone
+      };
+
+      localStorage.setItem('prefilled_diet_patient', JSON.stringify(prefilledData));
+
+      // Redirect to AI Diet Chart tab
+      if (onMenuChange) {
+        onMenuChange('ai-diet-chart');
+      } else {
+        // Fallback for standalone usage if any
+        window.location.hash = '#ai-diet-chart';
+      }
+
+      toast.success(`Redirecting to AI Diet Chart for ${patient.name}`);
+    } catch (error) {
+      console.error('Error initiating diet chart:', error);
+      toast.error('Failed to initiate diet chart');
+    }
   };
 
-  const handleReview = (patientId: string) => {
-    // System controlled, activated after marked seen
-    // Sends review request 24 hours after appointment
-  };
+
 
   const handleCancelConfirm = async () => {
     if (!selectedPatientId) {
@@ -812,18 +795,10 @@ export default function PatientDetails({
       // 🔔 SEND CANCELLATION NOTIFICATION
       // ============================================
       try {
-        const doctorId = localStorage.getItem('userId') || '';
         const doctorName = localStorage.getItem('healqr_user_name') || 'Doctor';
-        const doctorPhoto = localStorage.getItem('healqr_profile_photo') || '';
-        const doctorSpecialty = localStorage.getItem('healqr_specialty') || '';
 
         // Format appointment date - Use today's date as scheduleDate is schedule text like "Every Day" not a date
         const appointmentDate = new Date();
-        const formattedDate = appointmentDate.toLocaleDateString('en-US', {
-          month: 'long',
-          day: 'numeric',
-          year: 'numeric'
-        });
 
         // Format appointment time
         const formattedTime = patient.appointmentTime ? patient.appointmentTime.toLocaleTimeString('en-US', {
@@ -834,7 +809,7 @@ export default function PatientDetails({
 
         const cancelledDate = new Date(appointmentDate.getTime() - appointmentDate.getTimezoneOffset() * 60000).toISOString().split('T')[0]; // YYYY-MM-DD
 
-        const notifResult = await sendAppointmentCancelled({
+        await sendAppointmentCancelled({
           patientPhone: patient.phone,
           patientName: patient.name,
           age: patient.age,
@@ -842,8 +817,6 @@ export default function PatientDetails({
           purpose: patient.visitType,
           doctorId: doctorInfo.id,
           doctorName,
-          doctorSpecialty,
-          doctorPhoto,
           clinicName: (patient as any).chamber || 'Chamber',
           chamberAddress: '',
           bookingId: patient.bookingId, // Use structured booking ID from database
@@ -921,18 +894,10 @@ export default function PatientDetails({
       // 🔔 SEND RESTORATION NOTIFICATION
       // ============================================
       try {
-        const doctorId = localStorage.getItem('userId') || '';
         const doctorName = localStorage.getItem('healqr_user_name') || 'Doctor';
-        const doctorPhoto = localStorage.getItem('healqr_profile_photo') || '';
-        const doctorSpecialty = localStorage.getItem('healqr_specialty') || '';
 
         // Format appointment date - Use today's date as scheduleDate is schedule text like "Every Day" not a date
         const appointmentDate = new Date();
-        const formattedDate = appointmentDate.toLocaleDateString('en-US', {
-          month: 'long',
-          day: 'numeric',
-          year: 'numeric'
-        });
 
         // Format appointment time
         const formattedTime = patient.appointmentTime ? patient.appointmentTime.toLocaleTimeString('en-US', {
@@ -942,7 +907,6 @@ export default function PatientDetails({
         }) : scheduleTime.split(' - ')[0] || '10:00 AM'; // Get start time from schedule
 
         // Get doctor initials
-        const doctorInitials = doctorName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 
         // 🎯 USE THE ORIGINAL TOKEN NUMBER FROM DATABASE
         // Don't recalculate - the token number was assigned at booking time and should remain the same
@@ -952,7 +916,7 @@ export default function PatientDetails({
         const restoredDate = new Date(appointmentDate.getTime() - appointmentDate.getTimezoneOffset() * 60000).toISOString().split('T')[0]; // YYYY-MM-DD
 
         // Use the ORIGINAL token number assigned at booking time
-        const notifResult = await sendAppointmentRestored({
+        await sendAppointmentRestored({
           patientPhone: patient.phone,
           patientName: patient.name,
           age: patient.age,
@@ -960,8 +924,6 @@ export default function PatientDetails({
           purpose: patient.visitType,
           doctorId: doctorInfo.id,
           doctorName,
-          doctorSpecialty,
-          doctorPhoto,
           clinicName: (patient as any).chamber || 'Chamber',
           chamberAddress: '',
           bookingId: patient.bookingId, // Use structured booking ID from database
@@ -1186,26 +1148,6 @@ export default function PatientDetails({
 
                 return (
                   <>
-                    {/* Download Patient's Old RX Button - ONLY for Video Consultation patients when addon is active */}
-                    {patient.prescriptionUrl && patient.consultationType === 'video' && activeAddOns.includes('video-consultation') && (
-                      <button
-                        onClick={() => handleViewOldRx(patient)}
-                        disabled={isDisabled}
-                        className={`relative w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
-                          isDisabled
-                            ? 'bg-gray-800 border border-gray-700 opacity-50 cursor-not-allowed'
-                            : patient.prescriptionReviewed
-                            ? 'bg-emerald-500/30 border border-emerald-500/50'
-                            : 'bg-blue-500/30 border border-blue-500/50'
-                        }`}
-                        title={patient.prescriptionReviewed ? "Patient's Old RX (Reviewed)" : "Download Patient's Old RX with AI Translation"}
-                      >
-                        <Download className={`w-4 h-4 ${patient.prescriptionReviewed ? 'text-emerald-300' : 'text-blue-300'}`} />
-                        {!patient.prescriptionReviewed && (
-                          <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full border-2 border-[#0f1419] animate-pulse"></div>
-                        )}
-                      </button>
-                    )}
 
                     {/* Video Consultation Icon - Only shown for video consultation patients AND if video-consultation addon is active */}
                     {patient.consultationType === 'video' && activeAddOns.includes('video-consultation') && (
@@ -1409,6 +1351,20 @@ export default function PatientDetails({
                       )}
                     </div>
 
+                    {/* AI Diet Chart Shortcut - Beside Star */}
+                    <button
+                      onClick={() => handleCreateDietChart(patient)}
+                      disabled={isDisabled}
+                      className={`relative w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
+                        isDisabled
+                          ? 'bg-gray-800 border border-gray-700 opacity-50 cursor-not-allowed'
+                          : 'bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/50'
+                      }`}
+                      title="Create AI Diet Chart"
+                    >
+                      <Apple className="w-4 h-4 text-orange-500" />
+                    </button>
+
                     {/* Cancel or Restore - Spans full width */}
                     {!state.isCancelled ? (
                       <button
@@ -1435,12 +1391,10 @@ export default function PatientDetails({
                       </button>
                     )}
 
-                    {/* NEW: Patient Action Icons Row - 3 Icons */}
+                    {/* NEW: Patient Action Icons Row - Hidden for now as requested
                     <div className="col-span-5 grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-gray-700/50">
-                      {/* 1. Patient History - Always enabled */}
                       <button
                         onClick={() => {
-
                           setSelectedPatient(patient);
                           setHistoryModalOpen(true);
                         }}
@@ -1450,24 +1404,29 @@ export default function PatientDetails({
                         <History className="w-5 h-5 text-emerald-400 group-hover:text-emerald-300" />
                       </button>
 
-                      {/* 2. Upload Today's RX - Medico Locker feature (disabled) */}
                       <button
-                        disabled
-                        className="h-10 bg-gray-800/50 border border-gray-700/30 rounded-lg flex items-center justify-center opacity-40 cursor-not-allowed"
-                        title="Upload today's RX - Requires Medico Locker subscription"
+                        onClick={() => {
+                            setSelectedPatient(patient);
+                            setUploadModalOpen(true);
+                        }}
+                        className="h-10 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 rounded-lg flex items-center justify-center transition-colors group"
+                        title="Upload Prescription to Medico Locker"
                       >
-                        <Upload className="w-5 h-5 text-gray-500" />
+                        <Upload className="w-5 h-5 text-blue-400 group-hover:text-blue-300" />
                       </button>
 
-                      {/* 3. Full Locker Access - Medico Locker + OTP (disabled) */}
                       <button
-                        disabled
-                        className="h-10 bg-gray-800/50 border border-gray-700/30 rounded-lg flex items-center justify-center opacity-40 cursor-not-allowed"
-                        title="Full medical locker access - Requires patient OTP + Medico Locker"
+                        onClick={() => {
+                            toast.info('Requesting Locker Access...', {
+                                description: `Sending access request to ${patient.name}. They will receive an OTP to authorize.`,
+                            });
+                        }}
+                        className="h-10 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg flex items-center justify-center transition-colors group"
+                        title="Request Full Medical Locker Access"
                       >
-                        <Lock className="w-5 h-5 text-gray-500" />
+                        <Lock className="w-5 h-5 text-amber-500 group-hover:text-amber-400" />
                       </button>
-                    </div>
+                    </div> */}
                   </>
                 );
               })()}
@@ -1483,6 +1442,18 @@ export default function PatientDetails({
           onClose={() => setFollowUpModalOpen(false)}
           onSave={handleSaveFollowUp}
           patientName={selectedPatient?.name || ''}
+        />
+
+        <DoctorRxUploadModal
+          isOpen={uploadModalOpen}
+          onClose={() => {
+            setUploadModalOpen(false);
+            setSelectedPatient(null);
+          }}
+          patientName={selectedPatient?.name || ''}
+          patientPhone={selectedPatient?.phone}
+          bookingId={selectedPatient?.bookingId}
+          onUploadSuccess={handleUploadSuccess}
         />
 
         <CancellationModal
@@ -1515,17 +1486,6 @@ export default function PatientDetails({
           doctorName={doctorInfo.name}
         />
 
-        <DoctorRxUploadModal
-          isOpen={uploadModalOpen}
-          onClose={() => {
-            setUploadModalOpen(false);
-            setUploadTargetPatient(null);
-          }}
-          onUploadSuccess={handleUploadSuccess}
-          patientName={uploadTargetPatient?.name || ''}
-          patientPhone={uploadTargetPatient?.phone || ''}
-          bookingId={uploadTargetPatient?.bookingId || ''}
-        />
 
         {/* AI RX Reader Removed */}
         {/* <DoctorAIRXUploadModal

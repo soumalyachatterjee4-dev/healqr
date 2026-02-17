@@ -18,7 +18,8 @@ import {
   Languages,
   Globe,
   Zap,
-  Stethoscope
+  Stethoscope,
+  Star
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -46,6 +47,7 @@ interface ProfileManagerProps {
     language?: 'english' | 'hindi' | 'bengali';
     linkedClinicCodes?: string[];
     linkedClinics?: Array<{clinicId: string; clinicCode: string; name: string}>;
+    landmark?: string;
   };
   onProfileUpdate?: (data: {
     image: string | null;
@@ -120,6 +122,7 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
         // Set all fields from Firestore
         if (data.name) setName(data.name);
         if (data.pinCode) setResidentialPincodeState(data.pinCode);
+        if (data.landmark) setLandmark(data.landmark);
         if (data.gender) setGender(data.gender);
         if (data.preferredLanguage) setPreferredLanguage(data.preferredLanguage);
         if (data.degrees) setDegrees(data.degrees);
@@ -131,6 +134,7 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
         if (data.profileImage) setProfileImage(data.profileImage);
         if (data.clinicServices) setClinicServices(data.clinicServices);
         if (data.clinicServicesLabel) setClinicServicesLabel(data.clinicServicesLabel);
+        if (data.googleReviewLink) setGoogleReviewLink(data.googleReviewLink);
       } else {
         console.log('ℹ️ No profile found in Firestore, using props/defaults');
       }
@@ -145,6 +149,7 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
   // Editable required fields
   const [name, setName] = useState(profileData?.name || '');
   const [residentialPincodeState, setResidentialPincodeState] = useState(residentialPinCode);
+  const [landmark, setLandmark] = useState(profileData?.landmark || '');
 
   // Optional fields
   const [profileImage, setProfileImage] = useState<string | null>(profileData?.image || null);
@@ -158,6 +163,7 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
   const [bio, setBio] = useState('');
   const [clinicServices, setClinicServices] = useState<string[]>([]);
   const [clinicServicesLabel, setClinicServicesLabel] = useState('Done Here');
+  const [googleReviewLink, setGoogleReviewLink] = useState('');
 
   // Clinic linking (Legacy - kept if needed for other logic, but section removed)
   const [linkedClinicCodes] = useState<string[]>(profileData?.linkedClinicCodes || []);
@@ -352,6 +358,7 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
         {
           name,
           pinCode: residentialPincodeState,
+          landmark,
           profileImage,
           gender,
           preferredLanguage,
@@ -364,6 +371,7 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
           useDrPrefix,
           clinicServices,
           clinicServicesLabel,
+          googleReviewLink,
           linkedClinicCodes,
           linkedClinics,
           updatedAt: serverTimestamp(),
@@ -530,6 +538,20 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
                   </div>
                 </div>
 
+                {/* Landmark (Read-Only) */}
+                <div>
+                  <Label className="mb-2 block">Clinic Landmark</Label>
+                  <div className="relative">
+                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                    <Input
+                      type="text"
+                      value={landmark}
+                      disabled
+                      className="pl-12 bg-zinc-950 border-zinc-800 text-gray-500 h-12 rounded-lg cursor-not-allowed"
+                    />
+                  </div>
+                </div>
+
                 {/* QR Number */}
                 {qrNumber && (
                   <div>
@@ -600,6 +622,24 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
                       className="pl-12 bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-emerald-500"
                     />
                   </div>
+                </div>
+
+                {/* Editable Landmark */}
+                <div className="mt-4">
+                  <Label className="mb-2 block">
+                    Update Clinic Landmark <span className="text-gray-500 font-normal ml-1">(helps patient find exact location)</span>
+                  </Label>
+                  <div className="relative">
+                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <Input
+                      type="text"
+                      value={landmark}
+                      onChange={(e) => setLandmark(e.target.value)}
+                      placeholder="e.g., Near City Hospital"
+                      className="pl-12 bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
 
                   {/* Dr. Prefix Checkbox */}
                   <div className="mt-4 flex items-start gap-3 p-4 bg-zinc-800/50 rounded-lg border border-zinc-700">
@@ -620,6 +660,34 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
                         Uncheck this if you are a non-MBBS practitioner who cannot use the "Dr." title according to rural practice regulations. This affects your dashboard welcome message and mini website display.
                       </p>
                     </div>
+                  </div>
+                </div>
+              </div>
+
+            {/* Reputation Management */}
+            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-8 mb-6">
+              <h2 className="mb-6 flex items-center gap-2">
+                <Star className="w-5 h-5 text-yellow-500" />
+                Reputation Management
+              </h2>
+              <p className="text-gray-400 text-sm mb-6">Boost your online presence automatically</p>
+
+              <div className="space-y-4">
+                <div>
+                  <Label className="mb-2 block">Google Maps Review Link</Label>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Paste your "Get More Reviews" link from Google Business Profile.
+                    Patients giving 4-5 stars will be redirected here.
+                  </p>
+                  <div className="relative">
+                    <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <Input
+                      type="url"
+                      value={googleReviewLink}
+                      onChange={(e) => setGoogleReviewLink(e.target.value)}
+                      placeholder="e.g. https://g.page/r/CbX..."
+                      className="pl-12 bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-emerald-500"
+                    />
                   </div>
                 </div>
               </div>

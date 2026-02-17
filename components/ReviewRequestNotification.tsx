@@ -11,6 +11,7 @@ interface ReviewRequestNotificationProps {
   doctorSpecialty?: string;
   doctorInitials?: string;
   consultationDate?: string;
+  googleReviewLink?: string;
   onSubmitReview?: (reviewData: {
     patientName: string;
     rating: number;
@@ -27,6 +28,7 @@ export default function ReviewRequestNotification({
   doctorSpecialty = 'Cardiologist',
   doctorInitials = 'AS',
   consultationDate = 'October 10, 2025',
+  googleReviewLink,
   onSubmitReview,
   onIgnore,
 }: ReviewRequestNotificationProps) {
@@ -34,6 +36,7 @@ export default function ReviewRequestNotification({
   const [hoveredRating, setHoveredRating] = useState(0);
   const [feedback, setFeedback] = useState('');
   const [showRatingDialog, setShowRatingDialog] = useState(false);
+  const [showGooglePrompt, setShowGooglePrompt] = useState(false);
 
   const translations = {
     en: {
@@ -45,6 +48,8 @@ export default function ReviewRequestNotification({
       rate: 'Rate',
       ignore: 'Ignore',
       send: 'SEND',
+      postGoogle: 'Post on Google',
+      googlePrompt: 'Thanks! Would you like to post this 5-star review on Google to help us?',
       sponsoredBy: 'Sponsored by Triple',
     },
     hi: {
@@ -56,6 +61,8 @@ export default function ReviewRequestNotification({
       rate: 'रेटिंग दें',
       ignore: 'अनदेखा करें',
       send: 'भेजें',
+      postGoogle: 'Google पर पोस्ट करें',
+      googlePrompt: 'धन्यवाद! क्या आप इसे Google पर पोस्ट करना चाहेंगे?',
       sponsoredBy: 'Triple द्वारा प्रायोजित',
     },
     bn: {
@@ -67,6 +74,8 @@ export default function ReviewRequestNotification({
       rate: 'রেটিং দিন',
       ignore: 'উপেক্ষা করুন',
       send: 'পাঠান',
+      postGoogle: 'গুগুল এ পোস্ট করুন',
+      googlePrompt: 'ধন্যবাদ! আপনি কি আমাদের সাহায্য করার জন্য এই ৫-স্টার রিভিউ গুগুল এ পোস্ট করতে চান?',
       sponsoredBy: 'Triple দ্বারা স্পন্সর করা',
     },
   };
@@ -98,6 +107,18 @@ export default function ReviewRequestNotification({
     setRating(0);
     setFeedback('');
     setShowRatingDialog(false);
+
+    // If rating is 4 or 5 and google link exists, show prompt instead of closing immediately
+    if ((rating >= 4) && googleReviewLink) {
+        setShowGooglePrompt(true);
+    }
+  };
+
+  const handleGoogleRedirect = () => {
+    if (googleReviewLink) {
+        window.open(googleReviewLink, '_blank');
+    }
+    setShowGooglePrompt(false);
   };
 
   const handleIgnore = () => {
@@ -112,11 +133,11 @@ export default function ReviewRequestNotification({
     const rect = event.currentTarget.getBoundingClientRect();
     const clickX = event.clientX - rect.left;
     const starWidth = rect.width;
-    
+
     // If clicked on left half, give 0.5, if right half, give 1.0
     const halfStar = clickX < starWidth / 2;
     const newRating = halfStar ? starIndex - 0.5 : starIndex;
-    
+
     setRating(newRating);
   };
 
@@ -124,17 +145,17 @@ export default function ReviewRequestNotification({
     const rect = event.currentTarget.getBoundingClientRect();
     const hoverX = event.clientX - rect.left;
     const starWidth = rect.width;
-    
+
     const halfStar = hoverX < starWidth / 2;
     const newHoveredRating = halfStar ? starIndex - 0.5 : starIndex;
-    
+
     setHoveredRating(newHoveredRating);
   };
 
   // Render star with half-fill support
   const renderStar = (starIndex: number, currentRating: number) => {
     const fillPercentage = Math.max(0, Math.min(1, currentRating - (starIndex - 1)));
-    
+
     if (fillPercentage === 0) {
       // Empty star
       return <Star className="w-12 h-12 text-gray-300" />;
@@ -181,6 +202,9 @@ export default function ReviewRequestNotification({
             <div>
               <h3 className="text-gray-900 font-semibold">{doctorName}</h3>
               <p className="text-gray-600 text-sm">{doctorSpecialty}</p>
+              {consultationDate && (
+                <p className="text-gray-400 text-xs mt-1">Visited on {consultationDate}</p>
+              )}
             </div>
           </div>
 
@@ -235,7 +259,39 @@ export default function ReviewRequestNotification({
           </div>
         </div>
       </div>
-      
+
+      {/* Google Review Prompt Overlay */}
+      {showGooglePrompt && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl p-8 max-w-sm w-full shadow-2xl text-center">
+                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Star className="w-8 h-8 text-blue-600 fill-blue-600" />
+                </div>
+                <h3 className="text-gray-900 font-bold text-xl mb-2">
+                    {rating === 5 ? '🌟 Outstanding!' : '✨ Thank You!'}
+                </h3>
+                <p className="text-gray-600 mb-6">
+                    {t.googlePrompt}
+                </p>
+
+                <div className="space-y-3">
+                    <Button
+                        onClick={handleGoogleRedirect}
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white h-12 text-lg font-medium shadow-lg shadow-blue-200"
+                    >
+                        {t.postGoogle}
+                    </Button>
+                    <button
+                        onClick={() => setShowGooglePrompt(false)}
+                        className="text-gray-400 text-sm hover:text-gray-600 font-medium"
+                    >
+                        No thanks, maybe later
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
+
       {/* Rating Dialog Overlay */}
       {showRatingDialog && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -243,7 +299,7 @@ export default function ReviewRequestNotification({
               <h3 className="text-gray-900 font-semibold text-center mb-6">
                 {language === 'hi' ? 'रेटिंग दें' : language === 'bn' ? 'রেটিং দিন' : 'Rate Your Experience'}
               </h3>
-              
+
               {/* Star Rating */}
               <div className="flex justify-center gap-2 mb-6">
                 {[1, 2, 3, 4, 5].map((star) => (

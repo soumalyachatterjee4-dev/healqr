@@ -3,7 +3,15 @@ import { Card } from './ui/card';
 import { Switch } from './ui/switch';
 import { Progress } from './ui/progress';
 import { Badge } from './ui/badge';
-import { Menu, MapPin, Clock, Plus, Calendar, ArrowLeft } from 'lucide-react';
+import {
+  Plus,
+  Calendar,
+  Clock,
+  Menu,
+  ArrowLeft,
+  MapPin
+} from 'lucide-react';
+import { addDoctorNotification } from '../services/doctorNotificationService';
 import { useState, useEffect } from 'react';
 import DashboardSidebar from './DashboardSidebar';
 import AddPatientModal, { PatientFormData } from './AddPatientModal';
@@ -13,6 +21,7 @@ import ReactivateChamberModal from './ReactivateChamberModal';
 import { Patient } from './ViewPatientsModal';
 import PatientDetails from './PatientDetails';
 import { toast } from 'sonner';
+import { sendPatientListViaWhatsApp } from '../services/whatsappService';
 
 interface TodaysScheduleProps {
   onMenuChange?: (menu: string) => void;
@@ -26,11 +35,13 @@ interface TodaysScheduleProps {
 function PatientDetailsLoader({
   chamber,
   onBack,
+  onMenuChange,
   activeAddOns,
   doctorLanguage = 'english'
 }: {
   chamber: { id: number; name: string; address: string; startTime: string; endTime: string; schedule: string; booked: number; capacity: number };
   onBack: () => void;
+  onMenuChange?: (menu: string) => void;
   activeAddOns: string[];
   doctorLanguage?: 'english' | 'hindi' | 'bengali';
 }) {
@@ -295,6 +306,7 @@ function PatientDetailsLoader({
       totalPatients={chamber.capacity}
       patients={chamberPatients}
       onBack={onBack}
+      onMenuChange={onMenuChange}
       onRefresh={refreshPatients}
       prepaymentActive={activeAddOns.includes('prepayment-collection')}
       activeAddOns={activeAddOns}
@@ -537,8 +549,76 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
       }
     };
 
+
     loadTodaysSchedule();
   }, [currentDate]); // Re-run when date changes
+
+  // 🔔 AUTO-TRIGGER: Send List Notification for Non-Linked Clinics
+  useEffect(() => {
+    const checkExpiredClinics = async () => {
+      const userId = localStorage.getItem('userId');
+      if (!userId || chambers.length === 0) return;
+
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      // Filter for:
+      // 1. Non-Linked Clinics (have manualClinicId)
+      // 2. Schedule Expired (isExpired === true)
+      // 3. Not Notified Yet Today
+
+      for (const chamber of chambers) {
+        if (chamber.manualClinicId && chamber.isExpired) {
+          const notificationKeys = [
+            `healqr_notified_${chamber.manualClinicId}_${todayStr}`,
+            `healqr_notified_${chamber.id}_${todayStr}` // Also check chamber ID based key just in case
+          ];
+
+          const alreadyNotified = notificationKeys.some(key => localStorage.getItem(key));
+
+          if (!alreadyNotified) {
+            console.log(`🔔 Triggering notification for expired clinic: ${chamber.name}`);
+
+            // Send Notification to Database
+            await addDoctorNotification(userId, {
+              type: 'system',
+              category: 'alert',
+              title: 'Schedule Ended',
+              message: `Your schedule at ${chamber.name} has ended. Please send the patient list via WhatsApp.`,
+              actionUrl: '', // Could deep link to schedule if needed
+              metadata: {
+                clinicId: chamber.manualClinicId,
+                chamberId: chamber.id
+              }
+            });
+
+            // Mark as notified in local storage (set both keys for safety)
+            notificationKeys.forEach(key => localStorage.setItem(key, 'true'));
+
+            // Optional: Show toast for immediate feedback
+            toast('Schedule Ended', {
+              description: `Time to send patient list to ${chamber.name}`,
+              action: {
+                label: 'Send',
+                onClick: () => {
+                   // User can click button on card
+                }
+              }
+            });
+          } else {
+             console.log(`🔕 Already notified for expired clinic: ${chamber.name}`);
+          }
+        }
+      }
+    };
+
+    // Run check when chambers load/update
+    checkExpiredClinics();
+
+    // Set interval to check every minute (in case page stays open)
+    const interval = setInterval(checkExpiredClinics, 60000);
+    return () => clearInterval(interval);
+
+  }, [chambers]); // Dependency on chambers ensures we react to data load
 
   // Load walk-in patients from Firestore
   useEffect(() => {
@@ -1029,71 +1109,17 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
   };
 
   const handleSendPatientList = async (chamber: any) => {
-    if (!chamber.clinicPhone) {
-      toast.error('Clinic phone number not found');
-      return;
-    }
+    // Determine the doctor name to use
+    // If we're inside the main TodaysSchedule component, doctorName should be available from localStorage or state
+    const name = localStorage.getItem('doctorName') || 'Dr.';
 
-    try {
-      const { db } = await import('../lib/firebase/config');
-      const { collection, query, where, getDocs } = await import('firebase/firestore');
-
-      // 1. Get today's confirmed patients for this chamber
-      const today = new Date();
-      const todayStr = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split('T')[0];
-
-      const bookingsRef = collection(db!, 'bookings');
-      const numericChamberId = typeof chamber.id === 'string' ? parseInt(chamber.id, 10) : chamber.id;
-
-      const qrBookingsQuery = query(
-        bookingsRef,
-        where('chamberId', '==', numericChamberId || -1),
-        where('appointmentDate', '==', todayStr)
-      );
-
-      const querySnap = await getDocs(qrBookingsQuery);
-
-      const confirmedPatients = querySnap.docs
-        .map(doc => doc.data())
-        .filter(data => !data.isCancelled && data.status !== 'cancelled')
-        .sort((a, b) => (a.serialNo || 0) - (b.serialNo || 0));
-
-      if (confirmedPatients.length === 0) {
-        toast.info('No patients booked for this chamber today.');
-        return;
-      }
-
-      // 2. Format the message
-      const timeStr = `${chamber.startTime} - ${chamber.endTime}`;
-      const dateDisplay = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-
-      let message = `*PATIENT LIST - HEALQR*\n`;
-      message += `--------------------------\n`;
-      message += `👨‍⚕️ *Dr. ${doctorName}*\n`;
-      message += `🏥 *Clinic:* ${chamber.name}\n`;
-      message += `📅 *Date:* ${dateDisplay}\n`;
-      message += `⏰ *Time:* ${timeStr}\n`;
-      message += `--------------------------\n\n`;
-
-      confirmedPatients.forEach((p, index) => {
-        const token = p.tokenNumber || `#${p.serialNo || index + 1}`;
-        message += `${index + 1}. *${p.patientName || 'N/A'}* (Token: ${token})\n`;
-      });
-
-      message += `\n_Generated via HealQR System_`;
-
-      // 3. Open WhatsApp link
-      const encodedMessage = encodeURIComponent(message);
-      const whatsappUrl = `https://wa.me/${chamber.clinicPhone.replace(/\D/g, '')}?text=${encodedMessage}`;
-
-      window.open(whatsappUrl, '_blank');
-      toast.success('WhatsApp list generated!', {
-        description: 'Opening WhatsApp to send the list to the clinic.'
-      });
-    } catch (error) {
-      console.error('Error generating WhatsApp list:', error);
-      toast.error('Failed to generate patient list');
-    }
+    await sendPatientListViaWhatsApp({
+      id: chamber.id,
+      name: chamber.name,
+      clinicPhone: chamber.clinicPhone,
+      startTime: chamber.startTime,
+      endTime: chamber.endTime
+    }, name);
   };
 
   const handleViewWalkInPatients = () => {
@@ -1123,6 +1149,7 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
           setShowPatientDetails(false);
           setSelectedChamberForDetails(null);
         }}
+        onMenuChange={onMenuChange}
         activeAddOns={activeAddOns}
         doctorLanguage={doctorLanguage}
       />
@@ -1353,6 +1380,8 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
         isOpen={addPatientModalOpen}
         onClose={() => setAddPatientModalOpen(false)}
         onAddPatient={handlePatientAdded}
+        doctorId={localStorage.getItem('userId') || undefined}
+        doctorName={doctorName}
       />
 
       {/* Deactivate Chamber Modal */}

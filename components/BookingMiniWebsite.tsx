@@ -1,4 +1,4 @@
-import { Star, Lightbulb, Calendar, AlertCircle, Phone, Sparkles } from 'lucide-react';
+import { Star, Lightbulb, Calendar, AlertCircle, Phone, Sparkles, History as HistoryIcon } from 'lucide-react';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import {
@@ -36,16 +36,6 @@ interface Template {
   uploadDate?: string;
 }
 
-interface Product {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  imageUrl: string;
-  externalLink?: string;
-  stock: number;
-  category: string;
-}
 
 interface BookingMiniWebsiteProps {
   onBookNow?: () => void;
@@ -66,7 +56,10 @@ export default function BookingMiniWebsite({
   const [doctorProfile, setDoctorProfile] = useState<any>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [firestoreReviews, setFirestoreReviews] = useState<Review[]>([]);
-  const [allReviewsForStats, setAllReviewsForStats] = useState<Review[]>([]);
+  const [cumulativeStats, setCumulativeStats] = useState<{ averageRating: number; totalReviews: number }>({
+    averageRating: 0,
+    totalReviews: 0
+  });
 
   const [emergencyButtonActive, setEmergencyButtonActive] = useState(false);
   const [emergencyPhone, setEmergencyPhone] = useState('');
@@ -114,7 +107,7 @@ export default function BookingMiniWebsite({
       const { db } = await import('../lib/firebase/config');
       if (!db) return;
 
-      const { collection, addDoc, doc, getDoc, updateDoc, serverTimestamp, increment } =
+      const { collection, addDoc, doc, updateDoc, serverTimestamp, increment } =
         await import('firebase/firestore');
 
       // Record scan event in qr_scans collection
@@ -170,7 +163,40 @@ export default function BookingMiniWebsite({
         if (data.placeholderReviews && Array.isArray(data.placeholderReviews)) {
           allReviews.push(...data.placeholderReviews);
         }
-        setAllReviewsForStats(allReviews);
+
+        // ✅ FETCH ALL PATIENT REVIEWS for accurate stats fallback
+        try {
+          const { collection, query, where, getDocs } = await import('firebase/firestore');
+          const reviewsRef = collection(db, 'reviews');
+          const q = query(reviewsRef, where('doctorId', '==', bookingDoctorId));
+          const snapshot = await getDocs(q);
+          const patientReviews = snapshot.docs.map(doc => ({ ...doc.data() as any, id: doc.id }) as Review);
+          allReviews.push(...patientReviews);
+        } catch (error) {
+          console.error('❌ Error fetching patient reviews for stats:', error);
+        }
+
+
+        // Load cumulative stats
+        if (data.stats) {
+          // Use stats field but ensure it's at least the length of what we just loaded
+          const localAvg = allReviews.length > 0
+            ? allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length
+            : 0;
+
+          setCumulativeStats({
+            averageRating: (data.stats.averageRating && data.stats.averageRating > 0)
+              ? data.stats.averageRating
+              : localAvg,
+            // STRICT FORMULA: Trust the actual count of loaded reviews
+            totalReviews: allReviews.length
+          });
+        } else {
+          // Fallback calculation if stats field is missing
+          const total = allReviews.length;
+          const avg = total > 0 ? allReviews.reduce((sum, r) => sum + r.rating, 0) / total : 0;
+          setCumulativeStats({ averageRating: avg, totalReviews: total });
+        }
 
         // Load Personalized Templates
         if (data.personalizedTemplates && Array.isArray(data.personalizedTemplates)) {
@@ -200,16 +226,16 @@ export default function BookingMiniWebsite({
         if (db) {
           const { doc, getDoc } = await import('firebase/firestore');
           const doctorDoc = await getDoc(doc(db, 'doctors', bookingDoctorId));
-          
+
           if (doctorDoc.exists()) {
             const data = doctorDoc.data();
             const phone = data.emergencyPhone || '';
             setEmergencyPhone(phone);
-            
+
             // Load scheduling configuration
             const scheduling = data.emergencyScheduling || null;
             setEmergencyScheduling(scheduling);
-            
+
             // Check if button should be active based on schedule
             const shouldBeActive = checkEmergencyButtonSchedule(
               data.emergencyButtonActive || false,
@@ -222,7 +248,7 @@ export default function BookingMiniWebsite({
     } catch (error) {
       console.error('Error loading emergency button status:', error);
     }
-    
+
     // Note: Personalized templates are now loaded directly from Firestore in loadDoctorProfile
     // We no longer load them from localStorage to ensure patients see the correct data
   };
@@ -231,26 +257,26 @@ export default function BookingMiniWebsite({
   const checkEmergencyButtonSchedule = (buttonActive: boolean, scheduling: any): boolean => {
     // If button is not active in Firestore, don't show it
     if (!buttonActive) return false;
-    
+
     // If no scheduling configured or scheduling disabled, use button state as-is
     if (!scheduling || !scheduling.enabled) return buttonActive;
-    
+
     // If scheduling is enabled, check if current time is within any time slot
     const timeSlots = scheduling.timeSlots || [];
     if (timeSlots.length === 0) return false;
-    
+
     const now = new Date();
     const currentDay = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][now.getDay()];
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
-    
+
     for (const slot of timeSlots) {
       if (!slot.days || !slot.days.includes(currentDay)) continue;
-      
+
       const [startHour, startMin] = slot.startTime.split(':').map(Number);
       const [endHour, endMin] = slot.endTime.split(':').map(Number);
       const startMinutes = startHour * 60 + startMin;
       const endMinutes = endHour * 60 + endMin;
-      
+
       // Handle overnight slots
       if (endMinutes < startMinutes) {
         if (currentMinutes >= startMinutes || currentMinutes < endMinutes) {
@@ -262,7 +288,7 @@ export default function BookingMiniWebsite({
         }
       }
     }
-    
+
     // Not within any time slot
     return false;
   };
@@ -349,14 +375,14 @@ export default function BookingMiniWebsite({
                 <Calendar className="w-5 h-5" />
                 {t('bookAppointmentNow', language)}
               </Button>
-              
+
               {onViewHistory && (
                 <Button
                   onClick={onViewHistory}
                   variant="outline"
                   className="w-full h-12 mt-3 border-emerald-600 text-emerald-600 hover:bg-emerald-50 rounded-lg flex items-center justify-center gap-2"
                 >
-                  <History className="w-5 h-5" />
+                  <HistoryIcon className="w-5 h-5" />
                   {language === 'english' && 'View My Visit History'}
                   {language === 'hindi' && 'अपना विज़िट इतिहास देखें'}
                   {language === 'bengali' && 'আমার ভিজিট ইতিহাস দেখুন'}
@@ -429,7 +455,7 @@ export default function BookingMiniWebsite({
                   </div>
 
                   {/* Line 2: Degrees & Specialities */}
-                  {((doctorProfile?.degrees && doctorProfile.degrees.length > 0) || 
+                  {((doctorProfile?.degrees && doctorProfile.degrees.length > 0) ||
                     (doctorProfile?.specialities && doctorProfile.specialities.length > 0)) && (
                     <div className="flex flex-wrap gap-2">
                       {/* Degree Badges */}
@@ -466,8 +492,8 @@ export default function BookingMiniWebsite({
                   {doctorProfile?.experience && (
                     <div className="flex flex-wrap gap-2">
                       <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-lg">
-                        {doctorProfile.experience.toLowerCase().includes('year') || doctorProfile.experience.toLowerCase().includes('experience') 
-                          ? doctorProfile.experience 
+                        {doctorProfile.experience.toLowerCase().includes('year') || doctorProfile.experience.toLowerCase().includes('experience')
+                          ? doctorProfile.experience
                           : `${doctorProfile.experience} Years of Experience`}
                       </div>
                     </div>
@@ -477,13 +503,7 @@ export default function BookingMiniWebsite({
                 <div className="flex items-center gap-2 mb-2">
                   <div className="flex">
                     {[1, 2, 3, 4, 5].map((star) => {
-                      const calculatedRating =
-                        allReviewsForStats.length > 0
-                          ? allReviewsForStats.reduce(
-                              (sum, r) => sum + r.rating,
-                              0
-                            ) / allReviewsForStats.length
-                          : 0;
+                      const calculatedRating = cumulativeStats.averageRating;
                       const isFilled = star <= Math.floor(calculatedRating);
                       return (
                         <Star
@@ -498,18 +518,10 @@ export default function BookingMiniWebsite({
                     })}
                   </div>
                   <span className="text-sm text-white">
-                    {allReviewsForStats.length > 0
-                      ? (
-                          allReviewsForStats.reduce(
-                            (sum, r) => sum + r.rating,
-                            0
-                          ) / allReviewsForStats.length
-                        ).toFixed(1)
-                      : '0.0'}
-                    /5
+                    {cumulativeStats.averageRating.toFixed(1)}/5
                   </span>
                   <span className="text-sm text-gray-400">
-                    {allReviewsForStats.length} {t('reviews', language)}
+                    {cumulativeStats.totalReviews} {t('reviews', language)}
                   </span>
                 </div>
 

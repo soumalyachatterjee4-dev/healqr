@@ -85,6 +85,8 @@ const DoctorPatientChatManager = lazy(() => import("./components/DoctorPatientCh
 const PatientChatInterface = lazy(() => import("./components/PatientChatInterface"));
 const VideoConsultationManager = lazy(() => import("./components/VideoConsultationManager"));
 const AIRXReaderManager = lazy(() => import("./components/AIRXReaderManager"));
+const AIDietChartManager = lazy(() => import("./components/AIDietChartManager"));
+const SocialMediaKit = lazy(() => import("./components/SocialMediaKit"));
 
 // Loading Component
 const PageLoader = () => (
@@ -182,6 +184,8 @@ export default function App() {
     | "doctor-patient-chat"
     | "video-consultation"
     | "ai-rx-reader"
+    | "ai-diet-chart"
+    | "social-kit"
     | "advertiser-gateway"
     | "purchase-history"
   >("landing");
@@ -284,7 +288,12 @@ export default function App() {
       if (currentPage === 'dashboard' && auth?.currentUser && db) {
         try {
           const { doc, onSnapshot } = await import('firebase/firestore');
-          unsubscribe = onSnapshot(doc(db, 'doctors', auth.currentUser.uid), (docSnapshot) => {
+          const isAssistant = localStorage.getItem('healqr_is_assistant') === 'true';
+          const doctorIdToLoad = isAssistant
+            ? localStorage.getItem('healqr_assistant_doctor_id') || auth.currentUser.uid
+            : auth.currentUser.uid;
+
+          unsubscribe = onSnapshot(doc(db, 'doctors', doctorIdToLoad), (docSnapshot) => {
             if (docSnapshot.exists()) {
               const data = docSnapshot.data();
               // Reload profile photo
@@ -295,6 +304,14 @@ export default function App() {
               // Reload doctor's preferred language
               if (data.preferredLanguage) {
                 setDoctorPreferredLanguage(data.preferredLanguage);
+              }
+
+              // ✅ Reload doctor stats (Live Rating/Reviews Update)
+              if (data.stats) {
+                setDoctorStats({
+                  averageRating: data.stats.averageRating || 0,
+                  totalReviews: data.stats.totalReviews || 0
+                });
               }
 
               // Reload full profile data
@@ -1206,8 +1223,7 @@ export default function App() {
                 const reviewsRef = collection(db, 'reviews');
                 const q = query(
                   reviewsRef,
-                  where('doctorId', '==', user.uid),
-                  where('published', '==', false), // Only unpublished reviews (not yet uploaded to mini website)
+                  where('doctorId', '==', doctorIdToLoad),
                   orderBy('createdAt', 'desc')
                 );
                 const reviewsSnapshot = await getDocs(q);
@@ -1223,16 +1239,50 @@ export default function App() {
                 }));
 
                 setIncomingReviews(loadedReviews);
+
+                // ✅ SELF-HEALING STATS SYNC (NEW!)
+                // Calculate actual total pool: Patient Pool (reviewsSnapshot) + Self-Created Pool (placeholderReviews)
+                // We exclude miniWebsiteReviews as they are now redundant copies/flags of the source reviews
+                const patientCount = reviewsSnapshot.size;
+                const selfCreatedCount = data.placeholderReviews?.length || 0;
+                const actualTotal = patientCount + selfCreatedCount;
+
+                // Calculate actual average rating from all reviews
+                const allRatings: number[] = [];
+                reviewsSnapshot.forEach(doc => { if (doc.data().rating) allRatings.push(doc.data().rating); });
+                if (data.placeholderReviews) {
+                  data.placeholderReviews.forEach((r: any) => { if (r.rating) allRatings.push(r.rating); });
+                }
+                const actualAvg = allRatings.length > 0
+                  ? parseFloat((allRatings.reduce((a, b) => a + b, 0) / allRatings.length).toFixed(1))
+                  : 0;
+
+                const currentStoredStats = data.stats || { averageRating: 0, totalReviews: 0 };
+
+                // Sync if either total OR rating is incorrect (allowing for a tiny floating point margin)
+                const isOutOfSync = currentStoredStats.totalReviews !== actualTotal ||
+                                   Math.abs((currentStoredStats.averageRating || 0) - actualAvg) > 0.1;
+
+                if (isOutOfSync) {
+                  const updatedStats = {
+                    averageRating: actualAvg,
+                    totalReviews: actualTotal
+                  };
+                  setDoctorStats(updatedStats);
+
+                  // Update Firestore to fix the inconsistency permanently
+                  try {
+                    const { doc, updateDoc } = await import('firebase/firestore');
+                    const doctorRef = doc(db, 'doctors', doctorIdToLoad);
+                    await updateDoc(doctorRef, { stats: updatedStats });
+                  } catch (syncError) {
+                    console.error('❌ Error syncing stats:', syncError);
+                  }
+                } else {
+                  setDoctorStats(currentStoredStats);
+                }
               } catch (reviewError) {
                 console.error('❌ Error loading patient reviews:', reviewError);
-              }
-
-              // Load doctor stats (cumulative, never decreases)
-              if (data.stats) {
-                setDoctorStats({
-                  averageRating: data.stats.averageRating || 0,
-                  totalReviews: data.stats.totalReviews || 0
-                });
               }
 
               // Load subscription data with corrected trial calculation
@@ -1696,9 +1746,10 @@ export default function App() {
       return;
     }
     setUploadedReviews((prev) => [...prev, review]);
-    // Remove from incoming reviews OR self-created reviews after upload
-    setIncomingReviews((prev) => prev.filter(r => r.id !== review.id));
-    setSelfCreatedReviews((prev) => prev.filter(r => r.id !== review.id));
+
+    // ✅ PERSISTENT SOURCES: Do NOT remove from source arrays
+    // setIncomingReviews((prev) => prev.filter(r => r.id !== review.id));
+    // setSelfCreatedReviews((prev) => prev.filter(r => r.id !== review.id));
 
     // Save to Firestore for cross-device access
     try {
@@ -1780,11 +1831,11 @@ export default function App() {
 
   const handleReviewDelete = async (reviewId: number, source: 'incoming' | 'selfCreated' | 'uploaded') => {
     if (source === 'uploaded') {
-      // Remove from uploaded reviews (published on mini website)
+      // ✅ UNPUBLISH ONLY: Remove from uploaded reviews but keep in source tab
       const reviewToDelete = uploadedReviews.find(r => r.id === reviewId);
       setUploadedReviews((prev) => prev.filter(r => r.id !== reviewId));
 
-      // Remove from Firestore miniWebsiteReviews
+      // Remove from Firestore miniWebsiteReviews & mark source review as unpublished
       try {
         const { doc, updateDoc, arrayRemove } = await import('firebase/firestore');
         const user = auth.currentUser;
@@ -1793,30 +1844,59 @@ export default function App() {
           await updateDoc(doctorRef, {
             miniWebsiteReviews: arrayRemove(reviewToDelete)
           });
+
+          // Also mark as unpublished in reviews collection if it's a patient review
+          if (reviewToDelete.firestoreId) {
+            const reviewRef = doc(db, 'reviews', reviewToDelete.firestoreId);
+            await updateDoc(reviewRef, { published: false });
+          }
         }
       } catch (error) {
-        console.error('❌ Error removing review from Firestore:', error);
+        console.error('❌ Error unpublishing review:', error);
       }
     } else if (source === 'incoming') {
-      // Remove from incoming patient reviews
+      // PERMANENT DELETE: Remove from incoming patient reviews AND published list if present
+      const reviewToDelete = incomingReviews.find(r => r.id === reviewId);
       setIncomingReviews((prev) => prev.filter(r => r.id !== reviewId));
+      setUploadedReviews((prev) => prev.filter(r => r.id !== reviewId));
+
+      // Remove from Firestore collections
+      try {
+        const { doc, deleteDoc, updateDoc, arrayRemove } = await import('firebase/firestore');
+        const user = auth.currentUser;
+        if (user && reviewToDelete) {
+          // Delete from reviews collection
+          if (reviewToDelete.firestoreId) {
+            await deleteDoc(doc(db, 'reviews', reviewToDelete.firestoreId));
+          }
+          // Remove from miniWebsiteReviews if live
+          const doctorRef = doc(db, 'doctors', user.uid);
+          await updateDoc(doctorRef, {
+            miniWebsiteReviews: arrayRemove(reviewToDelete)
+          });
+        }
+      } catch (error) {
+        console.error('❌ Error deleting patient review:', error);
+      }
     } else if (source === 'selfCreated') {
-      // Remove from self-created reviews
+      // PERMANENT DELETE: Remove from self-created reviews AND published list if present
       const reviewToDelete = selfCreatedReviews.find(r => r.id === reviewId);
       setSelfCreatedReviews((prev) => prev.filter(r => r.id !== reviewId));
+      setUploadedReviews((prev) => prev.filter(r => r.id !== reviewId));
 
-      // Remove from Firestore placeholderReviews
+      // Remove from Firestore placeholderReviews & miniWebsiteReviews
       try {
         const { doc, updateDoc, arrayRemove } = await import('firebase/firestore');
         const user = auth.currentUser;
         if (user && reviewToDelete) {
           const doctorRef = doc(db, 'doctors', user.uid);
           await updateDoc(doctorRef, {
-            placeholderReviews: arrayRemove(reviewToDelete)
+            placeholderReviews: arrayRemove(reviewToDelete),
+            miniWebsiteReviews: arrayRemove(reviewToDelete)
           });
         }
       } catch (error) {
-        console.error('❌ Error removing self-created review from Firestore:', error);
+        console.error('❌ Error deleting self-created review:', error);
       }
     }
   };
@@ -1980,6 +2060,8 @@ export default function App() {
       setCurrentPage("purchase-history");
     else if (menu === "template-uploader")
       setCurrentPage("template-uploader");
+    else if (menu === "social-kit")
+      setCurrentPage("social-kit");
     else if (menu === "reminder-notifications")
       setCurrentPage("reminder-notifications");
     else if (menu === "video-library") {
@@ -1998,6 +2080,8 @@ export default function App() {
       setCurrentPage("video-consultation");
     else if (menu === "ai-rx-reader")
       setCurrentPage("ai-rx-reader");
+    else if (menu === "ai-diet-chart")
+      setCurrentPage("ai-diet-chart");
     else if (menu === "monthly-planner")
       setCurrentPage("monthly-planner");
   };
@@ -2350,6 +2434,20 @@ export default function App() {
           onMenuChange={menuChangeHandler}
           activeAddOns={activeAddOns}
         />
+      )}
+
+      {currentPage === "social-kit" && (
+        <Suspense fallback={<PageLoader />}>
+          <SocialMediaKit
+            doctorName={userName}
+            degree={userProfileData.degrees?.join(', ') || ''}
+            speciality={userProfileData.specialities?.[0] || ''}
+            qrUrl={`https://teamhealqr.web.app?doctorId=${auth?.currentUser?.uid || localStorage.getItem('userId') || ''}`}
+            profileImage={userProfileData.profileImage}
+            onLogout={handleLogout}
+            onMenuChange={menuChangeHandler}
+          />
+        </Suspense>
       )}
 
       {currentPage === "reminder-notifications" && (
@@ -2782,6 +2880,16 @@ export default function App() {
 
       {currentPage === "ai-rx-reader" && (
         <AIRXReaderManager
+          doctorName={userName}
+          email={userEmail}
+          onLogout={handleLogout}
+          onMenuChange={menuChangeHandler}
+          activeAddOns={activeAddOns}
+        />
+      )}
+
+      {currentPage === "ai-diet-chart" && (
+        <AIDietChartManager
           doctorName={userName}
           email={userEmail}
           onLogout={handleLogout}

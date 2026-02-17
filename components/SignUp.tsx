@@ -29,6 +29,7 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
   const [specialties, setSpecialties] = useState<string[]>([]);
   const [customSpecialty, setCustomSpecialty] = useState('');
   const [pinCode, setPinCode] = useState('');
+  const [landmark, setLandmark] = useState('');
   const [qrType, setQrType] = useState<'preprinted' | 'virtual'>('preprinted'); // NEW: QR type selection
   const [qrNumber, setQrNumber] = useState("");
   const [companyName, setCompanyName] = useState(""); // NEW: Company name for pre-printed QR
@@ -47,11 +48,11 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
     console.log('✅ SIGNUP: Cleared all premium add-ons - Starting with Starter Plan');
     // Extra debug: Log QR number entered
     console.log('🟢 SIGNUP: QR entered:', qrNumber);
-    
+
     // In demo mode, skip all validations
     if (isDemoMode) {
-      onNext({ 
-        email: email || 'demo@healqr.com', 
+      onNext({
+        email: email || 'demo@healqr.com',
         name: name || 'Dr. Demo User',
         dob: dob || '',
         specialties: specialties.length > 0 ? specialties : ['general_medicine'],
@@ -60,13 +61,13 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
       });
       return;
     }
-    
+
     // Validate required fields
-    if (!email || !name || !dob || specialties.length === 0 || !pinCode || !acceptedTerms) {
+    if (!email || !name || !dob || specialties.length === 0 || !pinCode || !landmark || !acceptedTerms) {
       toast.error('Please fill all required fields and select at least one specialty');
       return;
     }
-    
+
     // QR Number validation based on type
     if (qrType === 'preprinted') {
       if (!companyName) {
@@ -99,21 +100,21 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
 
       // Handle QR Code validation based on type
       const { collection, query, where, getDocs, updateDoc, addDoc, serverTimestamp } = await import('firebase/firestore');
-      
+
       let finalQrNumber = qrNumber;
       let qrDocRef = null;
       let qrData = null;
-      
+
       if (qrType === 'virtual') {
         // Generate Virtual QR from UNIVERSAL POOL - check BOTH collections for true max
         const qrPoolCollection = collection(db, 'qrPool');
         const qrCodesCollection = collection(db, 'qrCodes'); // Old collection
-        
+
         const [poolQrs, codesQrs] = await Promise.all([
           getDocs(qrPoolCollection),
           getDocs(qrCodesCollection)
         ]);
-        
+
         // Find highest HQR number across BOTH collections
         let maxNumber = 0;
         // Check qrPool collection
@@ -132,11 +133,11 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
             if (!isNaN(num) && num > maxNumber) maxNumber = num;
           }
         });
-        
+
         // Generate next HQR number in universal sequence
         finalQrNumber = `HQR${String(maxNumber + 1).padStart(5, '0')}`;
         console.log('🟢 Doctor Virtual QR - Max from both collections:', maxNumber, '→ New:', finalQrNumber);
-        
+
         // Save Virtual QR to qrPool collection (universal pool)
         await addDoc(qrPoolCollection, {
           qrNumber: finalQrNumber,
@@ -147,22 +148,22 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
           qrType: 'virtual',
           generatedBy: 'self-signup'
         });
-        
+
         console.log('✅ Virtual QR Generated from Universal Pool:', finalQrNumber);
         toast.success('Virtual QR Generated: ' + finalQrNumber);
         setQrNumber(finalQrNumber);
         setVirtualQrGenerated(true);
-        
+
       } else {
         // Pre-printed QR: Validate existing QR Code in BOTH collections
         const poolQuery = query(qrPoolCollection, where('qrNumber', '==', qrNumber));
         const codesQuery = query(qrCodesCollection, where('qrNumber', '==', qrNumber));
-        
+
         const [poolSnapshot, codesSnapshot] = await Promise.all([
           getDocs(poolQuery),
           getDocs(codesQuery)
         ]);
-        
+
         if (poolSnapshot.empty && codesSnapshot.empty) {
           toast.error('Invalid QR Code', {
             description: 'This QR code does not exist in our system'
@@ -170,7 +171,7 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
           setLoading(false);
           return;
         }
-        
+
         // Use whichever collection has the QR
         if (!poolSnapshot.empty) {
           qrDocRef = poolSnapshot.docs[0].ref;
@@ -190,7 +191,7 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
           setLoading(false);
           return;
         }
-        
+
         // Set QR status to pending and store email
         await updateDoc(qrDocRef, {
           status: 'pending',
@@ -208,6 +209,7 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
         dob,
         specialties,
         pinCode,
+        landmark,
         qrNumber: finalQrNumber,
         qrType: qrType, // NEW: Store QR type
         companyName: qrType === 'preprinted' ? companyName : '', // NEW: Store company name for pre-printed QR
@@ -217,7 +219,7 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
       // Store signup data in localStorage for retrieval after verification
       localStorage.setItem('healqr_pending_signup', JSON.stringify(signupData));
       localStorage.setItem('healqr_email_for_signin', email);
-      
+
       console.log('✅ Signup data stored in localStorage:', signupData);
 
       // Firebase Email Link configuration
@@ -285,13 +287,13 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
             <div className="inline-flex items-center justify-center w-16 h-16 bg-emerald-500/10 rounded-full mb-4">
               <CheckCircle2 className="h-8 w-8 text-emerald-500" />
             </div>
-            
+
             <h2 className="text-white mb-3">Verification Link Sent!</h2>
-            
+
             <p className="text-gray-400 text-sm mb-6">
               We've sent a verification link to:
             </p>
-            
+
             <div className="bg-zinc-800 rounded-lg p-4 mb-6 border border-zinc-700">
               <p className="text-emerald-500">{email}</p>
             </div>
@@ -341,12 +343,12 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
     <>
       {/* Terms & Conditions Modal */}
       {showTerms && (
-        <DoctorTermsConditions 
-          onClose={() => setShowTerms(false)} 
+        <DoctorTermsConditions
+          onClose={() => setShowTerms(false)}
           onNavigateToPricing={handleNavigateToPricing}
         />
       )}
-      
+
       {/* Privacy Policy Modal */}
       {showPrivacy && <DoctorPrivacyPolicy onClose={() => setShowPrivacy(false)} />}
 
@@ -422,7 +424,7 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
             <label className="block mb-3">
               Medical Specialties <span className="text-red-500">*</span>
             </label>
-            
+
             {/* Selected Specialties Display */}
             {specialties.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-3 p-3 bg-zinc-900 rounded-lg border border-zinc-800">
@@ -440,12 +442,12 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
                 ))}
               </div>
             )}
-            
+
             {/* Preset Specialties Dropdown */}
             <div className="relative mb-3">
               <Stethoscope className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 z-10" />
-              <Select 
-                value="" 
+              <Select
+                value=""
                 onValueChange={(value) => {
                   if (value && !specialties.includes(value)) {
                     setSpecialties([...specialties, value]);
@@ -468,7 +470,7 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
                 </SelectContent>
               </Select>
             </div>
-            
+
             {/* Custom Specialty Input */}
             <div className="flex gap-2">
               <div className="relative flex-1">
@@ -524,6 +526,26 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
             </div>
           </div>
 
+          {/* Clinic Landmark Field */}
+          <div className="mb-6">
+            <label className="block mb-3">
+              Clinic Landmark <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <Input
+                type="text"
+                value={landmark}
+                onChange={(e) => setLandmark(e.target.value)}
+                placeholder="e.g., Near City Hospital / Opp. Post Office"
+                className="pl-12 bg-black border-zinc-800 text-white h-14 rounded-lg focus:border-emerald-500"
+              />
+            </div>
+            <p className="text-xs text-gray-400 mt-2">
+              Helps patients find your clinic easily
+            </p>
+          </div>
+
           {/* QR Type Selection - NEW */}
           <div className="mb-6">
             <label className="block mb-3">
@@ -553,7 +575,7 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
                   </span>
                 </div>
               </button>
-              
+
               <button
                 type="button"
                 onClick={() => {
@@ -664,7 +686,7 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
                   <div>
                     <p className="text-sm text-gray-300 font-semibold mb-1">Virtual QR Self-Signup</p>
                     <p className="text-xs text-gray-500">
-                      A unique Virtual QR number will be automatically generated for you during signup. 
+                      A unique Virtual QR number will be automatically generated for you during signup.
                       This number will be permanently linked to your account and cannot be reused.
                     </p>
                   </div>
@@ -725,16 +747,16 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
           </div>
 
           {/* Register Button */}
-          <Button 
+          <Button
             onClick={handleRegister}
             disabled={
-              !email || 
-              !name || 
-              !dob || 
-              !pinCode || 
+              !email ||
+              !name ||
+              !dob ||
+              !pinCode ||
               specialties.length === 0 ||
-              (qrType === 'preprinted' && !qrNumber) || 
-              !acceptedTerms || 
+              (qrType === 'preprinted' && !qrNumber) ||
+              !acceptedTerms ||
               loading
             }
             className="w-full bg-emerald-500 hover:bg-emerald-600 text-white h-14 rounded-lg mb-6 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -751,7 +773,7 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
 
           {/* Back Button */}
           <div className="text-center">
-            <button 
+            <button
               onClick={onBack}
               className="text-gray-400 hover:text-white transition-colors inline-flex items-center gap-2"
             >
@@ -765,7 +787,7 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
         <div className="text-center mt-6">
           <p className="text-gray-400">
             Already have an account?{' '}
-            <button 
+            <button
               onClick={onLogin}
               className="text-emerald-500 hover:text-emerald-400 transition-colors"
             >

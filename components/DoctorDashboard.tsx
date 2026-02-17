@@ -30,10 +30,13 @@ import DashboardSidebar from './DashboardSidebar';
 import ContactSupport from './ContactSupport';
 import PatientReviewsPanel from './PatientReviewsPanel';
 import NotificationCenter from './NotificationCenter';
+import { subscribeToDoctorNotifications, markNotificationRead, markAllNotificationsRead, deleteDoctorNotification, DoctorNotification } from '../services/doctorNotificationService';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import BirthdayCardNotification from './BirthdayCardNotification';
 import DashboardPromoDisplay from './DashboardPromoDisplay';
 import SocialMediaPromoBanner from './SocialMediaPromoBanner';
+import { sendPatientListViaWhatsApp } from '../services/whatsappService';
+import { toast } from 'sonner';
 
 interface Review {
   id: number;
@@ -88,6 +91,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
   const [activeMenu, setActiveMenu] = useState('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
+  const [debugLog, setDebugLog] = useState<string[]>([]);
 
   // Check if user is assistant and get allowed pages
   const isAssistant = !!localStorage.getItem('healqr_is_assistant');
@@ -97,14 +101,14 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
   const handleDebugCheck = async () => {
     const logs: string[] = [];
     try {
-      const userId = auth.currentUser?.uid;
+      const userId = localStorage.getItem('userId');
       if (!userId) {
         logs.push('❌ No user logged in');
         setDebugLog(logs);
         return;
       }
 
-      const { db } = await import('../lib/firebase/config');
+      const { db, auth } = await import('../lib/firebase/config');
       const { collection, query, where, getDocs } = await import('firebase/firestore');
 
       const today = new Date();
@@ -115,7 +119,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
       logs.push(`🌍 TIMEZONE OFFSET: ${today.getTimezoneOffset()} minutes\n`);
 
       // Get all bookings for today
-      const bookingsRef = collection(db, 'bookings');
+      const bookingsRef = collection(db!, 'bookings');
       const allTodayBookings = query(
         bookingsRef,
         where('appointmentDate', '==', todayStr)
@@ -125,7 +129,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
       logs.push(`📊 TOTAL BOOKINGS FOR TODAY: ${snap.size}\n`);
 
       snap.docs.forEach((doc, idx) => {
-        const data = doc.data();
+        const data = doc.data() as any;
         logs.push(`\n📋 BOOKING ${idx + 1}:`);
         logs.push(`   ID: ${doc.id}`);
         logs.push(`   Patient: ${data.patientName}`);
@@ -143,8 +147,8 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
       logs.push(`\n\n🔔 FCM TOKEN STATUS:`);
       logs.push(`════════════════════════════════════════\n`);
 
-      const tokensRef = collection(db, 'fcmTokens');
-      const tokensSnap = await getDocs(tokensRef);
+      const registrationsRef = collection(db!, 'doctorRegistrations');
+      const tokensSnap = await getDocs(registrationsRef);
 
       if (tokensSnap.empty) {
         logs.push(`⚠️  NO FCM TOKENS REGISTERED`);
@@ -183,6 +187,9 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
   const [birthdayCardDeliveryTime, setBirthdayCardDeliveryTime] = useState('');
   const [doctorBirthday, setDoctorBirthday] = useState('');
 
+  // Dynamic Health Tip
+  const [dailyHealthTip, setDailyHealthTip] = useState<any>(null);
+
   // Chamber state with booking counts
   const [chambersList, setChambersList] = useState<Array<{
     id: number;
@@ -194,7 +201,86 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
     booked: number;
     capacity: number;
     isActive: boolean;
+    clinicPhone?: string | null;
+    isExpired?: boolean;
+    manualClinicId?: string | null;
+    clinicCode?: string | null;
   }>>([]);
+
+  // Notifications State
+  const [realTimeNotifications, setRealTimeNotifications] = useState<DoctorNotification[]>([]);
+  const unreadNotificationCount = realTimeNotifications.filter(n => !n.read).length;
+
+  // Subscribe to real-time notifications
+  useEffect(() => {
+    const userId = localStorage.getItem('userId');
+    if (!userId) return;
+
+    const unsubscribe = subscribeToDoctorNotifications(userId, (notifications) => {
+      setRealTimeNotifications(notifications);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Handler for marking notification as read
+  const handleMarkNotificationRead = async (id: string) => {
+    const userId = localStorage.getItem('userId');
+    if (!userId) return;
+    await markNotificationRead(userId, id);
+  };
+
+  // Handler for marking all as read
+  const handleMarkAllNotificationsRead = async () => {
+    const userId = localStorage.getItem('userId');
+    if (!userId) return;
+    const unreadIds = realTimeNotifications.filter(n => !n.read).map(n => n.id!);
+    if (unreadIds.length > 0) {
+      await markAllNotificationsRead(userId, unreadIds);
+    }
+  };
+
+  // Handler for deleting notification
+  const handleDeleteNotification = async (id: string) => {
+    const userId = localStorage.getItem('userId');
+    if (!userId) return;
+    await deleteDoctorNotification(userId, id);
+  };
+
+  const handleGeneratePatientList = async (notificationId: string, metadata: any) => {
+    console.log('🔘 [DASHBOARD] Generate Patient List clicked:', { notificationId, metadata });
+    if (!metadata || !metadata.chamberId) {
+      console.error('❌ [DASHBOARD] Missing chamberId in metadata:', metadata);
+      toast.error('Chamber information missing in notification');
+      return;
+    }
+
+    // Find the chamber details from our list
+    const chamber = chambersList.find(c => c.id === metadata.chamberId);
+
+    if (chamber) {
+      await sendPatientListViaWhatsApp({
+        id: chamber.id,
+        name: chamber.name,
+        clinicPhone: chamber.clinicPhone || metadata.clinicPhone || '',
+        startTime: chamber.startTime,
+        endTime: chamber.endTime
+      }, doctorName);
+    } else {
+      // Fallback: If chamber not in today's list, try to use metadata directly
+      if (metadata.clinicName && (metadata.clinicPhone || metadata.clinicId)) {
+          await sendPatientListViaWhatsApp({
+            id: metadata.chamberId,
+            name: metadata.clinicName,
+            clinicPhone: metadata.clinicPhone || '',
+            startTime: metadata.startTime || 'N/A',
+            endTime: metadata.endTime || 'N/A'
+          }, doctorName);
+      } else {
+        toast.error('Chamber details could not be found. Please go to Today\'s Schedule.');
+      }
+    }
+  };
 
   // Load birthday card data on mount
   useEffect(() => {
@@ -238,7 +324,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
         const { db } = await import('../lib/firebase/config');
         const { doc, getDoc, updateDoc } = await import('firebase/firestore');
 
-        const doctorRef = doc(db, 'doctors', userId);
+        const doctorRef = doc(db!, 'doctors', userId);
         const doctorSnap = await getDoc(doctorRef);
 
         if (!doctorSnap.exists()) return;
@@ -291,7 +377,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
             const { doc: firestoreDoc, getDoc: firestoreGetDoc } = await import('firebase/firestore');
 
             // Load from adminProfiles/super_admin/globalTemplates
-            const adminRef = firestoreDoc(db, 'adminProfiles', 'super_admin');
+            const adminRef = firestoreDoc(db!, 'adminProfiles', 'super_admin');
             const adminSnap = await firestoreGetDoc(adminRef);
 
             if (adminSnap.exists()) {
@@ -345,6 +431,72 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
     loadBirthdayData();
   }, []);
 
+  // Load Dynamic Health Tip
+  useEffect(() => {
+    const loadHealthTip = async () => {
+      try {
+        const { db } = await import('../lib/firebase/config');
+        const { doc, getDoc } = await import('firebase/firestore');
+
+        const adminRef = doc(db!, 'adminProfiles', 'super_admin');
+        const adminSnap = await getDoc(adminRef);
+
+        if (adminSnap.exists()) {
+          const data = adminSnap.data();
+          const templates = data.globalTemplates || [];
+
+          // Find published health tips
+          const healthTips = templates.filter(
+            (t: any) => t.category === 'health-tip' && t.isPublished
+          );
+
+          if (healthTips.length > 0) {
+            // Pick a random one or the latest one
+            // Let's pick a random one for variety each reload
+            const randomTip = healthTips[Math.floor(Math.random() * healthTips.length)];
+            setDailyHealthTip(randomTip);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading health tip:', error);
+      }
+    };
+    loadHealthTip();
+  }, []);
+
+  // Load Dynamic Health Tip
+  useEffect(() => {
+    const loadHealthTip = async () => {
+      try {
+        const { db } = await import('../lib/firebase/config');
+        const { doc, getDoc } = await import('firebase/firestore');
+
+        const adminRef = doc(db!, 'adminProfiles', 'super_admin');
+        const adminSnap = await getDoc(adminRef);
+
+        if (adminSnap.exists()) {
+          const data = adminSnap.data();
+          const templates = data.globalTemplates || [];
+
+          // Find published health tips
+          const healthTips = templates.filter(
+            (t: any) => t.category === 'health-tip' && t.isPublished
+          );
+
+          if (healthTips.length > 0) {
+            // Pick a random one or the latest one
+            // Let's pick a random one for variety each reload
+            const randomTip = healthTips[Math.floor(Math.random() * healthTips.length)];
+            setDailyHealthTip(randomTip);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading health tip:', error);
+      }
+    };
+    loadHealthTip();
+  }, []);
+
   // Load chambers with booking counts for next 24 hours
   useEffect(() => {
     const loadChambersWithBookings = async () => {
@@ -359,7 +511,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
         const { doc, getDoc, collection, query, where, getDocs, deleteDoc } = await import('firebase/firestore');
 
         // Load doctor's chambers from Firestore
-        const doctorRef = doc(db, 'doctors', userId);
+        const doctorRef = doc(db!, 'doctors', userId);
         const doctorSnap = await getDoc(doctorRef);
 
         if (!doctorSnap.exists()) {
@@ -400,7 +552,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
         // Get booking counts for each chamber
         const chambersWithBookings = await Promise.all(
           todaysChambers.map(async (chamber: any) => {
-            const bookingsRef = collection(db, 'bookings');
+            const bookingsRef = collection(db!, 'bookings');
 
             // Query 1: QR bookings
             const qrBookingsQuery = query(
@@ -452,7 +604,10 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
               isActive: chamber.isActive !== false,
               startMinutes, // For sorting
               isExpired, // For sorting expired to bottom
-            };
+              manualClinicId: chamber.manualClinicId || null,
+               clinicCode: chamber.clinicCode || null,
+               clinicPhone: chamber.clinicPhone || null
+             };
           })
         );
 
@@ -478,7 +633,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
 
             // Load clinic schedule to check if clinic is off today
             try {
-              const scheduleDoc = await getDoc(doc(db, 'clinicSchedules', clinicId));
+              const scheduleDoc = await getDoc(doc(db!, 'clinicSchedules', clinicId));
               if (scheduleDoc.exists()) {
                 const scheduleData = scheduleDoc.data();
                 const plannedOffPeriods = scheduleData.plannedOffPeriods || [];
@@ -529,6 +684,52 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
     loadChambersWithBookings();
   }, []);
 
+  // 🔔 AUTO-TRIGGER: Expired Clinic Notification (Global)
+  useEffect(() => {
+    const checkExpiredClinics = async () => {
+      const userId = localStorage.getItem('userId');
+      if (!userId || chambersList.length === 0) return;
+
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      for (const chamber of chambersList) {
+        // Detect session over for non-linked clinics
+        if (chamber.manualClinicId && chamber.isExpired) {
+          const notificationKey = `healqr_notified_${chamber.manualClinicId}_${todayStr}`;
+
+          if (!localStorage.getItem(notificationKey)) {
+            console.log(`🔔 Dashboard: Triggering notification for ${chamber.name}`);
+
+            const { addDoctorNotification } = await import('../services/doctorNotificationService');
+
+            await addDoctorNotification(userId, {
+              type: 'system',
+              category: 'alert',
+              title: 'Chamber Session Ended',
+              message: `Your session at ${chamber.name} has ended. Please generate and send the patient list to the clinic.`,
+              metadata: {
+                clinicId: chamber.manualClinicId,
+                chamberId: chamber.id,
+                clinicName: chamber.name,
+                chamberAddress: chamber.address,
+                clinicPhone: chamber.clinicPhone || undefined,
+                startTime: chamber.startTime,
+                endTime: chamber.endTime
+              }
+            });
+
+            localStorage.setItem(notificationKey, 'true');
+          }
+        }
+      }
+    };
+
+    checkExpiredClinics();
+    // Re-check periodically or when chamber list updates
+    const interval = setInterval(checkExpiredClinics, 60000); // Every minute
+    return () => clearInterval(interval);
+  }, [chambersList]);
+
   const handleVideoTutorialClick = () => {
     // Navigate to video library
     if (onMenuChange) {
@@ -574,12 +775,20 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
     }
   };
 
-  // Reviews data - Calculate from actual arrays (Patient + Self-Created)
-  const allReviews = [...incomingReviews, ...selfCreatedReviews];
-  const totalReviews = allReviews.length;
-  const averageRating = totalReviews > 0
-    ? allReviews.reduce((sum, review) => sum + review.rating, 0) / totalReviews
+  // Reviews data - Use cumulative stats from Firestore via props
+  // Compare with local arrays to ensure real-time accuracy and fix 0.0 rating issue
+  const localTotal = incomingReviews.length + selfCreatedReviews.length;
+  // STRICT FORMULA: Trust the local count of actual review objects
+  const totalReviews = localTotal;
+
+  // Calculate average rating with fallback to local calculation if Firestore stats are zero
+  const localAllReviews = [...incomingReviews, ...selfCreatedReviews];
+  const localAvg = localAllReviews.length > 0
+    ? localAllReviews.reduce((sum, r) => sum + r.rating, 0) / localAllReviews.length
     : 0;
+  const averageRating = (doctorStats?.averageRating && doctorStats.averageRating > 0)
+    ? doctorStats.averageRating
+    : localAvg;
 
   // 🎯 FREE TRIAL DATA - Using real subscription data from Firestore
   // --- FREE, NO LIMIT, MONTHLY BOOKINGS ---
@@ -598,7 +807,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
         if (!userId) return;
         const { db } = await import('../lib/firebase/config');
         const { collection, query, where, getDocs } = await import('firebase/firestore');
-        const bookingsRef = collection(db, 'bookings');
+        const bookingsRef = collection(db!, 'bookings');
         const start = new Date(now.getFullYear(), now.getMonth(), 1);
         const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
         const bookingsQuery = query(
@@ -649,7 +858,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
         const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59); // Last day of current month at 23:59:59
 
         // Get doctor data for sync check
-        const doctorRef = doc(db, 'doctors', userId);
+        const doctorRef = doc(db!, 'doctors', userId);
         const doctorSnap = await getDoc(doctorRef);
 
         if (!doctorSnap.exists()) return;
@@ -657,7 +866,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
         const doctorData = doctorSnap.data();
 
         // Query bookings collection for all metrics
-        const bookingsRef = collection(db, 'bookings');
+        const bookingsRef = collection(db!, 'bookings');
         const bookingsQuery = query(
           bookingsRef,
           where('doctorId', '==', userId)
@@ -673,7 +882,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
         let totalScans = 0;
 
         bookingsSnap.docs.forEach(doc => {
-          const data = doc.data();
+          const data = doc.data() as any;
           const bookingDate = data.createdAt?.toDate() || data.date?.toDate();
 
           // Only count bookings within current month
@@ -698,7 +907,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
             }
 
             // Count drop-outs (booked but not seen - Eye icon not pressed)
-            const appointmentDate = data.appointmentDate || (data.date?.toDate?.() ? data.date.toDate().toISOString().split('T')[0] : null);
+            const appointmentDate = data.appointmentDate || (data.date?.toDate?.() ? (data.date as any).toDate().toISOString().split('T')[0] : null);
             const today = new Date().toISOString().split('T')[0];
 
             if (appointmentDate && appointmentDate < today) {
@@ -904,8 +1113,11 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
               className="w-9 h-9 md:w-10 md:h-10 bg-zinc-900 hover:bg-zinc-800 rounded-lg flex items-center justify-center transition-colors relative"
             >
               <Bell className="w-4 h-4 md:w-5 md:h-5 text-gray-400" />
-              {/* 🧹 DEMO DATA CLEANED - Badge hidden when no notifications (was hardcoded to "3") */}
-              {/* Real notification count will be passed from backend/state when notifications exist */}
+              {unreadNotificationCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full text-[10px] text-white flex items-center justify-center border-2 border-black">
+                  {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
+                </span>
+              )}
             </button>
 
             {/* Profile Button */}
@@ -991,9 +1203,9 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
                       <SocialMediaPromoBanner
                         compact={true}
                         onNavigate={() => {
-                          console.log('🔘 Social Kit Button Clicked! Navigating to QR Manager...');
+                          console.log('🔘 Social Kit Button Clicked! Navigating to Social Kit Designer...');
                           if (onMenuChange) {
-                            onMenuChange('qr-social-media');
+                            onMenuChange('social-kit');
                           } else {
                             console.error('❌ onMenuChange is missing!');
                           }
@@ -1210,6 +1422,13 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
       <NotificationCenter
         isOpen={notificationOpen}
         onClose={() => setNotificationOpen(false)}
+        notifications={realTimeNotifications}
+        onMarkRead={handleMarkNotificationRead}
+        onMarkAllRead={handleMarkAllNotificationsRead}
+        healthTip={dailyHealthTip}
+        doctorName={doctorName}
+        onGeneratePatientList={handleGeneratePatientList}
+        onDelete={handleDeleteNotification}
       />
     </div>
   );

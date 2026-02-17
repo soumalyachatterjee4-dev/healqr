@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from './ui/tabs';
 import {
   Download,
   Share2,
@@ -11,10 +12,12 @@ import {
   Palette,
   Layout,
   Upload,
-  RefreshCw
+  RefreshCw,
+  Menu
 } from 'lucide-react';
 import { toast } from 'sonner';
 import QRCode from 'qrcode';
+import DashboardSidebar from './DashboardSidebar';
 
 interface SocialMediaKitProps {
   doctorName: string;
@@ -22,9 +25,11 @@ interface SocialMediaKitProps {
   speciality: string;
   qrUrl: string;
   profileImage: string | null;
+  onLogout?: () => void;
+  onMenuChange?: (menu: string) => void;
 }
 
-type TemplateType = 'story' | 'post' | 'status';
+type TemplateType = 'story' | 'post' | 'status' | 'health-tip' | 'reel-animated';
 
 interface Template {
   id: string;
@@ -35,13 +40,28 @@ interface Template {
   label: string;
 }
 
-export default function SocialMediaKit({ doctorName, degree, speciality, qrUrl, profileImage }: SocialMediaKitProps) {
+export default function SocialMediaKit({
+  doctorName,
+  degree,
+  speciality,
+  qrUrl,
+  profileImage,
+  onLogout,
+  onMenuChange
+}: SocialMediaKitProps) {
   const [activeTab, setActiveTab] = useState<TemplateType>('story');
   const [customText, setCustomText] = useState('Book your appointment online!');
   const [accentColor, setAccentColor] = useState('#10b981'); // Emerald default
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [offerType, setOfferType] = useState<'regular' | 'discount' | 'camp'>('regular');
+  const [discountValue, setDiscountValue] = useState('20%');
+  const [expiryDate, setExpiryDate] = useState('');
+  const [campDetails, setCampDetails] = useState('Location: Kolkata | Date: 20th Feb');
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingProgress, setRecordingProgress] = useState(0);
+  const animationFrameRef = useRef<number | null>(null);
+  const startTimeRef = useRef<number>(0);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -50,14 +70,28 @@ export default function SocialMediaKit({ doctorName, degree, speciality, qrUrl, 
     { id: 'story', name: 'Instagram Story', type: 'story', width: 1080, height: 1920, label: 'Story (9:16)' },
     { id: 'post', name: 'Social Post', type: 'post', width: 1080, height: 1080, label: 'Square Post (1:1)' },
     { id: 'status', name: 'WhatsApp Status', type: 'status', width: 1080, height: 1920, label: 'Status (9:16)' },
+    { id: 'health-tip', name: 'Health Tip', type: 'health-tip', width: 1080, height: 1350, label: 'Portrait (4:5)' },
+    { id: 'reel-animated', name: 'Video Reel', type: 'reel-animated', width: 1080, height: 1920, label: 'Video (9:16)' },
   ];
 
   const currentTemplate = templates.find(t => t.type === activeTab) || templates[0];
 
   // Re-generate preview when dependencies change
   useEffect(() => {
-    generatePreview();
-  }, [activeTab, customText, accentColor, uploadedImage, doctorName, qrUrl]);
+    if (activeTab === 'reel-animated') {
+      startTimeRef.current = Date.now();
+      const runAnimation = () => {
+        generatePreview();
+        animationFrameRef.current = requestAnimationFrame(runAnimation);
+      };
+      runAnimation();
+      return () => {
+        if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+      };
+    } else {
+      generatePreview();
+    }
+  }, [activeTab, customText, accentColor, uploadedImage, doctorName, qrUrl, offerType, discountValue, expiryDate, campDetails]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -71,7 +105,6 @@ export default function SocialMediaKit({ doctorName, degree, speciality, qrUrl, 
   };
 
   const generatePreview = async () => {
-    setIsGenerating(true);
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -90,15 +123,22 @@ export default function SocialMediaKit({ doctorName, degree, speciality, qrUrl, 
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
 
+    const elapsed = (Date.now() - startTimeRef.current) / 1000;
+
     // 2. Draw Uploaded Image or Placeholder Pattern
     if (uploadedImage) {
       try {
         const img = await loadImage(uploadedImage);
         // Cover fit
         const scale = Math.max(width / img.width, height / img.height);
-        const x = (width / 2) - (img.width / 2) * scale;
-        const y = (height / 2) - (img.height / 2) * scale;
-        ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+
+        // Subtle background zoom for animated reels
+        const animScale = activeTab === 'reel-animated' ? 1 + (Math.sin(elapsed * 0.2) * 0.05) : 1;
+        const currentScale = scale * animScale;
+
+        const x = (width / 2) - (img.width / 2) * currentScale;
+        const y = (height / 2) - (img.height / 2) * currentScale;
+        ctx.drawImage(img, x, y, img.width * currentScale, img.height * currentScale);
 
         // Add overlay for text readability
         ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
@@ -109,11 +149,12 @@ export default function SocialMediaKit({ doctorName, degree, speciality, qrUrl, 
     } else {
       // Draw decorative pattern if no image
       ctx.fillStyle = `${accentColor}10`; // Very transparent
-      for (let i = 0; i < width; i += 40) {
-        for (let j = 0; j < height; j += 40) {
+      const offset = activeTab === 'reel-animated' ? elapsed * 20 : 0;
+      for (let i = 0; i < width + 40; i += 40) {
+        for (let j = 0; j < height + 40; j += 40) {
           if ((i + j) % 80 === 0) {
             ctx.beginPath();
-            ctx.arc(i, j, 2, 0, Math.PI * 2);
+            ctx.arc(i, (j + offset) % height, 2, 0, Math.PI * 2);
             ctx.fill();
           }
         }
@@ -173,39 +214,189 @@ export default function SocialMediaKit({ doctorName, degree, speciality, qrUrl, 
     ctx.font = `600 ${width * 0.03}px sans-serif`;
     ctx.fillText((degree + ' • ' + speciality).substring(0, 35), textX, textY + (width * 0.06));
 
-    // 4. Draw Main Custom Text
-    const contentY = headerY + headerHeight + (height * 0.1);
-    ctx.fillStyle = uploadedImage ? '#ffffff' : '#1f2937';
-    ctx.font = `bold ${width * 0.06}px sans-serif`;
-    ctx.textAlign = 'center';
+    // 4. Draw Offer Specific Content
+    if (offerType === 'discount') {
+        const badgeY = headerY + headerHeight + 70;
+        ctx.fillStyle = accentColor;
+        const badgeWidth = width * 0.45;
+        roundRect(ctx, padding, badgeY, badgeWidth, 70, 15);
+        ctx.fill();
 
-    // Text wrapping
-    const maxWidth = width - (padding * 2);
-    const words = customText.split(' ');
-    let line = '';
-    let y = contentY;
-    const lineHeight = width * 0.08;
+        ctx.font = `bold ${width * 0.04}px sans-serif`;
+        ctx.fillStyle = 'white';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('SPECIAL OFFER', padding + (badgeWidth / 2), badgeY + 35);
 
-    if (uploadedImage) {
-        // Add text shadow for readability over image
-        ctx.shadowColor = 'rgba(0,0,0,0.8)';
-        ctx.shadowBlur = 10;
+        // Discount Circle - Professional styling
+        const circleSize = width * 0.28;
+        const circleX = width - padding - (circleSize / 2);
+        const circleY = badgeY + 130;
+
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.1)';
+        ctx.shadowBlur = 15;
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(circleX, circleY, circleSize / 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        ctx.strokeStyle = accentColor;
+        ctx.lineWidth = 12;
+        ctx.beginPath();
+        ctx.arc(circleX, circleY, circleSize / 2, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.fillStyle = accentColor;
+        ctx.font = `bold ${width * 0.08}px sans-serif`;
+        ctx.fillText(discountValue, circleX, circleY - 10);
+        ctx.font = `bold ${width * 0.035}px sans-serif`;
+        ctx.fillText('OFF', circleX, circleY + 35);
+
+        if (expiryDate) {
+            ctx.fillStyle = uploadedImage ? '#ffffff' : '#4b5563';
+            ctx.font = `600 ${width * 0.035}px sans-serif`;
+            ctx.textAlign = 'left';
+            ctx.fillText(`Valid till: ${expiryDate}`, padding, badgeY + 120);
+        }
+    } else if (offerType === 'camp') {
+        const campY = headerY + headerHeight + 60;
+        const campHeight = 180;
+
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.1)';
+        ctx.shadowBlur = 20;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+        roundRect(ctx, padding, campY, width - (padding * 2), campHeight, 20);
+        ctx.fill();
+        ctx.restore();
+
+        ctx.strokeStyle = accentColor;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        roundRect(ctx, padding, campY, width - (padding * 2), campHeight, 20);
+        ctx.stroke();
+
+        ctx.font = `bold ${width * 0.07}px sans-serif`;
+        ctx.fillStyle = accentColor;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('FREE HEALTH CAMP', width / 2, campY + (campHeight * 0.4));
+
+        ctx.font = `600 ${width * 0.038}px sans-serif`;
+        ctx.fillStyle = '#334155';
+        ctx.fillText(campDetails, width / 2, campY + (campHeight * 0.75));
+    } else if (activeTab === 'health-tip') {
+        const cardWidth = width - (padding * 2);
+        const cardHeight = height * 0.5;
+        const cardY = headerY + headerHeight + 50;
+
+        // Medical Card Background
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.1)';
+        ctx.shadowBlur = 30;
+        ctx.shadowOffsetY = 15;
+        ctx.fillStyle = '#ffffff';
+        roundRect(ctx, padding, cardY, cardWidth, cardHeight, 30);
+        ctx.fill();
+        ctx.restore();
+
+        // Tip Header
+        ctx.fillStyle = accentColor;
+        ctx.font = `600 ${width * 0.03}px sans-serif`;
+        ctx.textAlign = 'left';
+        ctx.fillText('HEALTH ADVICE', padding + 40, cardY + 60);
+
+        ctx.fillStyle = '#111827';
+        ctx.font = `bold ${width * 0.055}px sans-serif`;
+        ctx.fillText('Doctor\'s Tip', padding + 40, cardY + 105);
+
+        // Divider line
+        ctx.strokeStyle = `${accentColor}40`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(padding + 40, cardY + 135);
+        ctx.lineTo(padding + 120, cardY + 135);
+        ctx.stroke();
+
+        // Tip Content
+        ctx.fillStyle = '#374151';
+        ctx.font = `500 ${width * 0.045}px sans-serif`;
+
+        const words = customText.split(' ');
+        let line = '';
+        let y = cardY + 190;
+        const lineHeight = width * 0.065;
+        const maxWidth = cardWidth - 80;
+
+        for(let n = 0; n < words.length; n++) {
+            const testLine = line + words[n] + ' ';
+            const metrics = ctx.measureText(testLine);
+            const testWidth = metrics.width;
+            if (testWidth > maxWidth && n > 0) {
+                ctx.fillText(line, padding + 40, y);
+                line = words[n] + ' ';
+                y += lineHeight;
+            } else {
+                line = testLine;
+            }
+        }
+        ctx.fillText(line, padding + 40, y);
+
+        // Disclaimer
+        ctx.fillStyle = '#9ca3af';
+        ctx.font = `400 ${width * 0.025}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText('Consult for professional advice.', width/2, cardY + cardHeight - 30);
     }
 
-    for(let n = 0; n < words.length; n++) {
-      const testLine = line + words[n] + ' ';
-      const metrics = ctx.measureText(testLine);
-      const testWidth = metrics.width;
-      if (testWidth > maxWidth && n > 0) {
-        ctx.fillText(line, width/2, y);
-        line = words[n] + ' ';
-        y += lineHeight;
-      } else {
-        line = testLine;
+    // 5. Draw Main Custom Text - SKIP FOR HEALTH TIPS (already in card)
+    if (activeTab !== 'health-tip') {
+      const contentY = offerType === 'regular'
+          ? headerY + headerHeight + (height * 0.1)
+          : headerY + headerHeight + (height * 0.22);
+
+      // Animation: Slide and Fade for Video Reels
+      let alpha = 1;
+      let xOffset = 0;
+      if (activeTab === 'reel-animated') {
+          alpha = Math.min(1, elapsed * 1.5);
+          xOffset = Math.max(0, 50 - elapsed * 100);
       }
+
+      ctx.fillStyle = uploadedImage ? `rgba(255, 255, 255, ${alpha})` : `rgba(31, 41, 55, ${alpha})`;
+      ctx.font = `bold ${width * 0.06}px sans-serif`;
+      ctx.textAlign = 'center';
+
+      // Text wrapping
+      const maxWidth = width - (padding * 2);
+      const words = customText.split(' ');
+      let line = '';
+      let y = contentY;
+      const lineHeight = width * 0.08;
+
+      if (uploadedImage) {
+          // Add text shadow for readability over image
+          ctx.shadowColor = `rgba(0,0,0,${0.8 * alpha})`;
+          ctx.shadowBlur = 10;
+      }
+
+      for(let n = 0; n < words.length; n++) {
+        const testLine = line + words[n] + ' ';
+        const metrics = ctx.measureText(testLine);
+        const testWidth = metrics.width;
+        if (testWidth > maxWidth && n > 0) {
+          ctx.fillText(line, (width/2) + xOffset, y);
+          line = words[n] + ' ';
+          y += lineHeight;
+        } else {
+          line = testLine;
+        }
+      }
+      ctx.fillText(line, (width/2) + xOffset, y);
+      ctx.shadowBlur = 0; // Reset shadow
     }
-    ctx.fillText(line, width/2, y);
-    ctx.shadowBlur = 0; // Reset shadow
 
     // 5. Draw QR Code Section (Bottom Card)
     const footerHeight = height * 0.35;
@@ -229,10 +420,15 @@ export default function SocialMediaKit({ doctorName, degree, speciality, qrUrl, 
         });
         const qrImg = await loadImage(qrDataUrl);
         const qrSize = footerHeight * 0.65;
-        const qrX = (width - qrSize) / 2;
-        const qrY = footerY + (footerHeight - qrSize) / 2 - 20;
 
-        ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
+        // Pulse animation for QR
+        const qrAnim = activeTab === 'reel-animated' ? 1 + (Math.sin(elapsed * 2) * 0.03) : 1;
+        const currentQrSize = qrSize * qrAnim;
+
+        const qrX = (width - currentQrSize) / 2;
+        const qrY = footerY + (footerHeight - currentQrSize) / 2 - 20;
+
+        ctx.drawImage(qrImg, qrX, qrY, currentQrSize, currentQrSize);
 
         // "Scan to Book" Text
         ctx.fillStyle = '#374151';
@@ -251,7 +447,6 @@ export default function SocialMediaKit({ doctorName, degree, speciality, qrUrl, 
 
     // Set preview URL for display
     setPreviewUrl(canvas.toDataURL('image/png'));
-    setIsGenerating(false);
   };
 
   const loadImage = (src: string): Promise<HTMLImageElement> => {
@@ -322,8 +517,76 @@ export default function SocialMediaKit({ doctorName, degree, speciality, qrUrl, 
     }
   };
 
+  const captureVideo = async () => {
+    const canvas = canvasRef.current;
+    if (!canvas || isRecording) return;
+
+    setIsRecording(true);
+    setRecordingProgress(0);
+
+    // Check supported mime types
+    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+        ? 'video/webm;codecs=vp9'
+        : 'video/webm';
+
+    const stream = canvas.captureStream(30);
+    const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: mimeType,
+        videoBitsPerSecond: 5000000 // 5Mbps
+    });
+
+    const chunks: Blob[] = [];
+    mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
+    mediaRecorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `HealQR-Reel-${Date.now()}.webm`;
+        link.click();
+        setIsRecording(false);
+        setRecordingProgress(0);
+        toast.success('Video Reel exported!');
+    };
+
+    mediaRecorder.start();
+
+    // Record for 5 seconds
+    let progress = 0;
+    const interval = setInterval(() => {
+        progress += 2;
+        setRecordingProgress(progress);
+        if (progress >= 100) {
+            clearInterval(interval);
+            mediaRecorder.stop();
+        }
+    }, 100);
+  };
+
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   return (
-    <div className="flex flex-col lg:flex-row gap-8 max-w-7xl mx-auto p-6">
+    <div className="min-h-screen bg-black text-white flex">
+      <DashboardSidebar
+        activeMenu="social-kit"
+        onMenuChange={onMenuChange || (() => {})}
+        onLogout={onLogout}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
+
+      <div className="flex-1 lg:ml-64">
+        <div className="border-b border-zinc-800 px-6 py-4 flex items-center gap-4">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="lg:hidden text-white hover:text-emerald-500 transition-colors"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+          <h1>Social Kit & Offers</h1>
+        </div>
+
+        <div className="flex flex-col lg:flex-row gap-8 max-w-7xl mx-auto p-6">
       {/* Settings Panel */}
       <div className="w-full lg:w-1/3 space-y-6">
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
@@ -337,27 +600,100 @@ export default function SocialMediaKit({ doctorName, degree, speciality, qrUrl, 
             <div className="space-y-3">
               <Label className="text-gray-400">Select Format</Label>
               <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TemplateType)} className="w-full">
-                <TabsList className="grid grid-cols-3 bg-black border border-zinc-800">
-                  <TabsTrigger value="story">Story</TabsTrigger>
-                  <TabsTrigger value="post">Post</TabsTrigger>
-                  <TabsTrigger value="status">Status</TabsTrigger>
+                <TabsList className="grid grid-cols-5 bg-black border border-zinc-800">
+                  <TabsTrigger value="story" className="text-zinc-400">Story</TabsTrigger>
+                  <TabsTrigger value="post" className="text-zinc-400">Post</TabsTrigger>
+                  <TabsTrigger value="status" className="text-zinc-400">Status</TabsTrigger>
+                  <TabsTrigger value="health-tip" className="text-zinc-400">Tip 💡</TabsTrigger>
+                  <TabsTrigger value="reel-animated" className="text-emerald-400">Reel 🎬</TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
+
+            {/* Campaign Type - Hidden for Tips */}
+            {activeTab !== 'health-tip' && (
+              <div className="space-y-3">
+                <Label className="text-gray-400 flex items-center gap-2">
+                  <Layout className="w-4 h-4" /> Campaign Type
+                </Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['regular', 'discount', 'camp'] as const).map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => setOfferType(type)}
+                      className={`px-2 py-2 rounded-lg text-[10px] font-bold uppercase transition-all border ${
+                        offerType === type
+                          ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
+                          : 'bg-black border-zinc-800 text-gray-500 hover:border-zinc-700'
+                      }`}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {offerType === 'discount' && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-[10px] text-gray-500 uppercase">Discount</Label>
+                  <Input
+                    value={discountValue}
+                    onChange={(e) => setDiscountValue(e.target.value)}
+                    placeholder="e.g. 20%"
+                    className="bg-black border-zinc-800 text-white text-sm"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] text-gray-500 uppercase">Valid Till</Label>
+                  <Input
+                    value={expiryDate}
+                    onChange={(e) => setExpiryDate(e.target.value)}
+                    placeholder="e.g. 28 Feb"
+                    className="bg-black border-zinc-800 text-white text-sm"
+                  />
+                </div>
+              </div>
+            )}
+
+            {offerType === 'camp' && (
+              <div className="space-y-3">
+                <Label className="text-gray-400 flex items-center gap-2">
+                  <Layout className="w-4 h-4" /> Camp Details
+                </Label>
+                <Input
+                  value={campDetails}
+                  onChange={(e) => setCampDetails(e.target.value)}
+                  placeholder="Venue and Date..."
+                  className="bg-black border-zinc-800 text-white text-sm"
+                />
+              </div>
+            )}
 
             {/* Custom Text */}
             <div className="space-y-3">
               <Label className="text-gray-400 flex items-center gap-2">
                 <Type className="w-4 h-4" /> Message
               </Label>
-              <Input
-                value={customText}
-                onChange={(e) => setCustomText(e.target.value)}
-                placeholder="Enter your message..."
-                className="bg-black border-zinc-800 text-white"
-                maxLength={60}
-              />
-              <p className="text-xs text-gray-500 text-right">{customText.length}/60</p>
+              {activeTab === 'health-tip' ? (
+                <Textarea
+                  value={customText}
+                  onChange={(e) => setCustomText(e.target.value)}
+                  placeholder="Enter health tip (e.g. Drink 3L water daily...)"
+                  className="bg-black border-zinc-800 text-white min-h-[120px]"
+                  maxLength={200}
+                />
+              ) : (
+                <Input
+                  value={customText}
+                  onChange={(e) => setCustomText(e.target.value)}
+                  placeholder="Enter your message..."
+                  className="bg-black border-zinc-800 text-white"
+                  maxLength={60}
+                />
+              )}
+              <p className="text-xs text-gray-500 text-right">{customText.length}/{activeTab === 'health-tip' ? 200 : 60}</p>
             </div>
 
             {/* Background Image */}
@@ -423,22 +759,43 @@ export default function SocialMediaKit({ doctorName, degree, speciality, qrUrl, 
         </div>
 
         {/* Actions */}
-        <div className="grid grid-cols-2 gap-4">
-          <Button
-            onClick={handleShare}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white h-12"
-          >
-            <Share2 className="w-5 h-5 mr-2" />
-            Share Now
-          </Button>
-          <Button
-            onClick={handleDownload}
-            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white h-12"
-          >
-            <Download className="w-5 h-5 mr-2" />
-            Download
-          </Button>
-        </div>
+          {activeTab === 'reel-animated' ? (
+              <Button
+                onClick={captureVideo}
+                disabled={isRecording}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white h-12 col-span-2 relative overflow-hidden"
+              >
+                {isRecording ? (
+                    <>
+                        <div className="absolute inset-0 bg-emerald-500/20" style={{ width: `${recordingProgress}%` }} />
+                        <span className="relative z-10 flex items-center gap-2">
+                             <RefreshCw className="w-5 h-5 animate-spin" /> Recording ({recordingProgress}%)
+                        </span>
+                    </>
+                ) : (
+                    <span className="flex items-center gap-2">
+                        <RefreshCw className="w-5 h-5" /> Export Video Reel
+                    </span>
+                )}
+              </Button>
+          ) : (
+            <>
+                <Button
+                    onClick={handleShare}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white h-12"
+                >
+                    <Share2 className="w-5 h-5 mr-2" />
+                    Share Now
+                </Button>
+                <Button
+                    onClick={handleDownload}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white h-12"
+                >
+                    <Download className="w-5 h-5 mr-2" />
+                    Download
+                </Button>
+            </>
+          )}
       </div>
 
       {/* Preview Panel */}
@@ -464,6 +821,8 @@ export default function SocialMediaKit({ doctorName, degree, speciality, qrUrl, 
           Preview Scale: 1080px (HD)
         </div>
       </div>
+    </div>
+    </div>
     </div>
   );
 }

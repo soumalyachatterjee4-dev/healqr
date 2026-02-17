@@ -3,11 +3,11 @@ import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { Checkbox } from './ui/checkbox';
-import { 
-  Mail, 
-  Calendar, 
-  QrCode, 
-  User, 
+import {
+  Mail,
+  Calendar,
+  QrCode,
+  User,
   MapPin,
   Upload,
   Save,
@@ -23,12 +23,12 @@ import { useState, useEffect } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import ClinicSidebar from './ClinicSidebar';
-import { 
-  AlertDialog, 
-  AlertDialogContent, 
-  AlertDialogDescription, 
-  AlertDialogHeader, 
-  AlertDialogTitle 
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle
 } from './ui/alert-dialog';
 import { auth, storage } from '../lib/firebase/config';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -68,6 +68,7 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
 
   // Editable required field
   const [name, setName] = useState('');
+  const [landmark, setLandmark] = useState('');
 
   // Optional fields
   const [profileImage, setProfileImage] = useState<string | null>(null);
@@ -81,7 +82,7 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  
+
   // Temporary input for adding service
   const [newServiceBadge, setNewServiceBadge] = useState('');
 
@@ -112,6 +113,7 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
         // Non-editable fields
         setEmail(data.email || user.email || '');
         setPinCode(data.pinCode || '');
+        setLandmark(data.landmark || '');
         setQrNumber(data.qrNumber || '');
         setClinicCode(data.clinicCode || '');
 
@@ -163,7 +165,7 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
       const storageRef = ref(storage, filePath);
       await uploadBytes(storageRef, compressedFile);
       console.log('✅ Upload complete');
-      
+
       const downloadURL = await getDownloadURL(storageRef);
       console.log('✅ Download URL obtained:', downloadURL);
       setProfileImage(downloadURL);
@@ -271,11 +273,16 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
       }
 
       const { db } = await import('../lib/firebase/config');
+      if (!db) {
+        alert('Database connection error');
+        return;
+      }
       const { doc, updateDoc } = await import('firebase/firestore');
 
       const clinicDocRef = doc(db, 'clinics', user.uid);
       await updateDoc(clinicDocRef, {
         name: name.trim(),
+        landmark: landmark.trim(),
         profileImage,
         establishmentDate,
         languages: selectedLanguages,
@@ -359,7 +366,7 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
                   </div>
                 )}
               </div>
-              
+
               <div>
                 <Label htmlFor="image-upload" className="cursor-pointer">
                   <div className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg inline-flex items-center gap-2 transition-colors">
@@ -416,6 +423,20 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
                 </div>
               </div>
 
+              {/* Landmark (Read-Only) */}
+              <div>
+                <Label className="mb-2 block text-gray-300">Clinic Landmark</Label>
+                <div className="relative">
+                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                  <Input
+                    type="text"
+                    value={landmark}
+                    disabled
+                    className="pl-12 bg-zinc-950 border-zinc-800 text-gray-500 h-12 rounded-lg cursor-not-allowed"
+                  />
+                </div>
+              </div>
+
               {/* QR Used */}
               {qrNumber && (
                 <div>
@@ -456,6 +477,7 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
             <p className="text-gray-400 text-sm mb-6">Required field - cannot be left empty</p>
 
             <div className="space-y-4">
+
               {/* Clinic Name */}
               <div>
                 <Label className="mb-2 block text-gray-300">
@@ -468,6 +490,23 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Enter clinic name"
+                    className="pl-12 bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Landmark Field (Editable) */}
+              <div className="mt-4">
+                <Label className="mb-2 block text-gray-300">
+                  Update Clinic Landmark <span className="text-gray-500 font-normal ml-1">(helps patient find exact location)</span>
+                </Label>
+                <div className="relative">
+                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <Input
+                    type="text"
+                    value={landmark}
+                    onChange={(e) => setLandmark(e.target.value)}
+                    placeholder="e.g., Near City Hospital"
                     className="pl-12 bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-blue-500"
                   />
                 </div>
@@ -501,15 +540,15 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
                 <p className="text-sm text-gray-400 mb-3">
                   Select all languages your staff can communicate in (max 11)
                 </p>
-                
+
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {AVAILABLE_LANGUAGES.map((lang) => (
                     <div
                       key={lang.value}
                       className={`
                         flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all
-                        ${selectedLanguages.includes(lang.value) 
-                          ? 'bg-blue-500/20 border-blue-500/50 text-blue-400' 
+                        ${selectedLanguages.includes(lang.value)
+                          ? 'bg-blue-500/20 border-blue-500/50 text-blue-400'
                           : 'bg-zinc-800 border-zinc-700 text-gray-400 hover:border-zinc-600'
                         }
                       `}
@@ -562,7 +601,7 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
                 <p className="text-sm text-gray-400 mb-3">
                   Highlight key services available at your clinic (e.g., ECG, Physiotherapy, Echo, X-Ray)
                 </p>
-                
+
                 {/* Display existing service badges */}
                 <div className="flex flex-wrap gap-2 mb-3">
                   {serviceBadges.map((service, index) => (
@@ -585,8 +624,8 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
                 {/* Add new service badge */}
                 {serviceBadges.length < 4 && (
                   <div className="flex gap-2">
-                    <Select 
-                      value={newServiceBadge} 
+                    <Select
+                      value={newServiceBadge}
                       onValueChange={(val) => setNewServiceBadge(val)}
                     >
                       <SelectTrigger className="bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-blue-500 w-full">

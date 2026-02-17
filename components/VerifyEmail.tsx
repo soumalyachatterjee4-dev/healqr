@@ -72,11 +72,11 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
 
       // Try URL params first (most reliable for email links)
       console.log('🔍 Looking for signup data in URL...');
-      
+
       // Try query string first
       let urlParams = new URLSearchParams(window.location.search);
       let encodedData = urlParams.get('data');
-      
+
       // Fallback to hash parameters (Firebase sometimes uses this)
       if (!encodedData) {
         const hashParams = window.location.hash.split('?')[1];
@@ -118,7 +118,7 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
       // Validate we have the required fields based on type
       const isClinic = signupData.type === 'clinic';
       const nameField = isClinic ? (signupData.name || signupData.clinicName) : signupData.name;
-      
+
       if (!nameField) {
         console.error('❌ Name is missing from signup data');
         throw new Error('Name is missing. Please sign up again.');
@@ -168,13 +168,14 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
             console.log('🔵 Creating clinic doc with UID:', user.uid);
             console.log('🔵 Auth UID:', user.uid);
             console.log('🔵 User email verified:', user.emailVerified);
-            
+
             await setDoc(doc(db, 'clinics', user.uid), {
                 uid: user.uid,
                 email: email,
                 name: signupData.clinicName,
                 address: signupData.address || '',
                 pinCode: signupData.pinCode,
+                landmark: signupData.landmark || '',
                 qrNumber: signupData.qrNumber,
                 qrType: signupData.qrType || 'preprinted',
                 clinicCode: clinicCode,
@@ -202,7 +203,7 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
             const qrCodesCollection = collection(db, 'qrCodes');
             const poolQuery = query(qrPoolCollection, where('qrNumber', '==', signupData.qrNumber));
             const codesQuery = query(qrCodesCollection, where('qrNumber', '==', signupData.qrNumber));
-            
+
             const [poolSnapshot, codesSnapshot] = await Promise.all([
               getDocs(poolQuery),
               getDocs(codesQuery)
@@ -236,20 +237,20 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
               qrNumber: signupData.qrNumber,
               bookingUrl: bookingUrl
             };
-            
+
             await generateStyledQR(clinicData);
             setDoctorData(clinicData); // Reuse doctorData state for clinic
-            
+
             setStatus('success');
             setMessage('Clinic verified successfully!');
 
             console.log('✅ Clinic verification complete');
-            
+
             // Auto-redirect to clinic dashboard after showing QR briefly
             setTimeout(() => {
                 window.location.href = '/?page=clinic-dashboard';
             }, 2000);
-            
+
             return;
           }
       }
@@ -332,6 +333,7 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
           dob: signupData.dob || '',
           address: signupData.address || '',
           pinCode: signupData.pinCode || '',
+          landmark: signupData.landmark || '',
           qrNumber: signupData.qrNumber, // Always store the provided QR
           qrType: signupData.qrType || 'preprinted', // QR type (preprinted or virtual)
           companyName: signupData.companyName || '', // Company name for pre-printed QR
@@ -388,12 +390,12 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
               const qrCodesCollection = collection(db, 'qrCodes');
               const poolQuery = query(qrPoolCollection, where('qrNumber', '==', signupData.qrNumber));
               const codesQuery = query(qrCodesCollection, where('qrNumber', '==', signupData.qrNumber));
-              
+
               const [poolSnapshot, codesSnapshot] = await Promise.all([
                 getDocs(poolQuery),
                 getDocs(codesQuery)
               ]);
-              
+
               if (!poolSnapshot.empty) {
                 await updateDoc(poolSnapshot.docs[0].ref, {
                   status: 'active',

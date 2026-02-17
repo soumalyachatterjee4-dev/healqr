@@ -18,7 +18,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import DashboardSidebar from './DashboardSidebar';
 import QRCode from 'qrcode';
 import { toast } from 'sonner';
-import SocialMediaKit from './SocialMediaKit';
 
 interface QRManagerProps {
   onMenuChange?: (menu: string) => void;
@@ -529,24 +528,6 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
 
         <div className="p-6">
           <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">
-            <div className="max-w-7xl mx-auto mb-6">
-              <TabsList className="grid w-full max-w-md grid-cols-2 bg-zinc-900 border border-zinc-800">
-                <TabsTrigger
-                  value="qr-generator"
-                  className="data-[state=active]:bg-emerald-500 data-[state=active]:text-white text-gray-400"
-                >
-                  <QrCode className="w-4 h-4 mr-2" />
-                  QR Generator
-                </TabsTrigger>
-                <TabsTrigger
-                  value="social-media"
-                  className="data-[state=active]:bg-emerald-500 data-[state=active]:text-white text-gray-400"
-                >
-                  <Palette className="w-4 h-4 mr-2" />
-                  Social Media Kit
-                </TabsTrigger>
-              </TabsList>
-            </div>
 
             <TabsContent value="qr-generator" className="mt-0">
               <div className="max-w-7xl mx-auto">
@@ -799,15 +780,6 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
             </div>
           </TabsContent>
 
-          <TabsContent value="social-media" className="mt-0">
-            <SocialMediaKit
-              doctorName={doctorName}
-              degree={degree}
-              speciality={speciality}
-              qrUrl={qrUrl}
-              profileImage={doctorImage}
-            />
-          </TabsContent>
 
         </Tabs>
       </div>
