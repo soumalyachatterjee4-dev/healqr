@@ -1,17 +1,19 @@
-// 🔔 FCM NOTIFICATION SERVICE - ACTIVE IMPLEMENTATION
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { app } from '../lib/firebase/config';
-import { saveNotificationHistory, NotificationRecord } from './notificationHistoryService';
+import { saveNotificationHistory } from './notificationHistoryService';
 
-const functions = getFunctions(app);
+const functions = getFunctions(app!);
 
-const normalizePatientTarget = (rawPhone: string) => {
-  // Keep last 10 digits; strip non-digits and leading 91/\+91
-  const digits = (rawPhone || '').replace(/\D/g, '');
+// Ensure patient target format is consistent
+const normalizePatientTarget = (phoneOrId: string) => {
+  // Strip non-digits conditionally so "patient_..." is handled properly
+  const digits = (phoneOrId || '').replace(/\D/g, '');
   const trimmed = digits.replace(/^91/, '');
   const phone10 = trimmed.slice(-10);
-  const userId = `patient_${phone10}`;
-  return { userId, phone10 };
+  return {
+    userId: `patient_${phone10}`,
+    phone10
+  };
 };
 
 const sendFCM = async (payload: { userId: string; title: string; body: string; data?: Record<string, any> }) => {
@@ -21,11 +23,11 @@ const sendFCM = async (payload: { userId: string; title: string; body: string; d
       title: payload.title,
       type: payload.data?.type
     });
-    
+
     const sendFCMNotification = httpsCallable(functions, 'sendFCMNotification');
     const result = await sendFCMNotification(payload);
     const res: any = result.data;
-    
+
     if (res?.success === false) {
       console.warn('⚠️ FCM send failed (patient may not have registered for notifications):', res.error);
       console.warn('💡 To fix: Patient needs to enable notifications after booking. Check BookingConfirmation component.');
@@ -141,7 +143,9 @@ export const sendConsultationCompleted = async (data: any) => {
       consultationDate: data.consultationDate,
       consultationTime: data.consultationTime,
       phone: phone10,
-      url: `https://healqr-27726.web.app/?${params.toString()}`,
+      url: data.rxUrl || data.dietUrl
+        ? `https://teamhealqr.web.app/?page=consultation-completed&bookingId=${data.bookingId}&rxUrl=${encodeURIComponent(data.rxUrl || '')}&dietUrl=${encodeURIComponent(data.dietUrl || '')}&doctorName=${encodeURIComponent(data.doctorName)}&patientName=${encodeURIComponent(data.patientName)}&clinicName=${encodeURIComponent(data.clinicName || '')}&consultationDate=${encodeURIComponent(data.consultationDate || '')}&consultationTime=${encodeURIComponent(data.consultationTime || '')}`
+        : `https://healqr-27726.web.app/?${params.toString()}`,
     },
   });
 
@@ -173,6 +177,7 @@ export const sendConsultationCompleted = async (data: any) => {
       metadata: {
         isWalkIn: data.isWalkIn,
         walkInVerified: data.walkInVerified,
+        rxUrl: data.rxUrl,
       }
     });
     console.log('✅ Notification stored in Firestore for patient:', phone10);
@@ -184,7 +189,7 @@ export const sendConsultationCompleted = async (data: any) => {
   // Save to notification history
   const expiryDate = new Date();
   expiryDate.setDate(expiryDate.getDate() + 120); // 120 days retention
-  
+
   await saveNotificationHistory({
     patientPhone: phone10,
     patientName: data.patientName || 'Patient',
@@ -261,11 +266,11 @@ export const scheduleReviewRequest = async (data: any, seenAt: Date) => {
       url: `https://healqr-27726.web.app/?page=review-request&patientName=${encodeURIComponent(data.patientName)}&doctorName=${encodeURIComponent(data.doctorName)}&date=${encodeURIComponent(data.consultationDate)}&language=${encodeURIComponent(data.language || 'english')}`,
     },
   });
-  
+
   // Save to notification history with template data
   const expiryDate = new Date();
   expiryDate.setDate(expiryDate.getDate() + 120); // 120 days retention
-  
+
   await saveNotificationHistory({
     patientPhone: phone10,
     patientName: data.patientName || 'Patient',
@@ -304,7 +309,7 @@ export const scheduleReviewRequest = async (data: any, seenAt: Date) => {
       reviewSubmitted: false
     }
   });
-  
+
   return result;
 };
 
@@ -340,7 +345,7 @@ export const sendFollowUp = async (data: any) => {
   // Save to notification history
   const expiryDate = new Date();
   expiryDate.setDate(expiryDate.getDate() + 120); // 120 days retention
-  
+
   await saveNotificationHistory({
     patientPhone: phone10,
     patientName: data.patientName || 'Patient',
@@ -383,14 +388,24 @@ export const sendFollowUp = async (data: any) => {
   // 💾 ALWAYS STORE IN FIRESTORE (regardless of FCM success/failure)
   try {
     const { storeNotification } = await import('./patientNotificationStorage');
+    const followUpParams = new URLSearchParams({
+      page: 'follow-up',
+      doctorId: data.doctorId || '',
+      patientName: data.patientName || '',
+      doctorName: data.doctorName || '',
+      message: data.customMessage || '',
+      date: data.followUpDate || '',
+      language: data.language || 'english'
+    });
+
     await storeNotification({
       patientPhone: phone10,
       patientName: data.patientName || 'Patient',
       patientAge: data.age,
       patientGender: data.sex,
-      type: 'appointment_cancelled',
-      title: '❌ Appointment Cancelled',
-      message: data.message || 'Your appointment has been cancelled. Please contact the clinic for details.',
+      type: 'follow_up',
+      title: '📅 Follow-up Reminder',
+      message: data.customMessage || 'Your doctor has scheduled a follow-up. Please check your appointment.',
       bookingId: data.bookingId || '',
       doctorId: data.doctorId,
       doctorName: data.doctorName || 'Doctor',
@@ -398,9 +413,9 @@ export const sendFollowUp = async (data: any) => {
       doctorPhoto: data.doctorPhoto,
       chamberName: data.clinicName || data.chamber,
       chamberAddress: data.chamberAddress,
-      appointmentDate: data.appointmentDate,
-      appointmentTime: data.appointmentTime,
-      serialNumber: data.tokenNumber,
+      appointmentDate: data.followUpDate,
+      appointmentTime: '',
+      serialNumber: '',
       purpose: data.purpose,
       fcmAttempted: true,
       fcmSuccess: result?.success !== false,
@@ -408,22 +423,21 @@ export const sendFollowUp = async (data: any) => {
       fcmToken: result?.fcmToken,
       // Store full template URL for viewing
       metadata: {
-        templateUrl: `https://healqr-27726.web.app/?${params.toString()}`,
-        cancellationReason: data.message,
+        templateUrl: `https://healqr-27726.web.app/?${followUpParams.toString()}`,
+        followUpMessage: data.customMessage,
         language: data.language || 'english'
       }
     });
-    console.log('✅ Cancellation notification stored in Firestore');
+    console.log('✅ Follow-up notification stored in Firestore');
   } catch (error) {
-    console.error('❌ Failed to store cancellation notification:', error);
-    // Don't fail the whole operation if storage fails
+    console.error('❌ Failed to store follow-up notification:', error);
   }
   return result;
 };
 
 export const sendAppointmentCancelled = async (data: any) => {
   const { userId, phone10 } = normalizePatientTarget(data.patientPhone);
-  
+
   const params = new URLSearchParams({
     page: 'appointment-cancelled',
     bookingId: data.bookingId || '',
@@ -450,7 +464,7 @@ export const sendAppointmentCancelled = async (data: any) => {
   // Save to notification history
   const expiryDate = new Date();
   expiryDate.setDate(expiryDate.getDate() + 120); // 120 days retention
-  
+
   await saveNotificationHistory({
     patientPhone: phone10,
     patientName: data.patientName || 'Patient',
@@ -504,7 +518,7 @@ export const sendAppointmentCancelled = async (data: any) => {
       patientName: data.patientName || 'Patient',
       patientAge: data.age,
       patientGender: data.sex,
-      type: 'appointment_cancelled',
+      type: 'booking_cancelled',
       title: '❌ Appointment Cancelled',
       message: data.message || 'Your appointment has been cancelled. Please contact the clinic for details.',
       bookingId: data.bookingId || '',
@@ -540,7 +554,7 @@ export const sendAppointmentCancelled = async (data: any) => {
 
 export const sendAppointmentRestored = async (data: any) => {
   const { userId, phone10 } = normalizePatientTarget(data.patientPhone);
-  
+
   const params = new URLSearchParams({
     page: 'appointment-restored',
     bookingId: data.bookingId || '',
@@ -597,7 +611,7 @@ export const sendAppointmentRestored = async (data: any) => {
       patientName: data.patientName || 'Patient',
       patientAge: data.age,
       patientGender: data.sex,
-      type: 'appointment_restored',
+      type: 'booking_restored',
       title: '✅ Appointment Restored',
       message: data.message || 'Your appointment has been restored and confirmed again.',
       bookingId: data.bookingId || '',
@@ -632,18 +646,18 @@ export const sendAppointmentRestored = async (data: any) => {
 };
 
 export const sendBatchCancellation = async (
-  patients: any[], 
-  doctorInfo: any, 
-  chamberName: string, 
+  patients: any[],
+  doctorInfo: any,
+  chamberName: string,
   type: 'chamber' | 'global',
   bookingDetails?: any
 ) => {
   let sent = 0; let failed = 0;
-  
+
   // Get today's date
   const today = new Date();
   const todayStr = today.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-  
+
   for (const p of patients) {
     try {
       await sendAppointmentCancelled({
@@ -654,7 +668,7 @@ export const sendBatchCancellation = async (
         appointmentTime: bookingDetails?.appointmentTime || '',
         chamber: chamberName,
         bookingId: bookingDetails?.bookingId || '',
-        message: type === 'chamber' 
+        message: type === 'chamber'
           ? `Your appointment at ${chamberName} has been cancelled by doctor (Chamber Suspended)`
           : `Your appointment has been cancelled by doctor (Global Suspension)`,
         scope: type,
@@ -670,18 +684,18 @@ export const sendBatchCancellation = async (
 };
 
 export const sendBatchRestoration = async (
-  patients: any[], 
-  doctorInfo: any, 
-  chamberName: string, 
+  patients: any[],
+  doctorInfo: any,
+  chamberName: string,
   type: 'chamber' | 'global',
   bookingDetails?: any
 ) => {
   let sent = 0; let failed = 0;
-  
+
   // Get today's date
   const today = new Date();
   const todayStr = today.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-  
+
   for (const p of patients) {
     try {
       await sendAppointmentRestored({
@@ -693,7 +707,7 @@ export const sendBatchRestoration = async (
         chamber: chamberName,
         bookingId: bookingDetails?.bookingId || '',
         tokenNumber: p.tokenNumber || bookingDetails?.tokenNumber || '#1',
-        message: type === 'chamber' 
+        message: type === 'chamber'
           ? `Your appointment at ${chamberName} has been restored and confirmed`
           : `Your appointment has been restored and confirmed (Chamber Reactivated)`,
         scope: type,
@@ -806,6 +820,157 @@ export const scheduleBookingReminder = async (data: any) => {
   });
 };
 
+export const sendVideoCallLink = async (data: any) => {
+  const { userId, phone10 } = normalizePatientTarget(data.patientPhone);
+
+  const params = new URLSearchParams({
+    page: 'video-call',
+    bookingId: data.bookingId || '',
+    patientName: data.patientName || '',
+    doctorName: data.doctorName || '',
+    language: data.language || 'english'
+  });
+
+  const result = await sendFCM({
+    userId,
+    title: '🎥 Join Video Consultation',
+    body: `Dr. ${data.doctorName} is ready for your video consultation. Click to join now!`,
+    data: {
+      type: 'video_call_link',
+      bookingId: data.bookingId,
+      phone: phone10,
+      url: `https://healqr-27726.web.app/?${params.toString()}`,
+    },
+  });
+
+  // 💾 ALWAYS STORE IN FIRESTORE
+  try {
+    const { storeNotification } = await import('./patientNotificationStorage');
+    await storeNotification({
+      patientPhone: phone10,
+      patientName: data.patientName || 'Patient',
+      patientAge: data.age,
+      patientGender: data.sex,
+      type: 'video_call_link',
+      title: '🎥 Join Video Consultation',
+      message: `Dr. ${data.doctorName} is ready for your video consultation. Click to join now!`,
+      bookingId: data.bookingId || '',
+      doctorId: data.doctorId,
+      doctorName: data.doctorName || 'Doctor',
+      doctorSpecialty: data.doctorSpecialty,
+      doctorPhoto: data.doctorPhoto,
+      chamberName: data.clinicName || data.chamber,
+      chamberAddress: data.chamberAddress,
+      appointmentDate: data.appointmentDate,
+      appointmentTime: data.appointmentTime,
+      serialNumber: data.serialNumber,
+      purpose: data.purpose,
+      fcmAttempted: true,
+      fcmSuccess: result?.success !== false,
+      fcmError: result?.error,
+      fcmToken: result?.fcmToken,
+      metadata: {
+        templateUrl: `https://healqr-27726.web.app/?${params.toString()}`,
+        language: data.language || 'english'
+      }
+    });
+    console.log('✅ Video call notification stored in Firestore');
+  } catch (error) {
+    console.error('❌ Failed to store video call notification:', error);
+  }
+
+  // Save to notification history
+  await saveNotificationHistory({
+    patientPhone: phone10,
+    patientName: data.patientName || 'Patient',
+    doctorName: data.doctorName || 'Doctor',
+    notificationType: 'video_call_link',
+    bookingStatus: 'confirmed',
+    notificationStatus: result?.success === false ? 'failed' : 'sent',
+    timestamp: new Date(),
+    consultationDate: data.appointmentDate || '',
+    consultationTime: data.appointmentTime || '',
+    bookingId: data.bookingId,
+    doctorId: data.doctorId,
+    language: data.language || 'english'
+  });
+
+  return result;
+};
+
+export const scheduleVideoCallLink = async (data: any, appointmentTime: Date) => {
+  const { userId, phone10 } = normalizePatientTarget(data.patientPhone);
+
+  // Schedule 30 minutes before appointment
+  const sendAt = new Date(appointmentTime.getTime() - 30 * 60 * 1000);
+
+  // If we are already past the 30-minute mark, just send it immediately by setting sendAt to now
+  const now = new Date();
+  const finalSendAt = sendAt < now ? now : sendAt;
+
+  const params = new URLSearchParams({
+    page: 'video-call',
+    bookingId: data.bookingId || '',
+    patientName: data.patientName || '',
+    doctorName: data.doctorName || '',
+    language: data.language || 'english'
+  });
+
+  const result = await scheduleFCM({
+    userId,
+    sendAt: finalSendAt,
+    title: '🎥 Join Video Consultation',
+    body: `Dr. ${data.doctorName} will be ready for your video consultation soon. Click inside to get ready!`,
+    data: {
+      type: 'video_call_link',
+      bookingId: data.bookingId,
+      phone: phone10,
+      url: `https://healqr-27726.web.app/?${params.toString()}`,
+    },
+  });
+
+  // Store basic info in Firestore that link is scheduled
+  try {
+    const { storeNotification } = await import('./patientNotificationStorage');
+    await storeNotification({
+      patientPhone: phone10,
+      patientName: data.patientName || 'Patient',
+      type: 'video_call_link',
+      title: '🎥 Video Consultation Scheduled',
+      message: `Link automatically scheduled for 30 minutes before your appointment.`,
+      bookingId: data.bookingId || '',
+      doctorId: data.doctorId,
+      doctorName: data.doctorName || 'Doctor',
+      chamberName: data.clinicName || data.chamber,
+      appointmentDate: data.appointmentDate,
+      appointmentTime: data.appointmentTime,
+      fcmAttempted: true,
+      fcmSuccess: result?.success !== false,
+      fcmError: result?.error,
+    });
+  } catch (error) {
+    console.error('❌ Failed to store scheduled video call notification:', error);
+  }
+
+  // Save to notification history
+  await saveNotificationHistory({
+    patientPhone: phone10,
+    patientName: data.patientName || 'Patient',
+    doctorName: data.doctorName || 'Doctor',
+    notificationType: 'video_call_link', // reusing the type
+    bookingStatus: 'confirmed',
+    notificationStatus: result?.success === false ? 'failed' : 'pending',
+    timestamp: new Date(),
+    consultationDate: data.appointmentDate || '',
+    consultationTime: data.appointmentTime || '',
+    bookingId: data.bookingId,
+    doctorId: data.doctorId,
+    language: data.language || 'english'
+  });
+
+  return result;
+};
+
 // 🚨 ADMIN ALERT - Send to Doctor when patients not marked seen after chamber end
 export const sendAdminAlert = async (data: {
   doctorId: string;
@@ -818,11 +983,11 @@ export const sendAdminAlert = async (data: {
 }) => {
   // Send to doctor (not patient)
   const doctorUserId = `doctor_${data.doctorId}`;
-  
+
   console.log('🚨 Sending admin alert to doctor:', doctorUserId);
-  
+
   const patientList = data.unmarkedPatients.map(p => p.name).join(', ');
-  
+
   return sendFCM({
     userId: doctorUserId,
     title: '🚨 URGENT ADMIN ALERT',

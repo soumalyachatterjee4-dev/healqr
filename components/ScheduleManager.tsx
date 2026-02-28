@@ -15,12 +15,24 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { decrypt } from '../utils/encryptionService';
 
 interface ScheduleManagerProps {
+  doctorName?: string;
+  email?: string;
   onMenuChange?: (menu: string) => void;
   onLogout?: () => void;
   activeAddOns?: string[];
+  isSidebarCollapsed?: boolean;
+  setIsSidebarCollapsed?: (collapsed: boolean) => void;
 }
 
-export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns = [] }: ScheduleManagerProps) {
+export default function ScheduleManager({
+  doctorName,
+  email,
+  onMenuChange,
+  onLogout,
+  activeAddOns = [],
+  isSidebarCollapsed = false,
+  setIsSidebarCollapsed
+}: ScheduleManagerProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [doctorId, setDoctorId] = useState<string>('');
   const [, setLoading] = useState(true);
@@ -51,8 +63,8 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
           if (data.plannedOffPeriods && Array.isArray(data.plannedOffPeriods)) {
             const periods = data.plannedOffPeriods.map((p: any) => ({
               ...p,
-              startDate: p.startDate?.toDate ? p.startDate.toDate().toISOString().split('T')[0] : p.startDate,
-              endDate: p.endDate?.toDate ? p.endDate.toDate().toISOString().split('T')[0] : p.endDate,
+              startDate: (p.startDate as any)?.toDate ? (p.startDate as any).toDate().toISOString().split('T')[0] : p.startDate,
+              endDate: (p.endDate as any)?.toDate ? (p.endDate as any).toDate().toISOString().split('T')[0] : p.endDate,
             }));
             setAllPeriods(periods);
           }
@@ -1451,10 +1463,12 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
         onMenuChange={onMenuChange || (() => {})}
         onLogout={onLogout}
         activeAddOns={activeAddOns}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => setIsSidebarCollapsed?.(!isSidebarCollapsed)}
       />
 
       {/* Main Content */}
-      <div className="lg:ml-64">
+      <div className={`transition-all duration-300 ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`}>
         {/* Top Bar */}
         <div className="border-b border-gray-800 bg-[#0a0f1a]/80 backdrop-blur-sm sticky top-0 z-40">
           <div className="px-4 lg:px-8 py-4 flex items-center justify-between">
@@ -2075,27 +2089,28 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
                   <Card key={schedule.id} className="bg-gray-800/50 border-gray-700 p-6">
                     <div className="space-y-4">
                       {/* Header with Days Pills and Toggle */}
-                      <div className="flex items-start justify-between gap-4">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                         <div className="flex flex-wrap gap-2 flex-1">
                           {schedule.days.map((day) => (
                             <span
                               key={day}
-                              className="px-3 py-1 bg-emerald-500/20 border border-emerald-500/30 rounded-full text-emerald-400 text-sm"
+                              className="px-3 py-1 bg-emerald-500/20 border border-emerald-500/30 rounded-full text-emerald-400 text-xs sm:text-sm"
                             >
                               {day}
                             </span>
                           ))}
-                          <span className="px-3 py-1 bg-gray-700/50 border border-gray-600 rounded-full text-gray-400 text-sm">
+                          <span className="px-3 py-1 bg-gray-700/50 border border-gray-600 rounded-full text-gray-400 text-xs sm:text-sm">
                             {schedule.frequency}
                           </span>
                         </div>
-                        <div className="flex items-center gap-3 flex-shrink-0">
-                          <span className={`text-sm ${schedule.isActive !== false ? 'text-emerald-400' : 'text-gray-500'}`}>
+                        <div className="flex items-center gap-3 flex-shrink-0 self-end sm:self-auto">
+                          <span className={`text-xs sm:text-sm font-bold uppercase tracking-wider ${schedule.isActive !== false ? 'text-emerald-400' : 'text-zinc-500'}`}>
                             {schedule.isActive !== false ? 'Active' : 'Inactive'}
                           </span>
                           <Switch
                             checked={schedule.isActive !== false}
                             onCheckedChange={() => handleToggleChamber(schedule.id)}
+                            className="bg-zinc-700"
                           />
                         </div>
                       </div>
@@ -2105,18 +2120,18 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
                         <div className="flex items-start gap-3">
                           <MapPin className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
                           <div>
-                            <p className="text-white text-sm">{schedule.chamberName}</p>
-                            <p className="text-gray-400 text-sm">{schedule.chamberAddress}</p>
+                            <p className="text-white text-sm font-bold uppercase tracking-tight">{schedule.chamberName}</p>
+                            <p className="text-zinc-300 text-sm font-medium">{schedule.chamberAddress}</p>
                           </div>
                         </div>
 
                         <div className="flex items-start gap-3">
                           <Clock className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
                           <div>
-                            <p className="text-white text-sm">
+                            <p className="text-white text-sm font-bold">
                               {schedule.startTime} - {schedule.endTime}
                             </p>
-                            <p className="text-gray-400 text-sm">Working Hours</p>
+                            <p className="text-zinc-400 text-xs font-bold uppercase tracking-widest">Working Hours</p>
                           </div>
                         </div>
                       </div>
@@ -2224,30 +2239,30 @@ export default function ScheduleManager({ onMenuChange, onLogout, activeAddOns =
                       )}
 
                       {/* Capacity & Actions */}
-                      <div className="flex items-center justify-between pt-4 border-t border-gray-700">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-4 border-t border-gray-700">
                         <div className="flex items-center gap-2">
-                          <Users className="w-5 h-5 text-gray-400" />
-                          <span className="text-white text-sm">{schedule.maxCapacity}</span>
-                          <span className="text-gray-400 text-sm">patients/day</span>
+                          <Users className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
+                          <span className="text-white text-sm font-bold">{schedule.maxCapacity}</span>
+                          <span className="text-gray-400 text-xs sm:text-sm lowercase">patients/day</span>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
                           <Button
                             onClick={() => handleEditSchedule(schedule)}
                             variant="outline"
                             size="sm"
-                            className="border-gray-700 text-gray-300 hover:bg-gray-900 hover:text-white"
+                            className="flex-1 sm:flex-none border-gray-700 text-gray-300 hover:bg-gray-900 hover:text-white h-9 px-3"
                           >
-                            <Pencil className="w-4 h-4 mr-2" />
+                            <Pencil className="w-3.5 h-3.5 mr-2" />
                             EDIT
                           </Button>
                           <Button
                             onClick={() => handleDeleteSchedule(schedule.id)}
                             variant="outline"
                             size="sm"
-                            className="border-red-900/50 text-red-400 hover:bg-red-950 hover:text-red-300"
+                            className="flex-1 sm:flex-none border-red-900/50 text-red-400 hover:bg-red-950 hover:text-red-300 h-9 px-3"
                           >
-                            <Trash2 className="w-4 h-4 mr-2" />
+                            <Trash2 className="w-3.5 h-3.5 mr-2" />
                             DELETE
                           </Button>
                         </div>

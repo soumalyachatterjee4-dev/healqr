@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "teamhealqr"
-  }
+  },
+  "targets": {
+    "teamhealqr": {
+      "hosting": {
+        "teamhealqr": [
+          "teamhealqr"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

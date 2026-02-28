@@ -1,4 +1,4 @@
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, Download } from 'lucide-react';
 import { translations, getLanguageFromCode, type LanguageCode } from '../utils/translations';
 import TemplateDisplay from './TemplateDisplay';
 
@@ -13,10 +13,10 @@ interface ConsultationCompletedNotificationProps {
   clinicName?: string;
   consultationDate?: string;
   consultationTime?: string;
+  rxUrl?: string; // New prop for prescription link
 }
 
 export default function ConsultationCompletedNotification({
-  bookingId,
   language = 'en',
   patientName = 'Rahul Kumar',
   doctorName = 'Dr. Anika Sharma',
@@ -26,9 +26,10 @@ export default function ConsultationCompletedNotification({
   clinicName = 'Health Care Clinic',
   consultationDate = 'October 10, 2025',
   consultationTime = '09:30 AM',
+  rxUrl,
 }: ConsultationCompletedNotificationProps) {
-  const lang = getLanguageFromCode(language);
-  
+  const lang = getLanguageFromCode(language) as any;
+
   return (
     <div className="flex items-center justify-center py-8">
       {/* Phone Mockup */}
@@ -53,8 +54,8 @@ export default function ConsultationCompletedNotification({
               {/* Doctor Info */}
               <div className="flex items-center gap-3 mb-4">
                 {doctorPhoto ? (
-                  <img 
-                    src={doctorPhoto} 
+                  <img
+                    src={doctorPhoto}
                     alt={doctorName}
                     className="w-12 h-12 rounded-full object-cover flex-shrink-0"
                   />
@@ -112,6 +113,24 @@ export default function ConsultationCompletedNotification({
 
               {/* Health Tip Section */}
               <TemplateDisplay placement="notif-consultation-completed" className="mb-4" />
+
+              {/* 📄 DOWNLOAD PRESCRIPTION BUTTON */}
+              {rxUrl && (
+                <div className="mb-6 px-2">
+                  <a
+                    href={rxUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-[0.98] transition-all"
+                  >
+                    <Download className="w-5 h-5" />
+                    {translations.downloadPrescription?.[lang] || 'Download Digital Prescription'}
+                  </a>
+                  <p className="text-[10px] text-gray-400 text-center mt-2 italic">
+                    {translations.rxSecureLink?.[lang] || 'Securely generated digital prescription'}
+                  </p>
+                </div>
+              )}
 
               {/* Footer */}
               <p className="text-gray-400 text-xs text-center">

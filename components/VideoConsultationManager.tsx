@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Video, Calendar, Clock, User, FileText, CheckCircle2, XCircle, Menu, Filter, ArrowLeft } from 'lucide-react';
+import { Video, Calendar, Clock, User, FileText, CheckCircle2, XCircle, Menu, Filter, ArrowLeft, ChevronRight } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import DashboardSidebar from './DashboardSidebar';
@@ -18,12 +18,16 @@ interface VideoConsultationManagerProps {
   onMenuChange?: (menu: string) => void;
   onLogout?: () => void;
   activeAddOns?: string[];
+  isSidebarCollapsed?: boolean;
+  setIsSidebarCollapsed?: (collapsed: boolean) => void;
 }
 
-export default function VideoConsultationManager({ 
-  onMenuChange, 
+export default function VideoConsultationManager({
+  onMenuChange,
   onLogout,
-  activeAddOns = []
+  activeAddOns = [],
+  isSidebarCollapsed = false,
+  setIsSidebarCollapsed
 }: VideoConsultationManagerProps) {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<'today' | 'yesterday' | 'custom'>('today');
@@ -87,10 +91,12 @@ export default function VideoConsultationManager({
         onMenuChange={onMenuChange || (() => {})}
         onLogout={onLogout}
         activeAddOns={activeAddOns}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => setIsSidebarCollapsed?.(!isSidebarCollapsed)}
       />
 
       {/* Main Content */}
-      <div className="lg:pl-64">
+      <div className={`transition-all duration-300 ${isSidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'}`}>
         {/* Header */}
         <div className="border-b border-gray-800 bg-[#0a0f1a]/95 backdrop-blur sticky top-0 z-40">
           <div className="flex items-center justify-between px-4 lg:px-8 py-4">
@@ -108,8 +114,8 @@ export default function VideoConsultationManager({
                   <Video className="w-6 h-6 text-red-400" />
                 </div>
                 <div>
-                  <h1 className="text-white">Video Consultation History</h1>
-                  <p className="text-gray-400 text-sm mt-1">View all past video consultations</p>
+                  <h1 className="text-white text-xl uppercase font-black tracking-tight">Video Consultation History</h1>
+                  <p className="text-zinc-100 text-sm mt-1 font-semibold">View all past video consultations</p>
                 </div>
               </div>
             </div>
@@ -127,6 +133,7 @@ export default function VideoConsultationManager({
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Dashboard
           </Button>
+
 
           {/* Date Filter */}
           <Card className="bg-gray-800/50 border-gray-700 p-6 mb-6">
@@ -223,11 +230,11 @@ export default function VideoConsultationManager({
                   <table className="w-full">
                     <thead>
                       <tr className="bg-gray-900/30 border-b border-gray-700">
-                        <th className="px-6 py-4 text-left text-sm text-gray-400">Date</th>
-                        <th className="px-6 py-4 text-left text-sm text-gray-400">Time</th>
-                        <th className="px-6 py-4 text-left text-sm text-gray-400">Patient Name</th>
-                        <th className="px-6 py-4 text-left text-sm text-gray-400">Duration</th>
-                        <th className="px-6 py-4 text-left text-sm text-gray-400">RX Sent</th>
+                        <th className="px-6 py-4 text-left text-xs text-white font-black uppercase tracking-[0.15em]">Date</th>
+                        <th className="px-6 py-4 text-left text-xs text-white font-black uppercase tracking-[0.15em]">Time</th>
+                        <th className="px-6 py-4 text-left text-xs text-white font-black uppercase tracking-[0.15em]">Patient Name</th>
+                        <th className="px-6 py-4 text-left text-xs text-white font-black uppercase tracking-[0.15em]">Duration</th>
+                        <th className="px-6 py-4 text-left text-xs text-white font-black uppercase tracking-[0.15em]">RX Sent</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -353,8 +360,8 @@ export default function VideoConsultationManager({
               <Card className="bg-gray-800/50 border-gray-700 p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-gray-400 text-sm mb-1">Total Consultations</p>
-                    <p className="text-white text-2xl">{filteredData.length}</p>
+                    <p className="text-zinc-100 text-[10px] font-black uppercase tracking-[0.15em] mb-1">Total Consultations</p>
+                    <p className="text-white text-3xl font-black">{filteredData.length}</p>
                   </div>
                   <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
                     <Video className="w-6 h-6 text-blue-400" />
@@ -365,8 +372,8 @@ export default function VideoConsultationManager({
               <Card className="bg-gray-800/50 border-gray-700 p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-gray-400 text-sm mb-1">RX Sent</p>
-                    <p className="text-white text-2xl">
+                    <p className="text-zinc-100 text-[10px] font-black uppercase tracking-[0.15em] mb-1">RX Sent</p>
+                    <p className="text-white text-3xl font-black">
                       {filteredData.filter(item => item.rxSent).length}
                     </p>
                   </div>
@@ -379,8 +386,8 @@ export default function VideoConsultationManager({
               <Card className="bg-gray-800/50 border-gray-700 p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-gray-400 text-sm mb-1">RX Pending</p>
-                    <p className="text-white text-2xl">
+                    <p className="text-zinc-100 text-[10px] font-black uppercase tracking-[0.15em] mb-1">RX Pending</p>
+                    <p className="text-white text-3xl font-black">
                       {filteredData.filter(item => !item.rxSent).length}
                     </p>
                   </div>

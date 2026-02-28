@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
@@ -446,7 +446,7 @@ export default function ClinicDashboard() {
                     </div>
                  </div>
                  <div className="text-right">
-                    <span className={`text-xs px-2 py-1 rounded-full ${doctor.active ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                    <span className={`text-xs px-2 py-1 rounded-full ${doctor.active ? 'bg-blue-500/10 text-blue-500' : 'bg-red-500/10 text-red-500'}`}>
                        {doctor.active ? 'Active' : 'Inactive'}
                     </span>
                     <p className="text-xs text-gray-500 mt-1">{doctor.bookingsCount || 0} Bookings</p>

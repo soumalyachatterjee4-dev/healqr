@@ -2,40 +2,38 @@
 // Stores ALL notifications in Firestore for 120 days
 // Independent of FCM success/failure - Always stores notification
 
-import { 
-  getFirestore, 
-  collection, 
-  addDoc, 
-  query, 
-  where, 
-  orderBy, 
-  limit, 
-  getDocs, 
+import {
+  collection,
+  addDoc,
+  query,
+  where,
+  orderBy,
+  limit,
+  getDocs,
   onSnapshot,
   Timestamp,
   deleteDoc,
+  updateDoc,
   doc as firestoreDoc
 } from 'firebase/firestore';
-import { app } from '../lib/firebase/config';
-
-const db = getFirestore(app);
+import { db } from '../lib/firebase/config';
 const NOTIFICATIONS_COLLECTION = 'patient_notifications';
 const RETENTION_DAYS = 120;
 
 export interface StoredNotification {
   id?: string;
-  
+
   // Patient Info
   patientPhone: string;
   patientName: string;
   patientAge?: number;
   patientGender?: string;
-  
+
   // Notification Metadata
-  type: 'consultation_completed' | 'booking_confirmed' | 'appointment_reminder' | 'booking_cancelled' | 'booking_restored' | 'follow_up' | 'review_request' | 'prescription_ready';
+  type: 'consultation_completed' | 'booking_confirmed' | 'appointment_reminder' | 'booking_cancelled' | 'booking_restored' | 'follow_up' | 'review_request' | 'prescription_ready' | 'video_call_link';
   title: string;
   message: string;
-  
+
   // Booking Details
   bookingId: string;
   doctorId?: string;
@@ -44,27 +42,27 @@ export interface StoredNotification {
   doctorPhoto?: string;
   chamberName?: string;
   chamberAddress?: string;
-  
+
   // Appointment Details
   appointmentDate?: string;
   appointmentTime?: string;
   serialNumber?: string;
   purpose?: string;
-  
+
   // Timestamps
   createdAt: Timestamp;
   expiresAt: Timestamp;
-  
+
   // Status
   isRead: boolean;
   readAt?: Timestamp;
-  
+
   // FCM Delivery Status
   fcmAttempted: boolean;
   fcmSuccess: boolean;
   fcmError?: string;
   fcmToken?: string;
-  
+
   // Additional Data
   metadata?: Record<string, any>;
 }
@@ -77,7 +75,7 @@ const removeUndefined = (obj: any): any => {
   if (typeof obj !== 'object') return obj;
   if (obj instanceof Timestamp) return obj;
   if (Array.isArray(obj)) return obj.map(removeUndefined);
-  
+
   const cleaned: any = {};
   for (const [key, value] of Object.entries(obj)) {
     if (value !== undefined) {
@@ -97,15 +95,15 @@ export const storeNotification = async (
   try {
     // Normalize phone number (last 10 digits)
     const normalizedPhone = notification.patientPhone.replace(/\D/g, '').slice(-10);
-    
+
     const now = Timestamp.now();
     const expiresAt = Timestamp.fromDate(
       new Date(Date.now() + RETENTION_DAYS * 24 * 60 * 60 * 1000)
     );
-    
+
     // Remove undefined fields recursively to avoid Firestore errors
     const cleanNotification = removeUndefined(notification);
-    
+
     const notificationData: Omit<StoredNotification, 'id'> = {
       ...cleanNotification,
       patientPhone: normalizedPhone,
@@ -113,7 +111,7 @@ export const storeNotification = async (
       expiresAt: expiresAt,
       isRead: false,
     } as Omit<StoredNotification, 'id'>;
-    
+
     console.log('💾 Storing notification in Firestore:', {
       phone: normalizedPhone,
       type: notification.type,
@@ -121,17 +119,17 @@ export const storeNotification = async (
       bookingId: notification.bookingId,
       fcmSuccess: notification.fcmSuccess,
     });
-    
+
     const docRef = await addDoc(
-      collection(db, NOTIFICATIONS_COLLECTION),
+      collection(db!, NOTIFICATIONS_COLLECTION),
       notificationData
     );
-    
+
     console.log('✅ Notification stored with ID:', docRef.id);
-    
+
     // Auto-cleanup expired notifications for this patient
     await cleanupExpiredNotifications(normalizedPhone);
-    
+
     return docRef.id;
   } catch (error) {
     console.error('❌ Error storing notification:', error);
@@ -148,18 +146,18 @@ export const getPatientNotifications = async (
 ): Promise<StoredNotification[]> => {
   try {
     const normalizedPhone = patientPhone.replace(/\D/g, '').slice(-10);
-    
+
     console.log('📥 Fetching notifications for patient:', normalizedPhone);
-    
+
     // Simplified query to avoid composite index requirement
     const notificationsQuery = query(
-      collection(db, NOTIFICATIONS_COLLECTION),
+      collection(db!, NOTIFICATIONS_COLLECTION),
       where('patientPhone', '==', normalizedPhone),
       orderBy('createdAt', 'desc')
     );
-    
+
     const snapshot = await getDocs(notificationsQuery);
-    
+
     // Filter out expired notifications in memory
     const now = Timestamp.now();
     const notifications: StoredNotification[] = snapshot.docs
@@ -168,28 +166,28 @@ export const getPatientNotifications = async (
         ...doc.data() as Omit<StoredNotification, 'id'>
       }))
       .filter(n => n.expiresAt.toMillis() > now.toMillis());
-    
+
     console.log(`✅ Found ${notifications.length} notifications for patient`);
-    
+
     // Ensure at least last 2 consultations are included (if they exist)
     const consultationNotifs = notifications.filter(n => n.type === 'consultation_completed');
-    
+
     if (consultationNotifs.length < 2) {
       // Fetch older consultation notifications (even if expired)
       const olderQuery = query(
-        collection(db, NOTIFICATIONS_COLLECTION),
+        collection(db!, NOTIFICATIONS_COLLECTION),
         where('patientPhone', '==', normalizedPhone),
         where('type', '==', 'consultation_completed'),
         orderBy('createdAt', 'desc'),
         limit(2)
       );
-      
+
       const olderSnapshot = await getDocs(olderQuery);
       const olderNotifs = olderSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data() as Omit<StoredNotification, 'id'>
       }));
-      
+
       // Merge and deduplicate
       const allNotifs = [...notifications];
       olderNotifs.forEach(old => {
@@ -197,10 +195,10 @@ export const getPatientNotifications = async (
           allNotifs.push(old);
         }
       });
-      
+
       return allNotifs.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
     }
-    
+
     return notifications;
   } catch (error) {
     console.error('❌ Error fetching notifications:', error);
@@ -216,15 +214,15 @@ export const subscribeToPatientNotifications = (
   callback: (notifications: StoredNotification[]) => void
 ): (() => void) => {
   const normalizedPhone = patientPhone.replace(/\D/g, '').slice(-10);
-  
+
   console.log('🔔 Setting up real-time listener for patient:', normalizedPhone);
-  
+
   // Simple query with only where clause (no orderBy to avoid composite index)
   const notificationsQuery = query(
-    collection(db, NOTIFICATIONS_COLLECTION),
+    collection(db!, NOTIFICATIONS_COLLECTION),
     where('patientPhone', '==', normalizedPhone)
   );
-  
+
   const unsubscribe = onSnapshot(
     notificationsQuery,
     (snapshot) => {
@@ -237,7 +235,7 @@ export const subscribeToPatientNotifications = (
         }))
         .filter(n => n.expiresAt.toMillis() > now.toMillis())
         .sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
-      
+
       console.log(`🔔 Real-time update: ${notifications.length} notifications`);
       callback(notifications);
     },
@@ -246,7 +244,7 @@ export const subscribeToPatientNotifications = (
       callback([]);
     }
   );
-  
+
   return unsubscribe;
 };
 
@@ -255,14 +253,13 @@ export const subscribeToPatientNotifications = (
  */
 export const markNotificationAsRead = async (notificationId: string): Promise<void> => {
   try {
-    const { updateDoc } = await import('firebase/firestore');
-    const notificationRef = firestoreDoc(db, NOTIFICATIONS_COLLECTION, notificationId);
-    
+    const notificationRef = firestoreDoc(db!, NOTIFICATIONS_COLLECTION, notificationId);
+
     await updateDoc(notificationRef, {
       isRead: true,
       readAt: Timestamp.now(),
     });
-    
+
     console.log('✅ Notification marked as read:', notificationId);
   } catch (error) {
     console.error('❌ Error marking notification as read:', error);
@@ -275,34 +272,34 @@ export const markNotificationAsRead = async (notificationId: string): Promise<vo
 const cleanupExpiredNotifications = async (patientPhone: string): Promise<void> => {
   try {
     const normalizedPhone = patientPhone.replace(/\D/g, '').slice(-10);
-    
+
     // Simple query with only where clause (filter expiry in memory to avoid composite index)
     const allQuery = query(
-      collection(db, NOTIFICATIONS_COLLECTION),
+      collection(db!, NOTIFICATIONS_COLLECTION),
       where('patientPhone', '==', normalizedPhone)
     );
-    
+
     const snapshot = await getDocs(allQuery);
-    
+
     // Filter expired in memory
     const now = Timestamp.now();
-    const expiredDocs = snapshot.docs.filter(doc => 
+    const expiredDocs = snapshot.docs.filter(doc =>
       doc.data().expiresAt.toMillis() < now.toMillis()
     );
-    
+
     // Don't delete last 2 consultation notifications
     const consultationNotifs = expiredDocs
       .filter(doc => doc.data().type === 'consultation_completed')
       .sort((a, b) => b.data().createdAt.toMillis() - a.data().createdAt.toMillis());
-    
+
     const lastTwoConsultationIds = consultationNotifs.slice(0, 2).map(d => d.id);
-    
+
     const deletePromises = expiredDocs
       .filter(doc => !lastTwoConsultationIds.includes(doc.id))
       .map(doc => deleteDoc(doc.ref));
-    
+
     await Promise.all(deletePromises);
-    
+
     if (deletePromises.length > 0) {
       console.log(`🗑️ Cleaned up ${deletePromises.length} expired notifications`);
     }
@@ -317,14 +314,14 @@ const cleanupExpiredNotifications = async (patientPhone: string): Promise<void> 
 export const getUnreadCount = async (patientPhone: string): Promise<number> => {
   try {
     const normalizedPhone = patientPhone.replace(/\D/g, '').slice(-10);
-    
+
     const unreadQuery = query(
-      collection(db, NOTIFICATIONS_COLLECTION),
+      collection(db!, NOTIFICATIONS_COLLECTION),
       where('patientPhone', '==', normalizedPhone),
       where('isRead', '==', false),
       where('expiresAt', '>', Timestamp.now())
     );
-    
+
     const snapshot = await getDocs(unreadQuery);
     return snapshot.size;
   } catch (error) {

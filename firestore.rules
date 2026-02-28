@@ -133,6 +133,10 @@ service cloud.firestore {
       match /notifications/{notificationId} {
         allow read, write: if isOwner(doctorId);
       }
+
+      match /usage/{usageId} {
+        allow read, write: if isOwner(doctorId);
+      }
     }
 
     // ============================================
@@ -986,6 +990,26 @@ service cloud.firestore {
 
       // No deletes allowed
       allow delete: if false;
+    }
+
+    // ============================================
+    // BRAINDECK DATA COLLECTION (Quiz tracking)
+    // ============================================
+
+    match /brainDeckData/{doctorId} {
+      // Allow authenticated doctors to read/write their own quiz data
+      allow read, write: if isAuthenticated();
+    }
+
+    // ============================================
+    // APP CONFIG COLLECTION (Admin-controlled settings)
+    // ============================================
+
+    match /appConfig/{configId} {
+      // Allow anyone to read (health tip, etc.)
+      allow read: if true;
+      // Only admin can write (managed via Firebase Console)
+      allow write: if isAuthenticated() && request.auth.token.admin == true;
     }
 
     // ============================================

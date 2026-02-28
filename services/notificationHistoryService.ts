@@ -15,7 +15,7 @@ export interface NotificationRecord {
   doctorName: string;
   clinicName?: string;
   chamber?: string;
-  notificationType: 'booking_confirmed' | 'appointment_confirmed' | 'consultation_completed' | 'reminder' | 'cancelled' | 'restored' | 'follow_up' | 'review_request' | 'prescription_ready';
+  notificationType: 'booking_confirmed' | 'appointment_confirmed' | 'consultation_completed' | 'reminder' | 'cancelled' | 'restored' | 'follow_up' | 'review_request' | 'prescription_ready' | 'video_call_link';
   bookingStatus: 'confirmed' | 'cancelled' | 'dropout' | 'completed';
   notificationStatus: 'delivered' | 'failed' | 'not_allowed' | 'pending' | 'sent'; // 'sent' kept for backward compatibility
   deliveryStatus?: 'push_sent' | 'push_failed' | 'permission_denied' | 'no_token' | 'saved_only'; // New: detailed delivery status
@@ -32,6 +32,7 @@ export interface NotificationRecord {
   doctorId?: string;
   isWalkIn?: boolean;
   walkInVerified?: boolean;
+  language?: string;
 
   // 🆕 120-DAY TEMPLATE STORAGE
   templateType?: 'consultation_completed' | 'review_request' | 'prescription_ready' | 'appointment_cancelled' | 'follow_up' | 'appointment_reminder';
@@ -81,6 +82,7 @@ export interface NotificationRecord {
   expiresAt?: Date;
   isExpired?: boolean;
   readStatus?: boolean;
+  bookingSource?: string; // 🔑 Source of booking ('clinic_qr', 'doctor_qr', 'walkin')
 }
 
 export interface ConsultationHistory {
@@ -109,6 +111,7 @@ export interface ConsultationHistory {
     followUp?: { status: 'delivered' | 'failed' | 'not_allowed' | 'pending' | 'sent'; timestamp?: Date };
     reviewRequest?: { status: 'delivered' | 'failed' | 'not_allowed' | 'pending' | 'sent'; timestamp?: Date };
   };
+  bookingSource?: string; // 🔑 Source of booking
 }
 
 /**
@@ -306,152 +309,167 @@ export const searchPatientConsultationHistory = async (patientPhone: string, doc
     // Group by bookingId with improved deduplication
     const consultationMap = new Map<string, ConsultationHistory>();
 
+    /**
+     * 🛡️ ROBUST & TIMEZONE-SAFE DATE NORMALIZATION
+     * Converts "Thursday, 12 February 2026", "12/02/2026", "2026-02-12" -> "2026-02-12"
+     * Uses local components to avoid UTC shifts.
+     */
+    const parseToISODate = (dateStr: string | undefined): string => {
+      if (!dateStr) return '';
+
+      try {
+        let d = new Date(dateStr);
+
+        if (isNaN(d.getTime())) {
+          if (dateStr.includes('/')) {
+            const parts = dateStr.split('/');
+            if (parts.length === 3) {
+              d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+            }
+          } else {
+            const cleaned = dateStr.replace(/^[A-Za-z]+,\s*/, '').trim();
+            d = new Date(cleaned);
+          }
+        }
+
+        if (!isNaN(d.getTime())) {
+          // 🛡️ FIX: Use local components to avoid UTC day-shifts
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        }
+      } catch (e) {
+        console.warn('⚠️ Date normalization failed for:', dateStr);
+      }
+      return dateStr.toLowerCase().trim();
+    };
+
     // Helper to normalize time format for comparison (e.g., "07:24 pm" -> "07:24 PM")
     const normalizeTime = (time: string | undefined): string => {
       if (!time) return '';
       return time.toLowerCase().trim().replace(/\s+/g, ' ');
     };
 
-    // Helper to normalize date for comparison
-    const normalizeDate = (date: string | undefined): string => {
-      if (!date) return '';
-      return date.toLowerCase().trim();
-    };
+    records.forEach((record, index) => {
+      try {
+        const normalizedDate = parseToISODate(record.consultationDate);
+        const bookingId = record.bookingId?.trim();
 
-    records.forEach(record => {
-      // Prefer actual bookingId, but create a robust fallback based on normalized date+time
-      let bookingId = record.bookingId;
+        // 🛡️ ULTRA-ROBUST KEY GENERATION
+        // We need a stable key for this consultation day
+        let groupKey = '';
 
-      if (!bookingId) {
-        // Create normalized fallback ID
-        const normalizedDate = normalizeDate(record.consultationDate);
-        const normalizedTime = normalizeTime(record.consultationTime);
-        bookingId = `${normalizedDate}__${normalizedTime}`;
-      }
-
-      // Check if we already have a consultation for this normalized date+time
-      // This prevents duplicates even when some records have bookingId and others don't
-      let existingKey = bookingId;
-
-      if (!consultationMap.has(bookingId)) {
-        // Search for existing consultation with same date+time (different key)
-        const normalizedDate = normalizeDate(record.consultationDate);
-        const normalizedTime = normalizeTime(record.consultationTime);
-
-        for (const [key, existing] of consultationMap.entries()) {
-          const existingNormDate = normalizeDate(existing.consultationDate);
-          const existingNormTime = normalizeTime(existing.consultationTime);
-
-          if (existingNormDate === normalizedDate && existingNormTime === normalizedTime) {
-            existingKey = key;
-            break;
+        // Case A: We have a bookingId, check if it already exists as a key or inside an entry
+        if (bookingId) {
+          if (consultationMap.has(bookingId)) {
+            groupKey = bookingId;
+          } else {
+            // Check if any existing entry (keyed by date) has this bookingId
+            for (const [key, existing] of consultationMap.entries()) {
+              if (existing.bookingId === bookingId) {
+                groupKey = key;
+                break;
+              }
+            }
           }
         }
-      }
 
-      if (!consultationMap.has(existingKey)) {
-        consultationMap.set(existingKey, {
-          bookingId: record.bookingId || existingKey, // Prefer actual bookingId if available
-          patientPhone: record.patientPhone,
-          patientName: record.patientName,
-          age: record.age,
-          sex: record.sex,
-          purpose: record.purpose,
-          doctorName: record.doctorName,
-          clinicName: record.clinicName,
-          chamber: record.chamber,
-          consultationDate: record.consultationDate,
-          consultationTime: record.consultationTime,
-          serialNumber: record.serialNumber,
-          currentStatus: record.bookingStatus,
-          timestamp: record.timestamp,
-          isWalkIn: record.isWalkIn, // Track if walk-in
-          verificationMethod: record.isWalkIn
-            ? (record.walkInVerified ? 'qr_scan' : 'manual_override')
-            : 'qr_scan', // QR bookings are always qr_scan
-          notifications: {}
-        });
-      }
+        // Case B: No bookingId match found, try matching by Date
+        if (!groupKey && normalizedDate) {
+          if (consultationMap.has(normalizedDate)) {
+            groupKey = normalizedDate;
+          } else {
+            // Check if any existing entry (keyed by bookingId) has this date
+            for (const [key, existing] of consultationMap.entries()) {
+              if (parseToISODate(existing.consultationDate) === normalizedDate) {
+                groupKey = key;
+                break;
+              }
+            }
+          }
+        }
 
-      const consultation = consultationMap.get(existingKey)!;
+        // Case C: Final Fallback - Create new key
+        if (!groupKey) {
+          groupKey = bookingId || normalizedDate || `unknown_${index}_${Date.now()}`;
+        }
 
-      // Update patient details if available (prioritize non-generic values)
-      // We iterate Newest -> Oldest, so we want to keep the newest VALID data
-      // but allow older data to fill in gaps or replace generic defaults
+        // 🏗️ ENSURE CONSULTATION OBJECT EXISTS
+        if (!consultationMap.has(groupKey)) {
+          consultationMap.set(groupKey, {
+            bookingId: record.bookingId || groupKey,
+            patientPhone: record.patientPhone || phone10,
+            patientName: record.patientName || 'Unknown Patient',
+            age: record.age,
+            sex: record.sex,
+            purpose: record.purpose,
+            doctorName: record.doctorName || 'Doctor',
+            clinicName: record.clinicName,
+            chamber: record.chamber,
+            consultationDate: record.consultationDate || normalizedDate,
+            consultationTime: record.consultationTime,
+            serialNumber: record.serialNumber,
+            currentStatus: record.bookingStatus || 'confirmed',
+            timestamp: record.timestamp || new Date(),
+            isWalkIn: record.isWalkIn,
+            bookingSource: record.bookingSource, // 🔑 Map booking source
+            verificationMethod: record.isWalkIn
+              ? (record.walkInVerified ? 'qr_scan' : 'manual_override')
+              : 'qr_scan',
+            notifications: {}
+          });
+        }
 
-      const isGenericPurpose = (p: string | undefined) => {
-        if (!p) return true;
-        const lower = String(p).toLowerCase().trim();
-        return ['in-person', 'in person', 'video', 'video consultation', 'consultation', 'visit', 'checkup', 'check-up'].includes(lower);
-      };
+        const consultation = consultationMap.get(groupKey);
 
-      // Helper to check if value exists
-      const hasValue = (val: any) => val !== undefined && val !== null && String(val).trim() !== '';
+        // 🚨 FINAL SAFETY CHECK
+        if (!consultation) {
+          console.warn('⚠️ Skipping record due to failed map retrieval:', { groupKey, bookingId, normalizedDate });
+          return;
+        }
 
-      // 1. AGE: Prioritize existing value, fill if missing. Allow 0.
-      if (!hasValue(consultation.age) && hasValue(record.age)) {
-        consultation.age = record.age;
-      }
+        // Update patient details if available (prioritize non-generic values)
+        const isGenericPurpose = (p: string | undefined) => {
+          if (!p) return true;
+          const lower = String(p).toLowerCase().trim();
+          return ['in-person', 'in person', 'video', 'video consultation', 'consultation', 'visit', 'checkup', 'check-up', 'new-patient'].includes(lower);
+        };
 
-      // 2. SEX: Standard fill if missing
-      if (!hasValue(consultation.sex) && hasValue(record.sex)) {
-        consultation.sex = record.sex;
-      }
+        const hasValue = (val: any) => val !== undefined && val !== null && String(val).trim() !== '';
 
-      // 3. PURPOSE: Complex logic to avoid defaults
-      // If we don't have a purpose, take the record's purpose
-      if (!hasValue(consultation.purpose) && hasValue(record.purpose)) {
-        consultation.purpose = record.purpose;
-      }
-      // If we HAVE a generic purpose, and record has a specific one, UPGRADE it
-      else if (isGenericPurpose(consultation.purpose) && hasValue(record.purpose) && !isGenericPurpose(record.purpose)) {
-        consultation.purpose = record.purpose;
-      }
+        // Merging logic
+        if (!hasValue(consultation.age) && hasValue(record.age)) consultation.age = record.age;
+        if (!hasValue(consultation.sex) && hasValue(record.sex)) consultation.sex = record.sex;
 
-      // 4. CHAMBER/CLINIC/SERIAL: Fill if missing
-      if (!hasValue(consultation.chamber) && hasValue(record.chamber)) consultation.chamber = record.chamber;
-      if (!hasValue(consultation.clinicName) && hasValue(record.clinicName)) consultation.clinicName = record.clinicName;
-      if (!hasValue(consultation.serialNumber) && hasValue(record.serialNumber)) consultation.serialNumber = record.serialNumber;
+        if (!hasValue(consultation.purpose) && hasValue(record.purpose)) {
+          consultation.purpose = record.purpose;
+        } else if (isGenericPurpose(consultation.purpose) && hasValue(record.purpose) && !isGenericPurpose(record.purpose)) {
+          consultation.purpose = record.purpose;
+        }
 
-      // Update to latest status (timestamp check handles this correctly already)
-      // Since current logic overwrites, it correctly sets status from Newest record (first iter)
-      // But we loop Newest -> Oldest. The loop logic for status below was:
-      // if (record.timestamp > consultation.timestamp)
-      // Since first record is Newest, this condition is only True for the first record.
-      // So status is locked to the Newest. Correct.
+        if (!hasValue(consultation.chamber) && hasValue(record.chamber)) consultation.chamber = record.chamber;
+        if (!hasValue(consultation.clinicName) && hasValue(record.clinicName)) consultation.clinicName = record.clinicName;
+        if (!hasValue(consultation.serialNumber) && hasValue(record.serialNumber)) consultation.serialNumber = record.serialNumber;
 
-      // Aggregate notification statuses
-      const notifStatus = { status: record.notificationStatus, timestamp: record.timestamp };
-
-      switch (record.notificationType) {
-        case 'reminder':
-          consultation.notifications.reminder = notifStatus;
-          break;
-        case 'appointment_confirmed':
-        case 'booking_confirmed':
-          consultation.notifications.appointmentConfirmed = notifStatus;
-          break;
-        case 'consultation_completed':
-          consultation.notifications.consultationCompleted = notifStatus;
-          break;
-        case 'cancelled':
-          consultation.notifications.cancelled = notifStatus;
-          break;
-        case 'restored':
-          consultation.notifications.restored = notifStatus;
-          break;
-        case 'follow_up':
-          consultation.notifications.followUp = notifStatus;
-          break;
-        case 'review_request':
-          consultation.notifications.reviewRequest = notifStatus;
-          break;
+        // Aggregate notification statuses
+        const notifStatus = { status: record.notificationStatus, timestamp: record.timestamp };
+        switch (record.notificationType) {
+          case 'reminder': consultation.notifications.reminder = notifStatus; break;
+          case 'appointment_confirmed':
+          case 'booking_confirmed': consultation.notifications.appointmentConfirmed = notifStatus; break;
+          case 'consultation_completed': consultation.notifications.consultationCompleted = notifStatus; break;
+          case 'cancelled': consultation.notifications.cancelled = notifStatus; break;
+          case 'restored': consultation.notifications.restored = notifStatus; break;
+          case 'follow_up': consultation.notifications.followUp = notifStatus; break;
+          case 'review_request': consultation.notifications.reviewRequest = notifStatus; break;
+        }
+      } catch (innerError) {
+        console.error('⚠️ Skipping problematic record:', record.id, innerError);
       }
     });
 
     // HISTORY RULE: Show consultations from YESTERDAY and before, NOT TODAY
-    // Today's appointments (regardless of status) become history from tomorrow 00:00
-    // This applies to both QR/advance bookings and walk-in patients
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Reset to midnight
 

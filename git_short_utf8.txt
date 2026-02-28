@@ -1,0 +1,112 @@
+﻿ M .firebaserc
+ M App.tsx
+ M components/AIDietChartManager.tsx
+ D components/ClinicDashboard_BROKEN_BACKUP.tsx
+ M components/ClinicScheduleManager.tsx
+ M components/ConsultationCompletedNotification.tsx
+ M components/DoctorDashboard.tsx
+ M components/ScheduleManager.tsx
+ M components/VideoConsultationManager.tsx
+ M firebase.json
+ M firestore.indexes.json
+ M firestore.rules
+ M functions-backend/index.js
+ M functions-backend/package-lock.json
+ M functions-backend/package.json
+ M functions-backend/sendAIRXNotification.js
+ M package-lock.json
+ M package.json
+ M public/business-plan-report.html
+ M services/notificationHistoryService.ts
+ M services/notificationService.ts
+ M services/patientNotificationStorage.ts
+ M storage.rules
+ M utils/cloudFunctions.ts
+ M utils/encryptionService.ts
+ M utils/translations.ts
+?? build_debug_rollup.txt
+?? build_error.txt
+?? build_log.txt
+?? build_output.txt
+?? build_output_utf8.txt
+?? components/AdminClinicManagement.tsx
+?? components/BrainDeck.tsx
+?? components/ClinicAIDietChartManager.tsx
+?? components/ClinicAIRXReaderManager.tsx
+?? components/ClinicAdvanceBooking.tsx
+?? components/ClinicAnalytics.tsx
+?? components/ClinicAssistantAccessManager.tsx
+?? components/ClinicDashboard_BROKEN_BACKUP.txt
+?? components/ClinicEmergencyButtonManager.tsx
+?? components/ClinicLabReferralManager.tsx
+?? components/ClinicMonthlyPlanner.tsx
+?? components/ClinicPersonalizedTemplatesManager.tsx
+?? components/ClinicPreviewCenter.tsx
+?? components/ClinicReports.tsx
+?? components/ClinicSocialMediaKit.tsx
+?? components/ClinicVideoConsultationManager.tsx
+?? components/DigitalRXMaker.tsx
+?? components/DoctorReports.tsx
+?? domains_healqr.json
+?? domains_team.json
+?? firebase_projects.json
+?? fix.cjs
+?? functions-backend/.gitignore
+?? functions-backend/analyzeRXWithGemini.js
+?? functions-backend/checkVideoCallExpiry.js
+?? functions-backend/processScheduledNotifications.js
+?? functions-backend/temp_plan.txt
+?? functions-backend/test.cjs
+?? git_log.txt
+?? git_log_out.txt
+?? git_log_utf8.txt
+?? git_short.txt
+?? git_short_utf8.txt
+?? git_status.txt
+?? git_status_out.txt
+?? git_status_utf8.txt
+?? out.txt
+?? output.txt
+?? projects-utf8.json
+?? projects.json
+?? projects_clean.txt
+?? projects_list.txt
+?? services/aiService.ts
+?? services/fcmLogicService.ts
+?? sites-utf8.json
+?? sites.json
+?? sites.txt
+?? sites_healqr.json
+?? src/
+?? temp_get_projects.js
+?? temp_projects.json
+?? temp_search.txt
+?? test-gemini.js
+?? ts_errors.txt
+?? ts_errors_utf8.txt
+?? tsc_errors.txt
+?? tsc_final_check.txt
+?? tsc_full_report.txt
+?? tsc_output.txt
+?? tsout.txt
+?? utils/brainDeckService.ts
+?? utils/medicines.ts
+?? vite.config.debug.ts
+?? vite.config.ts.timestamp-1771407720926-2432bfc085995.mjs
+?? vite.config.ts.timestamp-1771415642471-e3e77e024c679.mjs
+?? vite.config.ts.timestamp-1771592847866-aa4049cb177fe.mjs
+?? vite.config.ts.timestamp-1771603551967-ffae597a34dc9.mjs
+?? vite.config.ts.timestamp-1771769073333-31442031fe14b.mjs
+?? vite.config.ts.timestamp-1771828851258-e6e8bb0405c78.mjs
+?? vite.config.ts.timestamp-1771849371879-d64a08838c2e5.mjs
+?? vite.config.ts.timestamp-1771853364607-a506eca908b5e.mjs
+?? vite.config.ts.timestamp-1772096648191-6204d3322384e.mjs
+?? vite.config.ts.timestamp-1772114486951-c39c785967cc2.mjs
+?? vite.config.ts.timestamp-1772114747527-90615e8d6603b.mjs
+?? vite.config.ts.timestamp-1772172668538-61b513178c6c6.mjs
+?? vite.config.ts.timestamp-1772179340334-66e6d70057137.mjs
+?? vite.config.ts.timestamp-1772197789913-31eac29b08d7f.mjs
+?? vite.config.ts.timestamp-1772203447942-a13adecebdc65.mjs
+?? vite.config.ts.timestamp-1772207011198-8293dc4bbfecb.mjs
+?? vite.config.ts.timestamp-1772209236970-d9d9db097f8d4.mjs
+?? vite.config.ts.timestamp-1772211010599-b064c316c2088.mjs

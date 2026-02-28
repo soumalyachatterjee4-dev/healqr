@@ -1,0 +1,20 @@
+﻿9ca1263 Phase 23/24: Landmark integration and Smart Search UX fix (partial refinement needed)
+b226d31 Fix ReferenceError: QrCode is not defined in ScheduleManager
+bb5aa08 Implement WhatsApp Patient List for non-linked clinics, code cleanup, and documentation updates
+4b2a865 Serial number fix: Unified QR + walk-in counting, removed orphaned code, fixed crashes - Synchronize serial assignment across doctor and clinic dashboards - Make walk-in count ALL patients like QR booking side - Remove orphaned code causing ClinicTodaysSchedule crash - Remove duplicate getCurrentDate function - Sort by stored serialNo for pending > seen > cancelled order - Both dashboards now follow consistent serial numbering
+fda1966 Add documentation and backup for clinic planned off partial fix
+d49d421 WIP: Enhanced clinic planned off with legacy period detection (partial fix - chamber blocking issue remains)
+3a81d44 Fix: Pass doctorId and selectedChamber to PatientDetailsForm from ClinicBookingFlow to prevent missing doctor info error
+a41bdac Docs: Update status with complete clinic chamber filter solution
+b18da0c Fix: Add clinic chamber filter in SelectChamber and pass clinicId from ClinicBookingFlow - properly filters chambers when scanning clinic QR
+867e082 Docs: Update PROJECT_STATUS_UPDATE with clinic QR chamber filter fix
+4364951 Fix: Filter chambers by clinic when scanning clinic QR code - patients now only see chambers at the scanned clinic, not doctor's personal chambers
+0712a82 Backup: Update drop out logic to count confirmed bookings marked as no-show
+0465a12 Separate clinic QR vs doctor QR bookings in analytics and fix monthly bookings
+bae1d35 Add Firestore security rules for qrScans collection
+e4d4ec6 Add Total Scans metric to clinic dashboard blue card
+ed2fccd Fix duplicate import in ClinicBookingFlow
+61b241a Implement separate QR scan tracking: Scans now tracked independently from bookings in qrScans collection
+8f1146f Fix clinic analytics: Distinguish clinic QR scans from doctor QR bookings using bookingSource field
+0f8cc04 Add clinic off filtering to DoctorDashboard and TodaysSchedule - hide clinic chambers when clinic is off
+b091bc7 Fix chamber filtering: Use clinicId for exact matching instead of unreliable address matching

@@ -1,0 +1,21 @@
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+require('dotenv').config();
+
+const API_KEY = process.env.GEMINI_API_KEY || "AIzaSy..."; // I will need to temporarily hardcode or ensure .env is read if I run this locally.
+// For now, I'll rely on the fact that I can't easily see the real env var here,
+// so I will construct the script to read from the same logic as the main file
+// or I will user `firebase functions:config:get` logic if applicable,
+// but since this is a one-off script, I'll assume I can run it if I have the key.
+// Actually, I don't have the key in the chat history.
+// However, the `analyzeRXWithGemini.js` file has: `const API_KEY = process.env.GEMINI_API_KEY || "AIzaSy...";`
+// I will try to use the same initialization.
+
+async function listModels() {
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  // Note: I cannot run this without the API KEY.
+  // I will check if `.env` exists in `functions-backend`.
+}
+// Wait, I can't easily run a script that requires an env var I don't see.
+// But the error comes from the deployed function which HAS the key.
+// I can modify the deployed function to Log the models instead of running analysis!
+// That is a safer bet.

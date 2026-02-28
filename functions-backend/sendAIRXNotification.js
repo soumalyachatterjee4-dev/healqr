@@ -1,7 +1,7 @@
 /**
  * sendAIRXNotification Cloud Function
  * Sends FCM push notification when doctor uploads AI-decoded prescription
- * 
+ *
  * Trigger: HTTPS callable
  * Purpose: Send prescription notification to patient's device
  */
@@ -14,29 +14,13 @@ if (!admin.apps.length) {
   admin.initializeApp();
 }
 
-exports.sendAIRXNotification = functions.https.onRequest(async (req, res) => {
-  // Enable CORS
-  res.set('Access-Control-Allow-Origin', '*');
-  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.set('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).send('');
-  }
-
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
+exports.sendAIRXNotification = functions.https.onCall(async (data, context) => {
   try {
-    const { patientId, patientName, doctorName, notificationId, fcmToken } = req.body;
+    const { patientId, patientName, doctorName, notificationId, fcmToken } = data;
 
     // Validate required fields
     if (!patientId || !patientName || !doctorName || !notificationId || !fcmToken) {
-      return res.status(400).json({ 
-        error: 'Missing required fields',
-        required: ['patientId', 'patientName', 'doctorName', 'notificationId', 'fcmToken']
-      });
+      throw new functions.https.HttpsError('invalid-argument', 'Missing required fields');
     }
 
     console.log('📤 Sending AI RX notification to patient:', patientId);
@@ -46,7 +30,7 @@ exports.sendAIRXNotification = functions.https.onRequest(async (req, res) => {
     const notificationDoc = await notificationRef.get();
 
     if (!notificationDoc.exists) {
-      return res.status(404).json({ error: 'Notification not found' });
+      throw new functions.https.HttpsError('not-found', 'Notification not found');
     }
 
     const notificationData = notificationDoc.data();
@@ -119,28 +103,22 @@ exports.sendAIRXNotification = functions.https.onRequest(async (req, res) => {
       fcmMessageId: response,
     });
 
-    return res.status(200).json({
+    return {
       success: true,
       messageId: response,
       message: 'AI RX notification sent successfully'
-    });
+    };
 
   } catch (error) {
     console.error('❌ Error sending AI RX notification:', error);
-    
+
     // Handle specific FCM errors
-    if (error.code === 'messaging/invalid-registration-token' || 
+    if (error.code === 'messaging/invalid-registration-token' ||
         error.code === 'messaging/registration-token-not-registered') {
       console.error('🚫 Invalid or expired FCM token');
-      return res.status(400).json({ 
-        error: 'Invalid FCM token',
-        code: error.code 
-      });
+      throw new functions.https.HttpsError('failed-precondition', 'Invalid FCM token');
     }
 
-    return res.status(500).json({ 
-      error: 'Failed to send notification',
-      details: error.message 
-    });
+    throw new functions.https.HttpsError('internal', error.message);
   }
 });

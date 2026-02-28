@@ -1,7 +1,7 @@
 /**
  * HealQR Encryption Service
  * AES-256 encryption for sensitive patient data
- * 
+ *
  * Encrypted Fields: patientName, whatsappNumber, age, gender, purposeOfVisit
  * Plain Fields: bookingId, doctorCode, appointmentDate, time, chamber (for searching)
  */
@@ -16,7 +16,7 @@ const ENCRYPTION_KEY = import.meta.env.VITE_ENCRYPTION_KEY || 'HealQR-2025-Secur
  */
 export function encrypt(text: string | null | undefined): string {
   if (!text) return '';
-  
+
   try {
     const encrypted = CryptoJS.AES.encrypt(text, ENCRYPTION_KEY).toString();
     return encrypted;
@@ -31,11 +31,17 @@ export function encrypt(text: string | null | undefined): string {
  */
 export function decrypt(encryptedText: string | null | undefined): string {
   if (!encryptedText) return '';
-  
+
   try {
     const decrypted = CryptoJS.AES.decrypt(encryptedText, ENCRYPTION_KEY);
-    const plainText = decrypted.toString(CryptoJS.enc.Utf8);
-    return plainText || encryptedText; // Return original if decryption fails
+    try {
+      const plainText = decrypted.toString(CryptoJS.enc.Utf8);
+      return plainText || encryptedText;
+    } catch (encodingError) {
+      // Handle "Malformed UTF-8 data" or other encoding errors
+      console.warn('⚠️ Decryption encoding error (invalid UTF-8):', encodingError);
+      return encryptedText; // Return original if encoding fails
+    }
   } catch (error) {
     console.error('❌ Decryption error:', error);
     return encryptedText; // Fallback to encrypted text
@@ -53,7 +59,7 @@ export interface PatientBookingData {
   age?: number | null;
   gender?: string | null;
   purposeOfVisit?: string | null;
-  
+
   // Searchable fields (remain plain)
   bookingId: string;
   doctorCode: string;
@@ -82,21 +88,21 @@ export interface EncryptedBookingData extends Omit<PatientBookingData, 'patientN
  */
 export function encryptBookingData(data: PatientBookingData): EncryptedBookingData {
   const encrypted: any = { ...data };
-  
+
   // Encrypt sensitive fields
   encrypted.patientName_encrypted = encrypt(data.patientName);
   encrypted.whatsappNumber_encrypted = encrypt(data.whatsappNumber);
   encrypted.age_encrypted = encrypt(data.age?.toString() || '');
   encrypted.gender_encrypted = encrypt(data.gender || '');
   encrypted.purposeOfVisit_encrypted = encrypt(data.purposeOfVisit || '');
-  
+
   // Remove plain text versions
   delete encrypted.patientName;
   delete encrypted.whatsappNumber;
   delete encrypted.age;
   delete encrypted.gender;
   delete encrypted.purposeOfVisit;
-  
+
   return encrypted;
 }
 
@@ -105,24 +111,24 @@ export function encryptBookingData(data: PatientBookingData): EncryptedBookingDa
  */
 export function decryptBookingData(encryptedData: any): PatientBookingData {
   const decrypted: any = { ...encryptedData };
-  
+
   // Decrypt sensitive fields
   decrypted.patientName = decrypt(encryptedData.patientName_encrypted || encryptedData.patientName || '');
   decrypted.whatsappNumber = decrypt(encryptedData.whatsappNumber_encrypted || encryptedData.whatsappNumber || '');
-  
+
   const ageDecrypted = decrypt(encryptedData.age_encrypted || '');
   decrypted.age = ageDecrypted ? parseInt(ageDecrypted) : null;
-  
+
   decrypted.gender = decrypt(encryptedData.gender_encrypted || encryptedData.gender || '');
   decrypted.purposeOfVisit = decrypt(encryptedData.purposeOfVisit_encrypted || encryptedData.purposeOfVisit || '');
-  
+
   // Remove encrypted versions from display object
   delete decrypted.patientName_encrypted;
   delete decrypted.whatsappNumber_encrypted;
   delete decrypted.age_encrypted;
   delete decrypted.gender_encrypted;
   delete decrypted.purposeOfVisit_encrypted;
-  
+
   return decrypted;
 }
 

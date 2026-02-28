@@ -1,0 +1,13 @@
+﻿{
+  "status": "success",
+  "result": {
+    "sites": [
+      {
+        "name": "projects/teamhealqr/sites/teamhealqr",
+        "defaultUrl": "https://teamhealqr.web.app",
+        "appId": "1:739121123030:web:37ed6fd7c052277b604377",
+        "type": "DEFAULT_SITE"
+      }
+    ]
+  }
+}

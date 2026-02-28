@@ -146,6 +146,24 @@ export const translations = {
     bengali: 'HealQR.com দ্বারা চালিত',
     assamese: 'HealQR.com দ্বাৰা পৰিচালিত',
   },
+  downloadPrescription: {
+    english: 'Download Digital Prescription',
+    hindi: 'डिजिटल पर्चा डाउनलोड करें',
+    bengali: 'ডিজিটাল প্রেসক্রিপশন ডাউনলোড করুন',
+    assamese: 'ডিজিটেল প্ৰেছক্ৰিপচন ডাউনলোড কৰক',
+  },
+  downloadDietChart: {
+    english: 'Download AI Diet Chart',
+    hindi: 'एआई डाइट चार्ट डाउनलोड करें',
+    bengali: 'এআই ডায়েট চার্ট ডাউনলোড করুন',
+    assamese: 'এআই ডায়েট চাৰ্ট ডাউনলোড কৰক',
+  },
+  rxSecureLink: {
+    english: 'Securely generated digital prescription',
+    hindi: 'सुरक्षित रूप से जनरेट किया गया डिजिटल पर्चा',
+    bengali: 'সুরক্ষিতভাবে তৈরি ডিজিটাল প্রেসক্রিপশন',
+    assamese: 'সুৰক্ষিতভাৱে তৈয়াৰী ডিজিটেল প্ৰেছক্ৰিপচন',
+  },
 
   // Mini Website / Doctor Profile
   doctorProfile: {
@@ -195,6 +213,62 @@ export const translations = {
     hindi: 'अपने दिल को स्वस्थ रखने के लिए सप्ताह में पांच दिन कम से कम 30 मिनट की मध्यम-तीव्रता वाली व्यायाम का लक्ष्य रखें।',
     bengali: 'আপনার হৃদয় সুস্থ রাখতে সপ্তাহে পাঁচ দিন অন্তত 30 মিনিটের মাঝারি-তীব্রতার ব্যায়ামের লক্ষ্য রাখুন।',
     assamese: 'আপোনাৰ হৃদয় সুস্থ ৰাখিবলৈ সপ্তাহত পাঁচ দিন অন্তত 30 মিনিটৰ মধ্যম-তীব্ৰতাৰ ব্যায়ামৰ লক্ষ্য ৰাখক।',
+  },
+
+  // Clinic Booking Doctor Search
+  findYourDoctor: {
+    english: 'Find Your Doctor', hindi: 'अपना डॉक्टर खोजें', bengali: 'আপনার ডাক্তার খুঁজুন', marathi: 'तुमचा डॉक्टर शोधा', tamil: 'உங்கள் மருத்துவரைத் தேடுங்கள்', telugu: 'మీ వైద్యుడిని కనుగొనండి', gujarati: 'તમારા ડૉક્ટરને શોધો', kannada: 'ನಿಮ್ಮ ವೈದ್ಯರನ್ನು ಹುಡುಕಿ', malayalam: 'നിങ്ങളുടെ ഡോക്ടറെ കണ്ടെത്തുക', punjabi: 'ਆਪਣੇ ਡਾਕਟਰ ਨੂੰ ਲੱਭੋ', assamese: 'আপোনাৰ ডাক্তৰ বিচাৰক',
+  },
+  chooseHowSearch: {
+    english: "Choose how you'd like to search", hindi: 'चुनें कि आप कैसे खोजना चाहते हैं', bengali: 'আপনি কীভাবে অনুসন্ধান করতে চান তা চয়ন করুন', marathi: 'तुम्हाला कसे शोधायचे आहे ते निवडा', tamil: 'நீங்கள் எவ்வாறு தேட விரும்புகிறீர்கள் என்பதைத் தேர்வுசெய்க', telugu: 'మీరు ఎలా శోధించాలనుకుంటున్నారో ఎంచుకోండి', gujarati: 'તમે કેવી રીતે શોધવા માંગો છો તે પસંદ કરો', kannada: 'ನೀವು ಹೇಗೆ ಹುಡುಕಬೇಕು ಎಂಬುದನ್ನು ಆಯ್ಕೆಮಾಡಿ', malayalam: 'നിങ്ങൾ എങ്ങനെ തിരയാൻ ആഗ്രഹിക്കുന്നുവെന്ന് തിരഞ്ഞെടുക്കുക', punjabi: 'ਚੁਣੋ ਕਿ ਤੁਸੀਂ ਕਿਵੇਂ ਖੋਜ ਕਰਨਾ ਚਾਹੁੰਦੇ ਹੋ', assamese: 'আপুনি কেনেকৈ বিচাৰিব বিচাৰে বাছক',
+  },
+  bySpecialty: {
+    english: 'By Specialty', hindi: 'विशेषज्ञता द्वारा', bengali: 'বিশেষজ্ঞতা দ্বারা', marathi: 'विशेषज्ञतेनुसार', tamil: 'சிறப்பு மூலம்', telugu: 'స్పెషాలిటీ ద్వారా', gujarati: 'વિશેષતા દ્વારા', kannada: 'ವಿಶೇಷತೆಯ ಮೂಲಕ', malayalam: 'സ്പെഷ്യാലിറ്റി പ്രകാരം', punjabi: 'ਵਿਸ਼ੇਸ਼ਤਾ ਦੁਆਰਾ', assamese: 'বিশেষজ্ঞতাৰ দ্বাৰা',
+  },
+  browseSpecialty: {
+    english: 'Browse doctors by their medical specialty', hindi: 'डॉक्टरों को उनकी चिकित्सा विशेषज्ञता द्वारा ब्राउज़ करें', bengali: 'ডাক্তারদের তাদের চিকিৎসা বিশেষজ্ঞতা দ্বারা ব্রাউজ করুন', marathi: 'डॉक्टरांना त्यांच्या वैद्यकीय विशेषज्ञतेनुसार ब्राउझ करा', tamil: 'வைத்தியர்களின் குறிக்கோள் மூலம் அவர்களை பாருங்கள்', telugu: 'వారి వైద్య ప్రత్యేకత ద్వారా వైద్యులను బ్రౌజ్ చేయండి', gujarati: 'તેમની તબીબી વિશેષતા દ્વારા ડોકટરો બ્રાઉઝ કરો', kannada: 'ಅವರ ವೈದ್ಯಕೀಯ ವಿಶೇಷತೆಯ ಮೂಲಕ ವೈದ್ಯರನ್ನು ಬ್ರೌಸ್ ಮಾಡಿ', malayalam: 'അവരുടെ മെഡിക്കൽ സ്പെഷ്യാലിറ്റി ഉപയോഗിച്ച് ഡോക്ടർമാരെ ബ്രൗസ് ചെയ്യുക', punjabi: 'ਉਹਨਾਂ ਦੀ ਮੈਡੀਕਲ ਵਿਸ਼ੇਸ਼ਤਾ ਦੁਆਰਾ ਡਾਕਟਰਾਂ ਨੂੰ ਬ੍ਰਾਊਜ਼ ਕਰੋ', assamese: 'ডাক্তৰসকলক তেওঁলোকৰ চিকিৎসা বিশেষজ্ঞতাৰ দ্বাৰা ব্ৰাউজ কৰক',
+  },
+  specialtiesAvailable: {
+    english: 'specialties available →', hindi: 'विशेषज्ञताएं उपलब्ध →', bengali: 'বিশেষজ্ঞতা উপলব্ধ →', marathi: 'विशेषज्ञता उपलब्ध →', tamil: 'சிறப்புகள் கிடைக்கின்றன →', telugu: 'స్పెషాలిటీలు అందుబాటులో ఉన్నాయి →', gujarati: 'વિશેષતાઓ ઉપલબ્ધ છે →', kannada: 'ವಿಶೇಷತೆಗಳು ಲಭ್ಯವಿದೆ →', malayalam: 'സ്പെഷ്യാലിറ്റികൾ ലഭ്യമാണ് →', punjabi: 'ਵਿਸ਼ੇਸ਼ਤਾਵਾਂ ਉਪਲਬਧ ਹਨ →', assamese: 'বিশেষজ্ঞতা উপলব্ধ →',
+  },
+  byName: {
+    english: 'By Name', hindi: 'नाम द्वारा', bengali: 'নাম দ্বারা', marathi: 'नावाद्वारे', tamil: 'பெயரால்', telugu: 'పేరు ద్వారా', gujarati: 'નામ દ્વારા', kannada: 'ಹೆಸರಿನ ಮೂಲಕ', malayalam: 'പേരിൽ', punjabi: 'ਨਾਮ ਦੁਆਰਾ', assamese: 'নামৰ দ্বাৰা',
+  },
+  searchByNameDesc: {
+    english: 'Search for a doctor by their name', hindi: 'नाम से डॉक्टर खोजें', bengali: 'নাম অনুসারে ডাক্তার খুঁজুন', marathi: 'नावाने डॉक्टर शोधा', tamil: 'ஒரு மருத்துவரை பெயரால் தேடுங்கள்', telugu: 'పేరు ద్వారా వైద్యుడిని శోధించండి', gujarati: 'નામ દ્વારા ડૉક્ટર શોધો', kannada: 'ಹೆಸರಿನಿಂದ ವೈದ್ಯರನ್ನು ಹುಡುಕಿ', malayalam: 'പേര് ഉപയോഗിച്ച് ഡോക്ടറെ തിരയുക', punjabi: 'ਨਾਮ ਦੁਆਰਾ ਡਾਕਟਰ ਦੀ ਖੋਜ ਕਰੋ', assamese: 'নামৰ দ্বাৰা ডাক্তৰ বিচাৰক',
+  },
+  doctorsAvailableTxt: {
+    english: 'doctors available →', hindi: 'डॉक्टर उपलब्ध →', bengali: 'ডাক্তার উপলব্ধ →', marathi: 'डॉक्टर उपलब्ध →', tamil: 'மருத்துவர்கள் உள்ளனர் →', telugu: 'వైద్యులు అందుబాటులో ఉన్నారు →', gujarati: 'ડોકટરો ઉપલબ્ધ છે →', kannada: 'ವೈದ್ಯರು ಲಭ್ಯವಿದ್ದಾರೆ →', malayalam: 'ഡോക്ടർമാർ ലഭ്യമാണ് →', punjabi: 'ਡਾਕਟਰ ਉਪਲਬਧ ਹਨ →', assamese: 'ডাক্তৰ উপলব্ধ →',
+  },
+  searchBySpecialty: {
+    english: 'Search by Specialty', hindi: 'विशेषज्ञता द्वारा खोजें', bengali: 'বিশেষজ্ঞতা দ্বারা অনুসন্ধান করুন', marathi: 'विशेषज्ञतेनुसार शोधा', tamil: 'சிறப்பு மூலம் தேடுங்கள்', telugu: 'స్పెషాలిటీ ద్వారా శోధించండి', gujarati: 'વિશેષતા દ્વારા શોધો', kannada: 'ವಿಶೇಷತೆಯ ಮೂಲಕ ಹುಡುಕಿ', malayalam: 'സ്പെഷ്യാലിറ്റി പ്രകാരം തിരയുക', punjabi: 'ਵਿਸ਼ੇਸ਼ਤਾ ਦੁਆਰਾ ਖੋਜ ਕਰੋ', assamese: 'विशेषজ্ঞতাৰ দ্বাৰা বিচাৰক',
+  },
+  searchByNameTitle: {
+    english: 'Search by Name', hindi: 'नाम से खोजें', bengali: 'নাম দ্বারা অনুসন্ধান করুন', marathi: 'नावाद्वारे शोधा', tamil: 'பெயரால் தேடுங்கள்', telugu: 'పేరు ద్వారా శోధించండి', gujarati: 'નામ દ્વારા શોધો', kannada: 'ಹೆಸರಿನ ಮೂಲಕ ಹುಡುಕಿ', malayalam: 'പേരിൽ തിരയുക', punjabi: 'ਨਾਮ ਦੁਆਰਾ ਖੋਜ ਕਰੋ', assamese: 'নামৰ দ্বাৰা বিচাৰক',
+  },
+  findRightDoctor: {
+    english: 'Find the right doctor for you', hindi: 'अपने लिए सही डॉक्टर खोजें', bengali: 'আপনার জন্য সঠিক ডাক্তার খুঁজুন', marathi: 'तुमच्यासाठी योग्य डॉक्टर शोधा', tamil: 'உங்களுக்கு சரியான மருத்துவரைக் கண்டறியவும்', telugu: 'మీకు సరైన వైద్యుడిని కనుగొనండి', gujarati: 'તમારા માટે યોગ્ય ડૉક્ટર શોધો', kannada: 'ನಿಮಗಾಗಿ ಸರಿಯಾದ ವೈದ್ಯರನ್ನು ಹುಡುಕಿ', malayalam: 'നിങ്ങൾക്ക് അനുയോജ്യമായ ഡോക്ടറെ കണ്ടെത്തുക', punjabi: 'ਤੁਹਾਡੇ ਲਈ ਸਹੀ ڈਾਕਟਰ ਲੱਭੋ', assamese: 'আপোনাৰ বাবে সঠিক ডাক্তৰ বিচাৰক',
+  },
+  noDoctorsFound: {
+    english: 'No doctors found', hindi: 'कोई डॉक्टर नहीं मिला', bengali: 'কোনো ডাক্তার পাওয়া যায়নি', marathi: 'कोणतेही डॉक्टर आढळले नाहीत', tamil: 'எந்த மருத்துவரும் காணப்படவில்லை', telugu: 'వైద్యులు ఎవరూ కనుగొనబడలేదు', gujarati: 'કોઈ ડોકટરો મળ્યા નથી', kannada: 'ಯಾವುದೇ ವೈದ್ಯರು ಕಂಡುಬಂದಿಲ್ಲ', malayalam: 'ഡോക്ടർമാരെയൊന്നും കണ്ടെത്തിയില്ല', punjabi: 'ਕੋਈ ਡਾਕਟਰ ਨਹੀਂ ਮਿਲਿਆ', assamese: 'কোনো ডাক্তৰ পোৱা নগ’ল',
+  },
+  tryAdjusting: {
+    english: 'Try adjusting your search criteria', hindi: 'अपने खोज मानदंड को समायोजित करने का प्रयास करें', bengali: 'আপনার অনুসন্ধানের মানদণ্ড সামঞ্জস্য করার চেষ্টা করুন', marathi: 'तुमचे शोध निकष समायोजित करण्याचा प्रयत्न करा', tamil: 'உங்கள் தேடல் அளவுகோல்களை சரிசெய்ய முயற்சிக்கவும்', telugu: 'మీ శోధన ప్రమాణాలను సర్దుబాటు చేయడానికి ప్రయత్నించండి', gujarati: 'તમારા શોધ માપદંડને સમાયોજિત કરવાનો પ્રયાસ કરો', kannada: 'ನಿಮ್ಮ ಹುಡುಕಾಟ ಮಾನದಂಡಗಳನ್ನು ಹೊಂದಿಸಲು ಪ್ರಯತ್ನಿಸಿ', malayalam: 'നിങ്ങളുടെ തിരയൽ മാനദണ്ഡം ക്രമീകരിക്കാൻ ശ്രമിക്കുക', punjabi: 'ਆਪਣੇ ਖੋਜ ਮਾਪਦੰਡ ਨੂੰ ਅਨੁਕੂਲ ਕਰਨ ਦੀ ਕੋਸ਼ਿਸ਼ ਕਰੋ', assamese: 'আপোনাৰ অনুসন্ধান নিৰ্ণায়ক সালসলনি কৰিবলৈ চেষ্টা কৰক',
+  },
+  resetSearchText: {
+    english: 'Reset search', hindi: 'खोज रीसेट करें', bengali: 'অনুসন্ধান রিসেট করুন', marathi: 'शोध रीसेट करा', tamil: 'தேடலை மீட்டமைக்கவும்', telugu: 'శోధనను రీసెట్ చేయండి', gujarati: 'શોધ રીસેટ કરો', kannada: 'ಹುಡುಕಾಟವನ್ನು ಮರುಹೊಂದಿಸಿ', malayalam: 'തിരയൽ പുനഃസജ്ജമാക്കുക', punjabi: 'ਖੋਜ ਰੀਸੈਟ ਕਰੋ', assamese: 'অনুসন্ধান ৰিছেট কৰক',
+  },
+  enterDoctorName: {
+    english: "Enter doctor's name...", hindi: 'डॉक्टर का नाम दर्ज करें...', bengali: 'ডাক্তারের নাম লিখুন...', marathi: 'डॉक्टरांचे नाव प्रविष्ट करा...', tamil: 'மருத்துவரின் பெயரை உள்ளிடவும்...', telugu: 'వైద్యుడి పేరు నమోదు చేయండి...', gujarati: 'ડૉક્ટરનું નામ દાખલ કરો...', kannada: 'ವೈದ್ಯರ ಹೆಸರನ್ನು ನಮೂದಿಸಿ...', malayalam: 'ഡോക്ടറുടെ പേര് നൽകുക...', punjabi: 'ਡਾਕਟਰ ਦਾ ਨਾਮ ਦਰਜ ਕਰੋ...', assamese: 'ডাক্তৰৰ নাম প্ৰবিষ্ট কৰক...',
+  },
+  showing: {
+    english: 'Showing:', hindi: 'दिखा रहा है:', bengali: 'দেখাচ্ছে:', marathi: 'दर्शवित आहे:', tamil: 'காட்டுகிறது:', telugu: 'చూపిస్తోంది:', gujarati: 'બતાવી રહ્યું છે:', kannada: 'ತೋರಿಸಲಾಗುತ್ತಿದೆ:', malayalam: 'കാണിക്കുന്നു:', punjabi: 'ਦਿਖਾ ਰਿਹਾ ਹੈ:', assamese: 'দেখুওৱা হৈছে:',
+  },
+  clearFilter: {
+    english: 'Clear', hindi: 'साफ़ करें', bengali: 'মুছে ফেলুন', marathi: 'रद्द करा', tamil: 'அழிக்கவும்', telugu: 'క్లియర్ చేయండి', gujarati: 'સાફ કરો', kannada: 'ಅಳಿಸಿ', malayalam: 'മായ്ക്കുക', punjabi: 'ਸਾਫ਼ ਕਰੋ', assamese: 'মচি পেলাওক',
+  },
+  selectDoctor: {
+    english: 'Select Doctor', hindi: 'डॉक्टर चुनें', bengali: 'ডাক্তar নির্বাচন করুন', marathi: 'डॉक्टर निवडा', tamil: 'மருத்துவரைத் தேர்ந்தெடுக்கவும்', telugu: 'వైద్యుడిని ఎంచుకోండి', gujarati: 'ડૉક્ટર પસંદ કરો', kannada: 'ವೈದ್ಯರನ್ನು ಆಯ್ಕೆಮಾಡಿ', malayalam: 'ഡോക്ടറെ തിരഞ്ഞെടുക്കുക', punjabi: 'ਡਾਕਟਰ ਦੀ ਚੋਣ ਕਰੋ', assamese: 'ডাক্তৰ বাছক',
   },
 
   // Profile Manager - Language Selection
@@ -1012,7 +1086,8 @@ export const translations = {
 
 // Translation helper function
 export function t(key: keyof typeof translations, language: Language): string {
-  return translations[key]?.[language] || translations[key]?.['english'] || key;
+  const translationsForKey = translations[key] as Record<string, string>;
+  return translationsForKey?.[language] || translationsForKey?.['english'] || key;
 }
 
 // Language display names in their native scripts
@@ -1046,7 +1121,7 @@ export const languageCodes = {
 };
 
 // Data value translations - for translating patient data from their language to doctor's language
-export const dataValueTranslations = {
+export const dataValueTranslations: Record<string, Partial<Record<Language, string>>> = {
   // Gender values
   'MALE': {
     english: 'MALE',
@@ -1567,7 +1642,7 @@ export function transliterateToLatin(text: string): string {
   let result = '';
   for (let i = 0; i < text.length; i++) {
     const char = text[i];
-    
+
     // Try Bengali first
     if (bengaliToLatin[char]) {
       result += bengaliToLatin[char];
@@ -1583,7 +1658,7 @@ export function transliterateToLatin(text: string): string {
   }
 
   // Clean up double consonants (e.g., "dtt" → "tta" for Dutta)
-  result = result.replace(/([dtbkgp])\1+/gi, (match, char) => {
+  result = result.replace(/([dtbkgp])\1+/gi, (match, _char) => {
     // Common double consonant corrections
     if (match.toLowerCase() === 'tt') return 'tta';
     if (match.toLowerCase() === 'dd') return 'dda';
@@ -1608,7 +1683,7 @@ export function transliterateFromLatin(text: string, targetScript: 'hindi' | 'be
   // Check for common names first (case-insensitive)
   const lowerText = text.toLowerCase();
   const words = lowerText.split(' ');
-  
+
   // If it's a multi-word string, process each word
   if (words.length > 1) {
     return text.split(' ').map(word => transliterateFromLatin(word, targetScript)).join(' ');
@@ -1621,10 +1696,10 @@ export function transliterateFromLatin(text: string, targetScript: 'hindi' | 'be
 
   const mapping = targetScript === 'hindi' ? latinToHindi : latinToBengali;
   const matraMapping = targetScript === 'hindi' ? hindiMatras : bengaliMatras;
-  
+
   let result = '';
   let isPreviousConsonant = false;
-  
+
   let i = 0;
   while (i < lowerText.length) {
     let matched = false;
@@ -1641,11 +1716,11 @@ export function transliterateFromLatin(text: string, targetScript: 'hindi' | 'be
         isVowel = /^[aeiou]/.test(three);
       }
     }
-    
+
     // Try 2-letter combinations (e.g., 'ch', 'sh', 'aa', 'nt')
     if (!matched && i + 1 < lowerText.length) {
       const two = lowerText.substring(i, i + 2);
-      
+
       // Special handling for vowels after consonants (Matras)
       if (isPreviousConsonant && matraMapping[two]) {
         charToAdd = matraMapping[two];
@@ -1659,11 +1734,11 @@ export function transliterateFromLatin(text: string, targetScript: 'hindi' | 'be
         i += 2;
       }
     }
-    
+
     // Single letter
     if (!matched) {
       const char = lowerText[i];
-      
+
       // Special handling for vowels after consonants (Matras)
       if (isPreviousConsonant && matraMapping[char] !== undefined) {
         charToAdd = matraMapping[char];
@@ -1682,7 +1757,7 @@ export function transliterateFromLatin(text: string, targetScript: 'hindi' | 'be
     }
 
     result += charToAdd;
-    
+
     // Update state
     if (charToAdd === ' ') {
       isPreviousConsonant = false;
@@ -1694,31 +1769,31 @@ export function transliterateFromLatin(text: string, targetScript: 'hindi' | 'be
       isPreviousConsonant = true;
     }
   }
-  
+
   return result;
 }
 
 // Smart transliteration: Convert name to doctor's preferred script
 export function transliterateName(name: string, targetLanguage: Language): string {
   if (!name) return name;
-  
+
   const hasIndicScript = containsIndicScript(name);
-  
+
   // If doctor wants English and name is in Indic script → convert to Latin
   if (targetLanguage === 'english' && hasIndicScript) {
     return transliterateToLatin(name);
   }
-  
+
   // If doctor wants Hindi and name is in Latin script → convert to Hindi
   if (targetLanguage === 'hindi' && !hasIndicScript) {
     return transliterateFromLatin(name, 'hindi');
   }
-  
+
   // If doctor wants Bengali and name is in Latin script → convert to Bengali
   if (targetLanguage === 'bengali' && !hasIndicScript) {
     return transliterateFromLatin(name, 'bengali');
   }
-  
+
   // Otherwise return as-is (same script as target)
   return name;
 }
@@ -1727,7 +1802,7 @@ export function transliterateName(name: string, targetLanguage: Language): strin
 export function translateDataValue(value: string, targetLanguage: Language): string {
   // If the value exists in our translation map, translate it
   if (dataValueTranslations[value as keyof typeof dataValueTranslations]) {
-    return dataValueTranslations[value as keyof typeof dataValueTranslations][targetLanguage];
+    return (dataValueTranslations[value as keyof typeof dataValueTranslations] as any)[targetLanguage] || value;
   }
   // Otherwise return the original value (patient name, etc.)
   return value;
@@ -1736,31 +1811,31 @@ export function translateDataValue(value: string, targetLanguage: Language): str
 // Normalize Indic numerals to English digits (for age input)
 export function normalizeIndicNumerals(text: string): string {
   if (!text) return text;
-  
+
   // Bengali numerals (০-৯) to English (0-9)
   const bengaliToEnglish: Record<string, string> = {
     '০': '0', '১': '1', '২': '2', '৩': '3', '৪': '4',
     '৫': '5', '৬': '6', '৭': '7', '৮': '8', '৯': '9'
   };
-  
+
   // Hindi/Devanagari numerals (०-९) to English (0-9)
   const hindiToEnglish: Record<string, string> = {
     '०': '0', '१': '1', '२': '2', '३': '3', '४': '4',
     '५': '5', '६': '6', '७': '7', '८': '8', '९': '9'
   };
-  
+
   let result = text;
-  
+
   // Replace Bengali numerals
   Object.keys(bengaliToEnglish).forEach(bengaliDigit => {
     result = result.replace(new RegExp(bengaliDigit, 'g'), bengaliToEnglish[bengaliDigit]);
   });
-  
+
   // Replace Hindi numerals
   Object.keys(hindiToEnglish).forEach(hindiDigit => {
     result = result.replace(new RegExp(hindiDigit, 'g'), hindiToEnglish[hindiDigit]);
   });
-  
+
   return result;
 }
 
@@ -1768,7 +1843,7 @@ export function normalizeIndicNumerals(text: string): string {
 // If name is in Bengali/Hindi, transliterate to English before storing
 export function normalizePatientName(name: string): string {
   if (!name) return name;
-  
+
   // DISABLE FORCED TRANSLITERATION
   // We want to preserve the original script entered by the patient.
   // The doctor's view will handle transliteration if needed.

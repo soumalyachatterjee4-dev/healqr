@@ -1,101 +1,121 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    
+
     // ============================================
     // HELPER FUNCTIONS
     // ============================================
-    
+
     function isAuthenticated() {
       return request.auth != null;
     }
-    
+
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
-    
+
     function isValidImageSize() {
       // Max 10MB for images
       return request.resource.size < 10 * 1024 * 1024;
     }
-    
+
     function isValidFileSize() {
       // Max 50MB for documents/prescriptions
       return request.resource.size < 50 * 1024 * 1024;
     }
-    
+
     function isImageFile() {
       return request.resource.contentType.matches('image/.*');
     }
-    
+
     function isPdfFile() {
       return request.resource.contentType == 'application/pdf';
     }
-    
+
     // ============================================
     // DOCTOR PROFILE PHOTOS
     // ============================================
-    
+
     match /doctors/{doctorId}/profile/{fileName} {
       // Allow read by anyone
       allow read: if true;
-      
+
       // Allow write only by owner, must be image, max 10MB
       allow write: if isOwner(doctorId) && isImageFile() && isValidImageSize();
     }
-    
+
     match /doctorProfileImages/{doctorId}/{allPaths=**} {
       // Allow read by anyone
       allow read: if true;
-      
+
       // Allow write by authenticated users (doctor uploading their own profile)
       allow write: if isAuthenticated() && isImageFile() && isValidImageSize();
     }
-    
+
+    // ============================================
+    // CLINIC PROFILE PHOTOS
+    // ============================================
+
+    match /clinicProfileImages/{clinicId}/{allPaths=**} {
+      // Allow read by anyone
+      allow read: if true;
+
+      // Allow write by authenticated users (clinic uploading their own profile)
+      allow write: if isAuthenticated() && isImageFile() && isValidImageSize();
+    }
+
     // ============================================
     // QR CODES
     // ============================================
-    
+
     match /doctors/{doctorId}/qr-codes/{fileName} {
       // Allow read by anyone (public QR codes)
       allow read: if true;
-      
+
       // Allow write only by owner
       allow write: if isOwner(doctorId) && isImageFile() && isValidImageSize();
     }
-    
+
     // ============================================
     // PRESCRIPTIONS (DOCTOR UPLOADS)
     // ============================================
-    
-    match /prescriptions/doctors/{doctorId}/{fileName} {
+
+    match /prescriptions/{patientId}/{fileName} {
       // Allow read by authenticated users
       allow read: if isAuthenticated();
-      
-      // Allow write only by owner, max 50MB
-      allow write: if isOwner(doctorId) && isValidFileSize();
-    }
-    
-    // ============================================
-    // PRESCRIPTIONS (PATIENT UPLOADS)
-    // ============================================
-    
-    match /prescriptions/patients/{patientId}/{fileName} {
-      // Allow read by authenticated users
-      allow read: if isAuthenticated();
-      
+
       // Allow write by authenticated users, max 50MB
       allow write: if isAuthenticated() && isValidFileSize();
     }
-    
+
+    match /prescriptions/doctors/{doctorId}/{fileName} {
+      // Allow read by authenticated users
+      allow read: if isAuthenticated();
+
+      // Allow write only by owner, max 50MB
+      allow write: if isOwner(doctorId) && isValidFileSize();
+    }
+
+    // ============================================
+    // PRESCRIPTIONS (PATIENT UPLOADS)
+    // ============================================
+
+    match /prescriptions/patients/{patientId}/{fileName} {
+      // Allow read by authenticated users
+      allow read: if isAuthenticated();
+
+      // Allow write by authenticated users, max 50MB
+      allow write: if isAuthenticated() && isValidFileSize();
+    }
+
     // ============================================
     // PRODUCT IMAGES (E-commerce)
     // ============================================
-    
+
     match /products/{doctorId}/{productId}/{fileName} {
       // Allow read by anyone
       allow read: if true;
-      
+
       // Allow write only by owner, must be image, max 10MB
       allow write: if isOwner(doctorId) && isImageFile() && isValidImageSize();
     }
@@ -103,79 +123,91 @@ service firebase.storage {
     // ============================================
     // PERSONALIZED TEMPLATES
     // ============================================
-    
+
     match /personalized-templates/{doctorId}/{allPaths=**} {
       // Allow read by anyone (so they can be shown on the mini-website)
       allow read: if true;
-      
+
       // Allow write only by owner
       allow write: if isOwner(doctorId);
     }
-    
+
+    // ============================================
+    // CLINIC PERSONALIZED TEMPLATES
+    // ============================================
+
+    match /clinic-personalized-templates/{clinicId}/{allPaths=**} {
+      // Allow read by anyone
+      allow read: if true;
+
+      // Allow write only by owner
+      allow write: if isOwner(clinicId);
+    }
+
     // ============================================
     // CHAT ATTACHMENTS
     // ============================================
-    
+
     match /chat/{chatRoomId}/{fileName} {
       // Allow read by authenticated users
       allow read: if isAuthenticated();
-      
+
       // Allow write by authenticated users, max 50MB
       allow write: if isAuthenticated() && isValidFileSize();
     }
-    
+
     // ============================================
     // ADMIN PROFILE PHOTOS
     // ============================================
-    
+
     match /admin_profiles/{fileName} {
       // Allow read by anyone (admin panel is already protected)
       allow read: if true;
-      
+
       // Allow write - admins can upload their profile photos
       allow write: if isImageFile() && isValidImageSize();
     }
-    
+
     // ============================================
     // TEMPLATES (ADMIN ONLY)
     // ============================================
-    
+
     match /templates/{fileName} {
       // Allow read by anyone
       allow read: if true;
-      
+
       // No public writes (admin only via backend)
       allow write: if false;
     }
-    
+
     // ============================================
     // VIDEOS (ADMIN ONLY)
     // ============================================
-    
+
     match /videos/{fileName} {
       // Allow read by anyone
       allow read: if true;
-      
+
       // No public writes (admin only via backend)
       allow write: if false;
     }
-    
+
     // ============================================
     // LAB REPORTS
     // ============================================
-    
+
     match /lab-reports/{doctorId}/{patientId}/{fileName} {
       // Allow read by authenticated users
       allow read: if isAuthenticated();
-      
+
       // Allow write by doctor or patient, max 50MB
       allow write: if isAuthenticated() && isValidFileSize();
     }
-    
+
     // ============================================
     // PROMOS (ADMIN UPLOADS)
     // ============================================
-    
+
     match /promos/{fileName} {
       allow read: if true;
       allow write: if isAuthenticated() && isImageFile();
@@ -184,16 +216,36 @@ service firebase.storage {
     // ============================================
     // ADVERTISER CAMPAIGNS
     // ============================================
-    
+
     match /campaigns/{userId}/{fileName} {
       allow read: if true;
       allow write: if isAuthenticated() && request.auth.uid == userId;
     }
 
     // ============================================
+    // AI RX TEMP (Intermediate Uploads)
+    // ============================================
+
+    match /ai_rx_temp/{allPaths=**} {
+      allow read, write: if true; // Temporarily allow all for debugging
+    }
+
+    // ============================================
+    // DIET CHARTS
+    // ============================================
+
+    match /diet-charts/{patientId}/{fileName} {
+      // Allow read by anyone (publicly accessible link for 72h)
+      allow read: if true;
+
+      // Allow write by authenticated users, max 20MB
+      allow write: if isAuthenticated() && isValidFileSize();
+    }
+
+    // ============================================
     // DEFAULT DENY
     // ============================================
-    
+
     // Deny access to all other files
     match /{allPaths=**} {
       allow read, write: if false;
