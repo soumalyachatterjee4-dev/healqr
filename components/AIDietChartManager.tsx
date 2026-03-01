@@ -6,16 +6,10 @@ import {
   Sparkles,
   CheckCircle2,
   Loader2,
-  AlertCircle,
   FileText,
   User,
   Activity,
-  Weight,
-  Scale,
-  Calendar,
   ChevronRight,
-  CreditCard,
-  Crown,
   Menu,
   Search,
   X,
@@ -68,7 +62,6 @@ export default function AIDietChartManager({
   const [activeTab, setActiveTab] = useState<'create' | 'history'>('create');
   const [isGenerating, setIsGenerating] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [usageCount, setUsageCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -79,24 +72,65 @@ export default function AIDietChartManager({
     const saved = localStorage.getItem('healqr_diet_history');
     return saved ? JSON.parse(saved) : [];
   });
-  const maxFreeUsage = 10;
 
-  // Derive usageCount from historyItems (current month only)
-  useEffect(() => {
-    const now = new Date();
-    const currentMonth = now.getMonth() + 1; // 1-12
-    const currentYear = now.getFullYear();
+  // Dropdown states for conditions & preferences
+  const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
+  const [otherCondition, setOtherCondition] = useState('');
+  const [selectedPreferences, setSelectedPreferences] = useState<string[]>([]);
+  const [conditionsDropdownOpen, setConditionsDropdownOpen] = useState(false);
+  const [preferencesDropdownOpen, setPreferencesDropdownOpen] = useState(false);
+  const [remarks, setRemarks] = useState('');
 
-    const monthlyItems = historyItems.filter(item => {
-      if (!item.date) return false;
-      const parts = item.date.split('/');
-      if (parts.length !== 3) return false;
-      const [, month, year] = parts.map(Number);
-      return month === currentMonth && year === currentYear;
+  const HEALTH_CONDITIONS = [
+    'None', 'Type 2 Diabetes', 'Type 1 Diabetes', 'Gestational Diabetes',
+    'Hypertension (High BP)', 'Hypotension (Low BP)', 'Hypothyroidism', 'Hyperthyroidism',
+    'PCOD / PCOS', 'Obesity', 'Underweight / Malnutrition', 'High Cholesterol',
+    'Heart Disease / CAD', 'Kidney Disease / CKD', 'Liver Disease / Fatty Liver',
+    'Gastritis / Acidity / GERD', 'IBS (Irritable Bowel)', 'Ulcerative Colitis',
+    'Celiac Disease', 'Anemia (Iron Deficiency)', 'Vitamin D Deficiency',
+    'Vitamin B12 Deficiency', 'Calcium Deficiency', 'Uric Acid / Gout',
+    'Arthritis', 'Osteoporosis', 'Asthma / COPD', 'Tuberculosis (TB)',
+    'Cancer (under treatment)', 'Post Surgery Recovery', 'Pregnancy',
+    'Lactating Mother', 'Depression / Anxiety', 'Insomnia / Sleep Disorder',
+    'Migraine', 'Skin Disorders (Eczema/Psoriasis)', 'Food Allergy',
+    'All of the above', 'Others',
+  ];
+
+  const FOOD_PREFERENCES = [
+    'Vegetarian (Pure Veg)', 'Non-Vegetarian', 'Eggetarian (Veg + Eggs)',
+    'Vegan (No Dairy/Animal)', 'Pescatarian (Veg + Fish)', 'High Protein',
+    'Low Carb / Keto', 'Low Fat', 'Low Sodium', 'Gluten-Free',
+    'Lactose-Free', 'No Seafood', 'No Red Meat', 'No Nuts', 'No Soy',
+    'Sugar-Free / Low Sugar', 'Jain Food (No Root Vegetables)', 'Satvik Diet',
+    'Halal Only', 'No Onion/Garlic', 'Intermittent Fasting', 'Liquid / Soft Diet Only',
+  ];
+
+  const toggleCondition = (condition: string) => {
+    if (condition === 'None') { setSelectedConditions(['None']); return; }
+    if (condition === 'All of the above') {
+      const allExceptMeta = HEALTH_CONDITIONS.filter(c => c !== 'None' && c !== 'All of the above' && c !== 'Others');
+      setSelectedConditions([...allExceptMeta, 'All of the above']);
+      return;
+    }
+    setSelectedConditions(prev => {
+      const filtered = prev.filter(c => c !== 'None' && c !== 'All of the above');
+      return filtered.includes(condition) ? filtered.filter(c => c !== condition) : [...filtered, condition];
     });
+  };
 
-    setUsageCount(monthlyItems.length);
-  }, [historyItems]);
+  const togglePreference = (pref: string) => {
+    setSelectedPreferences(prev =>
+      prev.includes(pref) ? prev.filter(p => p !== pref) : [...prev, pref]
+    );
+  };
+
+  const getConditionsString = () => {
+    let result = selectedConditions.filter(c => c !== 'All of the above').join(', ');
+    if (selectedConditions.includes('Others') && otherCondition.trim()) {
+      result += (result ? ', ' : '') + otherCondition.trim();
+    }
+    return result;
+  };
 
   // Save history to localStorage
   useEffect(() => {
@@ -153,18 +187,30 @@ export default function AIDietChartManager({
     isAlcoholic: false
   });
 
+  // BMI Calculation
+  const bmi = patientData.weight && patientData.height && parseFloat(patientData.height) > 0
+    ? (parseFloat(patientData.weight) / ((parseFloat(patientData.height) / 100) ** 2)).toFixed(1)
+    : null;
+
+  const getBmiCategory = (bmiVal: number): { label: string; color: string } => {
+    if (bmiVal < 18.5) return { label: 'Underweight', color: 'text-yellow-400' };
+    if (bmiVal < 25) return { label: 'Normal', color: 'text-emerald-400' };
+    if (bmiVal < 30) return { label: 'Overweight', color: 'text-orange-400' };
+    return { label: 'Obese', color: 'text-red-400' };
+  };
+
   // Simulated chart generation
   const handleGenerate = async () => {
-    if (!patientData.name || !patientData.age || !patientData.conditions) {
+    const condStr = getConditionsString();
+    if (!patientData.name || !patientData.age) {
       toast.error('Required fields missing', {
-        description: 'Please fill in Name, Age, and Medical Conditions. If none, please mention "None".'
+        description: 'Please fill in Patient Name and Age.'
       });
       return;
     }
-
-    if (usageCount >= maxFreeUsage) {
-      toast.error('Free limit reached', {
-        description: 'Please upgrade to premium for unlimited charts.'
+    if (!condStr.trim()) {
+      toast.error('Medical conditions required', {
+        description: 'Please select at least one medical condition. If none, select "None".'
       });
       return;
     }
@@ -228,7 +274,7 @@ export default function AIDietChartManager({
       phone: patientData.phone,
       age: patientData.age,
       gender: patientData.gender,
-      conditions: patientData.conditions,
+      conditions: getConditionsString(),
       region: patientData.region,
       isSmoker: patientData.isSmoker,
       isAlcoholic: patientData.isAlcoholic,
@@ -239,7 +285,6 @@ export default function AIDietChartManager({
 
     setHistoryItems(prev => [newChart, ...prev]);
     setIsGenerating(false);
-    setUsageCount(prev => prev + 1);
     toast.success('AI Diet Chart generated successfully!');
   };
 
@@ -358,59 +403,7 @@ export default function AIDietChartManager({
           </div>
         </header>
 
-        <div className="p-4 md:p-8 max-w-5xl mx-auto w-full space-y-8">
-          {/* Usage Tracker & Premium Card */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="md:col-span-2 bg-zinc-900 border-zinc-800 overflow-hidden relative">
-              <CardContent className="pt-6">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-                  <div>
-                    <h3 className="text-xl font-bold text-white mb-1">Monthly Usage</h3>
-                    <p className="text-sm text-gray-400">Generate up to 10 diet charts for free every month.</p>
-                  </div>
-                  <div className="bg-black rounded-lg px-4 py-2 border border-zinc-800">
-                    <span className="text-2xl font-bold text-emerald-500">{usageCount}</span>
-                    <span className="text-gray-500 mx-2">/</span>
-                    <span className="text-gray-400">{maxFreeUsage}</span>
-                  </div>
-                </div>
-
-                <div className="w-full h-3 bg-zinc-800 rounded-full overflow-hidden mb-4">
-                  <div
-                    className="h-full bg-emerald-500 transition-all duration-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]"
-                    style={{ width: `${(usageCount / maxFreeUsage) * 100}%` }}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between text-xs text-gray-500">
-                  <span>Usage resets on the 1st of next month</span>
-                  <span className="flex items-center text-emerald-500">
-                    <CheckCircle2 className="w-3 h-3 mr-1" />
-                    Real-time analysis active
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-br from-emerald-600 to-emerald-900 border-0 text-white relative overflow-hidden group">
-              <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
-              <CardContent className="pt-6 relative z-10 flex flex-col h-full">
-                <Crown className="w-8 h-8 text-yellow-400 mb-3" />
-                <h3 className="text-xl font-bold mb-2">Go Premium</h3>
-                <p className="text-emerald-100 text-sm mb-6 flex-1">
-                  Get unlimited charts, custom branding, and early access to new AI models.
-                </p>
-                <Button className="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-bold border-0 flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 py-6">
-                  <CreditCard className="w-4 h-4" />
-                  Upgrade Now
-                </Button>
-                <p className="text-[10px] text-center mt-3 text-emerald-200 opacity-60">
-                  Secure payment via Razorpay
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
+        <div className="p-4 md:p-8 max-w-4xl mx-auto w-full space-y-6">
           {/* Main Action Tabs */}
           <div className="flex p-1 bg-zinc-900 rounded-xl w-fit">
             <button
@@ -445,206 +438,309 @@ export default function AIDietChartManager({
                   Patient Assessment
                 </CardTitle>
               </CardHeader>
-              <CardContent className="pt-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  {/* Personal Info */}
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                       <label className="text-sm font-medium text-gray-400">Patient Name <span className="text-red-500">*</span></label>
-                       <div className="relative">
-                         <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                         <input
-                           type="text"
-                           placeholder="Enter full name"
-                           className="w-full bg-black border border-zinc-800 rounded-xl pl-12 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                           value={patientData.name}
-                           onChange={(e) => setPatientData({...patientData, name: e.target.value})}
-                         />
-                       </div>
-                    </div>
+              <CardContent className="pt-6 space-y-6">
 
-                    <div className="space-y-2">
-                       <label className="text-sm font-medium text-gray-400">Phone Number</label>
-                       <div className="relative">
-                         <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                         <input
-                           type="tel"
-                           placeholder="Enter phone number"
-                           className="w-full bg-black border border-zinc-800 rounded-xl pl-12 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                           value={patientData.phone}
-                           onChange={(e) => setPatientData({...patientData, phone: e.target.value})}
-                         />
-                       </div>
+                {/* Row 1: Name, Phone, Age, Gender */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-400">Patient Name <span className="text-red-500">*</span></label>
+                    <input
+                      type="text"
+                      placeholder="Enter full name"
+                      className="w-full bg-black border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all"
+                      value={patientData.name}
+                      onChange={(e) => setPatientData({...patientData, name: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-400">Phone Number</label>
+                    <input
+                      type="tel"
+                      placeholder="Enter phone number"
+                      className="w-full bg-black border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all"
+                      value={patientData.phone}
+                      onChange={(e) => setPatientData({...patientData, phone: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-400">Age <span className="text-red-500">*</span></label>
+                    <input
+                      type="number"
+                      placeholder="Years"
+                      className="w-full bg-black border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all"
+                      value={patientData.age}
+                      onChange={(e) => setPatientData({...patientData, age: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-400">Gender</label>
+                    <select
+                      className="w-full bg-black border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all"
+                      value={patientData.gender}
+                      onChange={(e) => setPatientData({...patientData, gender: e.target.value})}
+                    >
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Row 2: Weight, Height, BMI */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-400">Weight (kg)</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 72"
+                      className="w-full bg-black border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all"
+                      value={patientData.weight}
+                      onChange={(e) => setPatientData({...patientData, weight: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-400">Height (cm)</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 170"
+                      className="w-full bg-black border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all"
+                      value={patientData.height}
+                      onChange={(e) => setPatientData({...patientData, height: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-400">BMI</label>
+                    <div className={`flex flex-col items-center justify-center h-[42px] rounded-lg border ${
+                      bmi ? 'bg-zinc-800 border-zinc-600' : 'bg-zinc-900/50 border-zinc-700/50'
+                    }`}>
+                      {bmi ? (
+                        <>
+                          <span className="text-base font-bold text-white leading-tight">{bmi}</span>
+                          <span className={`text-[9px] font-semibold leading-tight ${getBmiCategory(parseFloat(bmi)).color}`}>
+                            {getBmiCategory(parseFloat(bmi)).label}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-xs text-gray-600">Auto</span>
+                      )}
                     </div>
                   </div>
+                </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-400">Age</label>
-                        <div className="relative group">
-                          <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                          <input
-                            type="number"
-                            placeholder="Years"
-                            className="w-full bg-black border border-zinc-800 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                            value={patientData.age}
-                            onChange={(e) => setPatientData({...patientData, age: e.target.value})}
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-400">Gender</label>
-                        <select
-                          className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all appearance-none"
-                          value={patientData.gender}
-                          onChange={(e) => setPatientData({...patientData, gender: e.target.value})}
-                        >
-                          <option value="male">Male</option>
-                          <option value="female">Female</option>
-                          <option value="other">Other</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-400">Weight (kg)</label>
-                        <div className="relative group">
-                          <Weight className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                          <input
-                            type="number"
-                            placeholder="e.g. 70"
-                            className="w-full bg-black border border-zinc-800 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                            value={patientData.weight}
-                            onChange={(e) => setPatientData({...patientData, weight: e.target.value})}
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-400">Height (cm)</label>
-                        <div className="relative group">
-                          <Scale className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                          <input
-                            type="number"
-                            placeholder="e.g. 175"
-                            className="w-full bg-black border border-zinc-800 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                            value={patientData.height}
-                            onChange={(e) => setPatientData({...patientData, height: e.target.value})}
-                          />
-                        </div>
-                      </div>
-                    </div>
+                {/* Activity Level */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-400">Activity Level</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['sedentary', 'moderate', 'active'] as const).map((level) => (
+                      <button
+                        key={level}
+                        onClick={() => setPatientData({...patientData, activityLevel: level})}
+                        className={`py-2.5 px-3 rounded-lg text-sm font-medium capitalize border transition-colors ${
+                          patientData.activityLevel === level
+                            ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                            : 'bg-black border-zinc-700 text-gray-400 hover:bg-zinc-800'
+                        }`}
+                      >
+                        {level}
+                      </button>
+                    ))}
                   </div>
+                </div>
 
-                  {/* Medical Info */}
-                  <div className="space-y-6">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-400">Activity Level</label>
-                      <div className="grid grid-cols-3 gap-2">
-                        {['sedentary', 'moderate', 'active'].map((level) => (
+                {/* Medical Conditions Dropdown (Mandatory) */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-400">Medical Conditions / Diagnosis</label>
+                    <span className="text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full">Mandatory</span>
+                  </div>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => { setConditionsDropdownOpen(!conditionsDropdownOpen); setPreferencesDropdownOpen(false); }}
+                      className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-sm text-left flex items-center justify-between min-h-[44px]"
+                    >
+                      <span className={selectedConditions.length > 0 ? 'text-white' : 'text-gray-500'}>
+                        {selectedConditions.length > 0
+                          ? selectedConditions.slice(0, 3).join(', ') + (selectedConditions.length > 3 ? ` +${selectedConditions.length - 3} more` : '')
+                          : 'Select conditions...'}
+                      </span>
+                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${conditionsDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    {conditionsDropdownOpen && (
+                      <div className="absolute z-50 mt-1 w-full bg-zinc-900 border border-zinc-600 rounded-lg shadow-xl max-h-[200px] overflow-y-auto">
+                        {HEALTH_CONDITIONS.map((cond) => (
                           <button
-                            key={level}
-                            onClick={() => setPatientData({...patientData, activityLevel: level})}
-                            className={`px-3 py-2 rounded-lg text-xs font-semibold capitalize transition-all border ${
-                              patientData.activityLevel === level
-                                ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
-                                : 'bg-black border-zinc-800 text-gray-500 hover:border-zinc-700'
+                            key={cond}
+                            type="button"
+                            onClick={() => toggleCondition(cond)}
+                            className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-zinc-800 transition-colors ${
+                              cond === 'None' ? 'text-gray-400 border-b border-zinc-700' :
+                              cond === 'All of the above' ? 'text-blue-400 border-t border-zinc-700' :
+                              cond === 'Others' ? 'text-orange-400 border-t border-zinc-700' :
+                              'text-gray-300'
                             }`}
                           >
-                            {level}
+                            <span className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center text-[10px] ${
+                              selectedConditions.includes(cond)
+                                ? 'bg-emerald-500 border-emerald-500 text-white'
+                                : 'border-zinc-600 bg-zinc-800'
+                            }`}>
+                              {selectedConditions.includes(cond) && '✓'}
+                            </span>
+                            {cond}
                           </button>
                         ))}
                       </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-400 flex items-center gap-2">
-                        Medical Conditions / Complaints
-                        <Badge variant="outline" className="text-[10px] py-0 border-red-500/50 text-red-400 bg-red-500/5">Mandatory</Badge>
-                      </label>
-                      <textarea
-                        placeholder="Mention 'None' if applicable. e.g. Diabetes, Hypertension..."
-                        className="w-full h-24 bg-black border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all resize-none"
-                        value={patientData.conditions}
-                        onChange={(e) => setPatientData({...patientData, conditions: e.target.value})}
-                      />
-                    </div>
-
-                    <div className="space-y-4">
-                      <label className="text-sm font-medium text-gray-400">Dietary Preferences & Lifestyle</label>
-                      <textarea
-                        placeholder="e.g. Vegetarian, No Dairy, High Protein..."
-                        className="w-full h-16 bg-black border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all resize-none mb-2"
-                        value={patientData.preferences}
-                        onChange={(e) => setPatientData({...patientData, preferences: e.target.value})}
-                      />
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                           <label className="text-[12px] text-gray-500">Regional Culture</label>
-                           <select
-                             className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 appearance-none"
-                             value={patientData.region}
-                             onChange={(e) => setPatientData({...patientData, region: e.target.value})}
-                           >
-                             <option value="West Bengal">West Bengal</option>
-                             <option value="North India">North India</option>
-                             <option value="South India">South India</option>
-                             <option value="Maharashtra">Maharashtra</option>
-                             <option value="Gujarat">Gujarat</option>
-                             <option value="General Indian">General Indian</option>
-                           </select>
-                        </div>
-
-                        <div className="flex items-center gap-4 pt-6">
-                           <label className="flex items-center gap-2 cursor-pointer group">
-                             <div
-                               onClick={() => setPatientData({...patientData, isSmoker: !patientData.isSmoker})}
-                               className={`w-10 h-5 rounded-full transition-colors relative ${patientData.isSmoker ? 'bg-emerald-500' : 'bg-zinc-800'}`}
-                             >
-                               <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${patientData.isSmoker ? 'left-6' : 'left-1'}`} />
-                             </div>
-                             <span className="text-xs text-gray-400">Smoker</span>
-                           </label>
-
-                           <label className="flex items-center gap-2 cursor-pointer group">
-                             <div
-                               onClick={() => setPatientData({...patientData, isAlcoholic: !patientData.isAlcoholic})}
-                               className={`w-10 h-5 rounded-full transition-colors relative ${patientData.isAlcoholic ? 'bg-emerald-500' : 'bg-zinc-800'}`}
-                             >
-                               <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${patientData.isAlcoholic ? 'left-6' : 'left-1'}`} />
-                             </div>
-                             <span className="text-xs text-gray-400">Alcoholic</span>
-                           </label>
-                        </div>
-                      </div>
-                    </div>
+                    )}
                   </div>
+                  {selectedConditions.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedConditions.map((cond) => (
+                        <span
+                          key={cond}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+                        >
+                          {cond}
+                          <button type="button" onClick={() => toggleCondition(cond)} className="hover:text-emerald-100">×</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {selectedConditions.includes('Others') && (
+                    <input
+                      placeholder="Specify other conditions..."
+                      value={otherCondition}
+                      onChange={(e) => setOtherCondition(e.target.value)}
+                      className="w-full bg-black border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 mt-1"
+                    />
+                  )}
                 </div>
 
-                <div className="mt-12 flex flex-col items-center">
+                {/* Food Preferences Dropdown */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-400">Food Preferences / Restrictions</label>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => { setPreferencesDropdownOpen(!preferencesDropdownOpen); setConditionsDropdownOpen(false); }}
+                      className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-sm text-left flex items-center justify-between min-h-[44px]"
+                    >
+                      <span className={selectedPreferences.length > 0 ? 'text-white' : 'text-gray-500'}>
+                        {selectedPreferences.length > 0
+                          ? selectedPreferences.slice(0, 3).join(', ') + (selectedPreferences.length > 3 ? ` +${selectedPreferences.length - 3} more` : '')
+                          : 'Select preferences...'}
+                      </span>
+                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${preferencesDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    {preferencesDropdownOpen && (
+                      <div className="absolute z-50 mt-1 w-full bg-zinc-900 border border-zinc-600 rounded-lg shadow-xl max-h-[200px] overflow-y-auto">
+                        {FOOD_PREFERENCES.map((pref) => (
+                          <button
+                            key={pref}
+                            type="button"
+                            onClick={() => togglePreference(pref)}
+                            className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-zinc-800 transition-colors text-gray-300"
+                          >
+                            <span className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center text-[10px] ${
+                              selectedPreferences.includes(pref)
+                                ? 'bg-emerald-500 border-emerald-500 text-white'
+                                : 'border-zinc-600 bg-zinc-800'
+                            }`}>
+                              {selectedPreferences.includes(pref) && '✓'}
+                            </span>
+                            {pref}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {selectedPreferences.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedPreferences.map((pref) => (
+                        <span
+                          key={pref}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+                        >
+                          {pref}
+                          <button type="button" onClick={() => togglePreference(pref)} className="hover:text-emerald-100">×</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Region */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-400">Region (for cuisine preferences)</label>
+                  <select
+                    value={patientData.region}
+                    onChange={(e) => setPatientData({...patientData, region: e.target.value})}
+                    className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value="West Bengal">West Bengal</option>
+                    <option value="North India">North India</option>
+                    <option value="South India">South India</option>
+                    <option value="East India">East India</option>
+                    <option value="West India">West India</option>
+                    <option value="Northeast India">Northeast India</option>
+                    <option value="Maharashtra">Maharashtra</option>
+                    <option value="Gujarat">Gujarat</option>
+                    <option value="General Indian">General Indian</option>
+                  </select>
+                </div>
+
+                {/* Smoker / Alcoholic Checkboxes */}
+                <div className="flex items-center gap-6">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={patientData.isSmoker}
+                      onChange={(e) => setPatientData({...patientData, isSmoker: e.target.checked})}
+                      className="w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-emerald-500 focus:ring-emerald-500"
+                    />
+                    <span className="text-sm text-gray-400">Smoker</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={patientData.isAlcoholic}
+                      onChange={(e) => setPatientData({...patientData, isAlcoholic: e.target.checked})}
+                      className="w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-emerald-500 focus:ring-emerald-500"
+                    />
+                    <span className="text-sm text-gray-400">Alcoholic</span>
+                  </label>
+                </div>
+
+                {/* Special Instructions / Remarks */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-400">Special Instructions / Remarks</label>
+                  <textarea
+                    placeholder="e.g. Low sodium diet, avoid spicy food..."
+                    value={remarks}
+                    onChange={(e) => setRemarks(e.target.value)}
+                    className="w-full bg-black border border-zinc-700 rounded-lg p-3 text-sm text-white min-h-[60px] focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                {/* Footer: AI text + Generate Button */}
+                <div className="pt-4 border-t border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <Sparkles className="w-4 h-4 text-emerald-400" />
+                    <span>AI-powered nutrition plan based on patient assessment</span>
+                  </div>
                   <Button
                     onClick={handleGenerate}
                     disabled={isGenerating}
-                    className="h-16 !px-[80px] bg-emerald-500 hover:bg-emerald-600 text-white rounded-full !text-[16px] font-bold shadow-[0_0_30px_rgba(16,185,129,0.4)] hover:shadow-[0_0_40px_rgba(16,185,129,0.6)] transition-all group overflow-hidden relative min-w-max"
+                    className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white font-bold h-10 px-6"
                   >
                     {isGenerating ? (
-                      <span className="flex items-center gap-3 whitespace-nowrap">
-                        <Loader2 className="w-6 h-6 animate-spin" />
-                        AI is crafting the chart...
-                      </span>
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating...</>
                     ) : (
-                      <span className="flex items-center gap-3 whitespace-nowrap">
-                        <Sparkles className="w-5 h-5 transition-transform group-hover:scale-125 group-hover:rotate-12" />
-                        Generate AI Diet Chart
-                      </span>
+                      <><Sparkles className="w-4 h-4 mr-2" /> Generate Diet Chart</>
                     )}
                   </Button>
-                  <p className="mt-4 text-xs text-gray-500 max-w-sm text-center">
-                    HealQR AI analysis takes into account 25+ biometric markers and medical associations. Result may vary based on data accuracy.
-                  </p>
                 </div>
+
               </CardContent>
             </Card>
           ) : (
@@ -735,37 +831,6 @@ export default function AIDietChartManager({
             </div>
           )}
 
-
-          {/* Educational / Feature Highlight Section */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-12">
-            {[
-              {
-                icon: Activity,
-                title: 'Nutritional Harmony',
-                desc: 'Balanced macros tailored to specific metabolic rates.'
-              },
-              {
-                icon: AlertCircle,
-                title: 'Medical Compliance',
-                desc: 'Intelligent filtering for common allergies and contraindications.'
-              },
-              {
-                icon: History,
-                title: '7-Day Precision',
-                desc: 'Complete week-long planning to ensure long-term adherence.'
-              }
-            ].map((feature, i) => (
-              <div key={i} className="flex gap-4 p-4 grayscale hover:grayscale-0 transition-all opacity-60 hover:opacity-100">
-                <div className="mt-1">
-                  <feature.icon className="w-5 h-5 text-emerald-500" />
-                </div>
-                <div>
-                  <h5 className="font-semibold text-white text-sm mb-1">{feature.title}</h5>
-                  <p className="text-xs text-gray-500 leading-relaxed">{feature.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
 
         <footer className="mt-auto py-8 text-center border-t border-zinc-900">
