@@ -5,6 +5,9 @@ import { Patient } from './ViewPatientsModal';
 import { useState, useEffect } from 'react';
 import FollowUpModal from './FollowUpModal';
 import PatientHistoryModal from './PatientHistoryModal';
+import DigitalRXMaker from './DigitalRXMaker';
+import InlineDietChartModal from './InlineDietChartModal';
+import { toast } from 'sonner';
 
 interface WalkInPatientsPageProps {
   patients: Patient[];
@@ -44,11 +47,205 @@ export default function WalkInPatientsPage({ patients, onBack, onMenuChange }: W
     name: ''
   });
 
+  // Full doctor info for DigitalRXMaker / InlineDietChartModal
+  const [fullDoctorInfo, setFullDoctorInfo] = useState<any>(null);
+
+  // RX Maker state
+  const [rxMakerOpen, setRxMakerOpen] = useState(false);
+  const [rxPatient, setRxPatient] = useState<Patient | null>(null);
+
+  // Diet Chart state
+  const [dietChartOpen, setDietChartOpen] = useState(false);
+  const [dietPatient, setDietPatient] = useState<Patient | null>(null);
+
   useEffect(() => {
     const id = localStorage.getItem('userId') || '';
     const name = localStorage.getItem('healqr_user_name') || localStorage.getItem('doctorName') || 'Doctor';
     setDoctorInfo({ id, name });
   }, []);
+
+  // Load full doctor info for PDF generation (same as PatientDetails)
+  useEffect(() => {
+    const loadFullDoctorInfo = async () => {
+      try {
+        const userId = localStorage.getItem('userId');
+        if (!userId) return;
+
+        const { db } = await import('../lib/firebase/config');
+        const { doc, getDoc } = await import('firebase/firestore');
+
+        const doctorDoc = await getDoc(doc(db!, 'doctors', userId));
+        if (!doctorDoc.exists()) return;
+        const d = doctorDoc.data();
+
+        // Check if doctor belongs to a clinic
+        const chamberClinicId = d.clinicId;
+        let clinicInfo: any = null;
+        let allDoctors: any[] = [];
+
+        if (chamberClinicId) {
+          try {
+            const clinicDoc = await getDoc(doc(db!, 'clinics', chamberClinicId));
+            if (clinicDoc.exists()) {
+              const cd = clinicDoc.data();
+              clinicInfo = {
+                name: cd.name || cd.clinicName || '',
+                address: cd.address || '',
+                qrNumber: cd.qrNumber || '',
+                phone: cd.phone || '',
+                clinicId: chamberClinicId,
+                registrationNumber: cd.registrationNumber || '',
+                showRegistrationOnRx: cd.showRegistrationOnRx !== undefined ? cd.showRegistrationOnRx : true,
+                footerLine1: cd.footerLine1 || '',
+                footerLine2: cd.footerLine2 || '',
+                watermarkLogo: cd.watermarkLogo || '',
+              };
+
+              const linkedDoctors = cd.linkedDoctorsDetails || [];
+              for (const ld of linkedDoctors) {
+                let docTiming = '';
+                let docRegNumber = '';
+                try {
+                  const ldDoc = await getDoc(doc(db!, 'doctors', ld.uid || ld.doctorId));
+                  if (ldDoc.exists()) {
+                    const ldData = ldDoc.data();
+                    const ldChamber = ldData.chambers?.find((c: any) => c.clinicId === chamberClinicId);
+                    docTiming = ldChamber ? `${ldChamber.startTime} - ${ldChamber.endTime}` : '';
+                    docRegNumber = ldData.registrationNumber || '';
+                  }
+                } catch { /* skip */ }
+                allDoctors.push({
+                  name: ld.name || '',
+                  specialty: ld.specialties?.[0] || ld.specialty || '',
+                  timing: docTiming,
+                  registrationNumber: docRegNumber,
+                });
+              }
+            }
+          } catch (e) {
+            console.error('Failed to load clinic info:', e);
+          }
+        }
+
+        let allChambers: any[] = [];
+        if (!chamberClinicId && d.chambers) {
+          allChambers = d.chambers.map((c: any) => ({
+            name: c.chamberName || '',
+            address: c.chamberAddress || '',
+            timing: `${c.startTime} - ${c.endTime}`,
+          }));
+        }
+
+        setFullDoctorInfo({
+          id: userId,
+          name: d.name || 'Doctor',
+          degree: d.degree || d.degrees?.[0] || '',
+          degrees: d.degrees || (d.degree ? [d.degree] : []),
+          specialty: d.specialty || d.specialities?.[0] || '',
+          specialities: d.specialities || (d.specialty ? [d.specialty] : []),
+          qrNumber: d.qrNumber || '',
+          clinicName: clinicInfo?.name || d.clinicName || '',
+          doctorId: userId,
+          address: clinicInfo?.address || d.address || '',
+          timing: d.timing || '',
+          registrationNumber: d.registrationNumber || '',
+          showRegistrationOnRX: d.showRegistrationOnRX !== false,
+          useDrPrefix: d.useDrPrefix !== false,
+          pdfContext: chamberClinicId ? 'clinic' : 'doctor',
+          clinicInfo: clinicInfo || undefined,
+          allDoctors: allDoctors.length > 0 ? allDoctors : undefined,
+          allChambers: allChambers.length > 0 ? allChambers : undefined,
+          footerLine1: d.footerLine1 || '',
+          footerLine2: d.footerLine2 || '',
+          watermarkLogo: d.watermarkLogo || '',
+        });
+      } catch (error) {
+        console.error('Failed to load doctor info:', error);
+      }
+    };
+    loadFullDoctorInfo();
+  }, []);
+
+  // Handle RX button click — open DigitalRXMaker directly
+  const handleOpenRxMaker = (patient: Patient) => {
+    setRxPatient(patient);
+    setRxMakerOpen(true);
+  };
+
+  // Handle RX generated — save to Firestore, skip notification for manual_override
+  const handleRxGenerated = async (downloadURL: string, rxData?: any) => {
+    setRxMakerOpen(false);
+    if (!rxPatient) return;
+
+    try {
+      toast.loading('Saving Digital RX...', { id: 'walkin-rx' });
+      const { doc: docRef, updateDoc } = await import('firebase/firestore');
+      const { db: fireDb } = await import('../lib/firebase/config');
+      await updateDoc(docRef(fireDb!, 'bookings', rxPatient.id), {
+        digitalRxUrl: downloadURL,
+        ...(rxData ? { rxLastData: rxData } : {}),
+      });
+
+      const isManualOverride = rxPatient.verificationMethod === 'manual_override';
+      if (!isManualOverride) {
+        // QR-verified: send RX notification
+        try {
+          const { sendRxUpdatedNotification } = await import('../services/notificationService');
+          await sendRxUpdatedNotification({
+            patientPhone: rxPatient.whatsappNumber,
+            patientName: rxPatient.patientName,
+            age: rxPatient.age,
+            sex: rxPatient.gender,
+            purpose: rxPatient.purposeOfVisit,
+            doctorId: doctorInfo.id,
+            doctorName: doctorInfo.name,
+            clinicName: fullDoctorInfo?.clinicName || 'Chamber',
+            bookingId: rxPatient.bookingId || rxPatient.id,
+            consultationDate: new Date().toISOString().split('T')[0],
+            consultationTime: new Date().toTimeString().split(' ')[0].slice(0, 5),
+            chamber: fullDoctorInfo?.clinicName || 'Chamber',
+            language: rxPatient.language || 'english',
+            rxUrl: downloadURL,
+          });
+        } catch (notifErr) {
+          console.error('RX notification error:', notifErr);
+        }
+      }
+
+      toast.success(
+        isManualOverride ? 'Digital RX created — ready for printing!' : 'Digital RX created & sent to patient!',
+        { id: 'walkin-rx' }
+      );
+    } catch (err) {
+      console.error('Error saving RX:', err);
+      toast.error('Failed to save Digital RX', { id: 'walkin-rx' });
+    }
+    setRxPatient(null);
+  };
+
+  // Handle Diet Chart button click — open InlineDietChartModal directly
+  const handleOpenDietChart = (patient: Patient) => {
+    setDietPatient(patient);
+    setDietChartOpen(true);
+  };
+
+  // Handle Diet Chart generated
+  const handleDietGenerated = async (dietUrl: string) => {
+    setDietChartOpen(false);
+    if (!dietPatient) return;
+
+    try {
+      const { doc: docRef, updateDoc } = await import('firebase/firestore');
+      const { db: fireDb } = await import('../lib/firebase/config');
+      await updateDoc(docRef(fireDb!, 'bookings', dietPatient.id), {
+        dietChartUrl: dietUrl,
+      });
+      toast.success('AI Diet Chart saved!');
+    } catch (err) {
+      console.error('Error saving diet chart:', err);
+    }
+    setDietPatient(null);
+  };
   
   // Get current date
   const getCurrentDate = () => {
@@ -299,24 +496,12 @@ export default function WalkInPatientsPage({ patients, onBack, onMenuChange }: W
                     </div>
                   )}
 
-                  {/* 3. Digital RX (Print Only) — FileText Blue */}
+                  {/* 3. Digital RX — FileText Blue (Opens RX Maker inline) */}
                   <button
-                    onClick={() => {
-                      // Pre-fill patient data and navigate to Digital RX tab
-                      const prefilledData = {
-                        name: patient.patientName,
-                        age: patient.age,
-                        gender: patient.gender,
-                        phone: patient.whatsappNumber,
-                        bookingId: patient.id,
-                        isWalkIn: true,
-                        verificationMethod: patient.verificationMethod,
-                      };
-                      localStorage.setItem('prefilled_rx_patient', JSON.stringify(prefilledData));
-                      if (onMenuChange) onMenuChange('digital-rx');
-                    }}
-                    className="relative w-12 h-12 md:w-10 md:h-10 rounded-lg flex items-center justify-center transition-colors bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50 cursor-pointer group"
-                    title={patient.verificationMethod === 'manual_override' ? "Create Digital RX (Print Only)" : "Create Digital RX"}
+                    onClick={() => handleOpenRxMaker(patient)}
+                    disabled={!fullDoctorInfo}
+                    className={`relative w-12 h-12 md:w-10 md:h-10 rounded-lg flex items-center justify-center transition-colors ${!fullDoctorInfo ? 'bg-gray-800 border border-gray-700 opacity-50 cursor-not-allowed' : 'bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50 cursor-pointer'} group`}
+                    title={!fullDoctorInfo ? "Loading doctor info..." : (patient.verificationMethod === 'manual_override' ? "Create Digital RX (Print Only)" : "Create Digital RX")}
                   >
                     <FileText className="w-5 h-5 md:w-4 md:h-4 text-blue-400 group-hover:scale-110 transition-transform" />
                   </button>
@@ -340,20 +525,12 @@ export default function WalkInPatientsPage({ patients, onBack, onMenuChange }: W
                     <Sparkles className="w-5 h-5 md:w-4 md:h-4 text-white group-hover:scale-110 transition-transform" />
                   </button>
 
-                  {/* 5. AI Diet Chart — Orange Apple */}
+                  {/* 5. AI Diet Chart — Orange Apple (Opens Diet Chart inline) */}
                   <button
-                    onClick={() => {
-                      const prefilledData = {
-                        name: patient.patientName,
-                        age: patient.age,
-                        gender: patient.gender,
-                        phone: patient.whatsappNumber,
-                      };
-                      localStorage.setItem('prefilled_diet_patient', JSON.stringify(prefilledData));
-                      if (onMenuChange) onMenuChange('ai-diet-chart');
-                    }}
-                    className="relative w-12 h-12 md:w-10 md:h-10 rounded-lg flex items-center justify-center transition-colors bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/50 cursor-pointer group"
-                    title="Create AI Diet Chart"
+                    onClick={() => handleOpenDietChart(patient)}
+                    disabled={!fullDoctorInfo}
+                    className={`relative w-12 h-12 md:w-10 md:h-10 rounded-lg flex items-center justify-center transition-colors ${!fullDoctorInfo ? 'bg-gray-800 border border-gray-700 opacity-50 cursor-not-allowed' : 'bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/50 cursor-pointer'} group`}
+                    title={!fullDoctorInfo ? "Loading doctor info..." : "Create AI Diet Chart"}
                   >
                     <Apple className="w-5 h-5 md:w-4 md:h-4 text-orange-500 group-hover:scale-110 transition-transform" />
                   </button>
@@ -465,6 +642,44 @@ export default function WalkInPatientsPage({ patients, onBack, onMenuChange }: W
           patientName={selectedPatient.patientName}
           doctorId={doctorInfo.id}
           doctorName={doctorInfo.name}
+        />
+      )}
+
+      {/* DigitalRXMaker Modal (inline) */}
+      {rxMakerOpen && rxPatient && fullDoctorInfo && (
+        <DigitalRXMaker
+          patient={{
+            id: rxPatient.id,
+            name: rxPatient.patientName,
+            age: typeof rxPatient.age === 'number' ? rxPatient.age : (parseInt(rxPatient.age) || 0),
+            gender: rxPatient.gender || 'N/A',
+            phone: rxPatient.whatsappNumber,
+            bookingId: rxPatient.bookingId || rxPatient.id,
+            appointmentTime: new Date(),
+            bookingTime: rxPatient.timestamp || new Date(),
+            language: rxPatient.language || 'english',
+            purpose: rxPatient.purposeOfVisit,
+          }}
+          doctorInfo={fullDoctorInfo}
+          onClose={() => { setRxMakerOpen(false); setRxPatient(null); }}
+          onGenerated={handleRxGenerated}
+        />
+      )}
+
+      {/* InlineDietChartModal (inline) */}
+      {dietChartOpen && dietPatient && fullDoctorInfo && (
+        <InlineDietChartModal
+          patient={{
+            id: dietPatient.id,
+            name: dietPatient.patientName,
+            age: typeof dietPatient.age === 'number' ? dietPatient.age : (parseInt(dietPatient.age) || 0),
+            gender: dietPatient.gender || 'N/A',
+            phone: dietPatient.whatsappNumber,
+            visitType: dietPatient.purposeOfVisit,
+          }}
+          doctorInfo={fullDoctorInfo}
+          onClose={() => { setDietChartOpen(false); setDietPatient(null); }}
+          onGenerated={handleDietGenerated}
         />
       )}
     </div>
