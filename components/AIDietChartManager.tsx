@@ -360,13 +360,11 @@ export default function AIDietChartManager({
     });
   };
 
-  // Download PDF for selected chart
-  const handleDownloadPDF = async () => {
-    if (!selectedChart?.plan) return;
-    try {
-      const { jsPDF } = await import('jspdf');
-      const doc = new jsPDF();
-      const pageWidth = doc.internal.pageSize.getWidth();
+  // Shared PDF generation helper
+  const generateDietPDF = async (chart: DietChartHistoryItem) => {
+    const { jsPDF } = await import('jspdf');
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
       const margin = 20;
       let y = 20;
 
@@ -396,15 +394,15 @@ export default function AIDietChartManager({
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(9);
       doc.setTextColor(30, 41, 59);
-      doc.text(selectedChart.patientName.toUpperCase(), margin + 5, y + 10);
-      doc.text(selectedChart.phone || 'NA', 75, y + 10);
-      doc.text(`${selectedChart.age}Y/${selectedChart.gender.charAt(0).toUpperCase()}`, 120, y + 10);
+      doc.text(chart.patientName.toUpperCase(), margin + 5, y + 10);
+      doc.text(chart.phone || 'NA', 75, y + 10);
+      doc.text(`${chart.age}Y/${chart.gender.charAt(0).toUpperCase()}`, 120, y + 10);
       doc.setTextColor(37, 99, 235);
-      doc.text(selectedChart.date, pageWidth - 45, y + 10);
+      doc.text(chart.date, pageWidth - 45, y + 10);
       y += 22;
 
       // Conditions
-      if (selectedChart.conditions) {
+      if (chart.conditions) {
         doc.setFillColor(255, 247, 237);
         doc.roundedRect(margin, y, pageWidth - margin * 2, 12, 2, 2, 'F');
         doc.setFont('helvetica', 'bold');
@@ -414,7 +412,7 @@ export default function AIDietChartManager({
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(8);
         doc.setTextColor(71, 85, 105);
-        const condLines = doc.splitTextToSize(selectedChart.conditions, pageWidth - margin * 2 - 10);
+        const condLines = doc.splitTextToSize(chart.conditions, pageWidth - margin * 2 - 10);
         doc.text(condLines, margin + 5, y + 9);
         y += 16;
       }
@@ -428,7 +426,7 @@ export default function AIDietChartManager({
 
       const maxY = doc.internal.pageSize.getHeight() - 30;
 
-      selectedChart.plan.forEach((day) => {
+      (chart.plan || []).forEach((day) => {
         if (y > maxY - 35) { doc.addPage(); y = 20; }
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
@@ -486,7 +484,18 @@ export default function AIDietChartManager({
         doc.text('Powered by HealQR AI • teamhealqr.web.app', pageWidth / 2, doc.internal.pageSize.getHeight() - 8, { align: 'center' });
       }
 
-      doc.save(`DietChart_${selectedChart.patientName.replace(/\s+/g, '_')}_${selectedChart.date.replace(/\//g, '-')}.pdf`);
+    return doc;
+  };
+
+  const getPdfFileName = (chart: DietChartHistoryItem) =>
+    `DietChart_${chart.patientName.replace(/\s+/g, '_')}_${chart.date.replace(/\//g, '-')}.pdf`;
+
+  // Download PDF for selected chart
+  const handleDownloadPDF = async () => {
+    if (!selectedChart?.plan) return;
+    try {
+      const doc = await generateDietPDF(selectedChart);
+      doc.save(getPdfFileName(selectedChart));
       toast.success('PDF downloaded successfully!');
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -494,34 +503,48 @@ export default function AIDietChartManager({
     }
   };
 
-  // Share via WhatsApp
-  const handleShareWhatsApp = () => {
+  // Share PDF via WhatsApp (native file share on mobile, Firebase link on desktop)
+  const handleShareWhatsApp = async () => {
     if (!selectedChart?.plan) return;
-    let text = `*AI DIET CHART*\n`;
-    text += `Patient: ${selectedChart.patientName}\n`;
-    text += `Age: ${selectedChart.age} | Gender: ${selectedChart.gender}\n`;
-    if (selectedChart.conditions) text += `Diagnosis: ${selectedChart.conditions}\n`;
-    text += `Date: ${selectedChart.date}\n\n`;
+    try {
+      const doc = await generateDietPDF(selectedChart);
+      const fileName = getPdfFileName(selectedChart);
+      const pdfBlob = doc.output('blob');
+      const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
 
-    selectedChart.plan.forEach((day) => {
-      text += `*DAY ${day.day}*\n`;
-      day.meals.forEach((meal) => {
-        text += `_${meal.type}_\n`;
-        meal.items.forEach((item) => {
-          text += `  • ${item.name} (${item.weight}) - ${item.kcal}\n`;
+      // Try native Web Share API (works on mobile — user picks WhatsApp, PDF sent as file)
+      if (navigator.share && navigator.canShare?.({ files: [pdfFile] })) {
+        await navigator.share({
+          title: `Diet Chart - ${selectedChart.patientName}`,
+          text: `AI Diet Chart for ${selectedChart.patientName} - Guided by Dr. ${doctorName}`,
+          files: [pdfFile],
         });
-      });
-      text += `\n`;
-    });
+        toast.success('Shared successfully!');
+      } else {
+        // Desktop fallback: Upload PDF to Firebase Storage, share download link via WhatsApp
+        toast.loading('Uploading PDF...', { id: 'wa-upload' });
+        const { getStorage, ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
+        const { app } = await import('../lib/firebase/config');
+        const storage = getStorage(app);
+        const storageRef = ref(storage, `diet-charts/${Date.now()}_${fileName}`);
+        await uploadBytes(storageRef, pdfBlob);
+        const downloadURL = await getDownloadURL(storageRef);
+        toast.dismiss('wa-upload');
 
-    text += `_Guided by Dr. ${doctorName}_\n`;
-    text += `_Powered by HealQR AI_`;
-
-    const phoneNumber = selectedChart.phone ? selectedChart.phone.replace(/\D/g, '') : '';
-    const url = phoneNumber
-      ? `https://wa.me/${phoneNumber.startsWith('91') ? phoneNumber : '91' + phoneNumber}?text=${encodeURIComponent(text)}`
-      : `https://wa.me/?text=${encodeURIComponent(text)}`;
-    window.open(url, '_blank');
+        const text = `\uD83D\uDCCB *AI Diet Chart*\nPatient: ${selectedChart.patientName}\nDr. ${doctorName}\n\n\uD83D\uDCE5 Download PDF:\n${downloadURL}`;
+        const phoneNumber = selectedChart.phone ? selectedChart.phone.replace(/\D/g, '') : '';
+        const url = phoneNumber
+          ? `https://wa.me/${phoneNumber.startsWith('91') ? phoneNumber : '91' + phoneNumber}?text=${encodeURIComponent(text)}`
+          : `https://wa.me/?text=${encodeURIComponent(text)}`;
+        window.open(url, '_blank');
+        toast.success('PDF link ready to share!');
+      }
+    } catch (error: any) {
+      toast.dismiss('wa-upload');
+      if (error?.name === 'AbortError') return; // User cancelled native share
+      console.error('Error sharing via WhatsApp:', error);
+      toast.error('Failed to share. Please download and share manually.');
+    }
   };
 
   const filteredHistory = historyItems.filter(item => {
