@@ -7,7 +7,7 @@ import { CheckCircle2, AlertCircle, Loader2, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import DashboardPromoDisplay from './DashboardPromoDisplay';
 import { requestNotificationPermission } from '../services/fcm.service';
-import { scheduleConsultationConfirmation, scheduleReviewRequest } from '../services/notificationService';
+import { scheduleReviewRequest } from '../services/notificationService';
 import BookingFlowLayout from './BookingFlowLayout';
 
 interface VerifyWalkinProps {
@@ -129,8 +129,9 @@ export default function VerifyWalkin({ bookingId }: VerifyWalkinProps) {
           purpose: bookingData.purposeOfVisit || undefined
         };
 
-        // Schedule "Eye" Notification (30 mins delay)
-        await scheduleConsultationConfirmation(notificationData);
+        // Walk-in verified — Doctor will press Eye button to start consultation flow
+        // No auto 30-min notification anymore — flows through Eye → RX → Diet → Consultation Complete
+        console.log('✅ Walk-in verified — awaiting doctor consultation flow');
         
         // Schedule "Star" Notification (24 hours delay)
         // Check for Clinic Restrictions

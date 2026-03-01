@@ -1172,6 +1172,7 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
       <WalkInPatientsPage
         patients={patients}
         onBack={() => setShowPatientsPage(false)}
+        onMenuChange={onMenuChange}
       />
     );
   }

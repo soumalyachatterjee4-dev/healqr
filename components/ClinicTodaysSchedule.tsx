@@ -331,7 +331,7 @@ function ChamberPatientDetailsLoader({
             prescriptionUrl: data.prescriptionUrl || null,
             prescriptionReviewed: data.prescriptionReviewed || false,
             isCancelled: false,
-            isMarkedSeen: data.isMarkedSeen || true, // Walk-ins auto-marked as seen
+            isMarkedSeen: data.isMarkedSeen || false, // Walk-ins now use Eye button flow like QR patients
             reminderSent: false,
             fcmNotificationSent: false,
             doctorId: data.doctorId,
@@ -341,6 +341,9 @@ function ChamberPatientDetailsLoader({
             verificationMethod: data.verificationMethod || 'manual_override',
             reviewScheduled: data.reviewScheduled || false,
             followUpScheduled: data.followUpScheduled || false,
+            digitalRxUrl: data.digitalRxUrl || '',
+            dietChartUrl: data.dietChartUrl || '',
+            isWalkIn: true,
             };
           });
 

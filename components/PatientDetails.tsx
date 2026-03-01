@@ -41,6 +41,7 @@ interface Patient {
   prescriptionReviewed?: boolean; // Whether doctor has reviewed the old RX
   language?: Language; // Patient's preferred language
   isWalkIn?: boolean;
+  verificationMethod?: 'qr_scan' | 'manual_override';
   serialNumber?: string | number;
   tokenNumber?: string;
   chamber?: string;
@@ -840,30 +841,39 @@ export default function PatientDetails({
       }));
 
       // Send UPDATED RX notification (distinct from original consultation completed)
-      try {
-        const { sendRxUpdatedNotification } = await import('../services/notificationService');
-        const doctorName = localStorage.getItem('healqr_user_name') || localStorage.getItem('doctorName') || 'Doctor';
-        await sendRxUpdatedNotification({
-          patientPhone: selectedPatientForFlow.phone,
-          patientName: selectedPatientForFlow.name,
-          age: selectedPatientForFlow.age,
-          sex: selectedPatientForFlow.gender,
-          purpose: selectedPatientForFlow.visitType,
-          doctorId: doctorInfo.id,
-          doctorName: doctorName,
-          clinicName: selectedPatientForFlow.chamber || 'Chamber',
-          bookingId: selectedPatientForFlow.bookingId,
-          consultationDate: new Date().toISOString().split('T')[0],
-          consultationTime: new Date().toTimeString().split(' ')[0].slice(0, 5),
-          chamber: selectedPatientForFlow.chamber || 'Chamber',
-          language: selectedPatientForFlow.language || 'english',
-          rxUrl: downloadURL,
-        });
-      } catch (notifErr) {
-        console.error('RX regen notification error:', notifErr);
+      // Skip notification for manual_override walk-ins (no patient FCM token / unverified)
+      const isManualOverrideWalkin = selectedPatientForFlow.isWalkIn && selectedPatientForFlow.verificationMethod === 'manual_override';
+      if (!isManualOverrideWalkin) {
+        try {
+          const { sendRxUpdatedNotification } = await import('../services/notificationService');
+          const doctorName = localStorage.getItem('healqr_user_name') || localStorage.getItem('doctorName') || 'Doctor';
+          await sendRxUpdatedNotification({
+            patientPhone: selectedPatientForFlow.phone,
+            patientName: selectedPatientForFlow.name,
+            age: selectedPatientForFlow.age,
+            sex: selectedPatientForFlow.gender,
+            purpose: selectedPatientForFlow.visitType,
+            doctorId: doctorInfo.id,
+            doctorName: doctorName,
+            clinicName: selectedPatientForFlow.chamber || 'Chamber',
+            bookingId: selectedPatientForFlow.bookingId,
+            consultationDate: new Date().toISOString().split('T')[0],
+            consultationTime: new Date().toTimeString().split(' ')[0].slice(0, 5),
+            chamber: selectedPatientForFlow.chamber || 'Chamber',
+            language: selectedPatientForFlow.language || 'english',
+            rxUrl: downloadURL,
+          });
+        } catch (notifErr) {
+          console.error('RX regen notification error:', notifErr);
+        }
       }
 
-      toast.success('Digital RX regenerated & sent to patient!', { id: 'rx-regen' });
+      toast.success(
+        isManualOverrideWalkin
+          ? 'Digital RX created — ready for printing!'
+          : 'Digital RX regenerated & sent to patient!',
+        { id: 'rx-regen' }
+      );
     } catch (err) {
       console.error('RX regen update error:', err);
       toast.error('Failed to update RX', { id: 'rx-regen' });
@@ -1691,19 +1701,21 @@ export default function PatientDetails({
                       )}
                     </div>
 
-                    {/* Follow-up */}
+                    {/* Follow-up — disabled for manual_override walk-ins (no patient contact for notification) */}
                     <button
                       onClick={() => handleFollowUp(patient.id)}
-                      disabled={isDisabled || !state.isMarkedSeen || state.followUpScheduled}
+                      disabled={isDisabled || !state.isMarkedSeen || state.followUpScheduled || (patient.isWalkIn && patient.verificationMethod === 'manual_override')}
                       className={`relative w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
-                        isDisabled || !state.isMarkedSeen
+                        isDisabled || !state.isMarkedSeen || (patient.isWalkIn && patient.verificationMethod === 'manual_override')
                           ? 'bg-gray-800 border border-gray-700 opacity-50 cursor-not-allowed'
                           : state.followUpScheduled
                           ? 'bg-purple-500/30 border border-purple-500/50'
                           : 'bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30'
                       }`}
                       title={
-                        !state.isMarkedSeen
+                        (patient.isWalkIn && patient.verificationMethod === 'manual_override')
+                          ? "Not available for unverified walk-in patients"
+                          : !state.isMarkedSeen
                           ? "Mark as seen first"
                           : state.followUpScheduled
                           ? "Follow-up Scheduled"
@@ -1741,24 +1753,26 @@ export default function PatientDetails({
                       )}
                     </div>
 
-                    {/* Digital RX Regen - Blue FileText (Active only after Digital RX first generated via Eye) */}
+                    {/* Digital RX Regen - Blue FileText (Active after first RX via Eye, OR always for manual_override walk-ins) */}
                     <button
                       onClick={() => handleRxRegenStart(patient)}
-                      disabled={isDisabled || !state.isMarkedSeen || !state.digitalRxUsed}
+                      disabled={isDisabled || !state.isMarkedSeen || (!state.digitalRxUsed && !(patient.isWalkIn && patient.verificationMethod === 'manual_override'))}
                       className={`relative w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
-                        isDisabled || !state.isMarkedSeen || !state.digitalRxUsed
+                        isDisabled || !state.isMarkedSeen || (!state.digitalRxUsed && !(patient.isWalkIn && patient.verificationMethod === 'manual_override'))
                           ? 'bg-gray-800 border border-gray-700 opacity-50 cursor-not-allowed'
                           : 'bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50'
                       }`}
                       title={
                         !state.isMarkedSeen
                           ? "Mark as seen first"
+                          : (patient.isWalkIn && patient.verificationMethod === 'manual_override')
+                          ? (state.digitalRxUsed ? "Regenerate Digital RX (Print Only)" : "Create Digital RX (Print Only)")
                           : !state.digitalRxUsed
                           ? "Generate Digital RX first via Eye button"
                           : "Regenerate Digital RX"
                       }
                     >
-                      <FileText className={`w-4 h-4 ${!state.isMarkedSeen || !state.digitalRxUsed ? 'text-gray-500' : 'text-blue-400'}`} />
+                      <FileText className={`w-4 h-4 ${!state.isMarkedSeen || (!state.digitalRxUsed && !(patient.isWalkIn && patient.verificationMethod === 'manual_override')) ? 'text-gray-500' : 'text-blue-400'}`} />
                     </button>
 
                     {/* AI Diet Chart - Active after Mark as Seen (re-generable until 23:59) */}

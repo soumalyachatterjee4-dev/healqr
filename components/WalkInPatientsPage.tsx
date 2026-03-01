@@ -1,16 +1,15 @@
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { ArrowLeft, Calendar, Star, Check, Eye, AlertTriangle, History, Lock, Download, Upload } from 'lucide-react';
+import { ArrowLeft, Calendar, Star, Check, Eye, AlertTriangle, History, Lock, Upload, FileText, Sparkles, Apple } from 'lucide-react';
 import { Patient } from './ViewPatientsModal';
 import { useState, useEffect } from 'react';
 import FollowUpModal from './FollowUpModal';
 import PatientHistoryModal from './PatientHistoryModal';
-import { doc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { db } from '../lib/firebase/config';
 
 interface WalkInPatientsPageProps {
   patients: Patient[];
   onBack: () => void;
+  onMenuChange?: (menu: string) => void;
 }
 
 interface WalkInPatientStates {
@@ -20,7 +19,7 @@ interface WalkInPatientStates {
   };
 }
 
-export default function WalkInPatientsPage({ patients, onBack }: WalkInPatientsPageProps) {
+export default function WalkInPatientsPage({ patients, onBack, onMenuChange }: WalkInPatientsPageProps) {
   // Filter patients to only show verified ones
   const verifiedPatients = patients.filter(p => p.verifiedByPatient);
 
@@ -262,8 +261,8 @@ export default function WalkInPatientsPage({ patients, onBack }: WalkInPatientsP
                   </div>
                 </div>
 
-                {/* Line 3: Action Buttons (5 buttons for Walk-In) */}
-                <div className="flex items-center gap-3 mt-4">
+                {/* Line 3: Action Buttons for Walk-In */}
+                <div className="flex items-center gap-3 mt-4 flex-wrap">
                   
                   {/* 1. History Button */}
                   <div
@@ -291,7 +290,7 @@ export default function WalkInPatientsPage({ patients, onBack }: WalkInPatientsP
                   ) : (
                     <div
                       className="relative w-12 h-12 md:w-10 md:h-10 rounded-lg flex items-center justify-center transition-colors bg-emerald-500/20 border border-emerald-500/50 cursor-default"
-                      title="Visit Verified (Confirmation sent after 30 mins)"
+                      title="Visit Verified via QR Scan"
                     >
                       <Eye className="w-5 h-5 md:w-4 md:h-4 text-emerald-400" />
                       <div className="absolute -top-1 -right-1 w-5 h-5 md:w-4 md:h-4 bg-emerald-500 rounded-full flex items-center justify-center border-2 border-[#0f1419]">
@@ -300,7 +299,66 @@ export default function WalkInPatientsPage({ patients, onBack }: WalkInPatientsP
                     </div>
                   )}
 
-                  {/* 3. Review/Rating (Star) */}
+                  {/* 3. Digital RX (Print Only) — FileText Blue */}
+                  <button
+                    onClick={() => {
+                      // Pre-fill patient data and navigate to Digital RX tab
+                      const prefilledData = {
+                        name: patient.patientName,
+                        age: patient.age,
+                        gender: patient.gender,
+                        phone: patient.whatsappNumber,
+                        bookingId: patient.id,
+                        isWalkIn: true,
+                        verificationMethod: patient.verificationMethod,
+                      };
+                      localStorage.setItem('prefilled_rx_patient', JSON.stringify(prefilledData));
+                      if (onMenuChange) onMenuChange('digital-rx');
+                    }}
+                    className="relative w-12 h-12 md:w-10 md:h-10 rounded-lg flex items-center justify-center transition-colors bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50 cursor-pointer group"
+                    title={patient.verificationMethod === 'manual_override' ? "Create Digital RX (Print Only)" : "Create Digital RX"}
+                  >
+                    <FileText className="w-5 h-5 md:w-4 md:h-4 text-blue-400 group-hover:scale-110 transition-transform" />
+                  </button>
+
+                  {/* 4. AI RX Reader — Purple Sparkle */}
+                  <button
+                    onClick={() => {
+                      const prefilledData = {
+                        name: patient.patientName,
+                        age: patient.age,
+                        gender: patient.gender,
+                        phone: patient.whatsappNumber,
+                        bookingId: patient.id,
+                      };
+                      localStorage.setItem('prefilled_rx_reader_patient', JSON.stringify(prefilledData));
+                      if (onMenuChange) onMenuChange('ai-rx-reader');
+                    }}
+                    className="relative w-12 h-12 md:w-10 md:h-10 rounded-lg flex items-center justify-center transition-colors bg-gradient-to-br from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 border border-purple-500/50 shadow-lg shadow-purple-500/30 cursor-pointer group"
+                    title="AI RX Reader"
+                  >
+                    <Sparkles className="w-5 h-5 md:w-4 md:h-4 text-white group-hover:scale-110 transition-transform" />
+                  </button>
+
+                  {/* 5. AI Diet Chart — Orange Apple */}
+                  <button
+                    onClick={() => {
+                      const prefilledData = {
+                        name: patient.patientName,
+                        age: patient.age,
+                        gender: patient.gender,
+                        phone: patient.whatsappNumber,
+                      };
+                      localStorage.setItem('prefilled_diet_patient', JSON.stringify(prefilledData));
+                      if (onMenuChange) onMenuChange('ai-diet-chart');
+                    }}
+                    className="relative w-12 h-12 md:w-10 md:h-10 rounded-lg flex items-center justify-center transition-colors bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/50 cursor-pointer group"
+                    title="Create AI Diet Chart"
+                  >
+                    <Apple className="w-5 h-5 md:w-4 md:h-4 text-orange-500 group-hover:scale-110 transition-transform" />
+                  </button>
+
+                  {/* 6. Review/Rating (Star) */}
                   <div
                     className={`relative w-12 h-12 md:w-10 md:h-10 rounded-lg flex items-center justify-center transition-colors ${
                       patient.verificationMethod === 'manual_override'
@@ -329,7 +387,7 @@ export default function WalkInPatientsPage({ patients, onBack }: WalkInPatientsP
                     )}
                   </div>
 
-                  {/* 4. Follow-Up (Calendar) */}
+                  {/* 7. Follow-Up (Calendar) */}
                   <button
                     onClick={() => patient.verificationMethod !== 'manual_override' && handleFollowUp(patient.id)}
                     disabled={patientStates[patient.id]?.followUpScheduled || patient.verificationMethod === 'manual_override'}
@@ -360,7 +418,7 @@ export default function WalkInPatientsPage({ patients, onBack }: WalkInPatientsP
                     )}
                   </button>
 
-                  {/* 5. Upload (Share/Upload Reports) - DISABLED (Medico Locker Feature) */}
+                  {/* 8. Upload (Share/Upload Reports) - DISABLED (Medico Locker Feature) */}
                   <div
                     className="relative w-12 h-12 md:w-10 md:h-10 rounded-lg flex items-center justify-center transition-colors bg-gray-500/10 border border-gray-500/30 cursor-not-allowed opacity-40"
                     title="Upload Reports (Available with Medico Locker - Coming Soon)"
@@ -368,7 +426,7 @@ export default function WalkInPatientsPage({ patients, onBack }: WalkInPatientsP
                     <Upload className="w-5 h-5 md:w-4 md:h-4 text-gray-500" />
                   </div>
 
-                  {/* 6. Lock (Medical Records/Locker) */}
+                  {/* 9. Lock (Medical Records/Locker) */}
                   <div
                     className="relative w-12 h-12 md:w-10 md:h-10 rounded-lg flex items-center justify-center transition-colors bg-gray-500/10 hover:bg-gray-500/20 border border-gray-500/30 cursor-pointer"
                     title="Medical Locker"

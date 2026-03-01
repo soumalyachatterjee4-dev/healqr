@@ -61,39 +61,9 @@ export default function AddPatientModal({ isOpen, onClose, onAddPatient, doctorI
         if (data.verifiedByPatient) {
           setIsVerified(true);
 
-          // 🔔 SCHEDULE CONFIRMATION NOTIFICATION (30 mins delay)
-          try {
-             const { scheduleConsultationConfirmation } = await import('../services/notificationService');
-             await scheduleConsultationConfirmation({
-                patientPhone: formData.whatsappNumber.startsWith('+91')
-                  ? formData.whatsappNumber
-                  : `+91${formData.whatsappNumber.replace(/^\+91\s*/, '')}`,
-                patientName: formData.patientName,
-                doctorName: doctorName || loadedDoctorName,
-                bookingId: currentBookingId,
-                consultationDate: new Date().toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                }),
-                consultationTime: new Date().toLocaleTimeString('en-US', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  hour12: true
-                }),
-                language: 'english',
-                // Additional fields for history - ensure proper string conversion
-                age: formData.age !== undefined && formData.age !== '' ? String(formData.age) : undefined,
-                sex: formData.gender || undefined,
-                purpose: formData.purposeOfVisit || undefined,
-                doctorId: doctorId || auth!.currentUser?.uid, // Fallback to current user if prop missing
-                clinicName: 'Walk-In Clinic' // Fallback
-             });
-             console.log('✅ Confirmation scheduled for 30 mins after verification');
-          } catch (err) {
-             console.warn('Failed to schedule confirmation:', err);
-          }
+          // 🔔 Walk-in verified via QR — Doctor will now press Eye button to start consultation flow
+          // No auto 30-min notification — consultation complete notification sent after Eye → RX → Diet flow
+          console.log('✅ Walk-in verified via QR — awaiting doctor Eye button press for consultation flow');
 
           // Auto close after 2 seconds
           setTimeout(() => {
@@ -266,11 +236,10 @@ export default function AddPatientModal({ isOpen, onClose, onAddPatient, doctorI
         type: 'walkin_booking', // Walk-in booking type (no chamber or appointment date needed)
         status: 'confirmed',
         createdAt: serverTimestamp(),
-        isMarkedSeen: true, // Walk-in patient is immediately considered "seen"
-        markedSeenAt: submissionTimestamp,
-        markedSeenBy: currentDoctorId,
-        reviewScheduled: true, // Auto-activate review request
-        reviewScheduledAt: submissionTimestamp,
+        isMarkedSeen: skipQr ? true : false, // QR-verified walk-ins need Eye button press; manual walk-ins are auto-seen
+        ...(skipQr ? { markedSeenAt: submissionTimestamp, markedSeenBy: currentDoctorId } : {}),
+        reviewScheduled: skipQr ? true : false, // Review only scheduled after consultation completes
+        ...(skipQr ? { reviewScheduledAt: submissionTimestamp } : {}),
         // Manual verification fields
         verifiedByPatient: skipQr, // If skipping QR, mark as verified (manually)
         verificationMethod: skipQr ? 'manual_override' : 'qr_scan',
