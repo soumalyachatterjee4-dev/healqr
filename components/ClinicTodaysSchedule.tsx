@@ -331,7 +331,11 @@ function ChamberPatientDetailsLoader({
             prescriptionUrl: data.prescriptionUrl || null,
             prescriptionReviewed: data.prescriptionReviewed || false,
             isCancelled: false,
-            isMarkedSeen: data.isMarkedSeen || false, // Walk-ins now use Eye button flow like QR patients
+            // manual_override → always "seen" (no Eye flow needed)
+            // QR-verified → only "seen" if consultation was actually completed via Eye flow
+            isMarkedSeen: (data.verificationMethod || 'manual_override') === 'manual_override'
+              ? true
+              : !!(data.consultationStatus === 'completed' || data.digitalRxUrl),
             reminderSent: false,
             fcmNotificationSent: false,
             doctorId: data.doctorId,

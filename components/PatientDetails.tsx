@@ -164,8 +164,14 @@ export default function PatientDetails({
         }
       }
 
+      // For QR-verified walk-ins, only treat as "seen" if consultation was actually completed
+      const isQrVerifiedWalkin = patient.isWalkIn && patient.verificationMethod !== 'manual_override';
+      const effectiveMarkedSeen = isQrVerifiedWalkin
+        ? !!(patient.digitalRxUrl || (patient as any).consultationStatus === 'completed')
+        : (patient.isMarkedSeen || false);
+
       initialStates[patient.id] = {
-        isMarkedSeen: patient.isMarkedSeen || false,
+        isMarkedSeen: effectiveMarkedSeen,
         reminderSent: patient.reminderSent || false,
         followUpScheduled: patient.followUpScheduled || false,
         reviewScheduled: patient.reviewScheduled || false,
