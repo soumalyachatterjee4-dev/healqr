@@ -360,6 +360,170 @@ export default function AIDietChartManager({
     });
   };
 
+  // Download PDF for selected chart
+  const handleDownloadPDF = async () => {
+    if (!selectedChart?.plan) return;
+    try {
+      const { jsPDF } = await import('jspdf');
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 20;
+      let y = 20;
+
+      // Header
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.setTextColor(30, 41, 59);
+      doc.text('AI DIET CHART', pageWidth / 2, y, { align: 'center' });
+      y += 6;
+      doc.setFontSize(8);
+      doc.setTextColor(100);
+      doc.text('PRECISION NUTRITION STRATEGY', pageWidth / 2, y, { align: 'center' });
+      y += 10;
+
+      // Patient Info Stripe
+      doc.setFillColor(248, 250, 252);
+      doc.rect(margin, y, pageWidth - margin * 2, 14, 'F');
+      doc.setDrawColor(226, 232, 240);
+      doc.line(margin, y, pageWidth - margin, y);
+      doc.line(margin, y + 14, pageWidth - margin, y + 14);
+      doc.setFontSize(7);
+      doc.setTextColor(148, 163, 184);
+      doc.text('PATIENT', margin + 5, y + 4);
+      doc.text('PHONE', 75, y + 4);
+      doc.text('AGE/SEX', 120, y + 4);
+      doc.text('DATE', pageWidth - 45, y + 4);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(30, 41, 59);
+      doc.text(selectedChart.patientName.toUpperCase(), margin + 5, y + 10);
+      doc.text(selectedChart.phone || 'NA', 75, y + 10);
+      doc.text(`${selectedChart.age}Y/${selectedChart.gender.charAt(0).toUpperCase()}`, 120, y + 10);
+      doc.setTextColor(37, 99, 235);
+      doc.text(selectedChart.date, pageWidth - 45, y + 10);
+      y += 22;
+
+      // Conditions
+      if (selectedChart.conditions) {
+        doc.setFillColor(255, 247, 237);
+        doc.roundedRect(margin, y, pageWidth - margin * 2, 12, 2, 2, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7);
+        doc.setTextColor(194, 65, 12);
+        doc.text('DIAGNOSIS', margin + 5, y + 5);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(71, 85, 105);
+        const condLines = doc.splitTextToSize(selectedChart.conditions, pageWidth - margin * 2 - 10);
+        doc.text(condLines, margin + 5, y + 9);
+        y += 16;
+      }
+
+      // 7-Day Plan
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(37, 99, 235);
+      doc.text('7-DAY NUTRITIONAL STRATEGY', margin, y);
+      y += 8;
+
+      const maxY = doc.internal.pageSize.getHeight() - 30;
+
+      selectedChart.plan.forEach((day) => {
+        if (y > maxY - 35) { doc.addPage(); y = 20; }
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(30, 41, 59);
+        doc.setFillColor(241, 245, 249);
+        doc.rect(margin, y, pageWidth - margin * 2, 7, 'F');
+        doc.text(`DAY ${day.day}`, margin + 5, y + 5);
+        y += 10;
+
+        day.meals.forEach((meal) => {
+          if (y > maxY - 15) { doc.addPage(); y = 20; }
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(8);
+          doc.setTextColor(37, 99, 235);
+          doc.text(meal.type.toUpperCase(), margin + 5, y);
+          y += 4;
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(8);
+          doc.setTextColor(71, 85, 105);
+          meal.items.forEach((item) => {
+            if (y > maxY - 8) { doc.addPage(); y = 20; }
+            doc.text(`• ${item.name} (${item.weight}) — ${item.kcal}`, margin + 8, y);
+            y += 4;
+          });
+          y += 2;
+        });
+        y += 3;
+      });
+
+      // Footer
+      if (y > maxY - 20) { doc.addPage(); y = 20; }
+      y += 5;
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(8);
+      doc.setTextColor(100);
+      doc.text('This plan is medically reviewed and', pageWidth - margin, y, { align: 'right' });
+      y += 5;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.setTextColor(30, 41, 59);
+      doc.text(`Guided by Dr. ${doctorName}`, pageWidth - margin, y, { align: 'right' });
+
+      // Watermark on all pages
+      const totalPages = doc.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        doc.setFontSize(40);
+        doc.setTextColor(240, 240, 240);
+        doc.text('HealQR', pageWidth / 2, doc.internal.pageSize.getHeight() / 2, {
+          align: 'center',
+          angle: 45,
+        });
+        doc.setFontSize(7);
+        doc.setTextColor(180);
+        doc.text('Powered by HealQR AI • teamhealqr.web.app', pageWidth / 2, doc.internal.pageSize.getHeight() - 8, { align: 'center' });
+      }
+
+      doc.save(`DietChart_${selectedChart.patientName.replace(/\s+/g, '_')}_${selectedChart.date.replace(/\//g, '-')}.pdf`);
+      toast.success('PDF downloaded successfully!');
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast.error('Failed to generate PDF');
+    }
+  };
+
+  // Share via WhatsApp
+  const handleShareWhatsApp = () => {
+    if (!selectedChart?.plan) return;
+    let text = `*AI DIET CHART*\n`;
+    text += `Patient: ${selectedChart.patientName}\n`;
+    text += `Age: ${selectedChart.age} | Gender: ${selectedChart.gender}\n`;
+    if (selectedChart.conditions) text += `Diagnosis: ${selectedChart.conditions}\n`;
+    text += `Date: ${selectedChart.date}\n\n`;
+
+    selectedChart.plan.forEach((day) => {
+      text += `*DAY ${day.day}*\n`;
+      day.meals.forEach((meal) => {
+        text += `_${meal.type}_\n`;
+        meal.items.forEach((item) => {
+          text += `  • ${item.name} (${item.weight}) - ${item.kcal}\n`;
+        });
+      });
+      text += `\n`;
+    });
+
+    text += `_Guided by Dr. ${doctorName}_\n`;
+    text += `_Powered by HealQR AI_`;
+
+    const phoneNumber = selectedChart.phone ? selectedChart.phone.replace(/\D/g, '') : '';
+    const url = phoneNumber
+      ? `https://wa.me/${phoneNumber.startsWith('91') ? phoneNumber : '91' + phoneNumber}?text=${encodeURIComponent(text)}`
+      : `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
+  };
+
   const filteredHistory = historyItems.filter(item => {
     const matchesSearch =
       item.patientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -1080,10 +1244,10 @@ export default function AIDietChartManager({
             </div>
 
             <div className="p-6 border-t border-zinc-900 bg-zinc-950 flex gap-4">
-              <Button className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl py-6 font-bold">
+              <Button onClick={handleDownloadPDF} className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl py-6 font-bold">
                  Download PDF
               </Button>
-              <Button variant="outline" className="flex-1 border-zinc-800 bg-zinc-950 hover:bg-zinc-900 text-white rounded-xl py-6 font-bold">
+              <Button onClick={handleShareWhatsApp} variant="outline" className="flex-1 border-zinc-800 bg-zinc-950 hover:bg-zinc-900 text-white rounded-xl py-6 font-bold">
                  Share via WhatsApp
               </Button>
             </div>
