@@ -1753,26 +1753,26 @@ export default function PatientDetails({
                       )}
                     </div>
 
-                    {/* Digital RX Regen - Blue FileText (Active after first RX via Eye, OR always for manual_override walk-ins) */}
+                    {/* Digital RX Regen - Blue FileText (Active after first RX via Eye, OR always for walk-in patients who are already marked seen) */}
                     <button
                       onClick={() => handleRxRegenStart(patient)}
-                      disabled={isDisabled || !state.isMarkedSeen || (!state.digitalRxUsed && !(patient.isWalkIn && patient.verificationMethod === 'manual_override'))}
+                      disabled={isDisabled || !state.isMarkedSeen || (!state.digitalRxUsed && !patient.isWalkIn)}
                       className={`relative w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
-                        isDisabled || !state.isMarkedSeen || (!state.digitalRxUsed && !(patient.isWalkIn && patient.verificationMethod === 'manual_override'))
+                        isDisabled || !state.isMarkedSeen || (!state.digitalRxUsed && !patient.isWalkIn)
                           ? 'bg-gray-800 border border-gray-700 opacity-50 cursor-not-allowed'
                           : 'bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50'
                       }`}
                       title={
                         !state.isMarkedSeen
                           ? "Mark as seen first"
-                          : (patient.isWalkIn && patient.verificationMethod === 'manual_override')
-                          ? (state.digitalRxUsed ? "Regenerate Digital RX (Print Only)" : "Create Digital RX (Print Only)")
+                          : patient.isWalkIn
+                          ? (state.digitalRxUsed ? "Regenerate Digital RX" : "Create Digital RX")
                           : !state.digitalRxUsed
                           ? "Generate Digital RX first via Eye button"
                           : "Regenerate Digital RX"
                       }
                     >
-                      <FileText className={`w-4 h-4 ${!state.isMarkedSeen || (!state.digitalRxUsed && !(patient.isWalkIn && patient.verificationMethod === 'manual_override')) ? 'text-gray-500' : 'text-blue-400'}`} />
+                      <FileText className={`w-4 h-4 ${!state.isMarkedSeen || (!state.digitalRxUsed && !patient.isWalkIn) ? 'text-gray-500' : 'text-blue-400'}`} />
                     </button>
 
                     {/* AI Diet Chart - Active after Mark as Seen (re-generable until 23:59) */}
