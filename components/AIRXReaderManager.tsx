@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Scan, Settings, TrendingUp, Zap, FileText, History, Info } from 'lucide-react';
+import { Scan, Settings, TrendingUp, Zap, FileText, History, Info, Menu } from 'lucide-react';
 import { Button } from './ui/button';
 import { Label } from './ui/label';
 import { Switch } from './ui/switch';
@@ -25,6 +25,7 @@ export default function AIRXReaderManager({
   const [isEnabled, setIsEnabled] = useState(true);
   const [autoExtract, setAutoExtract] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Statistics - Start empty (will be populated from backend)
   const todayScanned = 0;
@@ -39,20 +40,30 @@ export default function AIRXReaderManager({
   // If showing history, render the history component instead
   if (showHistory) {
     return (
-      <div className={onMenuChange ? "flex h-screen bg-gray-950" : "h-screen bg-gray-950"}>
+      <div className={onMenuChange ? "min-h-screen bg-gray-950 flex flex-col lg:flex-row" : "h-screen bg-gray-950"}>
         {onMenuChange && (
           <DashboardSidebar
             activeMenu="ai-rx-reader"
-            onMenuChange={onMenuChange}
+            onMenuChange={(menu) => { setMobileMenuOpen(false); onMenuChange(menu); }}
             onLogout={onLogout}
+            isOpen={mobileMenuOpen}
+            onClose={() => setMobileMenuOpen(false)}
             activeAddOns={activeAddOns}
           />
         )}
         <div className={`flex-1 overflow-auto ${onMenuChange ? 'lg:ml-64' : ''}`}>
           <div className="p-4 md:p-8">
-            <Button onClick={() => setShowHistory(false)} variant="ghost" className="mb-4 text-purple-400 hover:text-purple-300">
-              &larr; Back to Settings
-            </Button>
+            <div className="flex items-center gap-3 mb-4">
+              <button
+                onClick={() => setMobileMenuOpen(true)}
+                className="lg:hidden w-10 h-10 bg-zinc-900 hover:bg-zinc-800 rounded-lg flex items-center justify-center transition-colors"
+              >
+                <Menu className="w-5 h-5 text-purple-500" />
+              </button>
+              <Button onClick={() => setShowHistory(false)} variant="ghost" className="text-purple-400 hover:text-purple-300">
+                &larr; Back to Settings
+              </Button>
+            </div>
             <AIRXReaderHistory onBack={() => setShowHistory(false)} />
           </div>
         </div>
@@ -63,11 +74,13 @@ export default function AIRXReaderManager({
   // If called from dashboard, render with sidebar
   if (onMenuChange) {
     return (
-      <div className="flex h-screen bg-gray-950">
+      <div className="min-h-screen bg-gray-950 flex flex-col lg:flex-row">
         <DashboardSidebar
           activeMenu="ai-rx-reader"
-          onMenuChange={onMenuChange}
+          onMenuChange={(menu) => { setMobileMenuOpen(false); onMenuChange(menu); }}
           onLogout={onLogout}
+          isOpen={mobileMenuOpen}
+          onClose={() => setMobileMenuOpen(false)}
           activeAddOns={activeAddOns}
         />
         <div className="flex-1 overflow-auto lg:ml-64">
@@ -90,18 +103,26 @@ export default function AIRXReaderManager({
 
   function renderContent() {
     return (
-      <div className="space-y-6"    >
+      <div className="space-y-6">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-purple-500/10 rounded-lg">
-                  <Scan className="w-6 h-6 text-purple-500" />
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setMobileMenuOpen(true)}
+                className="lg:hidden w-10 h-10 bg-zinc-900 hover:bg-zinc-800 rounded-lg flex items-center justify-center transition-colors"
+              >
+                <Menu className="w-5 h-5 text-purple-500" />
+              </button>
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-purple-500/10 rounded-lg">
+                    <Scan className="w-6 h-6 text-purple-500" />
+                  </div>
+                  <h1 className="text-white">AI RX Reader</h1>
                 </div>
-                <h1 className="text-white">AI RX Reader</h1>
+                <p className="text-gray-400 text-sm">Configure AI-powered prescription analysis settings</p>
               </div>
-              <p className="text-gray-400">Configure AI-powered prescription analysis settings</p>
             </div>
             <Button
               onClick={() => setShowHistory(true)}
