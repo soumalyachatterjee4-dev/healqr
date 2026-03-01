@@ -1,11 +1,13 @@
-import { ArrowLeft, Calendar, MapPin, Clock, Bell, Eye, Star, Apple, Phone, X, Check, RotateCcw, CheckCircle2, Video, Send, UserCircle, Sparkles } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Clock, Bell, Eye, Star, Apple, Phone, X, Check, RotateCcw, CheckCircle2, Video, Send, UserCircle, Sparkles, History, Upload, Lock, QrCode, FileText, Stethoscope, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import FollowUpModal from './FollowUpModal';
 import CancellationModal from './CancellationModal';
 import RestorationModal from './RestorationModal';
 import DoctorRxUploadModal from './DoctorRxUploadModal';
 import PatientHistoryModal from './PatientHistoryModal';
-// import { DoctorAIRXUploadModal } from './DoctorAIRXUploadModal';
+import { DoctorAIRXUploadModal } from './DoctorAIRXUploadModal';
+import DigitalRXMaker from './DigitalRXMaker';
+import InlineDietChartModal from './InlineDietChartModal';
 // import { PatientOldRXViewer } from './PatientOldRXViewer';
 import { toast } from 'sonner';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
@@ -42,6 +44,11 @@ interface Patient {
   serialNumber?: string | number;
   tokenNumber?: string;
   chamber?: string;
+  isDataRestricted?: boolean; // Per-patient: true if this patient's data should be masked
+  bookingSource?: 'clinic_qr' | 'doctor_qr' | 'walkin'; // How the patient booked
+  clinicId?: string; // Which clinic facilitated the booking (if any)
+  digitalRxUrl?: string; // URL of generated Digital RX (if any)
+  dietChartUrl?: string; // URL of generated AI Diet Chart (if any)
 }
 
 interface PatientDetailsProps {
@@ -72,6 +79,8 @@ interface PatientButtonStates {
     videoLinkSent: boolean; // For video consultation - track if link sent (system controlled)
     patientWaiting: boolean; // For video consultation - track if patient is waiting on the other side
     prescriptionUploaded: boolean; // Track if doctor has uploaded today's prescription
+    digitalRxUsed: boolean; // Track if Digital RX was generated for this patient
+    dietChartUsed: boolean; // Track if AI Diet Chart was generated for this patient
   };
 }
 
@@ -92,16 +101,18 @@ export default function PatientDetails({
   doctorId,
 }: PatientDetailsProps) {
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [aiUploadModalOpen, setAiUploadModalOpen] = useState(false);
+  const [uploadTargetPatient, setUploadTargetPatient] = useState<Patient | null>(null);
   const [isReviewRestricted, setIsReviewRestricted] = useState(false);
 
-  // Check for Clinic Restrictions on Mount
+  // Check for Clinic Review Restrictions on Mount (centralized reviews only)
   useEffect(() => {
     const checkClinicRestrictions = async () => {
       try {
         const userId = localStorage.getItem('userId');
         if (!userId) return;
+        console.log('🔍 [PatientDetails] Checking restrictions for doctor:', userId);
 
-        // 1. Get Doctor's Clinic ID
         const doctorRef = doc(db!, 'doctors', userId);
         const doctorSnap = await getDoc(doctorRef);
 
@@ -110,16 +121,20 @@ export default function PatientDetails({
           const clinicId = doctorData.clinicId;
 
           if (clinicId) {
-            // 2. Get Clinic Settings
             const clinicRef = doc(db!, 'clinics', clinicId);
             const clinicSnap = await getDoc(clinicRef);
 
-            if (clinicSnap.exists() && clinicSnap.data().centralizedReviews) {
-
-              setIsReviewRestricted(true);
+            if (clinicSnap.exists()) {
+              const clinicData = clinicSnap.data();
+              if (clinicData.centralizedReviews) {
+                setIsReviewRestricted(true);
+              }
             }
           }
         }
+        // NOTE: Patient data masking is now handled PER-PATIENT via patient.isDataRestricted
+        // which is set by TodaysSchedule.tsx / ClinicTodaysSchedule.tsx based on bookingSource
+        console.log('✅ [PatientDetails] Using per-patient isDataRestricted flags from parent');
       } catch (error) {
         console.error('Error checking clinic restrictions:', error);
       }
@@ -158,6 +173,8 @@ export default function PatientDetails({
         videoLinkSent: videoLinkSent, // Set immediately if within 30-min window
         patientWaiting: false, // System will set to true when patient clicks the link
         prescriptionUploaded: false, // Initially no prescription uploaded
+        digitalRxUsed: !!patient.digitalRxUrl, // True if Digital RX was already generated
+        dietChartUsed: !!patient.dietChartUrl, // True if AI Diet Chart was already generated
       };
     });
     return initialStates;
@@ -170,10 +187,72 @@ export default function PatientDetails({
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
 
-  // Get current doctor info from Firebase auth
-  const [doctorInfo, setDoctorInfo] = useState<{ id: string; name: string }>({
+  // ============================================
+  // 🔄 MULTI-STEP CONSULTATION COMPLETION FLOW STATE
+  // Eye → "Create RX?" → RX Maker → "Add Diet Chart?" → Diet Chart → Send Notification
+  // ============================================
+  const [rxConfirmModalOpen, setRxConfirmModalOpen] = useState(false);
+  const [rxMakerOpen, setRxMakerOpen] = useState(false);
+  const [rxPausedState, setRxPausedState] = useState<{ items: any[]; remarks: string; diagnosis: string; vitals?: Record<string,string>; pathology?: Record<string,string>; suggestedTests?: string[] } | null>(null);
+  const [dietConfirmModalOpen, setDietConfirmModalOpen] = useState(false);
+  const [dietChartModalOpen, setDietChartModalOpen] = useState(false);
+  const [selectedPatientForFlow, setSelectedPatientForFlow] = useState<Patient | null>(null);
+  const [generatedRxUrl, setGeneratedRxUrl] = useState<string | null>(null);
+  const [generatedDietUrl, setGeneratedDietUrl] = useState<string | null>(null);
+  const [isSendingNotification, setIsSendingNotification] = useState(false);
+  const [isRegenMode, setIsRegenMode] = useState(false); // Track if RX Regen mode (vs initial Eye flow)
+  const [lastRxData, setLastRxData] = useState<{ items: any[], remarks: string, diagnosis: string, vitals: Record<string,string>, pathology: Record<string,string>, suggestedTests: string[] } | null>(null); // Last generated RX data for regen
+
+  // Get current doctor info from Firebase auth (expanded for DigitalRXMaker)
+  const [doctorInfo, setDoctorInfo] = useState<{
+    id: string;
+    name: string;
+    degree: string;
+    degrees?: string[];
+    specialty: string;
+    specialities?: string[];
+    qrNumber?: string;
+    clinicName?: string;
+    doctorId: string;
+    address?: string;
+    timing?: string;
+    registrationNumber?: string;
+    showRegistrationOnRX?: boolean;
+    useDrPrefix?: boolean;
+    // Context-aware PDF fields
+    pdfContext?: 'clinic' | 'doctor'; // clinic = clinic chamber, doctor = personal chamber
+    clinicInfo?: {
+      name: string;
+      address: string;
+      qrNumber: string;
+      phone?: string;
+      clinicId: string;
+      registrationNumber?: string;
+      showRegistrationOnRx?: boolean;
+      footerLine1?: string;
+      footerLine2?: string;
+      watermarkLogo?: string;
+    };
+    allDoctors?: Array<{
+      name: string;
+      specialty: string;
+      timing: string;
+      registrationNumber?: string;
+    }>;
+    allChambers?: Array<{
+      name: string;
+      address: string;
+      timing: string;
+    }>;
+    footerLine1?: string;
+    footerLine2?: string;
+    watermarkLogo?: string;
+  }>({
     id: '',
-    name: ''
+    name: '',
+    degree: '',
+    specialty: '',
+    doctorId: '',
   });
 
   useEffect(() => {
@@ -189,18 +268,115 @@ export default function PatientDetails({
         }
 
         const doctorDoc = await getDoc(doc(db!, 'doctors', docId));
-        if (doctorDoc.exists()) {
-          setDoctorInfo({
-            id: docId,
-            name: doctorDoc.data().name || 'Doctor'
-          });
+        if (!doctorDoc.exists()) return;
+        const d = doctorDoc.data();
+
+        // Determine PDF context: Is this patient coming from a clinic or doctor's own chamber?
+        // Check the first patient's booking source; if any patient has clinicId, it's a clinic chamber
+        const firstClinicPatient = patients.find(p => p.clinicId && p.bookingSource === 'clinic_qr');
+        const chamberClinicId = firstClinicPatient?.clinicId || d.clinicId;
+
+        // Check if the current chamber belongs to a clinic
+        const currentChamber = d.chambers?.find((c: any) => c.chamberName === chamberName);
+        const chamberOwnerClinicId = currentChamber?.clinicId || chamberClinicId;
+        const isClinicChamber = !!chamberOwnerClinicId;
+
+        let clinicInfo: any = null;
+        let allDoctors: any[] = [];
+
+        if (isClinicChamber && chamberOwnerClinicId) {
+          try {
+            // Load clinic data for header/footer/QR
+            const clinicDoc = await getDoc(doc(db!, 'clinics', chamberOwnerClinicId));
+            if (clinicDoc.exists()) {
+              const cd = clinicDoc.data();
+              clinicInfo = {
+                name: cd.name || cd.clinicName || '',
+                address: cd.address || '',
+                qrNumber: cd.qrNumber || '',
+                phone: cd.phone || '',
+                clinicId: chamberOwnerClinicId,
+                registrationNumber: cd.registrationNumber || '',
+                showRegistrationOnRx: cd.showRegistrationOnRx !== undefined ? cd.showRegistrationOnRx : true,
+                footerLine1: cd.footerLine1 || '',
+                footerLine2: cd.footerLine2 || '',
+                watermarkLogo: cd.watermarkLogo || '',
+              };
+
+              // Load all linked doctors for footer
+              const linkedDoctors = cd.linkedDoctorsDetails || [];
+              for (const ld of linkedDoctors) {
+                // Include all doctors (active, pending, etc.) for the footer
+                  // Find this doctor's chamber timing at this clinic
+                  let docTiming = '';
+                  let docRegNumber = '';
+                  try {
+                    const ldDoc = await getDoc(doc(db!, 'doctors', ld.uid || ld.doctorId));
+                    if (ldDoc.exists()) {
+                      const ldData = ldDoc.data();
+                      const ldChamber = ldData.chambers?.find((c: any) =>
+                        c.clinicId === chamberOwnerClinicId
+                      );
+                      docTiming = ldChamber ? `${ldChamber.startTime} - ${ldChamber.endTime}` : '';
+                      docRegNumber = ldData.registrationNumber || '';
+                    }
+                  } catch { /* skip */ }
+                  allDoctors.push({
+                    name: ld.name || '',
+                    specialty: ld.specialties?.[0] || ld.specialty || '',
+                    timing: docTiming,
+                    registrationNumber: docRegNumber,
+                  });
+              }
+            }
+          } catch (e) {
+            console.error('Failed to load clinic info:', e);
+          }
         }
+
+        // For doctor's own chambers: gather all chambers for footer
+        let allChambers: any[] = [];
+        if (!isClinicChamber && d.chambers) {
+          allChambers = d.chambers.map((c: any) => ({
+            name: c.chamberName || '',
+            address: c.chamberAddress || '',
+            timing: `${c.startTime} - ${c.endTime}`,
+          }));
+        }
+
+        // Registration number: use clinic-override if set, else use doctor's own
+        const regNumber = d.registrationNumber || '';
+        const showRegOnRX = d.showRegistrationOnRX !== false;
+
+        setDoctorInfo({
+          id: docId,
+          name: d.name || 'Doctor',
+          degree: d.degree || d.degrees?.[0] || '',
+          degrees: d.degrees || (d.degree ? [d.degree] : []),
+          specialty: d.specialty || d.specialities?.[0] || '',
+          specialities: d.specialities || (d.specialty ? [d.specialty] : []),
+          qrNumber: d.qrNumber || '',
+          clinicName: isClinicChamber ? (clinicInfo?.name || chamberName || '') : (chamberName || d.clinicName || ''),
+          doctorId: docId,
+          address: isClinicChamber ? (clinicInfo?.address || chamberAddress || '') : (chamberAddress || d.address || ''),
+          timing: scheduleTime || d.timing || '',
+          registrationNumber: regNumber,
+          showRegistrationOnRX: showRegOnRX,
+          useDrPrefix: d.useDrPrefix !== false,
+          pdfContext: isClinicChamber ? 'clinic' : 'doctor',
+          clinicInfo: clinicInfo || undefined,
+          allDoctors: allDoctors.length > 0 ? allDoctors : undefined,
+          allChambers: allChambers.length > 0 ? allChambers : undefined,
+          footerLine1: d.footerLine1 || '',
+          footerLine2: d.footerLine2 || '',
+          watermarkLogo: d.watermarkLogo || '',
+        });
       } catch (error) {
         console.error('Failed to load doctor info:', error);
       }
     };
     loadDoctorInfo();
-  }, [doctorId]);
+  }, [doctorId, chamberName, chamberAddress, scheduleTime, patients]);
 
   // Push reminders temporarily disabled while notification system is rebuilt.
 
@@ -304,205 +480,7 @@ export default function PatientDetails({
 
 
 
-  const handleMarkedSeen = async (patientId: string) => {
-    const patient = patients.find(p => p.id === patientId);
-    if (!patient) return;
-
-    try {
-      toast.loading('Marking patient as seen...', { id: 'mark-seen' });
-
-      // Get user info from localStorage (works for both doctors and assistants)
-      const isAssistant = localStorage.getItem('healqr_is_assistant') === 'true';
-      const userId = localStorage.getItem('userId'); // For assistants, this is the doctor's ID
-      const doctorName = localStorage.getItem('healqr_user_name') || localStorage.getItem('doctorName') || 'Doctor';
-      const markedBy = isAssistant ? localStorage.getItem('healqr_user_email') : userId; // Track who marked it
-
-      if (!userId) {
-        throw new Error('User ID not found');
-      }
-
-      // ============================================
-      // 🔍 CHECK IF PATIENT HAS FCM TOKEN REGISTERED
-      // ============================================
-      const { doc: firestoreDoc, getDoc } = await import('firebase/firestore');
-      const { db } = await import('../lib/firebase/config');
-
-      // Normalize phone number to match notificationService logic
-      const digits = (patient.phone || '').replace(/\D/g, '');
-      const trimmed = digits.replace(/^91/, '');
-      const phone10 = trimmed.slice(-10);
-
-      // 1. Try standard ID format
-      let fcmUserId = `patient_${phone10}`;
-      let tokenDoc = await getDoc(firestoreDoc(db!, 'fcmTokens', fcmUserId));
-
-      // 2. Fallback: Try with +91 prefix if standard fails
-      if (!tokenDoc.exists()) {
-
-        const fallbackId = `patient_+91${phone10}`;
-        const fallbackDoc = await getDoc(firestoreDoc(db!, 'fcmTokens', fallbackId));
-        if (fallbackDoc.exists()) {
-          fcmUserId = fallbackId;
-          tokenDoc = fallbackDoc;
-
-        }
-      }
-
-      // 3. Fallback: Try legacy collection (patientFCMTokens)
-      if (!tokenDoc.exists()) {
-
-        const legacyDoc = await getDoc(firestoreDoc(db!, 'patientFCMTokens', phone10));
-        if (legacyDoc.exists()) {
-          // Found in legacy, we can use this token but we need to adapt the logic
-          // The notification service might expect it in fcmTokens, but let's see if we can just use the token
-
-          // We might need to migrate it or just use it.
-          // For now, let's just proceed and let the notification service handle it if it looks up by ID.
-          // Actually, the notification service (cloud function) likely looks up by ID.
-          // If the cloud function expects it in 'fcmTokens', we might be stuck unless we migrate it here.
-
-          // Let's try to migrate it on the fly!
-          const legacyData = legacyDoc.data();
-          if (legacyData?.token) {
-             await import('firebase/firestore').then(({ setDoc, doc }) => {
-                setDoc(doc(db!, 'fcmTokens', `patient_${phone10}`), {
-                  userId: `patient_${phone10}`,
-                  token: legacyData.token,
-                  userType: 'patient',
-                  migratedFrom: 'patientFCMTokens',
-                  updatedAt: new Date()
-                }, { merge: true });
-             });
-             // Now re-fetch
-             fcmUserId = `patient_${phone10}`;
-             tokenDoc = await getDoc(firestoreDoc(db!, 'fcmTokens', fcmUserId));
-          }
-        }
-      }
-
-      if (!tokenDoc.exists()) {
-        console.error('❌ NO FCM TOKEN FOUND for patient:', fcmUserId);
-        console.error('   Patient never registered for notifications!');
-        toast.error('⚠️ Patient has not enabled notifications.', {
-          id: 'mark-seen',
-          duration: 5000,
-          description: 'They need to enable notifications when booking to receive updates.'
-        });
-      } else {
-        // Token exists - validate it's not too old
-        const tokenData = tokenDoc.data();
-        const updatedAt = tokenData?.updatedAt?.toDate();
-        if (updatedAt) {
-          const daysSinceUpdate = (Date.now() - updatedAt.getTime()) / (1000 * 60 * 60 * 24);
-          if (daysSinceUpdate > 60) {
-            console.warn('⚠️ FCM token is old (', Math.floor(daysSinceUpdate), 'days), may be expired');
-            toast.warning('⚠️ Patient notification may fail - their token is outdated.', {
-              id: 'mark-seen',
-              duration: 5000,
-              description: 'Ask patient to re-enable notifications in their next booking.'
-            });
-          }
-        }
-      }
-
-      // Get doctor info from Firestore
-      const { doc, updateDoc } = await import('firebase/firestore');
-
-      const seenTimestamp = new Date();
-
-      // Update Firestore booking document (use patient.id which is the Firestore doc ID)
-      const bookingRef = doc(db!, 'bookings', patient.id);
-
-      await updateDoc(bookingRef, {
-        isMarkedSeen: true,
-        markedSeenAt: seenTimestamp,
-        markedSeenBy: markedBy, // Doctor ID or assistant email
-        markedByRole: isAssistant ? 'assistant' : 'doctor', // Track role
-        reviewScheduled: true, // Auto-activate review button
-        reviewScheduledAt: seenTimestamp,
-        consultationStatus: 'completed', // For patient live tracker
-        isCompleted: true, // Flag for completed consultation
-      });
-
-      // Update local state - Activate review & follow-up, deactivate cancel
-      setPatientStates((prev: any) => ({
-        ...prev,
-        [patientId]: {
-          ...prev[patientId],
-          isMarkedSeen: true,
-          reviewScheduled: true, // Activate review button
-          // followUpScheduled stays false until doctor clicks it
-          // isCancelled stays as-is (can't cancel after seen)
-        }
-      }));
-
-      // ============================================
-      // 🔔 SEND CONSULTATION COMPLETED NOTIFICATION
-      // ============================================
-      try {
-        const { sendConsultationCompleted, scheduleReviewRequest } = await import('../services/notificationService');
-
-        // Send immediate "Consultation Completed" notification
-        const now = new Date();
-        const result = await sendConsultationCompleted({
-          patientPhone: patient.phone,
-          patientName: patient.name,
-          age: patient.age,
-          sex: patient.gender,
-          purpose: patient.visitType,
-          doctorId: doctorInfo.id,
-          doctorName: doctorName,
-          clinicName: patient.chamber, // Chamber name as clinic
-          bookingId: patient.bookingId, // Use structured booking ID from database
-          consultationDate: new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0], // YYYY-MM-DD format
-          consultationTime: now.toTimeString().split(' ')[0].slice(0, 5), // HH:mm format
-          chamber: patient.chamber || 'Chamber',
-          language: patient.language || 'english',
-        });
-
-        if (result?.success) {
-           toast.success('Patient notified via App');
-        }
-
-        // Schedule Review Request for 24h later
-        if (!isReviewRestricted) {
-          await scheduleReviewRequest(
-            {
-              patientPhone: patient.phone,
-              patientName: patient.name,
-              doctorName: doctorName,
-              doctorId: userId, // Pass doctorId for deep linking
-              bookingId: patient.id,
-              consultationDate: new Date().toLocaleDateString('en-IN', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-              }),
-              language: patient.language || 'english', // Pass patient's chosen language
-            },
-            seenTimestamp
-          );
-        } else {
-
-        }
-      } catch (notifError) {
-        // Notification error (non-blocking)
-        toast.error('Failed to notify patient');
-      }
-
-      toast.success('Patient marked as seen', {
-        id: 'mark-seen',
-        description: 'Consultation completed notification sent',
-      });
-    } catch (error) {
-      console.error('❌ Error marking patient as seen:', error);
-      toast.error('Failed to mark patient as seen', {
-        id: 'mark-seen',
-        description: error instanceof Error ? error.message : 'Please try again',
-      });
-    }
-  };
+  // handleMarkedSeen replaced by multi-step flow: Eye → RX modal → Diet Chart → finalizeConsultation()
 
   // Auto-send video link 30 minutes before appointment (System controlled)
   useEffect(() => {
@@ -747,6 +725,364 @@ export default function PatientDetails({
     } catch (error) {
       console.error('Error initiating diet chart:', error);
       toast.error('Failed to initiate diet chart');
+    }
+  };
+
+  // ============================================
+  // 🔄 MULTI-STEP CONSULTATION COMPLETION FLOW
+  // ============================================
+
+  // Step 1: User clicked Eye → "Create Digital RX?" modal shown
+  // "Yes, Create RX" → Opens DigitalRXMaker
+  const handleStartRxFlow = () => {
+    setRxConfirmModalOpen(false);
+    setRxMakerOpen(true);
+  };
+
+  // "No, Just Mark as Seen" → Skip RX, go straight to mark seen + send notification
+  const handleSkipRxAndMarkSeen = async () => {
+    setRxConfirmModalOpen(false);
+    if (selectedPatientForFlow) {
+      await finalizeConsultation(selectedPatientForFlow.id, null, null);
+    }
+  };
+
+  // Step 2: RX Maker callbacks
+  const handleRxPause = (savedState: { items: any[]; remarks: string; diagnosis: string; vitals: Record<string,string>; pathology: Record<string,string>; suggestedTests: string[] }) => {
+    setRxPausedState(savedState);
+    setRxMakerOpen(false);
+    toast.info('Prescription paused - You can resume anytime', {
+      description: 'Click the eye button again to resume',
+    });
+  };
+
+  const handleRxGenerated = (downloadURL: string, rxData?: { items: any[], remarks: string, diagnosis: string, vitals: Record<string,string>, pathology: Record<string,string>, suggestedTests: string[] }) => {
+    // Save RX data for potential regen later
+    if (rxData) setLastRxData(rxData);
+
+    if (isRegenMode) {
+      // Regen mode — update Firestore directly, no diet chart flow
+      handleRxRegenerated(downloadURL, rxData);
+      return;
+    }
+    setGeneratedRxUrl(downloadURL);
+    setRxMakerOpen(false);
+    // After RX generated → Ask "Add AI Diet Chart?"
+    setDietConfirmModalOpen(true);
+  };
+
+  const handleRxClose = () => {
+    setRxMakerOpen(false);
+    setIsRegenMode(false);
+    // If user closes RX maker without generating, show diet confirm anyway? No, just cancel.
+    // They can press the eye button again.
+  };
+
+  // ============================================
+  // 📋 RX REGEN FLOW (after initial Digital RX)
+  // ============================================
+  const handleRxRegenStart = async (patient: Patient) => {
+    setSelectedPatientForFlow(patient);
+    setIsRegenMode(true);
+
+    // Try to load last RX data from Firestore for this patient
+    try {
+      const { doc: docRef, getDoc: firestoreGetDoc } = await import('firebase/firestore');
+      const { db: fireDb } = await import('../lib/firebase/config');
+      const bookingDoc = await firestoreGetDoc(docRef(fireDb!, 'bookings', patient.id));
+      if (bookingDoc.exists()) {
+        const data = bookingDoc.data();
+        if (data.rxLastData) {
+          setRxPausedState(data.rxLastData);
+          toast.info('Loaded previous prescription data for editing');
+        } else if (lastRxData) {
+          setRxPausedState(lastRxData);
+          toast.info('Loaded last prescription data for editing');
+        } else {
+          setRxPausedState(null);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load last RX data:', e);
+      // Fallback to local state if available
+      if (lastRxData) {
+        setRxPausedState(lastRxData);
+      } else {
+        setRxPausedState(null);
+      }
+    }
+
+    setRxMakerOpen(true);
+  };
+
+  const handleRxRegenerated = async (downloadURL: string, rxData?: any) => {
+    setRxMakerOpen(false);
+    setIsRegenMode(false);
+    if (!selectedPatientForFlow) return;
+
+    try {
+      toast.loading('Updating Digital RX...', { id: 'rx-regen' });
+      const { doc: docRef, updateDoc: updateBooking } = await import('firebase/firestore');
+      const { db: fireDb } = await import('../lib/firebase/config');
+      const bookingRef = docRef(fireDb!, 'bookings', selectedPatientForFlow.id);
+      await updateBooking(bookingRef, { 
+        digitalRxUrl: downloadURL,
+        ...(rxData ? { rxLastData: rxData } : {}),
+      });
+
+      // Update local state
+      setPatientStates((prev: any) => ({
+        ...prev,
+        [selectedPatientForFlow!.id]: {
+          ...prev[selectedPatientForFlow!.id],
+          digitalRxUsed: true,
+        }
+      }));
+
+      // Send UPDATED RX notification (distinct from original consultation completed)
+      try {
+        const { sendRxUpdatedNotification } = await import('../services/notificationService');
+        const doctorName = localStorage.getItem('healqr_user_name') || localStorage.getItem('doctorName') || 'Doctor';
+        await sendRxUpdatedNotification({
+          patientPhone: selectedPatientForFlow.phone,
+          patientName: selectedPatientForFlow.name,
+          age: selectedPatientForFlow.age,
+          sex: selectedPatientForFlow.gender,
+          purpose: selectedPatientForFlow.visitType,
+          doctorId: doctorInfo.id,
+          doctorName: doctorName,
+          clinicName: selectedPatientForFlow.chamber || 'Chamber',
+          bookingId: selectedPatientForFlow.bookingId,
+          consultationDate: new Date().toISOString().split('T')[0],
+          consultationTime: new Date().toTimeString().split(' ')[0].slice(0, 5),
+          chamber: selectedPatientForFlow.chamber || 'Chamber',
+          language: selectedPatientForFlow.language || 'english',
+          rxUrl: downloadURL,
+        });
+      } catch (notifErr) {
+        console.error('RX regen notification error:', notifErr);
+      }
+
+      toast.success('Digital RX regenerated & sent to patient!', { id: 'rx-regen' });
+    } catch (err) {
+      console.error('RX regen update error:', err);
+      toast.error('Failed to update RX', { id: 'rx-regen' });
+    }
+  };
+
+  // Step 3: Diet Chart confirm modal callbacks
+  const handleStartDietFlow = () => {
+    setDietConfirmModalOpen(false);
+    setDietChartModalOpen(true);
+  };
+
+  const handleSkipDietAndSend = async () => {
+    setDietConfirmModalOpen(false);
+    if (selectedPatientForFlow) {
+      await finalizeConsultation(selectedPatientForFlow.id, generatedRxUrl, null);
+    }
+  };
+
+  // Step 4: Diet Chart generated callback
+  const handleDietGenerated = async (dietUrl: string) => {
+    setGeneratedDietUrl(dietUrl);
+    setDietChartModalOpen(false);
+    if (selectedPatientForFlow) {
+      await finalizeConsultation(selectedPatientForFlow.id, generatedRxUrl, dietUrl);
+    }
+  };
+
+  // ============================================
+  // 🏁 FINALIZE: Mark as seen + Send notification with RX & Diet URLs
+  // ============================================
+  const finalizeConsultation = async (patientId: string, rxUrl: string | null, dietUrl: string | null) => {
+    const patient = patients.find(p => p.id === patientId);
+    if (!patient) return;
+
+    setIsSendingNotification(true);
+
+    try {
+      toast.loading('Completing consultation...', { id: 'mark-seen' });
+
+      const isAssistant = localStorage.getItem('healqr_is_assistant') === 'true';
+      const userId = localStorage.getItem('userId');
+      const doctorName = localStorage.getItem('healqr_user_name') || localStorage.getItem('doctorName') || 'Doctor';
+      const markedBy = isAssistant ? localStorage.getItem('healqr_user_email') : userId;
+
+      if (!userId) throw new Error('User ID not found');
+
+      // ============================================
+      // 🔍 CHECK FCM TOKEN
+      // ============================================
+      const { doc: firestoreDoc, getDoc: firestoreGetDoc } = await import('firebase/firestore');
+      const { db: fireDb } = await import('../lib/firebase/config');
+
+      const digits = (patient.phone || '').replace(/\D/g, '');
+      const trimmed = digits.replace(/^91/, '');
+      const phone10 = trimmed.slice(-10);
+
+      let fcmUserId = `patient_${phone10}`;
+      let tokenDoc = await firestoreGetDoc(firestoreDoc(fireDb!, 'fcmTokens', fcmUserId));
+
+      if (!tokenDoc.exists()) {
+        const fallbackId = `patient_+91${phone10}`;
+        const fallbackDoc = await firestoreGetDoc(firestoreDoc(fireDb!, 'fcmTokens', fallbackId));
+        if (fallbackDoc.exists()) {
+          fcmUserId = fallbackId;
+          tokenDoc = fallbackDoc;
+        }
+      }
+
+      if (!tokenDoc.exists()) {
+        const legacyDoc = await firestoreGetDoc(firestoreDoc(fireDb!, 'patientFCMTokens', phone10));
+        if (legacyDoc.exists()) {
+          const legacyData = legacyDoc.data();
+          if (legacyData?.token) {
+            await import('firebase/firestore').then(({ setDoc, doc }) => {
+              setDoc(doc(fireDb!, 'fcmTokens', `patient_${phone10}`), {
+                userId: `patient_${phone10}`,
+                token: legacyData.token,
+                userType: 'patient',
+                migratedFrom: 'patientFCMTokens',
+                updatedAt: new Date()
+              }, { merge: true });
+            });
+            fcmUserId = `patient_${phone10}`;
+            tokenDoc = await firestoreGetDoc(firestoreDoc(fireDb!, 'fcmTokens', fcmUserId));
+          }
+        }
+      }
+
+      if (!tokenDoc.exists()) {
+        toast.error('⚠️ Patient has not enabled notifications.', {
+          id: 'mark-seen',
+          duration: 5000,
+          description: 'They need to enable notifications when booking to receive updates.'
+        });
+      } else {
+        const tokenData = tokenDoc.data();
+        const updatedAt = tokenData?.updatedAt?.toDate();
+        if (updatedAt) {
+          const daysSinceUpdate = (Date.now() - updatedAt.getTime()) / (1000 * 60 * 60 * 24);
+          if (daysSinceUpdate > 60) {
+            toast.warning('⚠️ Patient notification may fail - their token is outdated.', {
+              id: 'mark-seen',
+              duration: 5000,
+            });
+          }
+        }
+      }
+
+      // ============================================
+      // 📝 UPDATE FIRESTORE BOOKING
+      // ============================================
+      const { doc: docRef, updateDoc: updateBooking } = await import('firebase/firestore');
+      const seenTimestamp = new Date();
+      const bookingRef = docRef(fireDb!, 'bookings', patient.id);
+
+      await updateBooking(bookingRef, {
+        isMarkedSeen: true,
+        markedSeenAt: seenTimestamp,
+        markedSeenBy: markedBy,
+        markedByRole: isAssistant ? 'assistant' : 'doctor',
+        reviewScheduled: true,
+        reviewScheduledAt: seenTimestamp,
+        consultationStatus: 'completed',
+        isCompleted: true,
+        ...(rxUrl ? { digitalRxUrl: rxUrl } : {}),
+        ...(dietUrl ? { dietChartUrl: dietUrl } : {}),
+        ...(rxUrl && lastRxData ? { rxLastData: lastRxData } : {}),
+      });
+
+      // Update local state
+      setPatientStates((prev: any) => ({
+        ...prev,
+        [patientId]: {
+          ...prev[patientId],
+          isMarkedSeen: true,
+          reviewScheduled: true,
+          digitalRxUsed: !!rxUrl || prev[patientId]?.digitalRxUsed,
+          dietChartUsed: !!dietUrl || prev[patientId]?.dietChartUsed,
+        }
+      }));
+
+      // ============================================
+      // 🔔 SEND NOTIFICATION WITH RX & DIET URLs
+      // ============================================
+      try {
+        const { sendConsultationCompleted, scheduleReviewRequest } = await import('../services/notificationService');
+
+        const now = new Date();
+        const result = await sendConsultationCompleted({
+          patientPhone: patient.phone,
+          patientName: patient.name,
+          age: patient.age,
+          sex: patient.gender,
+          purpose: patient.visitType,
+          doctorId: doctorInfo.id,
+          doctorName: doctorName,
+          clinicName: patient.chamber,
+          bookingId: patient.bookingId,
+          consultationDate: new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0],
+          consultationTime: now.toTimeString().split(' ')[0].slice(0, 5),
+          chamber: patient.chamber || 'Chamber',
+          language: patient.language || 'english',
+          ...(rxUrl ? { rxUrl } : {}),
+          ...(dietUrl ? { dietUrl } : {}),
+        });
+
+        if (result?.success) {
+          const extras = [];
+          if (rxUrl) extras.push('Digital RX');
+          if (dietUrl) extras.push('Diet Chart');
+          const extraText = extras.length > 0 ? ` with ${extras.join(' + ')}` : '';
+          toast.success(`Patient notified via App${extraText}`);
+        }
+
+        if (!isReviewRestricted) {
+          await scheduleReviewRequest(
+            {
+              patientPhone: patient.phone,
+              patientName: patient.name,
+              doctorName: doctorName,
+              doctorId: userId,
+              bookingId: patient.id,
+              consultationDate: new Date().toLocaleDateString('en-IN', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              }),
+              language: patient.language || 'english',
+            },
+            seenTimestamp
+          );
+        }
+      } catch (notifError) {
+        toast.error('Failed to notify patient');
+      }
+
+      const extras = [];
+      if (rxUrl) extras.push('RX');
+      if (dietUrl) extras.push('Diet Chart');
+      const descText = extras.length > 0 ? `Sent with ${extras.join(' + ')} download link` : 'Consultation completed notification sent';
+
+      toast.success('Patient marked as seen', {
+        id: 'mark-seen',
+        description: descText,
+      });
+    } catch (error) {
+      console.error('❌ Error finalizing consultation:', error);
+      toast.error('Failed to mark patient as seen', {
+        id: 'mark-seen',
+        description: error instanceof Error ? error.message : 'Please try again',
+      });
+    } finally {
+      setIsSendingNotification(false);
+      setSelectedPatientForFlow(null);
+      setGeneratedRxUrl(null);
+      setGeneratedDietUrl(null);
+      setRxPausedState(null);
     }
   };
 
@@ -1076,6 +1412,14 @@ export default function PatientDetails({
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="text-white">
                       {(() => {
+                        if (patient.isDataRestricted) {
+                          // Mask name: Show first letter + asterisks
+                          const name = patient.name || 'Patient';
+                          const words = name.split(' ');
+                          return words.map(word =>
+                            word.charAt(0) + '*'.repeat(Math.max(3, word.length - 1))
+                          ).join(' ');
+                        }
                         const transliterated = transliterateName(patient.name, doctorLanguage);
                         return transliterated;
                       })()}
@@ -1093,7 +1437,12 @@ export default function PatientDetails({
                     {/* Phone */}
                     <div className="flex items-center gap-1 text-gray-400 text-sm">
                       <Phone className="w-3 h-3" />
-                      <span>{patient.phone}</span>
+                      <span>
+                        {patient.isDataRestricted
+                          ? `******${patient.phone.slice(-4)}`
+                          : patient.phone
+                        }
+                      </span>
 
                       {/* Enable Notifications Button */}
                       <button
@@ -1111,37 +1460,56 @@ export default function PatientDetails({
 
                     {/* Booking ID */}
                     <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs">
-                      {patient.bookingId}
+                      {patient.isDataRestricted
+                        ? '*********'
+                        : patient.bookingId
+                      }
                     </span>
 
-                    {/* Booking Channel Badge - QR SCAN or WALK IN */}
+                    {/* Booking Channel Badge - QR SCAN or WALK IN - Prominent Button Style */}
                     {patient.isWalkIn !== undefined && (
-                      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                      <span className={`px-3 py-1 rounded-md text-xs font-bold flex items-center gap-1 ${
                         patient.isWalkIn
-                          ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
-                          : 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                          ? 'bg-orange-500/20 text-orange-400 border-2 border-orange-500/50'
+                          : 'bg-purple-600/30 text-purple-200 border-2 border-purple-500/60'
                       }`}>
-                        {patient.isWalkIn ? '🚶 WALK IN' : '📱 QR SCAN'}
+                        {patient.isWalkIn ? (
+                          <>
+                            🚶 <span>WALK IN</span>
+                          </>
+                        ) : (
+                          <>
+                            <QrCode className="w-3.5 h-3.5" />
+                            <span>QR SCAN</span>
+                          </>
+                        )}
                       </span>
                     )}
 
                     {/* Age */}
-                    <span className="text-gray-400 text-sm">{patient.age > 0 ? `${patient.age} years` : 'Age N/A'}</span>
+                    <span className="text-gray-400 text-sm">
+                      {patient.isDataRestricted
+                        ? '** Years'
+                        : (patient.age > 0 ? `${patient.age} years` : 'Age N/A')
+                      }
+                    </span>
 
                     {/* Gender */}
                     <span className={`px-2 py-0.5 rounded text-xs ${getGenderColor(patient.gender)}`}>
-                      {translateDataValue(patient.gender, doctorLanguage)}
+                      {patient.isDataRestricted ? '**' : translateDataValue(patient.gender, doctorLanguage)}
                     </span>
                   </div>
 
                   {/* Visit Type */}
-                  <p className="text-gray-500 text-sm mt-1">{translateDataValue(patient.visitType, doctorLanguage)}</p>
+                  <p className="text-gray-500 text-sm mt-1">
+                    {patient.isDataRestricted ? '*********' : translateDataValue(patient.visitType, doctorLanguage)}
+                  </p>
                 </div>
               </div>
             </div>
 
-            {/* Action Buttons - 2 Rows Grid Layout */}
-            <div className="grid grid-cols-5 gap-2 mt-3 pt-3 border-t border-gray-800">
+            {/* Action Buttons - Horizontal Row */}
+            <div className="flex flex-wrap gap-4 mt-3 pt-3 border-t border-gray-800">
               {(() => {
                 const state = patientStates[patient.id];
                 const isDisabled = state.isCancelled;
@@ -1255,9 +1623,31 @@ export default function PatientDetails({
                     )}
                     */}
 
-                    {/* Mark as Seen - Sends FCM */}
+                    {/* AI RX Reader - Purple Sparkle Button (Disabled if Digital RX was used) */}
                     <button
-                      onClick={() => handleMarkedSeen(patient.id)}
+                      onClick={() => {
+                        setUploadTargetPatient(patient);
+                        setAiUploadModalOpen(true);
+                      }}
+                      disabled={isDisabled || state.digitalRxUsed}
+                      className={`relative w-10 h-10 rounded-lg flex items-center justify-center transition-all ${
+                        isDisabled || state.digitalRxUsed
+                          ? 'bg-gray-800 border border-gray-700 opacity-50 cursor-not-allowed'
+                          : 'bg-gradient-to-br from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 border border-purple-500/50 shadow-lg shadow-purple-500/30'
+                      }`}
+                      title={state.digitalRxUsed ? "Digital RX already created - No need to decode" : "AI RX Reader"}
+                    >
+                      <Sparkles className="w-4 h-4 text-white" />
+                    </button>
+
+                    {/* Mark as Seen - Opens Multi-Step Consultation Flow */}
+                    <button
+                      onClick={() => {
+                        setSelectedPatientForFlow(patient);
+                        setGeneratedRxUrl(null);
+                        setGeneratedDietUrl(null);
+                        setRxConfirmModalOpen(true);
+                      }}
                       disabled={isDisabled || state.isMarkedSeen}
                       className={`relative w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
                         isDisabled
@@ -1266,7 +1656,7 @@ export default function PatientDetails({
                           ? 'bg-green-500/30 border border-green-500/50'
                           : 'bg-green-500/10 hover:bg-green-500/20 border border-green-500/30'
                       }`}
-                      title={state.isMarkedSeen ? "Marked as Seen" : "Mark as Seen"}
+                      title={state.isMarkedSeen ? "Marked as Seen" : "Mark as Seen → Digital RX Flow"}
                     >
                       <Eye className={`w-4 h-4 ${state.isMarkedSeen ? 'text-green-300' : 'text-green-400'}`} />
                       {state.isMarkedSeen && (
@@ -1351,18 +1741,38 @@ export default function PatientDetails({
                       )}
                     </div>
 
-                    {/* AI Diet Chart Shortcut - Beside Star */}
+                    {/* Digital RX Regen - Blue FileText (Active only after Digital RX first generated via Eye) */}
+                    <button
+                      onClick={() => handleRxRegenStart(patient)}
+                      disabled={isDisabled || !state.isMarkedSeen || !state.digitalRxUsed}
+                      className={`relative w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
+                        isDisabled || !state.isMarkedSeen || !state.digitalRxUsed
+                          ? 'bg-gray-800 border border-gray-700 opacity-50 cursor-not-allowed'
+                          : 'bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50'
+                      }`}
+                      title={
+                        !state.isMarkedSeen
+                          ? "Mark as seen first"
+                          : !state.digitalRxUsed
+                          ? "Generate Digital RX first via Eye button"
+                          : "Regenerate Digital RX"
+                      }
+                    >
+                      <FileText className={`w-4 h-4 ${!state.isMarkedSeen || !state.digitalRxUsed ? 'text-gray-500' : 'text-blue-400'}`} />
+                    </button>
+
+                    {/* AI Diet Chart - Active after Mark as Seen (re-generable until 23:59) */}
                     <button
                       onClick={() => handleCreateDietChart(patient)}
-                      disabled={isDisabled}
+                      disabled={isDisabled || !state.isMarkedSeen}
                       className={`relative w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
-                        isDisabled
+                        isDisabled || !state.isMarkedSeen
                           ? 'bg-gray-800 border border-gray-700 opacity-50 cursor-not-allowed'
                           : 'bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/50'
                       }`}
-                      title="Create AI Diet Chart"
+                      title={!state.isMarkedSeen ? "Mark as seen first" : "Create AI Diet Chart"}
                     >
-                      <Apple className="w-4 h-4 text-orange-500" />
+                      <Apple className={`w-4 h-4 ${!state.isMarkedSeen ? 'text-gray-500' : 'text-orange-500'}`} />
                     </button>
 
                     {/* Cancel or Restore - Spans full width */}
@@ -1370,7 +1780,7 @@ export default function PatientDetails({
                       <button
                         onClick={() => openCancelModal(patient.id)}
                         disabled={state.isMarkedSeen}
-                        className={`col-span-5 w-full h-10 rounded-lg flex items-center justify-center gap-2 transition-colors ${
+                        className={`basis-full w-full h-10 rounded-lg flex items-center justify-center gap-2 transition-colors ${
                           state.isMarkedSeen
                             ? 'bg-gray-800 border border-gray-700 opacity-50 cursor-not-allowed'
                             : 'bg-red-500/10 hover:bg-red-500/20 border border-red-500/30'
@@ -1383,53 +1793,53 @@ export default function PatientDetails({
                     ) : (
                       <button
                         onClick={() => openRestorationModal(patient.id)}
-                        className="col-span-5 w-full h-10 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 rounded-lg flex items-center justify-center gap-2 transition-colors"
+                        className="basis-full w-full h-10 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 rounded-lg flex items-center justify-center gap-2 transition-colors"
                         title="Restore Booking"
                       >
                         <RotateCcw className="w-4 h-4 text-cyan-400" />
                         <span className="text-cyan-400 text-sm">Restore Booking</span>
                       </button>
                     )}
-
-                    {/* NEW: Patient Action Icons Row - Hidden for now as requested
-                    <div className="col-span-5 grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-gray-700/50">
-                      <button
-                        onClick={() => {
-                          setSelectedPatient(patient);
-                          setHistoryModalOpen(true);
-                        }}
-                        className="h-10 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-lg flex items-center justify-center transition-colors group"
-                        title="View patient consultation history with you"
-                      >
-                        <History className="w-5 h-5 text-emerald-400 group-hover:text-emerald-300" />
-                      </button>
-
-                      <button
-                        onClick={() => {
-                            setSelectedPatient(patient);
-                            setUploadModalOpen(true);
-                        }}
-                        className="h-10 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 rounded-lg flex items-center justify-center transition-colors group"
-                        title="Upload Prescription to Medico Locker"
-                      >
-                        <Upload className="w-5 h-5 text-blue-400 group-hover:text-blue-300" />
-                      </button>
-
-                      <button
-                        onClick={() => {
-                            toast.info('Requesting Locker Access...', {
-                                description: `Sending access request to ${patient.name}. They will receive an OTP to authorize.`,
-                            });
-                        }}
-                        className="h-10 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg flex items-center justify-center transition-colors group"
-                        title="Request Full Medical Locker Access"
-                      >
-                        <Lock className="w-5 h-5 text-amber-500 group-hover:text-amber-400" />
-                      </button>
-                    </div> */}
                   </>
                 );
               })()}
+            </div>
+
+            {/* Bottom Action Tabs - HISTORY, UPLOAD, LOCKER (Icons Only) */}
+            <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-gray-700/50">
+              <button
+                onClick={() => {
+                  setSelectedPatient(patient);
+                  setHistoryModalOpen(true);
+                }}
+                className="h-12 bg-gray-800/50 hover:bg-emerald-500/10 border border-gray-700 hover:border-emerald-500/30 rounded-lg flex items-center justify-center transition-colors group"
+                title="View patient consultation history with you"
+              >
+                <History className="w-5 h-5 text-emerald-400 group-hover:text-emerald-300" />
+              </button>
+
+              <button
+                onClick={() => {
+                  setUploadTargetPatient(patient);
+                  setUploadModalOpen(true);
+                }}
+                className="h-12 bg-gray-800/50 hover:bg-blue-500/10 border border-gray-700 hover:border-blue-500/30 rounded-lg flex items-center justify-center transition-colors group"
+                title="Upload Prescription to Medico Locker"
+              >
+                <Upload className="w-5 h-5 text-gray-400 group-hover:text-gray-300" />
+              </button>
+
+              <button
+                onClick={() => {
+                  toast.info('Requesting Locker Access...', {
+                    description: `Sending access request to ${patient.name}. They will receive an OTP to authorize.`,
+                  });
+                }}
+                className="h-12 bg-gray-800/50 hover:bg-amber-500/10 border border-gray-700 hover:border-amber-500/30 rounded-lg flex items-center justify-center transition-colors group"
+                title="Request Full Medical Locker Access"
+              >
+                <Lock className="w-5 h-5 text-gray-400 group-hover:text-amber-400" />
+              </button>
             </div>
           </div>
         ))}
@@ -1449,10 +1859,11 @@ export default function PatientDetails({
           onClose={() => {
             setUploadModalOpen(false);
             setSelectedPatient(null);
+            setUploadTargetPatient(null);
           }}
-          patientName={selectedPatient?.name || ''}
-          patientPhone={selectedPatient?.phone}
-          bookingId={selectedPatient?.bookingId}
+          patientName={uploadTargetPatient?.name || selectedPatient?.name || ''}
+          patientPhone={uploadTargetPatient?.phone || selectedPatient?.phone}
+          bookingId={uploadTargetPatient?.bookingId || selectedPatient?.bookingId}
           onUploadSuccess={handleUploadSuccess}
         />
 
@@ -1487,8 +1898,8 @@ export default function PatientDetails({
         />
 
 
-        {/* AI RX Reader Removed */}
-        {/* <DoctorAIRXUploadModal
+        {/* AI RX Reader Modal */}
+        <DoctorAIRXUploadModal
           isOpen={aiUploadModalOpen}
           onClose={() => {
             setAiUploadModalOpen(false);
@@ -1509,7 +1920,190 @@ export default function PatientDetails({
               }));
             }
           }}
-        /> */}
+        />
+
+        {/* ============================================ */}
+        {/* 🔄 MULTI-STEP CONSULTATION COMPLETION MODALS */}
+        {/* ============================================ */}
+
+        {/* Step 1: "Create Digital RX?" Confirmation Modal */}
+        {rxConfirmModalOpen && selectedPatientForFlow && (
+          <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="w-full max-w-md bg-[#0f172a] border border-zinc-700 rounded-2xl shadow-2xl overflow-hidden">
+              {/* Header */}
+              <div className="p-6 border-b border-zinc-800 bg-zinc-900/50">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-emerald-500/20 rounded-xl">
+                    <FileText className="w-6 h-6 text-emerald-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Create Digital RX?</h3>
+                    <p className="text-xs text-gray-400">For {selectedPatientForFlow.name}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Body */}
+              <div className="p-6 space-y-4">
+                <div className="p-4 bg-zinc-800/30 rounded-xl border border-zinc-700/50 space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-400">Patient</span>
+                    <span className="text-white font-medium">{selectedPatientForFlow.name}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-400">Age/Gender</span>
+                    <span className="text-white">{selectedPatientForFlow.age}Y / {selectedPatientForFlow.gender}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-400">Visit</span>
+                    <span className="text-white">{selectedPatientForFlow.visitType}</span>
+                  </div>
+                </div>
+
+                {rxPausedState && (
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center gap-3">
+                    <Stethoscope className="w-5 h-5 text-amber-400 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-amber-300">Draft Available</p>
+                      <p className="text-xs text-amber-400/70">{rxPausedState.items.length} medicine(s), {Object.keys(rxPausedState.vitals || {}).length} vital(s), {Object.keys(rxPausedState.pathology || {}).length} lab(s), {(rxPausedState.suggestedTests || []).length} test(s) saved - Will resume from where you left</p>
+                    </div>
+                  </div>
+                )}
+
+                <p className="text-sm text-gray-400 leading-relaxed">
+                  Would you like to create a Digital Prescription for this patient? 
+                  The RX will be generated as a professional PDF and sent to the patient via notification.
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="p-6 border-t border-zinc-800 space-y-3">
+                <button
+                  onClick={handleStartRxFlow}
+                  className="w-full py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20"
+                >
+                  <FileText className="w-5 h-5" />
+                  {rxPausedState ? 'Resume Digital RX' : 'Yes, Create Digital RX'}
+                </button>
+                <button
+                  onClick={handleSkipRxAndMarkSeen}
+                  className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 text-gray-300 font-medium rounded-xl flex items-center justify-center gap-2 transition-colors border border-zinc-700"
+                >
+                  <Eye className="w-4 h-4" />
+                  No, Just Mark as Seen
+                </button>
+                <button
+                  onClick={() => {
+                    setRxConfirmModalOpen(false);
+                    setSelectedPatientForFlow(null);
+                  }}
+                  className="w-full py-2 text-gray-500 text-sm hover:text-gray-400 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: DigitalRXMaker Modal */}
+        {rxMakerOpen && selectedPatientForFlow && (
+          <DigitalRXMaker
+            patient={{
+              id: selectedPatientForFlow.id,
+              name: selectedPatientForFlow.name,
+              age: selectedPatientForFlow.age,
+              gender: selectedPatientForFlow.gender,
+              phone: selectedPatientForFlow.phone,
+              bookingId: selectedPatientForFlow.bookingId,
+              appointmentTime: selectedPatientForFlow.appointmentTime,
+              bookingTime: selectedPatientForFlow.bookingTime,
+              language: selectedPatientForFlow.language,
+              purpose: selectedPatientForFlow.visitType,
+              srlNo: selectedPatientForFlow.serialNumber || selectedPatientForFlow.tokenNumber,
+            }}
+            doctorInfo={doctorInfo}
+            onClose={handleRxClose}
+            onPause={handleRxPause}
+            onGenerated={handleRxGenerated}
+            initialState={rxPausedState || undefined}
+          />
+        )}
+
+        {/* Step 3: "Add AI Diet Chart?" Confirmation Modal */}
+        {dietConfirmModalOpen && selectedPatientForFlow && (
+          <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="w-full max-w-md bg-[#0f172a] border border-zinc-700 rounded-2xl shadow-2xl overflow-hidden">
+              {/* Header */}
+              <div className="p-6 border-b border-zinc-800 bg-zinc-900/50">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-orange-500/20 rounded-xl">
+                    <Apple className="w-6 h-6 text-orange-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Add AI Diet Chart?</h3>
+                    <p className="text-xs text-gray-400">RX Generated Successfully ✅</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Body */}
+              <div className="p-6 space-y-4">
+                <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-emerald-300">Digital RX Ready</p>
+                    <p className="text-xs text-emerald-400/70">PDF prescription has been generated and stored</p>
+                  </div>
+                </div>
+
+                <p className="text-sm text-gray-400 leading-relaxed">
+                  Would you like to create an AI-powered Diet Chart for <span className="text-white font-medium">{selectedPatientForFlow.name}</span>?
+                  A personalized 7-day nutrition plan will be generated and sent along with the prescription.
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="p-6 border-t border-zinc-800 space-y-3">
+                <button
+                  onClick={handleStartDietFlow}
+                  className="w-full py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-orange-500/20"
+                >
+                  <Apple className="w-5 h-5" />
+                  Yes, Add AI Diet Chart
+                </button>
+                <button
+                  onClick={handleSkipDietAndSend}
+                  disabled={isSendingNotification}
+                  className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 text-gray-300 font-medium rounded-xl flex items-center justify-center gap-2 transition-colors border border-zinc-700 disabled:opacity-50"
+                >
+                  {isSendingNotification ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                  No, Send RX Only
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: Inline AI Diet Chart Modal */}
+        {dietChartModalOpen && selectedPatientForFlow && (
+          <InlineDietChartModal
+            patient={selectedPatientForFlow}
+            doctorInfo={doctorInfo}
+            onClose={() => {
+              setDietChartModalOpen(false);
+              // If closing without generating, send RX only
+              if (selectedPatientForFlow) {
+                finalizeConsultation(selectedPatientForFlow.id, generatedRxUrl, null);
+              }
+            }}
+            onGenerated={handleDietGenerated}
+          />
+        )}
 
         {/* <PatientOldRXViewer
           isOpen={oldRxViewerOpen}

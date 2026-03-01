@@ -10,14 +10,14 @@ import { Label } from './ui/label';
 import { Badge } from './ui/badge';
 import { Switch } from './ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { 
-  UserPlus, 
-  Link as LinkIcon, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Stethoscope, 
-  User, 
+import {
+  UserPlus,
+  Link as LinkIcon,
+  Mail,
+  Phone,
+  MapPin,
+  Stethoscope,
+  User,
   Building2,
   Clock,
   Send,
@@ -83,6 +83,10 @@ interface LinkedDoctor {
     setAt: any;
   };
   restrictPatientDataAccess?: boolean; // NEW: Clinic controls if doctor can see patient details
+  registrationNumber?: string; // Doctor's medical registration number
+  showRegistrationOnRX?: boolean; // Whether to show reg number on digital prescriptions
+  footerLine1?: string; // Custom footer line 1 for RX/Diet Chart PDFs
+  footerLine2?: string; // Custom footer line 2 for RX/Diet Chart PDFs
 }
 
 const SPECIALTIES = [
@@ -119,13 +123,13 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
   const [showAddModal, setShowAddModal] = useState(false);
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [clinicData, setClinicData] = useState<any>(null);
-  
+
   // Calculate default dates for toggle off (tomorrow and 7 days ahead)
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const nextWeek = new Date();
   nextWeek.setDate(nextWeek.getDate() + 8);
-  
+
   // Toggle Off States (inline UI with confirmation modals)
   const [selectedDoctorForToggle, setSelectedDoctorForToggle] = useState<{ id: string; name: string; } | null>(null);
   const [toggleOffStartDate, setToggleOffStartDate] = useState(tomorrow.toISOString().split('T')[0]);
@@ -262,7 +266,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
       if (clinicSnap.exists()) {
         const data = clinicSnap.data();
         setClinicData(data);
-        
+
         // Load doctor data including chambers
         const doctorsData = data.linkedDoctorsDetails || [];
         const doctorsWithChambers = await Promise.all(
@@ -270,26 +274,30 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
             try {
               const doctorRef = doc(db, 'doctors', doctor.uid);
               const doctorSnap = await getDoc(doctorRef);
-              
+
               if (doctorSnap.exists()) {
                 const doctorData = doctorSnap.data();
-                
+
                 // CRITICAL FILTER: Show ONLY chambers belonging to THIS clinic
                 const allChambers = doctorData.chambers || [];
-                const clinicChambers = allChambers.filter((chamber: Chamber) => 
+                const clinicChambers = allChambers.filter((chamber: Chamber) =>
                   chamber.clinicId === currentUser.uid
                 );
-                
+
                 console.log(`🔒 SECURITY FILTER for Dr. ${doctor.name}:`, {
                   totalChambers: allChambers.length,
                   clinicChambers: clinicChambers.length,
                   clinicId: currentUser.uid
                 });
-                
+
                 return {
                   ...doctor,
                   chambers: clinicChambers, // ONLY clinic's chambers
-                  maxAdvanceBookingDays: doctorData.maxAdvanceBookingDays || 30
+                  maxAdvanceBookingDays: doctorData.maxAdvanceBookingDays || 30,
+                  registrationNumber: doctorData.registrationNumber || '',
+                  showRegistrationOnRX: doctorData.showRegistrationOnRX !== false,
+                  footerLine1: doctorData.footerLine1 || '',
+                  footerLine2: doctorData.footerLine2 || '',
                 };
               }
               return doctor;
@@ -299,16 +307,16 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
             }
           })
         );
-        
+
         setLinkedDoctors(doctorsWithChambers);
       }
-      
+
       // Fetch available QR from pool
       try {
         const qrPoolRef = collection(db, 'qrPool');
         const availableQuery = query(qrPoolRef, where('status', '==', 'available'));
         const qrSnap = await getDocs(availableQuery);
-        
+
         if (!qrSnap.empty) {
           const firstAvailable = qrSnap.docs[0].data();
           setAvailableQR(firstAvailable.qrNumber || generateQRNumber());
@@ -329,16 +337,16 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
 
   const generateDoctorCode = async (pinCode: string) => {
     if (!db) return `HQR-${pinCode}-0001-DR`;
-    
+
     try {
       // Count existing doctors with this pincode (across all specialties)
       const doctorsRef = collection(db, 'doctors');
       const pincodeQuery = query(doctorsRef, where('pinCode', '==', pinCode));
       const pincodeSnap = await getDocs(pincodeQuery);
-      
+
       const count = pincodeSnap.size + 1; // Next sequential number
       const sequential = count.toString().padStart(4, '0');
-      
+
       return `HQR-${pinCode}-${sequential}-DR`;
     } catch (error) {
       console.error('Error generating doctor code:', error);
@@ -387,7 +395,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
 
         // Doctor exists but not linked - link them to this clinic
         console.log('🔗 Doctor found, linking to clinic...');
-        
+
         // Update doctor's linkedClinics array
         const doctorRef = doc(db, 'doctors', existingDoctorId);
         const currentLinkedClinics = existingDoctorData.linkedClinics || [];
@@ -413,7 +421,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
           qrNumber: existingDoctorData.qrNumber,
           status: existingDoctorData.status || 'active'
         };
-        
+
         await updateDoc(clinicRef, {
           linkedDoctorsDetails: [...existingDoctors, newLinkedDoctor]
         });
@@ -430,7 +438,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
 
       // Doctor doesn't exist - create new doctor profile
       console.log('👤 Creating new doctor profile...');
-      
+
       // Generate unique IDs
       const doctorId = `doc_${Date.now()}`;
       const doctorCode = await generateDoctorCode(newDoctor.pinCode);
@@ -473,7 +481,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
 
       // Save to Firestore
       await setDoc(doc(db, 'doctors', doctorId), newDoctorData);
-      
+
       // Update QR status to 'assigned' in qrPool
       try {
         const qrPoolRef = collection(db, 'qrPool');
@@ -505,7 +513,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
         qrNumber,
         status: 'pending_invitation'
       };
-      
+
       await updateDoc(clinicRef, {
         linkedDoctorsDetails: [...existingDoctors, newLinkedDoctor]
       });
@@ -523,7 +531,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
         invitationLink: `https://www.healqr.com/doctor/activate?code=${doctorCode}`,
         expiresIn: '7 days'
       };
-      
+
       // Email will be sent when doctor activates account via /doctor/activate page
       console.log('📧 Doctor activation link:', `${window.location.origin}/doctor/activate?code=${doctorCode}&email=${encodeURIComponent(newDoctor.email)}`);
       console.log('✅ Clinic can start booking appointments immediately using QR:', qrNumber);
@@ -531,15 +539,15 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
       console.log('🔒 Doctor MUST verify email to access dashboard');
       console.log('🎯 After activation, email/DOB/pinCode will be frozen');
       console.log('🖨️ Admin can send printed QR to doctor from admin panel using QR number:', qrNumber);
-      
+
       toast.success(`✅ Doctor added! Code: ${doctorCode}. You can book appointments immediately.`);
       toast.info('Click the copy icon to share activation link with doctor.');
-      
+
       // Reset form
       setShowAddModal(false);
       setNewDoctor({ email: '', name: '', pinCode: '', dateOfBirth: '' });
       setSelectedSpecialties([]);
-      
+
     } catch (error) {
       console.error('Error adding doctor:', error);
       toast.error('Error adding doctor. Please try again.');
@@ -568,7 +576,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
 
     try {
       console.log('🔗 Starting link process for doctor:', searchedDoctor.uid);
-      
+
       // Check if already linked
       const isAlreadyLinked = linkedDoctors.some(d => d.uid === searchedDoctor.uid);
       if (isAlreadyLinked) {
@@ -593,14 +601,14 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
       // Update clinic's linkedDoctorsDetails
       const clinicRef = doc(db, 'clinics', currentUser.uid);
       const clinicSnap = await getDoc(clinicRef);
-      
+
       let currentLinkedDoctors: LinkedDoctor[] = [];
-      
+
       if (clinicSnap.exists()) {
         console.log('✅ Clinic document exists');
         const clinicDataFromDb = clinicSnap.data();
         currentLinkedDoctors = clinicDataFromDb.linkedDoctorsDetails || [];
-        
+
         await updateDoc(clinicRef, {
           linkedDoctorsDetails: [...currentLinkedDoctors, newLinkedDoctor]
         });
@@ -617,14 +625,14 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
       // Update doctor's linkedClinics
       const doctorRef = doc(db, 'doctors', searchedDoctor.uid);
       const doctorSnap = await getDoc(doctorRef);
-      
+
       if (doctorSnap.exists()) {
         console.log('✅ Doctor document exists');
         const existingClinics = doctorSnap.data().linkedClinics || [];
-        
+
         // Check if clinic is already in doctor's linkedClinics
         const alreadyLinkedToClinic = existingClinics.some((c: any) => c.clinicId === currentUser.uid);
-        
+
         if (!alreadyLinkedToClinic) {
           await updateDoc(doctorRef, {
             linkedClinics: [...existingClinics, {
@@ -645,7 +653,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
 
       console.log('🎉 Link process completed successfully');
       toast.success(`Dr. ${searchedDoctor.name} linked successfully!`);
-      
+
       setDoctorCode('');
       setSearchedDoctor(null);
       setShowLinkModal(false);
@@ -676,7 +684,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
       // Remove from clinic's linkedDoctorsDetails
       const clinicRef = doc(db, 'clinics', currentUser.uid);
       const clinicSnap = await getDoc(clinicRef);
-      
+
       if (clinicSnap.exists()) {
         const updatedDoctors = linkedDoctors.filter(d => d.uid !== doctorId);
         await updateDoc(clinicRef, {
@@ -687,7 +695,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
       // Remove clinic from doctor's linkedClinics
       const doctorRef = doc(db, 'doctors', doctorId);
       const doctorSnap = await getDoc(doctorRef);
-      
+
       if (doctorSnap.exists()) {
         const existingClinics = doctorSnap.data().linkedClinics || [];
         const updatedClinics = existingClinics.filter((c: any) => c.clinicId !== currentUser.uid);
@@ -710,10 +718,10 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
       // Prepare activation link
       const activationLink = `${window.location.origin}/doctor/activate?code=${doctor.doctorCode}&email=${encodeURIComponent(doctor.email)}`;
       console.log('📧 Doctor activation link:', activationLink);
-      
+
       // Copy link to clipboard
       await navigator.clipboard.writeText(activationLink);
-      
+
       toast.success('Activation link copied!', {
         description: 'Share this link with the doctor via WhatsApp/SMS/Email'
       });
@@ -728,7 +736,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
     try {
       // Prepare activation link
       const activationLink = `${window.location.origin}/doctor/activate?code=${doctor.doctorCode}&email=${encodeURIComponent(doctor.email)}`;
-      
+
       // Prepare WhatsApp message
       const message = `Hello Dr. ${doctor.name},\n\n` +
         `You have been invited to join HealQR platform by ${clinicData?.name || 'our clinic'}.\n\n` +
@@ -743,11 +751,11 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
         `✅ Get your own QR code for independent practice\n\n` +
         `Best regards,\n` +
         `${clinicData?.name || 'Clinic Team'}`;
-      
+
       // Open WhatsApp with pre-filled message
       const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
       window.open(whatsappUrl, '_blank');
-      
+
       toast.success('WhatsApp opened with invitation message');
 
     } catch (error: any) {
@@ -881,14 +889,14 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
       if (!user) return;
 
       const newStatus = 'inactive';
-      
+
       // Update in clinic's linkedDoctorsDetails
       const clinicRef = doc(db, 'clinics', user.uid);
       const clinicSnap = await getDoc(clinicRef);
-      
+
       if (clinicSnap.exists()) {
         const data = clinicSnap.data();
-        const updatedDoctors = (data.linkedDoctorsDetails || []).map((d: any) => 
+        const updatedDoctors = (data.linkedDoctorsDetails || []).map((d: any) =>
           d.doctorId === selectedDoctorForToggle.id ? {
             ...d,
             status: newStatus,
@@ -901,13 +909,13 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
             }
           } : d
         );
-        
+
         await updateDoc(clinicRef, {
           linkedDoctorsDetails: updatedDoctors
         });
 
         // Update local state
-        setLinkedDoctors(prev => prev.map(d => 
+        setLinkedDoctors(prev => prev.map(d =>
           d.uid === selectedDoctorForToggle.id ? {
             ...d,
             status: newStatus as 'active' | 'inactive',
@@ -948,11 +956,11 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
       if (!user) return;
 
       const newStatus = 'active';
-      
+
       // Update in clinic's linkedDoctorsDetails
       const clinicRef = doc(db, 'clinics', user.uid);
       const clinicSnap = await getDoc(clinicRef);
-      
+
       if (clinicSnap.exists()) {
         const data = clinicSnap.data();
         const updatedDoctors = (data.linkedDoctorsDetails || []).map((d: any) => {
@@ -962,7 +970,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
           }
           return d;
         });
-        
+
         await updateDoc(clinicRef, {
           linkedDoctorsDetails: updatedDoctors
         });
@@ -998,16 +1006,16 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
 
       const clinicRef = doc(db, 'clinics', user.uid);
       const clinicSnap = await getDoc(clinicRef);
-      
+
       if (clinicSnap.exists()) {
         const data = clinicSnap.data();
         const updatedDoctors = (data.linkedDoctorsDetails || []).map((d: any) => {
-          if (d.doctorId === doctorId) {
+          if (d.doctorId === doctorId || d.uid === doctorId) {
             return { ...d, restrictPatientDataAccess: restrict };
           }
           return d;
         });
-        
+
         await updateDoc(clinicRef, {
           linkedDoctorsDetails: updatedDoctors
         });
@@ -1022,12 +1030,12 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
 
         const doctor = linkedDoctors.find(d => d.uid === doctorId);
         toast.success(
-          restrict 
-            ? `Patient data access RESTRICTED for Dr. ${doctor?.name}` 
+          restrict
+            ? `Patient data access RESTRICTED for Dr. ${doctor?.name}`
             : `Patient data access ENABLED for Dr. ${doctor?.name}`,
           {
-            description: restrict 
-              ? 'Doctor can only see patients from their personal QR' 
+            description: restrict
+              ? 'Doctor can only see patients from their personal QR'
               : 'Doctor can see all patients at this clinic',
             duration: 3000
           }
@@ -1039,21 +1047,71 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
     }
   };
 
+  // Save registration number for a doctor
+  const handleUpdateRegistrationNumber = async (doctorUid: string, regNumber: string, showOnRX: boolean) => {
+    try {
+      const doctorRef = doc(db, 'doctors', doctorUid);
+      await updateDoc(doctorRef, {
+        registrationNumber: regNumber,
+        showRegistrationOnRX: showOnRX,
+      });
+
+      // Update local state
+      setLinkedDoctors(prev => prev.map(d => {
+        if (d.uid === doctorUid) {
+          return { ...d, registrationNumber: regNumber, showRegistrationOnRX: showOnRX };
+        }
+        return d;
+      }));
+
+      const doctor = linkedDoctors.find(d => d.uid === doctorUid);
+      toast.success(`Registration number updated for Dr. ${doctor?.name}`, { duration: 2000 });
+    } catch (error) {
+      console.error('Error updating registration number:', error);
+      toast.error('Failed to update registration number');
+    }
+  };
+
+  // Save custom footer lines for a doctor
+  const handleUpdateFooterLines = async (doctorUid: string, line1: string, line2: string) => {
+    try {
+      const doctorRef = doc(db, 'doctors', doctorUid);
+      await updateDoc(doctorRef, {
+        footerLine1: line1,
+        footerLine2: line2,
+      });
+
+      // Update local state
+      setLinkedDoctors(prev => prev.map(d => {
+        if (d.uid === doctorUid) {
+          return { ...d, footerLine1: line1, footerLine2: line2 };
+        }
+        return d;
+      }));
+
+      const doctor = linkedDoctors.find(d => d.uid === doctorUid);
+      toast.success(`Footer lines updated for Dr. ${doctor?.name}`, { duration: 2000 });
+    } catch (error) {
+      console.error('Error updating footer lines:', error);
+      toast.error('Failed to update footer lines');
+    }
+  };
+
   const cancelAffectedBookings = async (doctorId: string, startDate: string, endDate: string) => {
     try {
       const { collection, query: fbQuery, where, getDocs } = await import('firebase/firestore');
       const bookingsRef = collection(db, 'bookings');
-      
+
       // Generate all dates in the blocked range
       const start = new Date(startDate);
       const end = new Date(endDate);
       const blockedDates: string[] = [];
-      
+
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
         const dateStr = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split('T')[0];
         blockedDates.push(dateStr);
       }
-      
+
       console.log(`📤 Clinic Toggle Off: Blocking dates for doctor ${doctorId}:`, blockedDates);
 
       // Query bookings for this doctor in the affected date range
@@ -1068,7 +1126,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
 
       for (const bookingDoc of bookingsSnapshot.docs) {
         const bookingData = bookingDoc.data();
-        
+
         // Only cancel if not already cancelled and date is in blocked range
         if (bookingData.status !== 'cancelled' && blockedDates.includes(bookingData.appointmentDate)) {
           await updateDoc(bookingDoc.ref, {
@@ -1097,12 +1155,12 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
     // Store selected doctor in localStorage for ClinicScheduleManager to read
     localStorage.setItem('selectedDoctorId', doctorId);
     localStorage.setItem('selectedDoctorName', doctorName);
-    
+
     // Navigate to schedule manager
     if (onNavigate) {
       onNavigate('schedule', doctorId);
     }
-    
+
     toast.info(`Opening Schedule Manager for Dr. ${doctorName}`);
   };
 
@@ -1116,8 +1174,8 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
-      <ClinicSidebar 
-        activeMenu="doctors" 
+      <ClinicSidebar
+        activeMenu="doctors"
         onMenuChange={(menu) => {
           if (onNavigate) {
             onNavigate(menu);
@@ -1130,14 +1188,14 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
         isOpen={mobileMenuOpen}
         onClose={() => setMobileMenuOpen(false)}
       />
-      
+
       <div className="lg:ml-64">
         {/* Header */}
         <div className="bg-gray-800/50 border-b border-gray-700 px-4 lg:px-8 py-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="flex items-center gap-3">
               {/* Mobile Menu Button */}
-              <button 
+              <button
                 onClick={() => setMobileMenuOpen(true)}
                 className="lg:hidden w-10 h-10 bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center justify-center transition-colors"
               >
@@ -1149,7 +1207,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
               </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
-              <Button 
+              <Button
                 onClick={() => setShowLinkModal(true)}
                 variant="outline"
                 className="border-blue-600 text-blue-400 hover:bg-blue-600 hover:text-white"
@@ -1157,7 +1215,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
                 <LinkIcon className="w-4 h-4 mr-2" />
                 Link Existing Doctor
               </Button>
-              <Button 
+              <Button
                 onClick={() => setShowAddModal(true)}
                 className="bg-blue-600 hover:bg-blue-700 text-white"
               >
@@ -1179,7 +1237,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
                   Add doctors to your clinic to start managing their schedules and appointments
                 </p>
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <Button 
+                  <Button
                     onClick={() => setShowLinkModal(true)}
                     variant="outline"
                     className="border-blue-600 text-blue-400 hover:bg-blue-600 hover:text-white"
@@ -1187,7 +1245,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
                     <LinkIcon className="w-4 h-4 mr-2" />
                     Link Existing Doctor
                   </Button>
-                  <Button 
+                  <Button
                     onClick={() => setShowAddModal(true)}
                     className="bg-blue-600 hover:bg-blue-700 text-white"
                   >
@@ -1200,8 +1258,8 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {linkedDoctors.map((doctor) => (
-                <Card 
-                  key={doctor.uid} 
+                <Card
+                  key={doctor.uid}
                   className={`bg-gray-800/50 border-gray-700 p-6 ${
                     doctor.status === 'pending_invitation' ? 'opacity-75' : ''
                   }`}
@@ -1216,8 +1274,8 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
                       <div className="flex-1 min-w-0">
                         <h3 className="text-white font-semibold text-lg break-words">{doctor.name}</h3>
                         <p className="text-gray-400 text-sm break-words">
-                          {Array.isArray(doctor.specialties) 
-                            ? doctor.specialties.join(', ') 
+                          {Array.isArray(doctor.specialties)
+                            ? doctor.specialties.join(', ')
                             : doctor.specialty || 'N/A'}
                         </p>
                       </div>
@@ -1233,7 +1291,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
                       <p className="text-blue-300 text-xs flex items-start gap-2">
                         <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
                         <span>
-                          Share activation link with this doctor via WhatsApp/SMS/Email to grant them access to their own dashboard. 
+                          Share activation link with this doctor via WhatsApp/SMS/Email to grant them access to their own dashboard.
                           Click the <Copy className="w-3 h-3 inline mx-0.5" /> icon above to copy the link.
                         </span>
                       </p>
@@ -1272,7 +1330,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
                       </h4>
                       <div className="space-y-2">
                         {doctor.chambers.map((chamber, index) => (
-                          <div 
+                          <div
                             key={chamber.id || index}
                             className="bg-gray-900/50 border border-gray-700 rounded-lg p-3"
                           >
@@ -1289,8 +1347,8 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
                               <div className="flex items-center gap-1.5 text-gray-400 text-xs">
                                 <Calendar className="w-3 h-3" />
                                 <span>
-                                  {chamber.frequency === 'Custom' 
-                                    ? chamber.customDate 
+                                  {chamber.frequency === 'Custom'
+                                    ? chamber.customDate
                                     : chamber.days.map(d => d.substring(0, 3)).join(', ')
                                   }
                                 </span>
@@ -1322,11 +1380,11 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
                   {/* Planned Off Section - Shows for all doctors */}
                   <div className="border-t border-gray-700 pt-4 mb-4">
                     <h4 className="text-gray-300 text-sm font-medium mb-3">Planned Off</h4>
-                    
+
                     {/* Status Indicator */}
                     <div className={`py-2 px-3 ${
-                      doctor.toggleOffPeriod 
-                        ? 'bg-red-500/10 border border-red-500/20' 
+                      doctor.toggleOffPeriod
+                        ? 'bg-red-500/10 border border-red-500/20'
                         : 'bg-emerald-500/10 border border-emerald-500/20'
                     } rounded-lg mb-3`}>
                       <div className="flex items-center gap-2">
@@ -1336,7 +1394,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
                         <span className={`text-xs ${
                           doctor.toggleOffPeriod ? 'text-red-400' : 'text-emerald-400'
                         }`}>
-                          {doctor.toggleOffPeriod 
+                          {doctor.toggleOffPeriod
                             ? `Chamber Off (${doctor.toggleOffPeriod.startDate} to ${doctor.toggleOffPeriod.endDate})`
                             : 'Chamber Active - Accepting Bookings'
                           }
@@ -1376,8 +1434,8 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
 
                     {/* Toggle Patient Data Access - For linked doctors only */}
                     <div className={`flex items-center justify-between py-2 px-3 rounded-lg mb-3 transition-colors ${
-                      !doctor.restrictPatientDataAccess 
-                        ? 'bg-emerald-500/10 border border-emerald-500/20' 
+                      !doctor.restrictPatientDataAccess
+                        ? 'bg-emerald-500/10 border border-emerald-500/20'
                         : 'bg-red-500/10 border border-red-500/20'
                     }`}>
                       <div className="flex flex-col gap-1">
@@ -1385,19 +1443,135 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
                           Enable Patient Data Access
                         </Label>
                         <span className={`text-[10px] ${
-                          !doctor.restrictPatientDataAccess 
-                            ? 'text-emerald-400' 
+                          !doctor.restrictPatientDataAccess
+                            ? 'text-emerald-400'
                             : 'text-red-400'
                         }`}>
-                          {!doctor.restrictPatientDataAccess 
-                            ? '✓ Allowed - Doctor can view patient details' 
+                          {!doctor.restrictPatientDataAccess
+                            ? '✓ Allowed - Doctor can view patient details'
                             : '✗ Restricted - Doctor can only see personal QR patients'}
                         </span>
                       </div>
                       <Switch
                         checked={!doctor.restrictPatientDataAccess}
                         onCheckedChange={(checked) => handleTogglePatientDataAccess(doctor.uid, !checked)}
+                        className={doctor.restrictPatientDataAccess
+                          ? 'data-[state=unchecked]:bg-red-500/60'
+                          : 'data-[state=checked]:bg-emerald-500'}
                       />
+                    </div>
+
+                    {/* Registration Number Section */}
+                    <div className="border-t border-gray-700 pt-4 mb-4">
+                      <h4 className="text-gray-300 text-sm font-medium mb-3">Additional Information</h4>
+                      <p className="text-gray-500 text-xs mb-3">Optional fields</p>
+
+                      <div className="space-y-3">
+                        <div className="space-y-1">
+                          <Label className="text-yellow-400 text-xs font-semibold">Registration Number (Optional)</Label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-yellow-500">⚡</span>
+                            <Input
+                              placeholder="Enter your Medical Registration Number"
+                              value={doctor.registrationNumber || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setLinkedDoctors(prev => prev.map(d =>
+                                  d.uid === doctor.uid ? { ...d, registrationNumber: val } : d
+                                ));
+                              }}
+                              onBlur={() => {
+                                handleUpdateRegistrationNumber(
+                                  doctor.uid,
+                                  doctor.registrationNumber || '',
+                                  doctor.showRegistrationOnRX ?? true
+                                );
+                              }}
+                              className="bg-gray-900/50 border-gray-700 text-white text-xs h-9 pl-9"
+                            />
+                          </div>
+                        </div>
+
+                        <div className={`flex items-center justify-between py-2 px-3 rounded-lg transition-colors ${
+                          doctor.showRegistrationOnRX
+                            ? 'bg-gray-900/30 border border-gray-700'
+                            : 'bg-gray-900/30 border border-gray-700'
+                        }`}>
+                          <div className="flex flex-col gap-1">
+                            <Label className="text-gray-300 text-xs cursor-pointer">
+                              Show Registration Number on Digital RX
+                            </Label>
+                            <span className="text-[10px] text-gray-500">
+                              When enabled, your registration number will be printed on generated prescriptions for legal compliance.
+                            </span>
+                          </div>
+                          <Switch
+                            checked={doctor.showRegistrationOnRX ?? true}
+                            onCheckedChange={(checked) => {
+                              setLinkedDoctors(prev => prev.map(d =>
+                                d.uid === doctor.uid ? { ...d, showRegistrationOnRX: checked } : d
+                              ));
+                              handleUpdateRegistrationNumber(
+                                doctor.uid,
+                                doctor.registrationNumber || '',
+                                checked
+                              );
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Custom Footer Lines Section */}
+                    <div className="border-t border-gray-700 pt-4 mb-4">
+                      <h4 className="text-gray-300 text-sm font-medium mb-2">Custom RX Footer Lines</h4>
+                      <p className="text-gray-500 text-xs mb-3">Add up to 2 custom lines for RX/Diet Chart PDF footers (e.g. emergency contact, medico-legal caution)</p>
+                      <div className="space-y-2">
+                        <div className="relative">
+                          <Input
+                            placeholder="e.g. In Emergency Contact: XYZ Hospital, Ph: 1234567890"
+                            value={doctor.footerLine1 || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setLinkedDoctors(prev => prev.map(d =>
+                                d.uid === doctor.uid ? { ...d, footerLine1: val } : d
+                              ));
+                            }}
+                            onBlur={() => {
+                              handleUpdateFooterLines(
+                                doctor.uid,
+                                doctor.footerLine1 || '',
+                                doctor.footerLine2 || ''
+                              );
+                            }}
+                            className="bg-gray-900/50 border-gray-700 text-white text-xs h-9 pr-14"
+                            maxLength={120}
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-500">{(doctor.footerLine1 || '').length}/120</span>
+                        </div>
+                        <div className="relative">
+                          <Input
+                            placeholder="e.g. Medico-Legal Notice: This prescription is valid for 30 days only"
+                            value={doctor.footerLine2 || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setLinkedDoctors(prev => prev.map(d =>
+                                d.uid === doctor.uid ? { ...d, footerLine2: val } : d
+                              ));
+                            }}
+                            onBlur={() => {
+                              handleUpdateFooterLines(
+                                doctor.uid,
+                                doctor.footerLine1 || '',
+                                doctor.footerLine2 || ''
+                              );
+                            }}
+                            className="bg-gray-900/50 border-gray-700 text-white text-xs h-9 pr-14"
+                            maxLength={120}
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-500">{(doctor.footerLine2 || '').length}/120</span>
+                        </div>
+                      </div>
                     </div>
 
                     {/* Date Selection UI - Shows when toggle is enabled */}
@@ -1493,7 +1667,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
 
                   {/* Actions - Same for all doctors */}
                   <div className="flex gap-2 pt-2">
-                    <Button 
+                    <Button
                       onClick={() => handleEditSchedule(doctor.uid, doctor.name)}
                       size="sm"
                       variant="outline"
@@ -1502,7 +1676,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
                       <Edit className="w-3 h-3 mr-2" />
                       Edit Schedule
                     </Button>
-                    <Button 
+                    <Button
                       onClick={() => handleUnlinkDoctor(doctor.uid, doctor.name)}
                       size="sm"
                       variant="outline"
@@ -1600,8 +1774,8 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
               <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-3 min-h-[60px]">
                 <div className="flex flex-wrap gap-2 mb-2">
                   {selectedSpecialties.map((specialty, index) => (
-                    <Badge 
-                      key={index} 
+                    <Badge
+                      key={index}
                       className="bg-blue-600 text-white flex items-center gap-1 px-3 py-1"
                     >
                       {specialty}
@@ -1614,8 +1788,8 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
                     </Badge>
                   ))}
                 </div>
-                <Select 
-                  value={specialtyInput} 
+                <Select
+                  value={specialtyInput}
                   onValueChange={(value) => {
                     if (!selectedSpecialties.includes(value)) {
                       setSelectedSpecialties([...selectedSpecialties, value]);
@@ -1651,7 +1825,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 pt-4 flex-shrink-0">
-              <Button 
+              <Button
                 onClick={() => {
                   setShowAddModal(false);
                   setNewDoctor({ email: '', name: '', dateOfBirth: '', pinCode: '' });
@@ -1663,7 +1837,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
               >
                 Cancel
               </Button>
-              <Button 
+              <Button
                 onClick={handleAddNewDoctor}
                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
               >
@@ -1700,7 +1874,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
                   placeholder="DR-123456789"
                   className="bg-gray-900/50 border-gray-700 text-white flex-1"
                 />
-                <Button 
+                <Button
                   onClick={async () => {
                     setSearchLoading(true);
                     setSearchedDoctor(null);
@@ -1737,8 +1911,8 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
                   <div className="flex-1">
                     <h4 className="text-white font-semibold">{searchedDoctor.name}</h4>
                     <p className="text-gray-400 text-sm">
-                      {Array.isArray(searchedDoctor.specialties) 
-                        ? searchedDoctor.specialties.join(', ') 
+                      {Array.isArray(searchedDoctor.specialties)
+                        ? searchedDoctor.specialties.join(', ')
                         : searchedDoctor.specialty || 'N/A'}
                     </p>
                   </div>
@@ -1761,7 +1935,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
             )}
 
             <div className="flex flex-col sm:flex-row gap-3 pt-4 flex-shrink-0">
-              <Button 
+              <Button
                 onClick={() => {
                   setShowLinkModal(false);
                   setDoctorCode('');
@@ -1772,7 +1946,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
               >
                 Cancel
               </Button>
-              <Button 
+              <Button
                 onClick={handleLinkExistingDoctor}
                 disabled={!searchedDoctor}
                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"

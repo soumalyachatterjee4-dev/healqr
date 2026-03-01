@@ -3,10 +3,10 @@ import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { 
-  Share2, 
-  Copy, 
-  Bell, 
+import {
+  Share2,
+  Copy,
+  Bell,
   User,
   BarChart3,
   Calendar,
@@ -15,7 +15,15 @@ import {
   Building2,
   QrCode,
   Users,
-  Stethoscope
+  Stethoscope,
+  Lock as LucideLock,
+  BrainCircuit,
+  Settings,
+  Instagram,
+  Facebook,
+  ArrowRight,
+  Sparkles,
+  Video
 } from 'lucide-react';
 import { auth, db } from '../lib/firebase/config';
 import { signOut } from 'firebase/auth';
@@ -27,6 +35,7 @@ import ClinicQRManager from './ClinicQRManager';
 import ClinicScheduleManager from './ClinicScheduleManager';
 import ClinicTodaysSchedule from './ClinicTodaysSchedule';
 import ManageDoctors from './ManageDoctors';
+import BrainDeckManager from './BrainDeckManager';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 
 interface ClinicData {
@@ -73,7 +82,7 @@ export default function ClinicDashboard() {
   const [shareMenuOpen, setShareMenuOpen] = useState(false);
   const [todaysChambers, setTodaysChambers] = useState<TodayChamber[]>([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0); // Real-time refresh trigger
-  
+
   // Analytics State
   const [analyticsData, setAnalyticsData] = useState({
     totalScans: 0,
@@ -87,24 +96,53 @@ export default function ClinicDashboard() {
     monthlyBookings: 0
   });
 
-  // Load data whenever refreshTrigger changes
+  // Load data whenever refreshTrigger changes or user changes
   useEffect(() => {
-    loadClinicData();
-    loadTodaysSchedule();
-  }, [refreshTrigger]);
+    const fetchData = async () => {
+      if (!auth.currentUser) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        // Fetch clinic data first as it's needed for other calculations
+        const clinicRef = doc(db, 'clinics', auth.currentUser.uid);
+        const clinicSnap = await getDoc(clinicRef);
+
+        if (clinicSnap.exists()) {
+          const rawData = clinicSnap.data();
+          const data = { id: clinicSnap.id, ...rawData } as ClinicData;
+          setClinicData(data);
+
+          // Now fetch analytics and schedule in parallel using the fetched data
+          await Promise.all([
+            loadClinicAnalytics(data),
+            loadTodaysSchedule(data)
+          ]);
+        } else {
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Error initializing dashboard:', error);
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [refreshTrigger, auth.currentUser]);
 
   // 🔥 REAL-TIME LISTENER: Triggers refresh via state change
   useEffect(() => {
     const currentUser = auth.currentUser;
     if (!currentUser) return;
-    
+
     let timeoutId: NodeJS.Timeout | null = null;
-    
+
     const bookingsQuery = query(
       collection(db, 'bookings'),
       where('clinicId', '==', currentUser.uid)
     );
-    
+
     const unsubscribe = onSnapshot(bookingsQuery, (snapshot) => {
       snapshot.docChanges().forEach((change) => {
         if (change.type === 'added' || change.type === 'modified' || change.type === 'removed') {
@@ -117,284 +155,186 @@ export default function ClinicDashboard() {
         }
       });
     });
-    
+
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
       unsubscribe();
     };
-  }, []);
+  }, [auth.currentUser]);
 
-  const loadClinicData = async () => {
+  const loadClinicAnalytics = async (data: ClinicData) => {
     const currentUser = auth.currentUser;
-    if (!currentUser) {
-      setLoading(false);
-      return;
-    }
+    if (!currentUser) return;
 
     try {
-      const clinicRef = doc(db, 'clinics', currentUser.uid);
-      const clinicSnap = await getDoc(clinicRef);
+      // Get current month date range for client-side filtering
+      const now = new Date();
+      const todayStr = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
 
-      if (clinicSnap.exists()) {
-        const rawData = clinicSnap.data();
-        if (!rawData) {
-          console.error('Clinic data is null or undefined');
-          setLoading(false);
-          return;
+      // 1. Fetch all doctor bookings in parallel
+      const doctorBookingsPromises = (data.linkedDoctorsDetails || []).map(async (doctor) => {
+        const docId = doctor?.doctorId || doctor?.uid;
+        if (!docId) return null;
+
+        try {
+          const clinicBookingsQuery = query(
+            collection(db, 'bookings'),
+            where('doctorId', '==', docId),
+            where('clinicId', '==', currentUser.uid)
+          );
+          return await getDocs(clinicBookingsQuery);
+        } catch (err) {
+          console.error(`Error fetching bookings for doctor ${docId}:`, err);
+          return null;
         }
+      });
 
-        const data = { id: clinicSnap.id, ...rawData } as ClinicData;
-        setClinicData(data);
-
-        // Calculate analytics from linked doctors with comprehensive safety checks
-        let totalScans = 0;
-        let totalBookings = 0;
-        let qrBookings = 0;
-        let clinicQRBookings = 0;
-        let doctorQRBookings = 0;
-        let walkinBookings = 0;
-        let dropOuts = 0;
-        let cancelled = 0;
-        let monthlyBookings = 0;
-
-        // Get current month date range for client-side filtering
-        const now = new Date();
-        // Adjust for timezone offset to get correct YYYY-MM-DD
-        const todayStr = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
-        const currentMonth = now.getMonth();
-        const currentYear = now.getFullYear();
-
-        if (data.linkedDoctorsDetails && Array.isArray(data.linkedDoctorsDetails)) {
-          for (const doctor of data.linkedDoctorsDetails) {
-            // Safety check for doctor object and get doctor ID
-            const docId = doctor?.doctorId || doctor?.uid;
-            if (!doctor || !docId) {
-              console.warn('Invalid doctor object (missing doctorId/uid):', doctor);
-              continue;
-            }
-
-            try {
-              // 🔥 CLINIC ANALYTICS: Only count bookings that came through THIS CLINIC
-              // Query bookings where doctorId matches AND clinicId matches this clinic
-              const clinicBookingsQuery = query(
-                collection(db, 'bookings'),
-                where('doctorId', '==', docId),
-                where('clinicId', '==', currentUser.uid) // 🎯 ONLY this clinic's bookings
-              );
-              const clinicBookingsSnap = await getDocs(clinicBookingsQuery);
-              
-              // Calculate metrics from CLINIC bookings only
-              clinicBookingsSnap.forEach((docSnap) => {
-                const bookingData = docSnap.data();
-                
-                // Check if booking is cancelled
-                const isCancelled = bookingData.status === 'cancelled' || bookingData.isCancelled === true;
-                
-                // Drop Outs (No Show) Logic:
-                // Patient booked but did not come by end of day (23:59)
-                // Conditions: Date is in the past AND Not Cancelled AND Not Marked Seen (Eye button not pressed)
-                if (bookingData.appointmentDate && bookingData.appointmentDate < todayStr) {
-                  if (!isCancelled && !bookingData.isMarkedSeen) {
-                    dropOuts++;
-                  }
-                }
-                
-                // Clinic QR bookings
-                if (bookingData.bookingSource === 'clinic_qr') {
-                  if (!isCancelled) {
-                    clinicQRBookings++;
-                    qrBookings++;
-                  }
-                }
-                // Doctor QR bookings (patient scanned doctor QR, booked clinic chamber)
-                else if (bookingData.bookingSource === 'doctor_qr' || (bookingData.type === 'qr_booking' && !bookingData.bookingSource)) {
-                  if (!isCancelled) {
-                    doctorQRBookings++;
-                    qrBookings++;
-                  }
-                }
-                // Walk-in bookings (added at clinic)
-                else if (bookingData.type === 'walkin_booking') {
-                  if (!isCancelled) {
-                    walkinBookings++;
-                  }
-                }
-                
-                // Cancelled count
-                if (isCancelled) {
-                  cancelled++;
-                }
-              });
-
-            } catch (doctorError) {
-              console.error(`Error loading doctor ${docId}:`, doctorError);
-              // Continue with other doctors
-            }
-          }
-        }
-        
-        // 🎯 SCANS: Query qrScans collection separately (scan ≠ booking)
+      // 2. Fetch scan data in parallel
+      const scansQueryPromise = (async () => {
         try {
           const scansQuery = query(
             collection(db, 'qrScans'),
             where('scannedBy', '==', 'clinic'),
             where('clinicId', '==', currentUser.uid)
           );
-          const scansSnap = await getDocs(scansQuery);
-          totalScans = scansSnap.size; // Total number of clinic QR scans (regardless of booking completion)
-          console.log(`📊 Total Clinic QR Scans: ${totalScans}`);
-        } catch (scanError) {
-          console.error('Error loading scan data:', scanError);
+          return await getDocs(scansQuery);
+        } catch (err) {
+          console.error('Error fetching scan data:', err);
+          return null;
         }
-        
-        // Removed inferred dropout calculation as per user request (strict definition: Booked but No Show)
-        
-        totalBookings = qrBookings + walkinBookings;
-        monthlyBookings = totalBookings; // All bookings are for this clinic (no historical filter needed)
+      })();
 
-        setAnalyticsData({
-          totalScans,
-          totalBookings,
-          qrBookings,
-          clinicQRBookings,
-          doctorQRBookings,
-          walkinBookings,
-          dropOuts,
-          cancelled,
-          monthlyBookings
+      const [bookingsSnapshots, scansSnap] = await Promise.all([
+        Promise.all(doctorBookingsPromises),
+        scansQueryPromise
+      ]);
+
+      // 3. Process the results
+      let qrBookings = 0;
+      let clinicQRBookings = 0;
+      let doctorQRBookings = 0;
+      let walkinBookings = 0;
+      let dropOuts = 0;
+      let cancelled = 0;
+
+      bookingsSnapshots.forEach((snap) => {
+        if (!snap) return;
+        snap.forEach((docSnap) => {
+          const bookingData = docSnap.data();
+          const isCancelled = bookingData.status === 'cancelled' || bookingData.isCancelled === true;
+
+          if (bookingData.appointmentDate && bookingData.appointmentDate < todayStr) {
+            if (!isCancelled && !bookingData.isMarkedSeen) {
+              dropOuts++;
+            }
+          }
+
+          if (!isCancelled) {
+            if (bookingData.bookingSource === 'clinic_qr') {
+              clinicQRBookings++;
+              qrBookings++;
+            } else if (bookingData.bookingSource === 'doctor_qr' || (bookingData.type === 'qr_booking' && !bookingData.bookingSource)) {
+              doctorQRBookings++;
+              qrBookings++;
+            } else if (bookingData.type === 'walkin_booking') {
+              walkinBookings++;
+            }
+          } else {
+            cancelled++;
+          }
         });
-      }
+      });
+
+      const totalScans = scansSnap?.size || 0;
+      const totalBookings = qrBookings + walkinBookings;
+
+      setAnalyticsData({
+        totalScans,
+        totalBookings,
+        qrBookings,
+        clinicQRBookings,
+        doctorQRBookings,
+        walkinBookings,
+        dropOuts,
+        cancelled,
+        monthlyBookings: totalBookings
+      });
     } catch (error) {
-      console.error('Error loading clinic data:', error);
-      toast.error('Failed to load clinic data');
+      console.error('Error processing clinic analytics:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const loadTodaysSchedule = async () => {
+  const loadTodaysSchedule = async (data: ClinicData) => {
     const currentUser = auth.currentUser;
     if (!currentUser) return;
 
     try {
-      const clinicRef = doc(db, 'clinics', currentUser.uid);
-      const clinicSnap = await getDoc(clinicRef);
-
-      if (clinicSnap.exists()) {
-        const clinicData = clinicSnap.data();
-        if (!clinicData) {
-          console.error('Clinic data is null or undefined');
-          return;
-        }
-
-        const linkedDoctors = clinicData.linkedDoctorsDetails;
-        if (!linkedDoctors || !Array.isArray(linkedDoctors)) {
-          console.warn('No linked doctors found or invalid format');
-          setTodaysChambers([]);
-          return;
-        }
-
-        const chambers: TodayChamber[] = [];
-        const today = new Date();
-        const todayDay = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][today.getDay()];
-        const currentTime = `${today.getHours().toString().padStart(2, '0')}:${today.getMinutes().toString().padStart(2, '0')}`;
-
-        for (const doctor of linkedDoctors) {
-          // Safety check for doctor object and get doctor ID
-          const docId = doctor?.doctorId || doctor?.uid;
-          if (!doctor || !docId) {
-            console.warn('Invalid doctor object (missing doctorId/uid):', doctor);
-            continue;
-          }
-
-          try {
-            const doctorRef = doc(db, 'doctors', docId);
-            const doctorSnap = await getDoc(doctorRef);
-
-            if (doctorSnap.exists()) {
-              const doctorData = doctorSnap.data();
-              if (!doctorData) {
-                console.warn(`Doctor data is null for ${docId}`);
-                continue;
-              }
-
-              const allChambers = doctorData.chambers;
-              if (!allChambers || !Array.isArray(allChambers)) {
-                // Silent - doctors may not have chambers configured yet
-                continue;
-              }
-
-              const todayChambers = allChambers.filter((chamber: any) => {
-                // Comprehensive safety checks
-                if (!chamber || typeof chamber !== 'object') return false;
-                if (chamber.clinicId !== currentUser.uid) return false;
-                
-                if (chamber.frequency === 'Custom') {
-                  return chamber.customDate === today.toISOString().split('T')[0];
-                } else {
-                  // Triple safety check for days array
-                  return chamber.days && 
-                         Array.isArray(chamber.days) && 
-                         chamber.days.length > 0 && 
-                         chamber.days.includes(todayDay);
-                }
-              });
-
-              for (const chamber of todayChambers) {
-                // Validate chamber has required fields
-                if (!chamber.id || !chamber.chamberName) {
-                  console.warn('Chamber missing required fields:', chamber);
-                  continue;
-                }
-
-                try {
-                  const todayStr = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split('T')[0];
-                  const bookingsQuery = query(
-                    collection(db, 'bookings'),
-                    where('doctorId', '==', docId),
-                    where('chamberId', '==', chamber.id),
-                    where('appointmentDate', '==', todayStr)
-                  );
-                  
-                  const bookingsSnap = await getDocs(bookingsQuery);
-                  // Filter out cancelled bookings
-                  const bookingCount = bookingsSnap.docs.filter(doc => {
-                    const data = doc.data();
-                    return data.isCancelled !== true && data.status !== 'cancelled';
-                  }).length;
-
-                  chambers.push({
-                    id: chamber.id || '',
-                    chamberName: chamber.chamberName || 'Unknown Chamber',
-                    chamberNo: chamber.id ? String(chamber.id).slice(-4) : '0000',
-                    doctorName: doctor.name || 'Unknown Doctor',
-                    doctorId: docId,
-                    specialty: doctorData.specialty || 'General',
-                    address: chamber.chamberAddress || '',
-                    startTime: chamber.startTime || '09:00',
-                    endTime: chamber.endTime || '17:00',
-                    booked: bookingCount,
-                    capacity: Number(chamber.maxCapacity) || 0,
-                    isExpired: chamber.endTime ? currentTime > chamber.endTime : false
-                  });
-                } catch (bookingError) {
-                  console.error(`Error loading bookings for chamber ${chamber.id}:`, bookingError);
-                  // Continue with other chambers
-                }
-              }
-            }
-          } catch (doctorError) {
-            console.error(`Error loading doctor ${docId}:`, doctorError);
-            // Continue with other doctors
-          }
-        }
-
-        setTodaysChambers(chambers);
+      const linkedDoctors = data.linkedDoctorsDetails;
+      if (!linkedDoctors || !Array.isArray(linkedDoctors)) {
+        setTodaysChambers([]);
+        return;
       }
+
+      const today = new Date();
+      const todayDay = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][today.getDay()];
+
+      // 1. Fetch all doctors and their chambers in parallel
+      const doctorDetailsPromises = linkedDoctors.map(async (doctor) => {
+        const docId = doctor?.doctorId || doctor?.uid;
+        if (!docId) return null;
+
+        try {
+          const doctorSnap = await getDoc(doc(db, 'doctors', docId));
+          if (!doctorSnap.exists()) return null;
+
+          const doctorData = doctorSnap.data();
+          if (!doctorData || !doctorData.chambers) return null;
+
+          // Filter chambers for this clinic and for TODAY
+          const todayChambers = (doctorData.chambers as any[]).filter((chamber: any) => {
+            if (!chamber || chamber.clinicId !== currentUser.uid) return false;
+            if (chamber.frequency === 'Custom') {
+              return chamber.customDate === today.toISOString().split('T')[0];
+            }
+            return chamber.days && Array.isArray(chamber.days) && chamber.days.includes(todayDay);
+          });
+
+          return { doctorData, todayChambers };
+        } catch (err) {
+          console.error(`Error fetching schedule for doctor ${docId}:`, err);
+          return null;
+        }
+      });
+
+      const doctorDetails = await Promise.all(doctorDetailsPromises);
+
+      // 2. Format and flatten chambers
+      const chambers: TodayChamber[] = [];
+      doctorDetails.forEach((res) => {
+        if (!res) return;
+        const { doctorData, todayChambers } = res;
+
+        todayChambers.forEach((chamber) => {
+          chambers.push({
+            id: chamber.id,
+            doctorName: doctorData.name || 'Doctor',
+            specialization: doctorData.specialties?.[0] || 'Medical Specialist',
+            chamberName: chamber.chamberName,
+            address: chamber.chamberAddress,
+            startTime: chamber.startTime || '00:00',
+            endTime: chamber.endTime || '00:00',
+            booked: 0, // Inferred for now
+            capacity: chamber.maxCapacity || 0,
+            isExpired: false // Inferred
+          });
+        });
+      });
+
+      setTodaysChambers(chambers);
     } catch (error) {
-      console.error('Error loading today\'s schedule:', error);
-      toast.error('Failed to load today\'s schedule');
-      setTodaysChambers([]);
+      console.error('Error loading todays schedule:', error);
     }
   };
 
@@ -419,7 +359,7 @@ export default function ClinicDashboard() {
   // Render Profile Manager if menu is active
   if (activeMenu === 'profile') {
     return (
-      <ClinicProfileManager 
+      <ClinicProfileManager
         onMenuChange={(menu) => setActiveMenu(menu)}
         onLogout={handleLogout}
       />
@@ -429,7 +369,7 @@ export default function ClinicDashboard() {
   // Render QR Manager if menu is active
   if (activeMenu === 'qr-manager') {
     return (
-      <ClinicQRManager 
+      <ClinicQRManager
         onMenuChange={(menu) => setActiveMenu(menu)}
         onLogout={handleLogout}
         profileData={{
@@ -460,13 +400,153 @@ export default function ClinicDashboard() {
     }} />;
   }
 
+  // Render BrainDeck Manager if menu is active
+  if (activeMenu === 'braindeck') {
+    return <BrainDeckManager onBack={() => setActiveMenu('dashboard')} doctorName={clinicData?.name || 'Clinic'} />;
+  }
+
+  // Render Video Library if menu is active
+  if (activeMenu === 'video-consult') {
+    const videos = [
+      { id: 1, title: 'How to Boost Your Energy', thumbnail: 'https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg', duration: '5:30' },
+      { id: 2, title: 'Digital Health Tips for Doctors', thumbnail: 'https://img.youtube.com/vi/jNQXAC9IVRw/maxresdefault.jpg', duration: '3:45' },
+      { id: 3, title: 'Using HealQR for Your Practice', thumbnail: 'https://img.youtube.com/vi/9bZkp7q19f0/maxresdefault.jpg', duration: '7:12' },
+      { id: 4, title: 'Patient Engagement Strategies', thumbnail: 'https://img.youtube.com/vi/kJQP7kiw5Fk/maxresdefault.jpg', duration: '4:20' },
+    ];
+
+    return (
+      <div className="min-h-screen bg-black text-white flex flex-col lg:flex-row">
+        <ClinicSidebar
+          activeMenu={activeMenu}
+          onMenuChange={(menu) => setActiveMenu(menu)}
+          onLogout={handleLogout}
+          isOpen={mobileMenuOpen}
+          onClose={() => setMobileMenuOpen(false)}
+        />
+        <div className="flex-1 lg:ml-64 overflow-y-auto">
+          <div className="p-6 space-y-6">
+            {/* Back to Dashboard */}
+            <button
+              onClick={() => setActiveMenu('dashboard')}
+              className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-sm"
+            >
+              <ArrowRight className="w-4 h-4 rotate-180" />
+              Back to Dashboard
+            </button>
+
+            {/* Header */}
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#0d9488' }}>
+                <Video className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-white">Video Library</h1>
+                <p className="text-sm text-gray-400">Learn how to make the most of HealQR</p>
+              </div>
+            </div>
+
+            {/* Video Grid */}
+            <div className="space-y-5">
+              {videos.map((video) => (
+                <div
+                  key={video.id}
+                  className="relative rounded-2xl overflow-hidden cursor-pointer group"
+                >
+                  <div className="aspect-video bg-zinc-800 relative">
+                    <img
+                      src={video.thumbnail}
+                      alt={video.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '';
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                    {/* Duration badge */}
+                    <div className="absolute bottom-3 right-3 bg-black/70 text-white text-xs font-medium px-2 py-1 rounded">
+                      {video.duration}
+                    </div>
+                    {/* Close/dismiss button */}
+                    <button className="absolute top-3 right-3 w-8 h-8 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                      ×
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle unimplemented features
+  const implementedMenus = [
+    'dashboard', 'profile', 'qr-manager', 'schedule', 'schedule-manager',
+    'todays-schedule', 'doctors', 'braindeck', 'video-consult'
+  ];
+
+  if (!implementedMenus.includes(activeMenu)) {
+    return (
+      <div className="min-h-screen bg-black text-white flex flex-col lg:flex-row">
+        <ClinicSidebar
+          activeMenu={activeMenu}
+          onMenuChange={(menu) => setActiveMenu(menu)}
+          onLogout={handleLogout}
+          isOpen={mobileMenuOpen}
+          onClose={() => setMobileMenuOpen(false)}
+        />
+        <div className="flex-1 lg:ml-64 flex flex-col items-center justify-center p-8">
+          <div className="text-center space-y-4">
+            <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto">
+              <Settings className="w-8 h-8 text-blue-500 animate-pulse" />
+            </div>
+            <h2 className="text-2xl font-bold">Feature Coming Soon</h2>
+            <p className="text-gray-400 max-w-md mx-auto">
+              We're working hard to bring this feature to your clinic dashboard. Stay tuned for updates!
+            </p>
+            <Button
+              onClick={() => setActiveMenu('dashboard')}
+              className="bg-blue-600 hover:bg-blue-500 text-white px-8"
+            >
+              Back to Dashboard
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const menuTitles: Record<string, string> = {
+    'dashboard': 'Dashboard',
+    'doctors': 'Manage Doctors',
+    'profile': 'Clinic Profile',
+    'qr-manager': 'QR Manager',
+    'schedule-manager': 'Schedule Manager',
+    'todays-schedule': "Today's Schedule",
+    'advance-booking': 'Advance Booking',
+    'analytics': 'Analytics',
+    'reports': 'Reports',
+    'social-kit': 'Social Kit & Offers',
+    'monthly-planner': 'Monthly Planner',
+    'preview': 'Preview Centre',
+    'assistant': 'Assistant Access',
+    'lab-referral': 'Lab Referral Tracking',
+    'templates': 'Personalized Templates',
+    'emergency': 'Emergency Button',
+    'ai-diet': 'AI Diet Chart',
+    'ai-rx': 'AI RX Reader',
+    'video-consult': 'Video Consultation'
+  };
+
   return (
     <div className="min-h-screen bg-black text-white flex flex-col lg:flex-row">
       {/* Sidebar */}
-      <ClinicSidebar 
+      <ClinicSidebar
         activeMenu={activeMenu}
         onMenuChange={(menu) => {
           setActiveMenu(menu);
+          setMobileMenuOpen(false);
         }}
         onLogout={handleLogout}
         isOpen={mobileMenuOpen}
@@ -476,18 +556,18 @@ export default function ClinicDashboard() {
       {/* Main Content Container */}
       <div className="flex-1 lg:ml-64 flex flex-col min-h-screen">
         {/* Top Header - Fixed */}
-        <header className="bg-black border-b border-gray-900 px-4 md:px-8 py-4 flex items-center justify-between sticky top-0 z-50">
+        <header className="bg-black border-b border-zinc-900 px-4 md:px-8 py-4 flex items-center justify-between sticky top-0 z-50">
           <div className="flex items-center gap-3">
             {/* Mobile Menu Button */}
-            <button 
+            <button
               onClick={() => setMobileMenuOpen(true)}
               className="lg:hidden w-10 h-10 bg-zinc-900 hover:bg-zinc-800 rounded-lg flex items-center justify-center transition-colors"
             >
               <Menu className="w-5 h-5 text-blue-500" />
             </button>
-            <h2 className="text-lg md:text-xl">Dashboard</h2>
+            <h2 className="text-lg md:text-xl font-medium">{menuTitles[activeMenu] || 'Dashboard'}</h2>
           </div>
-          
+
           <div className="flex items-center gap-2 md:gap-3">
             {/* Share Button */}
             <Popover open={shareMenuOpen} onOpenChange={setShareMenuOpen}>
@@ -507,6 +587,14 @@ export default function ClinicDashboard() {
                 </button>
               </PopoverContent>
             </Popover>
+
+            {/* Video Library */}
+            <button
+              onClick={() => setActiveMenu('video-consult')}
+              className="relative w-10 h-10 bg-zinc-900 hover:bg-zinc-800 rounded-lg flex items-center justify-center transition-colors"
+            >
+              <Video className="w-5 h-5" />
+            </button>
 
             {/* Notifications */}
             <button className="relative w-10 h-10 bg-zinc-900 hover:bg-zinc-800 rounded-lg flex items-center justify-center transition-colors">
@@ -537,6 +625,34 @@ export default function ClinicDashboard() {
                   <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
                     Welcome Back, {clinicData?.name || 'Clinic'} !
                   </h1>
+
+                  {/* Rating Placeholder */}
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="flex text-amber-400">
+                      {'★★★★'.split('').map((star, i) => <span key={i} className="text-lg">{star}</span>)}
+                      <span className="text-lg text-gray-600">★</span>
+                    </div>
+                    <span className="text-white text-sm ml-1">4.5/5</span>
+                    <span className="text-blue-500 text-sm hover:underline cursor-pointer">2 reviews</span>
+                  </div>
+
+                  {/* Badges block: Encrypted and BrainDeck - Same Row */}
+                  <div className="flex flex-wrap items-center gap-3 mb-4">
+                    <button className="flex items-center gap-2 text-white px-4 py-2 rounded-lg font-medium cursor-default" style={{ backgroundColor: '#2563eb' }}>
+                      <LucideLock className="w-4 h-4" />
+                      <span>Data is encrypted</span>
+                    </button>
+
+                    <button
+                      onClick={() => setActiveMenu('braindeck')}
+                      className="flex items-center gap-2 text-white px-4 py-2 rounded-lg font-medium shadow-lg shadow-orange-500/20 transition-all cursor-pointer hover:opacity-90 active:scale-[0.98]"
+                      style={{ backgroundColor: '#f97316' }}
+                    >
+                      <BrainCircuit className="w-5 h-5" />
+                      <span className="font-bold tracking-wide italic">healQR BrainDeck</span>
+                    </button>
+                  </div>
+
                   <div className="flex items-center gap-3 mb-4">
                     <div className="flex items-center gap-2">
                       <Building2 className="w-5 h-5 text-blue-500" />
@@ -552,36 +668,67 @@ export default function ClinicDashboard() {
                 </div>
               </div>
 
-              {/* Analytics Cards - Blue Banner */}
-              <div className="bg-gradient-to-r from-blue-600 to-blue-900 rounded-xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-white/10 rounded-lg flex items-center justify-center">
-                    <Users className="w-6 h-6 text-white" />
+              {/* Social Media Kit Card - Blue Banner */}
+              <div
+                className="rounded-2xl p-6 relative overflow-hidden shadow-xl"
+                style={{ backgroundColor: '#2b63f1' }}
+              >
+                {/* Top: Free + Active badges */}
+                <div className="flex gap-2 mb-3">
+                  <Badge variant="outline" className="text-white border-white/40 bg-transparent text-[10px] px-2 py-0 h-5">Free</Badge>
+                  <Badge className="bg-white/20 hover:bg-white/30 text-white border-none text-[10px] px-2 py-0 h-5">Active</Badge>
+                </div>
+
+                {/* Bookings Count */}
+                <div className="mb-1">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-4xl font-bold text-white">{analyticsData.monthlyBookings}</span>
+                    <span className="text-2xl font-semibold text-white">Bookings</span>
                   </div>
-                  <div>
-                    <p className="text-blue-100 text-sm">Total Doctors</p>
-                    <p className="text-3xl font-bold text-white">
-                      {clinicData?.linkedDoctorsDetails?.length || 0}
-                    </p>
+                  <p className="text-[11px] text-blue-100/70 font-medium">
+                    {new Date().toLocaleString('default', { month: 'short' })} 1, 2026 – {new Date().toLocaleString('default', { month: 'short' })} 31, 2026
+                  </p>
+                </div>
+
+                {/* Divider */}
+                <div className="border-t border-white/10 my-4" />
+
+                {/* Social Kit Info */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Badge className="hover:bg-white border-none text-[10px] font-bold px-2 py-0 h-5 shrink-0" style={{ backgroundColor: 'white', color: '#2b63f1' }}>
+                      <Sparkles className="w-3 h-3 mr-1" style={{ fill: '#2b63f1' }} />
+                      New
+                    </Badge>
+                    <h3 className="text-sm font-bold text-white whitespace-nowrap">Social Media Kit</h3>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs text-blue-100/80">Create branded posts for Instagram & WhatsApp.</p>
+                    <button
+                      onClick={() => setActiveMenu('social-kit')}
+                      className="hover:bg-slate-50 px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-1.5 transition-all shadow-lg shrink-0"
+                      style={{ backgroundColor: 'white', color: '#059669' }}
+                    >
+                      Try Now
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-white/10 rounded-lg flex items-center justify-center">
-                    <QrCode className="w-6 h-6 text-white" />
+
+                {/* Social Icons + One-click share */}
+                <div className="flex items-center gap-3 mt-4">
+                  <div className="flex -space-x-1">
+                    <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
+                      <Instagram className="w-3.5 h-3.5 text-white" />
+                    </div>
+                    <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
+                      <Facebook className="w-3.5 h-3.5 text-white" />
+                    </div>
+                    <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
+                      <Share2 className="w-3.5 h-3.5 text-white" />
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-blue-100 text-sm">Total Scans</p>
-                    <p className="text-3xl font-bold text-white">{analyticsData.totalScans}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-white/10 rounded-lg flex items-center justify-center">
-                    <Calendar className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <p className="text-blue-100 text-sm">Monthly Bookings</p>
-                    <p className="text-3xl font-bold text-white">{analyticsData.monthlyBookings}</p>
-                  </div>
+                  <span className="text-[11px] text-blue-100/90 font-medium">One-click share</span>
                 </div>
               </div>
 
@@ -591,7 +738,7 @@ export default function ClinicDashboard() {
                   <Stethoscope className="w-5 h-5 text-blue-500" />
                   <h3 className="text-lg font-semibold text-white">Doctors by Specialty</h3>
                 </div>
-                
+
                 {clinicData?.linkedDoctorsDetails && clinicData.linkedDoctorsDetails.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {(() => {
@@ -603,9 +750,9 @@ export default function ClinicDashboard() {
                           specialtyCounts[spec] = (specialtyCounts[spec] || 0) + 1;
                         });
                       });
-                      
+
                       return Object.entries(specialtyCounts).map(([specialty, count]) => (
-                        <div 
+                        <div
                           key={specialty}
                           className="inline-flex items-center gap-2 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-sm transition-colors"
                         >
@@ -655,7 +802,7 @@ export default function ClinicDashboard() {
                           1
                         );
                         const percentage = (item.value / maxValue) * 100;
-                        
+
                         return (
                           <div key={index} className="space-y-2">
                             <div className="flex justify-between items-center">
@@ -663,7 +810,7 @@ export default function ClinicDashboard() {
                               <span className="text-white font-bold text-lg">{item.value}</span>
                             </div>
                             <div className="relative h-8 bg-zinc-900 rounded-lg overflow-hidden">
-                              <div 
+                              <div
                                 className="absolute top-0 left-0 h-full rounded-lg transition-all duration-1000 ease-out"
                                 style={{
                                   width: `${percentage}%`,
@@ -676,7 +823,7 @@ export default function ClinicDashboard() {
                         );
                       })}
                     </div>
-                    
+
                     {/* Summary Stats */}
                     <div className="grid grid-cols-3 gap-4 mt-8 pt-6 border-t border-zinc-800">
                       <div className="text-center">
@@ -695,9 +842,9 @@ export default function ClinicDashboard() {
                   </div>
                 </CardContent>
               </Card>
-              
 
-              
+
+
               {/* Today's Schedule - Doctor Names Prominently Displayed */}
               <Card className="bg-zinc-900 border-zinc-800">
                 <CardHeader>
@@ -706,9 +853,9 @@ export default function ClinicDashboard() {
                       <Calendar className="w-5 h-5 text-blue-500" />
                       <CardTitle className="text-white">Today's Schedule</CardTitle>
                     </div>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       className="text-blue-500 hover:text-blue-400"
                       onClick={() => setActiveMenu('todays-schedule')}
                     >
@@ -728,7 +875,7 @@ export default function ClinicDashboard() {
                   ) : (
                     <div className="space-y-4">
                       {todaysChambers.slice(0, 3).map((chamber) => (
-                        <div 
+                        <div
                           key={chamber.id}
                           className={`bg-zinc-800 border border-zinc-700 rounded-lg p-4 hover:border-blue-500/50 transition-colors ${chamber.isExpired ? 'opacity-60' : ''}`}
                         >
@@ -773,7 +920,7 @@ export default function ClinicDashboard() {
                                 <span className="text-gray-300">{chamber.booked}/{chamber.capacity}</span>
                               </div>
                               <div className="h-2 bg-zinc-900 rounded-full overflow-hidden">
-                                <div 
+                                <div
                                   className="h-full bg-blue-500 rounded-full transition-all"
                                   style={{ width: `${Math.min((chamber.booked / (chamber.capacity || 1)) * 100, 100)}%` }}
                                 />
@@ -782,7 +929,7 @@ export default function ClinicDashboard() {
                           </div>
                         </div>
                       ))}
-                      
+
                       {todaysChambers.length > 3 && (
                         <div className="text-center pt-2">
                           <Button

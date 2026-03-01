@@ -22,6 +22,7 @@ export default function ClinicSignUp({ onBack, onLogin }: ClinicSignUpProps) {
   const [qrType, setQrType] = useState<'preprinted' | 'virtual'>('preprinted');
   const [qrNumber, setQrNumber] = useState("");
   const [companyName, setCompanyName] = useState("");
+  const [division, setDivision] = useState("");
   const [virtualQrGenerated, setVirtualQrGenerated] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -36,6 +37,10 @@ export default function ClinicSignUp({ onBack, onLogin }: ClinicSignUpProps) {
     if (qrType === 'preprinted') {
       if (!companyName) {
         toast.error('Please enter the company name');
+        return;
+      }
+      if (!division) {
+        toast.error('Please enter the division');
         return;
       }
       if (!qrNumber) {
@@ -56,12 +61,12 @@ export default function ClinicSignUp({ onBack, onLogin }: ClinicSignUpProps) {
         // Generate Virtual QR from UNIVERSAL POOL - check BOTH collections for true max
         const qrPoolCollection = collection(db, 'qrPool');
         const qrCodesCollection = collection(db, 'qrCodes'); // Old collection
-        
+
         const [poolQrs, codesQrs] = await Promise.all([
           getDocs(qrPoolCollection),
           getDocs(qrCodesCollection)
         ]);
-        
+
         let maxNumber = 0;
         // Check qrPool collection
         poolQrs.forEach(doc => {
@@ -79,7 +84,7 @@ export default function ClinicSignUp({ onBack, onLogin }: ClinicSignUpProps) {
             if (!isNaN(num) && num > maxNumber) maxNumber = num;
           }
         });
-        
+
         finalQrNumber = `HQR${String(maxNumber + 1).padStart(5, '0')}`;
         console.log('🔵 Clinic Virtual QR - Max from both collections:', maxNumber, '→ New:', finalQrNumber);
         // Save Virtual QR to qrPool collection
@@ -100,18 +105,18 @@ export default function ClinicSignUp({ onBack, onLogin }: ClinicSignUpProps) {
         const qrCodesCollection = collection(db, 'qrCodes'); // Old collection
         const poolQuery = query(qrPoolCollection, where('qrNumber', '==', qrNumber));
         const codesQuery = query(qrCodesCollection, where('qrNumber', '==', qrNumber));
-        
+
         const [poolSnapshot, codesSnapshot] = await Promise.all([
           getDocs(poolQuery),
           getDocs(codesQuery)
         ]);
-        
+
         if (poolSnapshot.empty && codesSnapshot.empty) {
           toast.error('Invalid QR Code', { description: 'This QR code does not exist in the universal pool.' });
           setLoading(false);
           return;
         }
-        
+
         // Use whichever collection has the QR
         if (!poolSnapshot.empty) {
           qrDocRef = poolSnapshot.docs[0].ref;
@@ -148,6 +153,7 @@ export default function ClinicSignUp({ onBack, onLogin }: ClinicSignUpProps) {
         qrNumber: finalQrNumber,
         qrType: qrType,
         companyName: qrType === 'preprinted' ? companyName : '',
+        division: qrType === 'preprinted' ? division : '',
       };
       localStorage.setItem('healqr_pending_clinic_signup', JSON.stringify(signupData));
       localStorage.setItem('healqr_email_for_signin', email);
@@ -331,11 +337,26 @@ export default function ClinicSignUp({ onBack, onLogin }: ClinicSignUpProps) {
                   Company Name <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
+                  <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <Input
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
-                    className="pl-4 bg-black border-zinc-800 text-white h-14 rounded-lg focus:border-blue-500"
+                    className="pl-12 bg-black border-zinc-800 text-white h-14 rounded-lg focus:border-blue-500"
                     placeholder="e.g. ABC Pharmaceuticals"
+                  />
+                </div>
+              </div>
+              <div className="mb-6">
+                <label className="block mb-3">
+                  Division <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <Input
+                    value={division}
+                    onChange={(e) => setDivision(e.target.value)}
+                    className="pl-12 bg-black border-zinc-800 text-white h-14 rounded-lg focus:border-blue-500"
+                    placeholder="e.g. North Division"
                   />
                 </div>
               </div>
@@ -373,8 +394,8 @@ export default function ClinicSignUp({ onBack, onLogin }: ClinicSignUpProps) {
           {/* Terms */}
           <div className="mb-8">
             <div className="flex items-start gap-3">
-              <Checkbox 
-                id="terms" 
+              <Checkbox
+                id="terms"
                 checked={acceptedTerms}
                 onCheckedChange={(checked) => setAcceptedTerms(checked as boolean)}
                 className="mt-0.5 border-zinc-700 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500 flex-shrink-0"
@@ -385,7 +406,7 @@ export default function ClinicSignUp({ onBack, onLogin }: ClinicSignUpProps) {
             </div>
           </div>
 
-          <Button 
+          <Button
             onClick={handleRegister}
             disabled={loading}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white h-14 rounded-lg mb-6 text-lg font-medium"
@@ -395,7 +416,7 @@ export default function ClinicSignUp({ onBack, onLogin }: ClinicSignUpProps) {
 
           {/* Back Button */}
           <div className="text-center">
-            <button 
+            <button
               onClick={onBack}
               className="text-gray-400 hover:text-white transition-colors inline-flex items-center gap-2"
             >

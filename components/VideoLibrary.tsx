@@ -3,7 +3,7 @@ import { Play, ArrowLeft, Video, Clock, Eye } from 'lucide-react';
 
 interface VideoLibraryProps {
   onBack: () => void;
-  source: 'landing' | 'dashboard';
+  source: 'landing' | 'dashboard' | 'patient-search';
 }
 
 interface VideoItem {
@@ -103,7 +103,7 @@ export default function VideoLibrary({ onBack, source }: VideoLibraryProps) {
                 className="w-full h-full"
               />
             </div>
-            
+
             <div className="p-6">
               <h1 className="text-2xl mb-3 text-gray-900">{selectedVideo.title}</h1>
               <div className="flex items-center gap-4 text-sm text-gray-600 mb-4">
@@ -134,9 +134,9 @@ export default function VideoLibrary({ onBack, source }: VideoLibraryProps) {
             className="flex items-center gap-2 text-gray-600 hover:text-emerald-600 mb-4 transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
-            <span>Back {source === 'landing' ? 'to Home' : 'to Dashboard'}</span>
+            <span>Back to {source === 'landing' ? 'Home' : source === 'patient-search' ? 'Search' : 'Dashboard'}</span>
           </button>
-          
+
           <div className="flex items-center gap-3 mb-2">
             <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center">
               <Video className="w-6 h-6 text-white" />

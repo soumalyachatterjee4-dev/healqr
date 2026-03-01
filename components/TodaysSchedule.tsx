@@ -70,6 +70,7 @@ function PatientDetailsLoader({
 
         // 🔒 PATIENT DATA ACCESS CONTROL: Build list of restricted clinic IDs
         let restrictedClinicIds: string[] = [];
+        console.log('🔍 Checking patient data access restrictions for userId:', userId);
         try {
           const clinicsRef = collection(db!, 'clinics');
           const allClinicsSnap = await getDocs(clinicsRef);
@@ -78,14 +79,35 @@ function PatientDetailsLoader({
             const clinicData = clinicDoc.data();
             const linkedDoctors = clinicData.linkedDoctorsDetails || [];
 
+            console.log('🏥 Checking clinic:', {
+              clinicId: clinicDoc.id,
+              clinicName: clinicData.clinicName,
+              linkedDoctors: linkedDoctors.map((d: any) => ({
+                doctorId: d.doctorId,
+                uid: d.uid,
+                name: d.name,
+                restrictPatientDataAccess: d.restrictPatientDataAccess
+              }))
+            });
+
             // Check if current doctor is linked to this clinic with restricted access
-            const isRestricted = linkedDoctors.some((d: any) =>
-              d.doctorId === userId && d.restrictPatientDataAccess === true
-            );
+            const isRestricted = linkedDoctors.some((d: any) => {
+              const matches = (d.doctorId === userId || d.uid === userId) && d.restrictPatientDataAccess === true;
+              if (d.doctorId === userId || d.uid === userId) {
+                console.log('✅ Found doctor match in clinic:', {
+                  clinicId: clinicDoc.id,
+                  doctorId: d.doctorId,
+                  uid: d.uid,
+                  restrictPatientDataAccess: d.restrictPatientDataAccess,
+                  isRestricted: matches
+                });
+              }
+              return matches;
+            });
 
             if (isRestricted) {
               restrictedClinicIds.push(clinicDoc.id);
-              console.log('🔒 Restricted clinic:', {
+              console.log('🔒 ⚠️ RESTRICTED CLINIC FOUND:', {
                 clinicId: clinicDoc.id,
                 clinicName: clinicData.clinicName
               });
@@ -93,12 +115,17 @@ function PatientDetailsLoader({
           });
 
           if (restrictedClinicIds.length > 0) {
-            console.log('🔒 Patient data access restricted for clinics:', restrictedClinicIds);
+            console.log('🔒 ⚠️ Patient data access restricted for clinics:', restrictedClinicIds);
+          } else {
+            console.log('✅ No restricted clinics found - doctor has full access');
           }
         } catch (error) {
           console.error('Error checking clinic access restrictions:', error);
           // Continue loading patients even if access check fails
         }
+
+        // NOTE: Doctor self-restriction toggle only affects CLINIC view, not doctor's own view
+        // So we do NOT check selfRestrictedClinics here - that's handled in ClinicTodaysSchedule
 
         // Get today's date in YYYY-MM-DD format (matching the format used when saving bookings)
         // Get today's date in YYYY-MM-DD format (using local timezone, not UTC)
@@ -207,6 +234,32 @@ function PatientDetailsLoader({
               hasPlain: !!data.patientName
             });
 
+            // 🔒 Check if this patient's data should be restricted
+            const bookingClinicId = data.clinicId;
+            const bookingSource = data.bookingSource; // 'clinic_qr' or 'doctor_qr'
+
+            // RULE: Doctor QR bookings are NEVER hidden from the doctor
+            // Only CLINIC QR bookings can be restricted (by clinic-end toggle)
+            const isDataRestricted =
+              bookingSource !== 'doctor_qr' && // Doctor's own QR bookings → ALWAYS visible
+              bookingClinicId &&
+              restrictedClinicIds.includes(bookingClinicId) &&
+              (bookingSource === 'clinic_qr' || !bookingSource);
+
+            if (bookingClinicId && restrictedClinicIds.length > 0) {
+              console.log('📋 Booking data:', {
+                bookingId: data.bookingId,
+                patientName: patientName.substring(0, 3) + '***',
+                clinicId: bookingClinicId,
+                bookingSource: bookingSource || 'NOT SET',
+                isInRestrictedList: restrictedClinicIds.includes(bookingClinicId),
+                willBeRestricted: isDataRestricted
+              });
+            }
+
+            // 🔓 Always pass REAL data — masking is handled at DISPLAY level only
+            // (PatientDetails.tsx masks based on isDataRestricted flag)
+            // This ensures Digital RX, Diet Chart PDFs, and notifications use real patient info
             return {
               id: doc.id,
               name: patientName || 'N/A',
@@ -231,35 +284,18 @@ function PatientDetailsLoader({
               tokenNumber: data.tokenNumber || `#${data.serialNo || 0}`,
               serialNo: data.serialNo || 0,
               chamber: data.chamber || 'Chamber',
-              isWalkIn: data.isWalkIn !== undefined ? data.isWalkIn : false, // QR bookings default to false
+              isWalkIn: data.isWalkIn !== undefined ? data.isWalkIn : false,
+              isDataRestricted: isDataRestricted || false,
+              bookingSource: bookingSource || 'doctor_qr',
+              clinicId: bookingClinicId || '',
+              digitalRxUrl: data.digitalRxUrl || '',
+              dietChartUrl: data.dietChartUrl || '',
             };
           })
           // Filter out invalid patients (already filtered by date in query)
           .filter(patient => patient.name !== 'N/A' && patient.phone !== 'N/A')
-          // 🔒 PATIENT DATA ACCESS CONTROL: Filter out patients from restricted clinics
-          .filter(patient => {
-            // If no restrictions, show all patients
-            if (restrictedClinicIds.length === 0) return true;
-
-            // Get booking document to check clinicId
-            const bookingDoc = qrBookingsSnap.docs.find(doc => doc.id === patient.id);
-            if (!bookingDoc) return true; // Keep patient if booking doc not found (safety)
-
-            const bookingData = bookingDoc.data();
-            const bookingClinicId = bookingData.clinicId;
-
-            // Filter out patient if from restricted clinic
-            if (bookingClinicId && restrictedClinicIds.includes(bookingClinicId)) {
-              console.log('🔒 Filtered out patient from restricted clinic:', {
-                patientName: patient.name,
-                clinicId: bookingClinicId,
-                restrictedClinics: restrictedClinicIds
-              });
-              return false; // Hide this patient
-            }
-
-            return true; // Show patient (from doctor's own QR or unrestricted clinic)
-          })
+          // 🔒 PATIENT DATA ACCESS CONTROL: Restricted patients already have masked data from .map() above
+          // They are still SHOWN in the list but with masked name/phone/age/gender/visitType
           // ✅ SORT BY STORED SERIAL NUMBER (booking order)
           .sort((a, b) => {
             // Cancelled last

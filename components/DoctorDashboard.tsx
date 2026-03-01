@@ -22,7 +22,8 @@ import {
   Twitter,
   Linkedin,
   Mail,
-  MessageCircle
+  MessageCircle,
+  BrainCircuit
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
@@ -954,12 +955,12 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
 
   // Practice overview data - Vibrant colors for black background
   const practiceOverviewData: Array<{ name: string; value: number; fill: string }> = [
-    { name: 'Total Scans', value: analyticsData.totalScans, fill: '#3b82f6' }, // Vibrant Blue
+    { name: 'Total Visitors', value: analyticsData.totalScans, fill: '#3b82f6' }, // Vibrant Blue
     { name: 'Total Bookings', value: analyticsData.totalBookings, fill: '#10b981' }, // Vibrant Green
-    { name: 'QR Bookings', value: analyticsData.qrBookings, fill: '#8b5cf6' }, // Vibrant Purple
-    { name: 'Walk-in Bookings', value: analyticsData.walkinBookings, fill: '#f59e0b' }, // Vibrant Amber
+    { name: 'Q1 Bookings', value: analyticsData.qrBookings, fill: '#8b5cf6' }, // Vibrant Purple
+    { name: 'Walk-in Bookings', value: analyticsData.walkinBookings, fill: '#6366f1' }, // Vibrant Indigo
     { name: 'Drop Outs', value: analyticsData.dropOuts, fill: '#ef4444' }, // Vibrant Red
-    { name: 'Cancelled', value: analyticsData.cancelled, fill: '#ec4899' }, // Vibrant Pink
+    { name: 'Cancelled', value: analyticsData.cancelled, fill: '#374151' }, // Dark Gray
   ];
 
   // Transform chambers data to upcoming schedule format
@@ -1163,6 +1164,13 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
             </div>
 
             <div className="flex gap-3 flex-wrap">
+              <Button
+                onClick={() => onMenuChange?.('braindeck')}
+                className="bg-orange-500 hover:bg-orange-600 text-white font-semibold transition-all shadow-lg hover:shadow-orange-500/25"
+              >
+                <BrainCircuit className="w-4 h-4 mr-2" />
+                healQR BrainDeck
+              </Button>
               <Button className="bg-emerald-500 hover:bg-emerald-600 text-white">
                 <Lock className="w-4 h-4 mr-2" />
                 Data is encrypted
@@ -1269,7 +1277,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
                   <div className="grid grid-cols-3 gap-4 mt-8 pt-6 border-t border-zinc-800">
                     <div className="text-center">
                       <div className="text-2xl font-bold text-blue-400">{analyticsData.totalScans}</div>
-                      <div className="text-xs text-gray-400 mt-1">Total Scans</div>
+                      <div className="text-xs text-gray-400 mt-1">Total Visitors</div>
                     </div>
                     <div className="text-center">
                       <div className="text-2xl font-bold text-green-400">{analyticsData.totalBookings}</div>

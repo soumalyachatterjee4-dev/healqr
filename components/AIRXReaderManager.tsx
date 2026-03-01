@@ -38,7 +38,26 @@ export default function AIRXReaderManager({
 
   // If showing history, render the history component instead
   if (showHistory) {
-    return <AIRXReaderHistory onBack={() => setShowHistory(false)} />;
+    return (
+      <div className={onMenuChange ? "flex h-screen bg-gray-950" : "h-screen bg-gray-950"}>
+        {onMenuChange && (
+          <DashboardSidebar
+            activeMenu="ai-rx-reader"
+            onMenuChange={onMenuChange}
+            onLogout={onLogout}
+            activeAddOns={activeAddOns}
+          />
+        )}
+        <div className={`flex-1 overflow-auto ${onMenuChange ? 'lg:ml-64' : ''}`}>
+          <div className="p-4 md:p-8">
+            <Button onClick={() => setShowHistory(false)} variant="ghost" className="mb-4 text-purple-400 hover:text-purple-300">
+              &larr; Back to Settings
+            </Button>
+            <AIRXReaderHistory onBack={() => setShowHistory(false)} />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // If called from dashboard, render with sidebar
@@ -51,8 +70,8 @@ export default function AIRXReaderManager({
           onLogout={onLogout}
           activeAddOns={activeAddOns}
         />
-        <div className="flex-1 overflow-auto">
-          <div className="p-8">
+        <div className="flex-1 overflow-auto lg:ml-64">
+          <div className="p-4 md:p-8">
             {renderContent()}
           </div>
         </div>
@@ -61,8 +80,14 @@ export default function AIRXReaderManager({
   }
 
   // Standalone mode
-  return renderContent();
-  
+  return (
+    <div className="h-screen bg-gray-950 overflow-auto">
+      <div className="p-4 md:p-8">
+        {renderContent()}
+      </div>
+    </div>
+  );
+
   function renderContent() {
     return (
       <div className="space-y-6"    >
@@ -122,7 +147,7 @@ export default function AIRXReaderManager({
               />
             </div>
 
-            <Button 
+            <Button
               onClick={handleSaveSettings}
               className="bg-purple-500 hover:bg-purple-600 text-white"
             >

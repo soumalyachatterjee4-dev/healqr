@@ -19,7 +19,6 @@ import {
   Scan,
   CalendarClock,
   AlertCircle,
-  History,
   Apple,
   Share2
 } from 'lucide-react';
@@ -33,7 +32,6 @@ interface DashboardSidebarProps {
   isOpen?: boolean;
   onClose?: () => void;
   activeAddOns?: string[];
-  isBookingBlocked?: boolean; // When booking limit reached or subscription failed
   isAssistant?: boolean; // Hide logout for assistants
   assistantAllowedPages?: string[]; // Pages assistant can access
 }
@@ -45,14 +43,14 @@ export default function DashboardSidebar({
   isOpen = true,
   onClose,
   activeAddOns = [],
-  isBookingBlocked = false,
   isAssistant = false,
   assistantAllowedPages = []
 }: DashboardSidebarProps) {
   const [isManagementOpen, setIsManagementOpen] = useState(true);
   const [isPracticeEnhancerOpen, setIsPracticeEnhancerOpen] = useState(true);
   const [isGeneralToolsOpen, setIsGeneralToolsOpen] = useState(true);
-  const [isPremiumOpen, setIsPremiumOpen] = useState(true);
+  const [isFreeAddOnOpen, setIsFreeAddOnOpen] = useState(true);
+  const [isFreemiumAddOnOpen, setIsFreemiumAddOnOpen] = useState(true);
   const [isTodayBlocked, setIsTodayBlocked] = useState(false);
 
   // Helper function to check if page is accessible to assistant
@@ -119,17 +117,16 @@ export default function DashboardSidebar({
     { id: 'todays-schedule', label: "Today's Schedule", icon: Calendar },
     { id: 'advance-booking', label: 'Advance Booking', icon: CalendarClock },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-    { id: 'monthly-planner', label: 'Monthly Planner', icon: Calendar },
     { id: 'reports', label: 'Reports', icon: FileText },
     { id: 'social-kit', label: 'Social Kit & Offers', icon: Share2 },
   ];
 
   const generalTools = [
+    { id: 'monthly-planner', label: 'Monthly Planner', icon: Calendar },
     { id: 'preview', label: 'Preview Centre', icon: Eye },
-    // Purchase History removed
   ];
 
-  const premiumAddOnPages = [
+  const freeAddOnPages = [
     {
       id: 'assistant-access',
       label: 'Assistant Access',
@@ -153,7 +150,10 @@ export default function DashboardSidebar({
       label: 'Emergency Button',
       icon: AlertCircle,
       addonKey: 'emergency-button'
-    },
+    }
+  ];
+
+  const freemiumAddOnPages = [
     {
       id: 'ai-diet-chart',
       label: 'AI Diet Chart',
@@ -164,15 +164,13 @@ export default function DashboardSidebar({
       id: 'ai-rx-reader',
       label: 'AI RX Reader',
       icon: Scan,
-      addonKey: 'ai-rx-reader',
-      disabled: true // Paid service - Coming Soon
+      addonKey: 'ai-rx-reader'
     },
     {
       id: 'video-consultation',
       label: 'Video Consultation',
       icon: Video,
-      addonKey: 'video-consultation',
-      disabled: true // Paid service - Coming Soon
+      addonKey: 'video-consultation'
     }
   ];
 
@@ -184,28 +182,10 @@ export default function DashboardSidebar({
     }
   };
 
-  const handlePremiumItemClick = (item: typeof premiumAddOnPages[0]) => {
-    // ============================================================================
-    // 🚫 PREMIUM ADD-ON SIDEBAR NAVIGATION IS DISABLED
-    // ============================================================================
-    // Premium add-on service pages should NOT be clickable directly from sidebar.
-    // Users can only access these features through:
-    // 1. Doctor pays → page activated → green → clickable (ONLY from premium store)
-    // 2. Doctor press DEMO → page activated → yellow → clickable (ONLY demo surfing)
-    //
-    // BUT NOT CLICKABLE DIRECTLY FROM SIDEBAR
-    //
-    // This function should never be called as premium items render as non-clickable divs
-    // ============================================================================
 
-    // Do nothing - premium items are not clickable from sidebar
-    return;
-  };
-
-  // Check if a premium feature is accessible (paid or demo mode)
   const isPremiumFeatureAccessible = (addonKey: string): { accessible: boolean; isDemo: boolean; isPaid: boolean } => {
-    // Emergency Button, Assistant Access & AI Diet Chart are always accessible in the sidebar
-    if (addonKey === 'emergency-button' || addonKey === 'assistant-access' || addonKey === 'ai-diet-chart') {
+    // These features show as green/activated permanently
+    if (['emergency-button', 'assistant-access', 'ai-diet-chart', 'lab-referral-tracking', 'personalized-templates', 'ai-rx-reader', 'video-consultation'].includes(addonKey)) {
       return {
         accessible: true,
         isDemo: false,
@@ -410,55 +390,28 @@ export default function DashboardSidebar({
             )}
           </div>
 
-          {/* PREMIUM ADD-ON SERVICE */}
+          {/* FREE ADD-ON SERVICE */}
           <div className="border-t border-zinc-800 my-4" />
           <div className="mb-3">
             <button
-              onClick={() => setIsPremiumOpen(!isPremiumOpen)}
+              onClick={() => setIsFreeAddOnOpen(!isFreeAddOnOpen)}
               className="w-full flex items-center gap-2 px-3 py-2 text-gray-500 hover:text-gray-300 transition-colors"
             >
               <span className="text-xs uppercase tracking-wider flex-1 text-left">
-                Premium Add-On Service
+                Free Add-On Service
               </span>
-              {isPremiumOpen ? (
+              {isFreeAddOnOpen ? (
                 <ChevronDown className="w-3.5 h-3.5" />
               ) : (
                 <ChevronRight className="w-3.5 h-3.5" />
               )}
             </button>
-            {isPremiumOpen && (
+            {isFreeAddOnOpen && (
               <div className="mt-2 space-y-1">
-                {/* ====================================================================== */}
-                {/* 🎯 PREMIUM ADD-ON ITEMS - SIMPLE RULE                                 */}
-                {/* ====================================================================== */}
-                {/* 1. Dr PAID → GREEN ✓ + CLICKABLE (always until subscription ends)     */}
-                {/* 2. Dr NOT PAID → GRAY 🔒 + NOT CLICKABLE (locked)                     */}
-                {/* 3. DEMO → Temporary access via button, doesn't change sidebar         */}
-                {/* ====================================================================== */}
-                {premiumAddOnPages.filter(item => isPageAccessible(item.id)).map((item) => {
+                {freeAddOnPages.filter(item => isPageAccessible(item.id)).map((item) => {
                   const isCurrentPage = activeMenu === item.id;
-                  const { accessible, isDemo, isPaid } = isPremiumFeatureAccessible(item.addonKey);
+                  const { isPaid } = isPremiumFeatureAccessible(item.addonKey);
 
-                  // Check if item is disabled (coming soon features)
-                  const isDisabled = (item as any).disabled === true;
-
-                  // If DISABLED → render as GRAY and NOT CLICKABLE
-                  if (isDisabled) {
-                    return (
-                      <div
-                        key={item.id}
-                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-gray-600 opacity-40 pointer-events-none"
-                      >
-                        <item.icon className="w-4 h-4" />
-                        <span className="text-xs flex-1 text-left">{item.label}</span>
-                        <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded text-[10px] font-semibold">
-                          PAID
-                        </span>
-                      </div>
-                    );
-                  }
-
-                  // If PAID → render as GREEN and CLICKABLE
                   if (isPaid) {
                     return (
                       <button
@@ -477,7 +430,60 @@ export default function DashboardSidebar({
                     );
                   }
 
-                  // If NOT PAID → render as GRAY and NOT CLICKABLE
+                  return (
+                    <div
+                      key={item.id}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-gray-600 opacity-60 pointer-events-none"
+                    >
+                      <item.icon className="w-4 h-4" />
+                      <span className="text-xs flex-1 text-left">{item.label}</span>
+                      <Lock className="w-3 h-3 text-gray-600" />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* FREEMIUM ADD-ON SERVICE */}
+          <div className="mb-3">
+            <button
+              onClick={() => setIsFreemiumAddOnOpen(!isFreemiumAddOnOpen)}
+              className="w-full flex items-center gap-2 px-3 py-2 text-gray-500 hover:text-gray-300 transition-colors"
+            >
+              <span className="text-xs uppercase tracking-wider flex-1 text-left">
+                Freemium Add-On Service
+              </span>
+              {isFreemiumAddOnOpen ? (
+                <ChevronDown className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronRight className="w-3.5 h-3.5" />
+              )}
+            </button>
+            {isFreemiumAddOnOpen && (
+              <div className="mt-2 space-y-1">
+                {freemiumAddOnPages.filter(item => isPageAccessible(item.id)).map((item) => {
+                  const isCurrentPage = activeMenu === item.id;
+                  const { isPaid } = isPremiumFeatureAccessible(item.addonKey);
+
+                  if (isPaid) {
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => handleMenuClick(item.id)}
+                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                          isCurrentPage
+                            ? 'bg-emerald-500 text-white'
+                            : 'text-emerald-400 hover:bg-zinc-900 hover:text-emerald-300'
+                        }`}
+                      >
+                        <item.icon className="w-4 h-4" />
+                        <span className="text-xs flex-1 text-left">{item.label}</span>
+                        <Check className={`w-3 h-3 ${isCurrentPage ? 'text-white' : 'text-emerald-500'}`} />
+                      </button>
+                    );
+                  }
+
                   return (
                     <div
                       key={item.id}

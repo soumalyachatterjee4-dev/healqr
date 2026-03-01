@@ -123,7 +123,11 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
         if (data.name) setName(data.name);
         if (data.pinCode) setResidentialPincodeState(data.pinCode);
         if (data.landmark) setLandmark(data.landmark);
-        if (data.gender) setGender(data.gender);
+        if (data.registrationNumber) setRegistrationNumber(data.registrationNumber);
+        if (data.showRegistrationOnRx !== undefined) setShowRegistrationOnRx(data.showRegistrationOnRx);
+        if (data.footerLine1) setFooterLine1(data.footerLine1);
+        if (data.footerLine2) setFooterLine2(data.footerLine2);
+        if (data.watermarkLogo) setWatermarkLogo(data.watermarkLogo);
         if (data.preferredLanguage) setPreferredLanguage(data.preferredLanguage);
         if (data.degrees) setDegrees(data.degrees);
         if (data.specialities) setSpecialities(data.specialities);
@@ -153,7 +157,12 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
 
   // Optional fields
   const [profileImage, setProfileImage] = useState<string | null>(profileData?.image || null);
-  const [gender, setGender] = useState('');
+  const [registrationNumber, setRegistrationNumber] = useState('');
+  const [showRegistrationOnRx, setShowRegistrationOnRx] = useState(false);
+  const [footerLine1, setFooterLine1] = useState('');
+  const [footerLine2, setFooterLine2] = useState('');
+  const [watermarkLogo, setWatermarkLogo] = useState<string | null>(null);
+  const [isUploadingWatermark, setIsUploadingWatermark] = useState(false);
   const [preferredLanguage, setPreferredLanguage] = useState<'english' | 'hindi' | 'bengali' | 'marathi' | 'tamil' | 'telugu' | 'gujarati' | 'kannada' | 'malayalam' | 'punjabi' | 'assamese'>(profileData?.language || 'english');
   const [degrees, setDegrees] = useState<string[]>(profileData?.degrees || []);
   const [specialities, setSpecialities] = useState<string[]>(profileData?.specialities || []);
@@ -286,6 +295,30 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
     });
   };
 
+  const handleWatermarkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (!auth?.currentUser || !storage) {
+        alert('Please login again before uploading.');
+        return;
+      }
+      setIsUploadingWatermark(true);
+      const compressedFile = await compressImage(file);
+      const filePath = `watermarkLogos/${auth.currentUser.uid}/${Date.now()}_${file.name}`;
+      const storageRef = ref(storage, filePath);
+      await uploadBytes(storageRef, compressedFile);
+      const downloadURL = await getDownloadURL(storageRef);
+      setWatermarkLogo(downloadURL);
+      alert('Watermark logo uploaded successfully!');
+    } catch (error: any) {
+      console.error('❌ Watermark upload error:', error);
+      alert(`Failed to upload watermark: ${error?.message || 'Unknown error'}`);
+    } finally {
+      setIsUploadingWatermark(false);
+    }
+  };
+
   const addDegree = () => {
     if (newDegree.trim()) {
       setDegrees([...degrees, newDegree.trim()]);
@@ -360,7 +393,11 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
           pinCode: residentialPincodeState,
           landmark,
           profileImage,
-          gender,
+          registrationNumber,
+          showRegistrationOnRx,
+          footerLine1,
+          footerLine2,
+          watermarkLogo,
           preferredLanguage,
           degrees,
           specialties: specialities, // Normalized to 'specialties' (US)
@@ -699,20 +736,108 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
               <p className="text-gray-400 text-sm mb-6">Optional fields</p>
 
               <div className="space-y-6">
-                {/* Gender */}
+                {/* Registration Number */}
                 <div>
-                  <Label className="mb-2 block">Gender</Label>
-                  <Select value={gender} onValueChange={setGender}>
-                    <SelectTrigger className="bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-emerald-500">
-                      <SelectValue placeholder="Select gender" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-zinc-900 border-zinc-800 text-white">
-                      <SelectItem value="male">Male</SelectItem>
-                      <SelectItem value="female">Female</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                      <SelectItem value="prefer-not-to-say">Prefer not to say</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label className="mb-2 block">Registration Number (Optional)</Label>
+                  <div className="relative mb-4">
+                    <Zap className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <Input
+                      type="text"
+                      value={registrationNumber}
+                      onChange={(e) => setRegistrationNumber(e.target.value)}
+                      placeholder="Enter your Medical Registration Number"
+                      className="pl-12 bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-emerald-500"
+                    />
+                  </div>
+                  <div className="flex items-start gap-3 p-4 bg-zinc-800/50 rounded-lg border border-zinc-700">
+                    <Checkbox
+                      id="showRegistrationOnRx"
+                      checked={showRegistrationOnRx}
+                      onCheckedChange={(checked) => setShowRegistrationOnRx(checked as boolean)}
+                      className="mt-0.5"
+                    />
+                    <div className="flex-1">
+                      <label
+                        htmlFor="showRegistrationOnRx"
+                        className="text-sm text-white cursor-pointer block mb-1"
+                      >
+                        Show Registration Number on Digital RX
+                      </label>
+                      <p className="text-xs text-gray-400">
+                        When enabled, your registration number will be printed on generated prescriptions for legal compliance.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Custom Footer Lines for RX/Diet Chart PDFs */}
+                <div>
+                  <Label className="mb-2 block">Custom RX Footer Lines (Optional)</Label>
+                  <p className="text-xs text-gray-400 mb-3">
+                    Add up to 2 custom lines that will appear in the footer of your Digital RX and Diet Chart PDFs. Use for emergency hospital contact, medico-legal cautions, disclaimers, etc.
+                  </p>
+                  <div className="space-y-3">
+                    <div className="relative">
+                      <Input
+                        type="text"
+                        value={footerLine1}
+                        onChange={(e) => setFooterLine1(e.target.value)}
+                        placeholder="e.g. In Emergency Contact: XYZ Hospital, Ph: 1234567890"
+                        className="bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-emerald-500"
+                        maxLength={120}
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500">{footerLine1.length}/120</span>
+                    </div>
+                    <div className="relative">
+                      <Input
+                        type="text"
+                        value={footerLine2}
+                        onChange={(e) => setFooterLine2(e.target.value)}
+                        placeholder="e.g. Medico-Legal Notice: This prescription is valid for 30 days only"
+                        className="bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-emerald-500"
+                        maxLength={120}
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500">{footerLine2.length}/120</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Watermark Logo for Digital RX */}
+                <div>
+                  <Label className="mb-2 block">RX Watermark Logo (Optional)</Label>
+                  <p className="text-xs text-gray-400 mb-3">
+                    Upload your logo/emblem to appear as a faint watermark in the center of Digital RX PDFs. Recommended: PNG with transparent background, 200x200px or similar.
+                  </p>
+                  <div className="flex items-center gap-4">
+                    {watermarkLogo ? (
+                      <div className="relative">
+                        <img src={watermarkLogo} alt="Watermark" className="w-20 h-20 object-contain rounded-lg border border-zinc-700 bg-zinc-800 p-1" />
+                        <button
+                          onClick={() => setWatermarkLogo(null)}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="w-20 h-20 rounded-lg border border-dashed border-zinc-700 flex items-center justify-center text-gray-500 text-xs">
+                        No logo
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-sm text-white transition-colors">
+                        {isUploadingWatermark ? 'Uploading...' : 'Upload Watermark Logo'}
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept="image/*"
+                          onChange={handleWatermarkUpload}
+                          disabled={isUploadingWatermark}
+                        />
+                      </label>
+                      <p className="text-[10px] text-gray-500 mt-1">PNG/JPG, max ~200KB recommended</p>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Preferred Language */}

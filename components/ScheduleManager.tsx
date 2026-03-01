@@ -78,6 +78,11 @@ export default function ScheduleManager({
           if (data.manualClinics && Array.isArray(data.manualClinics)) {
             setManualClinics(data.manualClinics);
           }
+
+          // Load Self-Restricted Clinics (doctor-side toggle)
+          if (data.selfRestrictedClinics && Array.isArray(data.selfRestrictedClinics)) {
+            setSelfRestrictedClinics(data.selfRestrictedClinics);
+          }
         }
       } catch (error) {
         console.error('Error loading schedule data:', error);
@@ -142,6 +147,9 @@ export default function ScheduleManager({
   const [clinicFormCode, setClinicFormCode] = useState('');
   const [showClinicDeleteModal, setShowClinicDeleteModal] = useState(false);
   const [clinicToDelete, setClinicToDelete] = useState<string | null>(null);
+
+  // State for Doctor Self-Restriction Toggle (hide clinic QR patients)
+  const [selfRestrictedClinics, setSelfRestrictedClinics] = useState<string[]>([]);
 
   // State for Schedule Maker (Section 2)
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
@@ -334,6 +342,40 @@ export default function ScheduleManager({
     } catch (error) {
       console.error('Error deleting manual clinic:', error);
       toast.error('Failed to delete clinic');
+    }
+  };
+
+  // Handle doctor-side self-restriction toggle for clinic patients
+  const handleToggleSelfRestriction = async (clinicId: string) => {
+    if (!doctorId || !db) return;
+
+    try {
+      const clinic = manualClinics.find(c => c.id === clinicId);
+      if (!clinic?.clinicCode) return;
+
+      const isCurrentlyRestricted = selfRestrictedClinics.includes(clinicId);
+      const updatedList = isCurrentlyRestricted
+        ? selfRestrictedClinics.filter(id => id !== clinicId)
+        : [...selfRestrictedClinics, clinicId];
+
+      setSelfRestrictedClinics(updatedList);
+
+      // Save to doctor's own profile (clinic-side reads this directly)
+      await updateDoc(doc(db, 'doctors', doctorId), {
+        selfRestrictedClinics: updatedList,
+        updatedAt: serverTimestamp()
+      });
+
+      toast.success(
+        isCurrentlyRestricted
+          ? 'Clinic can now see your QR patients'
+          : 'Your QR patients are now hidden from clinic'
+      );
+    } catch (error) {
+      console.error('Error toggling self-restriction:', error);
+      toast.error('Failed to update preference');
+      // Revert on error
+      setSelfRestrictedClinics(selfRestrictedClinics);
     }
   };
 
@@ -2435,6 +2477,30 @@ export default function ScheduleManager({
                         </Button>
                       </div>
                     </div>
+
+                    {/* Doctor Self-Restriction Toggle - Only for linked clinics */}
+                    {clinic.clinicCode && (
+                      <div className="mt-4 pt-4 border-t border-gray-700/50">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Eye className={`w-4 h-4 ${selfRestrictedClinics.includes(clinic.id) ? 'text-red-400' : 'text-emerald-400'}`} />
+                            <span className="text-xs text-gray-300">Hide my QR data from clinic</span>
+                          </div>
+                          <Switch
+                            checked={selfRestrictedClinics.includes(clinic.id)}
+                            onCheckedChange={() => handleToggleSelfRestriction(clinic.id)}
+                            className={selfRestrictedClinics.includes(clinic.id)
+                              ? 'data-[state=checked]:bg-red-500'
+                              : 'data-[state=checked]:bg-emerald-500'}
+                          />
+                        </div>
+                        <p className={`text-[10px] mt-1 ml-6 ${selfRestrictedClinics.includes(clinic.id) ? 'text-red-400' : 'text-gray-500'}`}>
+                          {selfRestrictedClinics.includes(clinic.id)
+                            ? '🔒 Clinic cannot see your QR booking patients'
+                            : '✅ Clinic can see your QR booking patients'}
+                        </p>
+                      </div>
+                    )}
                   </Card>
                 ))}
               </div>

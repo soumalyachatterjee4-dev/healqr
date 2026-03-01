@@ -44,11 +44,11 @@ interface DoctorSchedule {
 }
 
 // Helper component to load and display patient details for a specific chamber
-function ChamberPatientDetailsLoader({ 
+function ChamberPatientDetailsLoader({
   chamber,
   doctorId,
   onBack,
-}: { 
+}: {
   chamber: DoctorChamber;
   doctorId: string;
   onBack: () => void;
@@ -72,13 +72,52 @@ function ChamberPatientDetailsLoader({
 
         const bookingsRef = collection(db, 'bookings');
         const currentClinicId = auth?.currentUser?.uid;
-        
+
+        // 🔒 Check if this doctor has restricted their QR data from this clinic
+        // Read from DOCTOR's profile (not clinic doc - doctor has no write permission there)
+        let isDoctorQrRestricted = false;
+        if (currentClinicId && doctorId) {
+          try {
+            const { doc: firestoreDoc, getDoc: firestoreGetDoc } = await import('firebase/firestore');
+            const doctorDoc = await firestoreGetDoc(firestoreDoc(db, 'doctors', doctorId));
+            if (doctorDoc.exists()) {
+              const doctorData = doctorDoc.data();
+              const selfRestrictedClinics: string[] = doctorData.selfRestrictedClinics || [];
+              const manualClinics: any[] = doctorData.manualClinics || [];
+
+              // Check if any of the doctor's self-restricted manual clinics match this clinic
+              // We need to find the clinic document that matches the currentClinicId
+              // and check if the manual clinic with the matching clinicCode is restricted
+              const { collection: firestoreCollection, getDocs: firestoreGetDocs, query: firestoreQuery, where: firestoreWhere } = await import('firebase/firestore');
+              const clinicDoc = await firestoreGetDoc(firestoreDoc(db, 'clinics', currentClinicId));
+              if (clinicDoc.exists()) {
+                const clinicCode = clinicDoc.data().clinicCode;
+                if (clinicCode) {
+                  // Find the manual clinic entry that has this clinicCode
+                  const matchingManualClinic = manualClinics.find((mc: any) => mc.clinicCode === clinicCode);
+                  if (matchingManualClinic && selfRestrictedClinics.includes(matchingManualClinic.id)) {
+                    isDoctorQrRestricted = true;
+                    console.log('🔒 Doctor self-restricted QR data from clinic:', {
+                      doctorId,
+                      clinicId: currentClinicId,
+                      clinicCode,
+                      manualClinicId: matchingManualClinic.id
+                    });
+                  }
+                }
+              }
+            }
+          } catch (err) {
+            console.error('Error checking doctor QR restriction:', err);
+          }
+        }
+
         let numericChamberId = typeof chamber.id === 'string' ? parseInt(chamber.id, 10) : chamber.id;
-        
+
         if (!numericChamberId || isNaN(numericChamberId)) {
           numericChamberId = -1;
         }
-        
+
         // Query 1: QR bookings for this chamber
         const qrBookingsQuery = query(
           bookingsRef,
@@ -87,7 +126,7 @@ function ChamberPatientDetailsLoader({
         );
 
         const qrBookingsSnap = await getDocs(qrBookingsQuery);
-        
+
         // Query 1B: Fallback query for non-linked doctors - search by doctorId + chamberId + date
         // This handles cases where clinic QR bookings might have different chamberId mapping
         let fallbackQrBookings: any[] = [];
@@ -103,7 +142,7 @@ function ChamberPatientDetailsLoader({
             return data.type !== 'walkin_booking';
           });
         }
-        
+
         // Query 2: Walk-in bookings for this doctor + clinic (added via ADD PATIENT button)
         const walkInQuery = query(
           bookingsRef,
@@ -140,7 +179,7 @@ function ChamberPatientDetailsLoader({
           const targetName = (chamber.chamberName || '').toString().toLowerCase();
           return chamberName !== '' && targetName !== '' && chamberName === targetName;
         });
-        
+
         const buildAppointmentDateTime = (dateValue: any, timeValue: any, fallback: Date) => {
           if (dateValue && timeValue && timeValue !== 'immediate') {
             const dateStr = typeof dateValue === 'string'
@@ -173,22 +212,22 @@ function ChamberPatientDetailsLoader({
         const qrPatients = qrBookingDocs
           .map(doc => {
             const data = doc.data();
-            
-            const bookingTime = data.createdAt?.toDate 
-              ? data.createdAt.toDate() 
+
+            const bookingTime = data.createdAt?.toDate
+              ? data.createdAt.toDate()
               : new Date(data.createdAt);
 
             const appointmentFallback = data.date?.toDate ? data.date.toDate() : bookingTime;
             const appointmentTime = buildAppointmentDateTime(data.appointmentDate, data.time, appointmentFallback);
-            
+
             const isCancelledStatus = (data.isCancelled === true) || (data.status === 'cancelled');
-            
+
             const patientName = decrypt(data.patientName_encrypted || data.patientName || '');
             const whatsappNumber = decrypt(data.whatsappNumber_encrypted || data.whatsappNumber || '');
             const ageDecrypted = decrypt(data.age_encrypted || '');
             const genderDecrypted = decrypt(data.gender_encrypted || data.gender || '');
             const purposeDecrypted = decrypt(data.purposeOfVisit_encrypted || data.purposeOfVisit || '');
-            
+
             let parsedAge = 0;
             if (ageDecrypted) {
               const ageNum = parseInt(ageDecrypted.toString().trim());
@@ -197,15 +236,27 @@ function ChamberPatientDetailsLoader({
               const ageNum = typeof data.age === 'number' ? data.age : parseInt(data.age.toString().trim());
               parsedAge = isNaN(ageNum) ? 0 : ageNum;
             }
-            
+
+            // 🔒 Doctor QR restriction: mask data if doctor has restricted AND this is a doctor_qr booking
+            const bookingSource = data.bookingSource;
+            const shouldMask = isDoctorQrRestricted && (bookingSource === 'doctor_qr' || (!bookingSource && !data.clinicId));
+
+            const maskName = (name: string) => {
+              if (!name || name === 'N/A') return name;
+              const parts = name.trim().split(' ');
+              return parts.map(part =>
+                part.length > 0 ? part[0] + '*'.repeat(part.length > 1 ? part.length - 1 : 3) : part
+              ).join(' ');
+            };
+
             return {
               id: doc.id,
-              name: patientName || 'N/A',
-              phone: whatsappNumber || data.phone || 'N/A',
+              name: shouldMask ? maskName(patientName || 'N/A') : (patientName || 'N/A'),
+              phone: shouldMask ? ('*'.repeat(6) + (whatsappNumber || '').slice(-4)) : (whatsappNumber || data.phone || 'N/A'),
               bookingId: data.bookingId || doc.id,
-              age: parsedAge,
-              gender: (genderDecrypted || 'MALE').toUpperCase(),
-              visitType: purposeDecrypted || data.visitType || (data.consultationType === 'video' ? 'Video Consultation' : 'In-Person'),
+              age: shouldMask ? 0 : parsedAge,
+              gender: shouldMask ? '**' : (genderDecrypted || 'MALE').toUpperCase(),
+              visitType: shouldMask ? '*********' : (purposeDecrypted || data.visitType || (data.consultationType === 'video' ? 'Video Consultation' : 'In-Person')),
               bookingTime: bookingTime,
               appointmentTime: appointmentTime,
               appointmentDate: data.appointmentDate,
@@ -223,6 +274,11 @@ function ChamberPatientDetailsLoader({
               serialNo: data.serialNo || 0, // 🔄 SYNCHRONIZE: Use serialNo from Firestore
               tokenNumber: data.tokenNumber || `#${data.serialNo || 0}`, // 🔄 SYNCHRONIZE
               type: 'qr_booking', // Mark as QR booking
+              isDataRestricted: shouldMask || false,
+              bookingSource: bookingSource || 'clinic_qr',
+              clinicId: data.clinicId || '',
+              digitalRxUrl: data.digitalRxUrl || '',
+              dietChartUrl: data.dietChartUrl || '',
             };
           });
 
@@ -240,9 +296,9 @@ function ChamberPatientDetailsLoader({
           })
           .map(doc => {
             const data = doc.data();
-          
-          const bookingTime = data.createdAt?.toDate 
-            ? data.createdAt.toDate() 
+
+          const bookingTime = data.createdAt?.toDate
+            ? data.createdAt.toDate()
             : new Date(data.createdAt || new Date());
 
           const appointmentFallback = data.date?.toDate ? data.date.toDate() : bookingTime;
@@ -314,19 +370,19 @@ function ChamberPatientDetailsLoader({
   // 🔥 REAL-TIME LISTENER: Triggers refresh via state
   useEffect(() => {
     const bookingsRef = collection(db, 'bookings');
-    
+
     let numericChamberId = typeof chamber.id === 'string' ? parseInt(chamber.id, 10) : chamber.id;
     if (!numericChamberId || isNaN(numericChamberId)) {
       numericChamberId = -1;
     }
-    
+
     let timeoutId: NodeJS.Timeout | null = null;
-    
+
     const qrBookingsQuery = query(
       bookingsRef,
       where('chamberId', '==', numericChamberId)
     );
-    
+
     const unsubscribe = onSnapshot(qrBookingsQuery, (snapshot) => {
       snapshot.docChanges().forEach((change) => {
         if (change.type === 'added' || change.type === 'modified' || change.type === 'removed') {
@@ -339,7 +395,7 @@ function ChamberPatientDetailsLoader({
         }
       });
     });
-    
+
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
       unsubscribe();
@@ -421,14 +477,14 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
   useEffect(() => {
     const currentUser = auth.currentUser;
     if (!currentUser) return;
-    
+
     let timeoutId: NodeJS.Timeout | null = null;
-    
+
     const bookingsQuery = query(
       collection(db, 'bookings'),
       where('clinicId', '==', currentUser.uid)
     );
-    
+
     const unsubscribe = onSnapshot(bookingsQuery, (snapshot) => {
       snapshot.docChanges().forEach((change) => {
         if (change.type === 'added' || change.type === 'modified' || change.type === 'removed') {
@@ -441,7 +497,7 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
         }
       });
     });
-    
+
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
       unsubscribe();
@@ -464,11 +520,11 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
       // If trying to TURN OFF the chamber, check for pending bookings
       if (currentStatus === true) { // Currently ON, trying to turn OFF
         setChambersTogglingState(prev => ({ ...prev, [`${doctorId}-${chamberId}`]: true }));
-        
+
         // Check for pending (non-intervened) bookings for this chamber
         const today = new Date();
         const todayStr = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split('T')[0];
-        
+
         const bookingsRef = collection(db, 'bookings');
         const pendingBookingsQuery = query(
           bookingsRef,
@@ -476,19 +532,19 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
           where('doctorId', '==', doctorId),
           where('appointmentDate', '==', todayStr)
         );
-        
+
         const bookingsSnap = await getDocs(pendingBookingsQuery);
-        
+
         // Check if there are any non-intervened, non-cancelled bookings
         const pendingBookings = bookingsSnap.docs.filter(doc => {
           const data = doc.data();
           const isMarkedSeen = data.isMarkedSeen || false;
           const isCancelled = data.isCancelled === true || data.status === 'cancelled';
-          
+
           // Pending if NOT marked seen AND NOT cancelled
           return !isMarkedSeen && !isCancelled;
         });
-        
+
         if (pendingBookings.length > 0) {
           // Show modal with pending patients instead of just blocking
           const pendingPatientsList = pendingBookings.map(doc => {
@@ -525,15 +581,15 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
           return;
         }
       }
-      
+
       // If trying to TURN ON the chamber, check for cancelled bookings
       if (currentStatus === false) { // Currently OFF, trying to turn ON
         setChambersTogglingState(prev => ({ ...prev, [`${doctorId}-${chamberId}`]: true }));
-        
+
         // Check for cancelled bookings for this chamber
         const today = new Date();
         const todayStr = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split('T')[0];
-        
+
         const bookingsRef = collection(db, 'bookings');
         const cancelledBookingsQuery = query(
           bookingsRef,
@@ -542,9 +598,9 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
           where('appointmentDate', '==', todayStr),
           where('isCancelled', '==', true)
         );
-        
+
         const bookingsSnap = await getDocs(cancelledBookingsQuery);
-        
+
         if (bookingsSnap.docs.length > 0) {
           // Show restoration modal with cancelled patients
           const restoredPatientsList = bookingsSnap.docs.map(doc => {
@@ -581,12 +637,12 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
           return;
         }
       }
-      
+
       setChambersTogglingState(prev => ({ ...prev, [`${doctorId}-${chamberId}`]: true }));
-      
+
       const chamberRef = doc(db, 'doctors', doctorId);
       const doctorSnap = await getDoc(chamberRef);
-      
+
       if (doctorSnap.exists()) {
         const chambers = doctorSnap.data().chambers || [];
         const updatedChambers = chambers.map((ch: any) => {
@@ -595,9 +651,9 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
           }
           return ch;
         });
-        
+
         await updateDoc(chamberRef, { chambers: updatedChambers });
-        
+
         // Refresh schedules
         setRefreshTrigger(prev => prev + 1);
         toast.success(currentStatus ? 'Chamber disabled' : 'Chamber enabled');
@@ -834,21 +890,21 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
             if (chamber.clinicId !== currentUser.uid) {
               return false;
             }
-            
+
             if (chamber.frequency === 'Daily') {
               return true;
             }
-            
+
             if (chamber.frequency === 'Custom' && chamber.customDate) {
               const customDate = new Date(chamber.customDate);
               const customStr = customDate.toISOString().split('T')[0];
               return customStr === todayStr;
             }
-            
+
             if (chamber.days && Array.isArray(chamber.days)) {
               return chamber.days.includes(todayDay);
             }
-            
+
             return false;
           });
 
@@ -860,7 +916,7 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
             where('type', '==', 'walkin_booking'),
             where('clinicId', '==', currentUser.uid)
           );
-          
+
           const walkInSnap = await getDocs(walkInQuery);
           const todaysWalkIns = walkInSnap.docs.filter(doc => {
             const data = doc.data();
@@ -1009,7 +1065,7 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
         {/* Header */}
         <header className="bg-black border-b border-gray-900 px-4 md:px-8 py-4 flex items-center justify-between sticky top-0 z-50">
           <div className="flex items-center gap-3">
-            <button 
+            <button
               onClick={() => setMobileMenuOpen(true)}
               className="lg:hidden w-10 h-10 bg-zinc-900 hover:bg-zinc-800 rounded-lg flex items-center justify-center transition-colors"
             >
@@ -1072,7 +1128,7 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
                     {/* Chambers for this doctor */}
                     <div className="space-y-4 ml-13">
                       {schedule.chambers.map((chamber) => (
-                        <Card 
+                        <Card
                           key={chamber.id}
                           className={`bg-zinc-800 border-zinc-700 p-6 hover:border-blue-500/50 transition-colors ${
                             chamber.isExpired ? 'opacity-60' : ''

@@ -42,14 +42,45 @@ interface DigitalRXMakerProps {
     registrationNumber?: string;
     showRegistrationOnRX?: boolean;
     useDrPrefix?: boolean;
+    // Context-aware PDF fields
+    pdfContext?: 'clinic' | 'doctor';
+    clinicInfo?: {
+      name: string;
+      address: string;
+      qrNumber: string;
+      phone?: string;
+      clinicId: string;
+      registrationNumber?: string;
+      showRegistrationOnRx?: boolean;
+      footerLine1?: string;
+      footerLine2?: string;
+      watermarkLogo?: string;
+    };
+    allDoctors?: Array<{
+      name: string;
+      specialty: string;
+      timing: string;
+      registrationNumber?: string;
+    }>;
+    allChambers?: Array<{
+      name: string;
+      address: string;
+      timing: string;
+    }>;
+    footerLine1?: string;
+    footerLine2?: string;
+    watermarkLogo?: string;
   };
   onClose: () => void;
-  onPause?: (savedState: { items: any[], remarks: string, diagnosis: string }) => void;
-  onGenerated?: (downloadURL: string) => void;
+  onPause?: (savedState: { items: any[], remarks: string, diagnosis: string, vitals: Record<string,string>, pathology: Record<string,string>, suggestedTests: string[] }) => void;
+  onGenerated?: (downloadURL: string, rxData?: { items: any[], remarks: string, diagnosis: string, vitals: Record<string,string>, pathology: Record<string,string>, suggestedTests: string[] }) => void;
   initialState?: {
     items: any[];
     remarks: string;
     diagnosis: string;
+    vitals?: Record<string,string>;
+    pathology?: Record<string,string>;
+    suggestedTests?: string[];
   };
 }
 
@@ -62,6 +93,83 @@ interface PrescriptionItem {
   duration: string;
   instructions: string;
 }
+
+const VITALS_OPTIONS: Record<string, { label: string; unit: string }> = {
+  bp: { label: 'Blood Pressure', unit: 'mmHg' },
+  pulse: { label: 'Pulse', unit: 'bpm' },
+  temp: { label: 'Temperature', unit: '°F' },
+  spo2: { label: 'SpO2', unit: '%' },
+  rr: { label: 'Resp. Rate', unit: '/min' },
+  weight: { label: 'Weight', unit: 'kg' },
+  height: { label: 'Height', unit: 'cm' },
+  bmi: { label: 'BMI', unit: 'kg/m²' },
+};
+
+const PATHOLOGY_OPTIONS: Record<string, { label: string; unit: string }> = {
+  fbs: { label: 'Fasting Blood Sugar', unit: 'mg/dL' },
+  ppbs: { label: 'PP Blood Sugar', unit: 'mg/dL' },
+  rbs: { label: 'Random Blood Sugar', unit: 'mg/dL' },
+  hba1c: { label: 'HbA1c', unit: '%' },
+  hb: { label: 'Hemoglobin', unit: 'g/dL' },
+  wbc: { label: 'WBC', unit: '/μL' },
+  platelet: { label: 'Platelet', unit: 'lakh/μL' },
+  creatinine: { label: 'Creatinine', unit: 'mg/dL' },
+  urea: { label: 'Blood Urea', unit: 'mg/dL' },
+  uricAcid: { label: 'Uric Acid', unit: 'mg/dL' },
+  cholesterol: { label: 'Total Cholesterol', unit: 'mg/dL' },
+  hdl: { label: 'HDL', unit: 'mg/dL' },
+  ldl: { label: 'LDL', unit: 'mg/dL' },
+  triglycerides: { label: 'Triglycerides', unit: 'mg/dL' },
+  tsh: { label: 'TSH', unit: 'μIU/mL' },
+  t3: { label: 'T3', unit: 'ng/dL' },
+  t4: { label: 'T4', unit: 'μg/dL' },
+  sgot: { label: 'SGOT (AST)', unit: 'U/L' },
+  sgpt: { label: 'SGPT (ALT)', unit: 'U/L' },
+  esr: { label: 'ESR', unit: 'mm/hr' },
+};
+
+const COMMON_TESTS: string[] = [
+  'CBC (Complete Blood Count)',
+  'LFT (Liver Function Test)',
+  'KFT (Kidney Function Test)',
+  'Lipid Profile',
+  'Thyroid Profile (T3, T4, TSH)',
+  'Blood Sugar (F/PP)',
+  'HbA1c',
+  'Urine R/M',
+  'Urine C/S',
+  'Stool R/M',
+  'Chest X-Ray (PA View)',
+  'X-Ray',
+  'ECG',
+  'USG Abdomen',
+  'USG Whole Abdomen',
+  '2D Echo',
+  'TMT (Treadmill Test)',
+  'MRI',
+  'CT Scan',
+  'HRCT Chest',
+  'Blood C/S',
+  'Widal Test',
+  'Dengue NS1 + IgM/IgG',
+  'Malaria (MP)',
+  'CRP (C-Reactive Protein)',
+  'RA Factor',
+  'ANA Profile',
+  'Vitamin D',
+  'Vitamin B12',
+  'Iron Profile',
+  'Serum Electrolytes',
+  'PT/INR',
+  'D-Dimer',
+  'Troponin I',
+  'PSA (Prostate Specific Antigen)',
+  'HBsAg',
+  'Anti HCV',
+  'HIV I & II',
+  'Sputum AFB',
+  'Mantoux Test',
+];
 
 export default function DigitalRXMaker({
   patient,
@@ -77,6 +185,23 @@ export default function DigitalRXMaker({
   const [remarks, setRemarks] = useState(initialState?.remarks || '');
   const [diagnosis, setDiagnosis] = useState(initialState?.diagnosis || '');
   const [generating, setGenerating] = useState(false);
+
+  // Common Findings (Vitals)
+  const [vitals, setVitals] = useState<Record<string, string>>(initialState?.vitals || {});
+  const [selectedVitalKey, setSelectedVitalKey] = useState('');
+  const [vitalInputValue, setVitalInputValue] = useState('');
+  const [customVitalName, setCustomVitalName] = useState('');
+
+  // Pathology Values
+  const [pathology, setPathology] = useState<Record<string, string>>(initialState?.pathology || {});
+  const [selectedPathKey, setSelectedPathKey] = useState('');
+  const [pathInputValue, setPathInputValue] = useState('');
+  const [customPathName, setCustomPathName] = useState('');
+
+  // Suggested Tests
+  const [suggestedTests, setSuggestedTests] = useState<string[]>(initialState?.suggestedTests || []);
+  const [selectedTestKey, setSelectedTestKey] = useState('');
+  const [customTestName, setCustomTestName] = useState('');
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -113,7 +238,7 @@ export default function DigitalRXMaker({
   };
 
   const addItem = () => {
-    setItems([...items, {
+    setItems([{
       id: Math.random().toString(36).substr(2, 9),
       medicineName: '',
       type: 'Tablet',
@@ -121,7 +246,7 @@ export default function DigitalRXMaker({
       dosage: '1-0-1',
       duration: '5 Days',
       instructions: 'After Food'
-    }]);
+    }, ...items]);
   };
 
   const removeItem = (id: string) => {
@@ -158,75 +283,116 @@ export default function DigitalRXMaker({
       const margin = 20;
       const contentWidth = pageWidth - (margin * 2);
 
-      // --- HEADER SECTION ---
-      // Left Side: Doctor Details
-      doc.setFontSize(22);
-      doc.setTextColor(40);
-      doc.setFont('helvetica', 'bold');
-      const displayName = doctorInfo.useDrPrefix ? `Dr. ${doctorInfo.name}` : doctorInfo.name;
-      doc.text(displayName.toUpperCase(), margin, 20);
+      // --- HEADER SECTION (Context-Aware) ---
+      const isClinic = doctorInfo.pdfContext === 'clinic' && doctorInfo.clinicInfo;
 
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(100);
+      let currentY = 20;
 
-      let currentY = 28;
-
-      // Degrees
-      const degreesText = doctorInfo.degrees?.length
-        ? doctorInfo.degrees.join(', ')
-        : doctorInfo.degree;
-      doc.text(degreesText, margin, currentY);
-      currentY += 6;
-
-      // Specialties
-      const specialtiesText = doctorInfo.specialities?.length
-        ? doctorInfo.specialities.join(', ')
-        : doctorInfo.specialty;
-      doc.text(specialtiesText, margin, currentY);
-      currentY += 6;
-
-      // Registration Number (Conditional)
-      if (doctorInfo.showRegistrationOnRX && doctorInfo.registrationNumber) {
-        doc.text(`REG NO: ${doctorInfo.registrationNumber}`, margin, currentY);
-        currentY += 6;
-      }
-
-      // Clinic/Chamber Info
-      if (doctorInfo.clinicName) {
+      if (isClinic) {
+        // === CLINIC HEADER: Clinic Name & Address FIRST, then Doctor ===
+        doc.setFontSize(20);
+        doc.setTextColor(30, 41, 59);
         doc.setFont('helvetica', 'bold');
-        doc.setTextColor(60);
-        doc.text(doctorInfo.clinicName, margin, currentY);
+        doc.text((doctorInfo.clinicInfo!.name || '').toUpperCase(), margin, currentY);
+        currentY += 7;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(100);
+        if (doctorInfo.clinicInfo!.address) {
+          const splitAddr = doc.splitTextToSize(doctorInfo.clinicInfo!.address, pageWidth / 2 - margin);
+          doc.text(splitAddr, margin, currentY);
+          currentY += splitAddr.length * 4 + 2;
+        }
+        if (doctorInfo.clinicInfo!.phone) {
+          doc.text(`Tel: ${doctorInfo.clinicInfo!.phone}`, margin, currentY);
+          currentY += 5;
+        }
+        // Clinic registration number
+        if (doctorInfo.clinicInfo!.showRegistrationOnRx && doctorInfo.clinicInfo!.registrationNumber) {
+          doc.text(`Clinic Reg: ${doctorInfo.clinicInfo!.registrationNumber}`, margin, currentY);
+          currentY += 5;
+        }
+
+        // Then Doctor info
+        currentY += 2;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.setTextColor(40);
+        const displayName = (doctorInfo.useDrPrefix ?? true) ? `Dr. ${doctorInfo.name}` : doctorInfo.name;
+        doc.text(displayName.toUpperCase(), margin, currentY);
         currentY += 5;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(100);
+        const degreesText = doctorInfo.degrees?.length ? doctorInfo.degrees.join(', ') : doctorInfo.degree;
+        if (degreesText) { doc.text(degreesText, margin, currentY); currentY += 4; }
+        const specialtiesText = doctorInfo.specialities?.length ? doctorInfo.specialities.join(', ') : doctorInfo.specialty;
+        if (specialtiesText) { doc.text(specialtiesText, margin, currentY); currentY += 4; }
+        if (doctorInfo.showRegistrationOnRX && doctorInfo.registrationNumber) {
+          doc.text(`REG NO: ${doctorInfo.registrationNumber}`, margin, currentY);
+          currentY += 4;
+        }
+        if (doctorInfo.timing) { doc.text(`Timing: ${doctorInfo.timing}`, margin, currentY); currentY += 4; }
+
+      } else {
+        // === DOCTOR HEADER: Doctor Name & Details FIRST, then Chamber ===
+        doc.setFontSize(22);
+        doc.setTextColor(40);
+        doc.setFont('helvetica', 'bold');
+        const displayName = (doctorInfo.useDrPrefix ?? true) ? `Dr. ${doctorInfo.name}` : doctorInfo.name;
+        doc.text(displayName.toUpperCase(), margin, currentY);
+        currentY += 8;
+
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(100);
+
+        const degreesText = doctorInfo.degrees?.length ? doctorInfo.degrees.join(', ') : doctorInfo.degree;
+        if (degreesText) { doc.text(degreesText, margin, currentY); currentY += 6; }
+        const specialtiesText = doctorInfo.specialities?.length ? doctorInfo.specialities.join(', ') : doctorInfo.specialty;
+        if (specialtiesText) { doc.text(specialtiesText, margin, currentY); currentY += 6; }
+        if (doctorInfo.showRegistrationOnRX && doctorInfo.registrationNumber) {
+          doc.text(`REG NO: ${doctorInfo.registrationNumber}`, margin, currentY);
+          currentY += 6;
+        }
+
+        // Chamber / Clinic info below doctor
+        if (doctorInfo.clinicName) {
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(60);
+          doc.text(doctorInfo.clinicName, margin, currentY);
+          currentY += 5;
+        }
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(100);
+        doc.setFontSize(9);
+        if (doctorInfo.address) {
+          const splitAddress = doc.splitTextToSize(doctorInfo.address, pageWidth / 2 - margin);
+          doc.text(splitAddress, margin, currentY);
+          currentY += (splitAddress.length * 5);
+        }
+        if (doctorInfo.timing) { doc.text(doctorInfo.timing, margin, currentY); currentY += 5; }
       }
 
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(100);
-      doc.setFontSize(9);
-      if (doctorInfo.address) {
-        // Split address if too long
-        const splitAddress = doc.splitTextToSize(doctorInfo.address, pageWidth / 2 - margin);
-        doc.text(splitAddress, margin, currentY);
-        currentY += (splitAddress.length * 5);
-      }
-
-      if (doctorInfo.timing) {
-        doc.text(doctorInfo.timing, margin, currentY);
-      }
-
-      // Right Side: QR Code "Scan for Next Appointment"
+      // Right Side: QR Code — Context-Aware
       const qrSize = 35;
       const qrX = pageWidth - margin - qrSize;
-      const qrY = 15;
+      const qrY = 18;
 
-      doc.setFontSize(8);
+      doc.setFontSize(7);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(120);
-      doc.text('SCAN FOR NEXT APPOINTMENT', qrX + (qrSize / 2), qrY - 2, { align: 'center' });
+      doc.setTextColor(40);
+      doc.text('FOR APPOINTMENT SCAN HERE', qrX + (qrSize / 2), qrY - 3, { align: 'center' });
 
-      // Build Mini-website URL for the QR
-      const doctorId = doctorInfo.doctorId;
-      const qrUrl = `https://teamhealqr.web.app/?page=doctor-mini-website&doctorId=${doctorId}`;
+      // Build QR URL — Clinic QR for clinic bookings, Doctor QR for personal bookings
+      let qrUrl: string;
+      if (isClinic && doctorInfo.clinicInfo?.clinicId) {
+        qrUrl = `https://teamhealqr.web.app/?page=clinic-mini-website&clinicId=${doctorInfo.clinicInfo.clinicId}`;
+      } else {
+        qrUrl = `https://teamhealqr.web.app/?page=doctor-mini-website&doctorId=${doctorInfo.doctorId}`;
+      }
 
       // Generate QR Code as DataURL
       const qrDataUrl = await QRCode.toDataURL(qrUrl, { margin: 1, width: 200 });
@@ -272,6 +438,33 @@ export default function DigitalRXMaker({
 
       doc.line(margin, 88, pageWidth - margin, 88);
 
+      // --- WATERMARK LOGO (if available) ---
+      const wmLogo = (isClinic && doctorInfo.clinicInfo?.watermarkLogo) || doctorInfo.watermarkLogo;
+      if (wmLogo) {
+        try {
+          const wmImg = new Image();
+          wmImg.crossOrigin = 'anonymous';
+          await new Promise<void>((resolve, reject) => {
+            wmImg.onload = () => resolve();
+            wmImg.onerror = () => reject();
+            wmImg.src = wmLogo;
+          });
+          // Draw watermark in center with low opacity
+          const wmSize = 80;
+          const wmX = (pageWidth - wmSize) / 2;
+          const wmY = 120;
+          // jsPDF doesn't support opacity directly — use GState
+          const gState = (doc as any).GState({ opacity: 0.08 });
+          doc.saveGraphicsState();
+          doc.setGState(gState);
+          doc.addImage(wmImg, 'PNG', wmX, wmY, wmSize, wmSize);
+          doc.restoreGraphicsState();
+        } catch {
+          // Skip watermark if image fails to load
+          console.log('Watermark image failed to load, skipping');
+        }
+      }
+
       // --- MAIN BODY (TWO PANELS) ---
       const bodyY = 98;
       const leftColWidth = contentWidth * 0.33;
@@ -291,55 +484,264 @@ export default function DigitalRXMaker({
       const diagnosisLines = doc.splitTextToSize(diagnosis || 'No diagnosis recorded.', leftColWidth - 5);
       doc.text(diagnosisLines, margin, bodyY + 10);
 
+      // Vitals & Pathology in Left Panel
+      let leftPanelY = bodyY + 10 + (diagnosisLines.length * 5) + 5;
+
+      // Common Findings / Vitals
+      const activeVitals = Object.entries(vitals).filter(([_, v]) => v);
+      if (activeVitals.length > 0) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(0, 150, 150);
+        doc.text('VITALS:', margin, leftPanelY);
+        leftPanelY += 4;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        doc.setTextColor(60);
+        activeVitals.forEach(([key, val]) => {
+          if (leftPanelY < 225) {
+            const opt = VITALS_OPTIONS[key];
+            const label = opt ? opt.label : key;
+            const unit = opt ? ` ${opt.unit}` : '';
+            doc.text(`${label}: ${val}${unit}`, margin + 2, leftPanelY);
+            leftPanelY += 4;
+          }
+        });
+        leftPanelY += 2;
+      }
+
+      // Pathology Values
+      const activePath = Object.entries(pathology).filter(([_, v]) => v);
+      if (activePath.length > 0) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(180, 120, 0);
+        doc.text('LAB VALUES:', margin, leftPanelY);
+        leftPanelY += 4;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        doc.setTextColor(60);
+        activePath.forEach(([key, val]) => {
+          if (leftPanelY < 225) {
+            const opt = PATHOLOGY_OPTIONS[key];
+            const label = opt ? opt.label : key;
+            const unit = opt ? ` ${opt.unit}` : '';
+            doc.text(`${label}: ${val}${unit}`, margin + 2, leftPanelY);
+            leftPanelY += 4;
+          }
+        });
+        leftPanelY += 2;
+      }
+
+      // Suggested Investigations in Left Panel
+      if (suggestedTests.length > 0) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(100, 60, 180);
+        doc.text('INVESTIGATIONS:', margin, leftPanelY);
+        leftPanelY += 4;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.setTextColor(60);
+        suggestedTests.forEach((test) => {
+          if (leftPanelY < 228) {
+            const testLines = doc.splitTextToSize(`• ${test}`, leftColWidth - 5);
+            doc.text(testLines, margin + 2, leftPanelY);
+            leftPanelY += testLines.length * 3.5;
+          }
+        });
+      }
+
       // RIGHT PANEL: Prescription
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(24);
       doc.text('Rx', dividerX + 10, bodyY);
 
+      const rxAreaWidth = contentWidth - leftColWidth - 10;
+      const validItems = items.filter(item => item.medicineName);
+      const maxMedsPerPage = 8;
       let currentMedY = bodyY + 15;
-      doc.setFontSize(11);
-      items.forEach((item, i) => {
-        if (!item.medicineName) return;
+      let medPageCount = 0;
 
-        // Prevent overflow
-        if (currentMedY > 220) return;
+      validItems.forEach((item, i) => {
+        // Check if we need a new page (after every 5 meds)
+        if (i > 0 && i % maxMedsPerPage === 0) {
+          // Draw bottom section and footer on current page before creating new page
+          // (only remarks on first page)
+          doc.addPage();
+          medPageCount++;
 
+          // Re-draw header on new page
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(10);
+          doc.setTextColor(100);
+          const drName = (doctorInfo.useDrPrefix ?? true) ? `Dr. ${doctorInfo.name}` : doctorInfo.name;
+          doc.text(`${drName} — Prescription (contd.)`, margin, 15);
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(8);
+          doc.text(`Patient: ${patient.name} | ${patient.age}Y/${patient.gender}`, margin, 22);
+          doc.setLineWidth(0.3);
+          doc.setDrawColor(200);
+          doc.line(margin, 26, pageWidth - margin, 26);
+
+          // Reset Rx header on new page
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(18);
+          doc.setTextColor(60);
+          doc.text('Rx (contd.)', margin, 36);
+          currentMedY = 46;
+        }
+
+        doc.setFontSize(11);
+        doc.setTextColor(60);
         doc.setFont('helvetica', 'bold');
-        doc.text(`${i + 1}. ${item.type} ${item.medicineName} (${item.strength})`, dividerX + 10, currentMedY);
+        const medLine = `${i + 1}. ${item.type} ${item.medicineName} (${item.strength})`;
+        const medLines = doc.splitTextToSize(medLine, rxAreaWidth);
+        doc.text(medLines, dividerX + 10, currentMedY);
 
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
-        doc.text(`Dosage: ${item.dosage} | Duration: ${item.duration}`, dividerX + 15, currentMedY + 6);
+        doc.text(`Dosage: ${item.dosage} | Duration: ${item.duration}`, dividerX + 15, currentMedY + (medLines.length * 5) + 1);
 
         if (item.instructions) {
           doc.setTextColor(100);
-          doc.text(`Note: ${item.instructions}`, dividerX + 15, currentMedY + 12);
+          doc.text(`Note: ${item.instructions}`, dividerX + 15, currentMedY + (medLines.length * 5) + 7);
           doc.setTextColor(60);
-          currentMedY += 20;
+          currentMedY += (medLines.length * 5) + 14;
         } else {
-          currentMedY += 15;
+          currentMedY += (medLines.length * 5) + 8;
         }
       });
 
+      // If we had extra pages, go back to page 1 for the bottom section
+      // Actually, we write bottom/footer on last page
+      // If multi-page, remarks go on the last page
+      const lastPageBottomStart = medPageCount > 0 ? Math.max(currentMedY + 5, 200) : 235;
+
       // --- BOTTOM SECTION: Special Instructions ---
-      const bottomY = 240;
-      doc.setLineWidth(0.5);
-      doc.line(margin, 235, pageWidth - margin, 235);
+      let bottomY = lastPageBottomStart + 5;
+      if (medPageCount === 0) {
+        doc.setLineWidth(0.5);
+        doc.setDrawColor(200);
+        doc.line(margin, lastPageBottomStart, pageWidth - margin, lastPageBottomStart);
+        bottomY = lastPageBottomStart + 5;
+      }
 
       if (remarks) {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
+        doc.setTextColor(60);
         doc.text('SPECIAL INSTRUCTIONS:', margin, bottomY);
         doc.setFont('helvetica', 'normal');
         const remarksLines = doc.splitTextToSize(remarks, contentWidth);
         doc.text(remarksLines, margin, bottomY + 7);
+        bottomY += 7 + (remarksLines.length * 4) + 2;
       }
 
-      // --- FOOTER ---
-      doc.setFontSize(8);
-      doc.setTextColor(150);
-      doc.text('Digitally generated by HealQR - No signature required.', pageWidth / 2, 285, { align: 'center' });
-      doc.text(`Prescription Date: ${new Date().toLocaleDateString()}`, pageWidth / 2, 290, { align: 'center' });
+      // --- FOOTER BOX (Context-Aware, Compact) ---
+      const footerTopY = 258;
+      doc.setDrawColor(200);
+      doc.setLineWidth(0.3);
+
+      // Helper: render custom footer lines side-by-side in one tiny line
+      const renderFooterLines = (line1: string, line2: string, yPos: number) => {
+        const combined = [line1, line2].filter(Boolean).join('  |  ');
+        if (combined) {
+          doc.setFont('helvetica', 'italic');
+          doc.setFontSize(5.5);
+          doc.setTextColor(130);
+          doc.text(combined, pageWidth / 2, yPos, { align: 'center' });
+          return 3;
+        }
+        return 0;
+      };
+
+      if (isClinic && doctorInfo.allDoctors && doctorInfo.allDoctors.length > 0) {
+        // CLINIC FOOTER: Always show specialty groups with counts (saves space)
+        const doctors = doctorInfo.allDoctors;
+        const specialtyMap: Record<string, number> = {};
+        doctors.forEach(dr => {
+          const spec = dr.specialty || 'General';
+          specialtyMap[spec] = (specialtyMap[spec] || 0) + 1;
+        });
+        const specEntries = Object.entries(specialtyMap);
+        const specLine = specEntries.map(([spec, count]) => `${spec} (${count})`).join('  •  ');
+        const specLines = doc.splitTextToSize(specLine, contentWidth - 6);
+
+        const footerBoxH = 8 + (specLines.length * 3.5) + 5;
+        doc.setFillColor(248, 250, 252);
+        doc.roundedRect(margin, footerTopY, contentWidth, footerBoxH, 2, 2, 'FD');
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(6);
+        doc.setTextColor(100);
+        doc.text(`DOCTORS BY SPECIALTY (${doctors.length} Doctors)`, margin + 3, footerTopY + 3.5);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(6);
+        doc.setTextColor(80);
+        doc.text(specLines, margin + 3, footerTopY + 7);
+
+        // QR scan prompt line
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(5.5);
+        doc.setTextColor(60);
+        doc.text('FOR MORE DETAILS AND APPOINTMENT SCAN ABOVE QR CODE', pageWidth / 2, footerTopY + 7 + (specLines.length * 3.5) + 2, { align: 'center' });
+
+        const cFL1 = doctorInfo.clinicInfo?.footerLine1 || doctorInfo.footerLine1 || '';
+        const cFL2 = doctorInfo.clinicInfo?.footerLine2 || doctorInfo.footerLine2 || '';
+        let afterBox = footerTopY + footerBoxH + 2;
+        afterBox += renderFooterLines(cFL1, cFL2, afterBox);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(6);
+        doc.setTextColor(150);
+        doc.text(`Digitally generated by HealQR  •  No signature required  •  ${new Date().toLocaleDateString('en-GB')}`, pageWidth / 2, afterBox + 1, { align: 'center' });
+
+      } else if (!isClinic && doctorInfo.allChambers && doctorInfo.allChambers.length > 0) {
+        // DOCTOR FOOTER: Compact box with all chambers
+        const chLineH = 3.5;
+        const footerBoxH = 5 + (doctorInfo.allChambers.length * chLineH) + 2;
+        doc.setFillColor(248, 250, 252);
+        doc.roundedRect(margin, footerTopY, contentWidth, footerBoxH, 2, 2, 'FD');
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(6);
+        doc.setTextColor(100);
+        doc.text('ALSO AVAILABLE AT', margin + 3, footerTopY + 3.5);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(6);
+        doc.setTextColor(80);
+        doctorInfo.allChambers.forEach((ch, i) => {
+          const line = `${ch.name}  •  ${ch.address || ''}  •  ${ch.timing || ''}`;
+          const trimmed = doc.splitTextToSize(line, contentWidth - 6)[0];
+          doc.text(trimmed, margin + 3, footerTopY + 7 + (i * chLineH));
+        });
+
+        const dFooterLine1 = doctorInfo.footerLine1 || '';
+        const dFooterLine2 = doctorInfo.footerLine2 || '';
+        let afterBox = footerTopY + footerBoxH + 2;
+        afterBox += renderFooterLines(dFooterLine1, dFooterLine2, afterBox);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(6);
+        doc.setTextColor(150);
+        doc.text(`Digitally generated by HealQR  •  No signature required  •  ${new Date().toLocaleDateString('en-GB')}`, pageWidth / 2, afterBox + 1, { align: 'center' });
+
+      } else {
+        // FALLBACK: Simple footer with custom lines side-by-side
+        const fFooterLine1 = doctorInfo.clinicInfo?.footerLine1 || doctorInfo.footerLine1 || '';
+        const fFooterLine2 = doctorInfo.clinicInfo?.footerLine2 || doctorInfo.footerLine2 || '';
+        let fallbackY = 280;
+        fallbackY += renderFooterLines(fFooterLine1, fFooterLine2, fallbackY);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(6);
+        doc.setTextColor(150);
+        doc.text(`Digitally generated by HealQR  •  No signature required  •  ${new Date().toLocaleDateString('en-GB')}`, pageWidth / 2, fallbackY + 1, { align: 'center' });
+      }
 
       // Generate PDF as Blob for upload
       const pdfBlob = doc.output('blob');
@@ -355,7 +757,7 @@ export default function DigitalRXMaker({
 
       if (onGenerated) {
         toast.success('Digital RX generated!');
-        onGenerated(downloadURL);
+        onGenerated(downloadURL, { items, remarks, diagnosis, vitals, pathology, suggestedTests });
       } else {
         // Fallback for standalone usage
         try {
@@ -424,15 +826,229 @@ export default function DigitalRXMaker({
           </div>
 
           {/* Clinical Info */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="text-gray-400">Diagnosis / Provisional Diagnosis</Label>
-              <Input
-                placeholder="e.g. Acute Viral Fever"
-                value={diagnosis}
-                onChange={(e) => setDiagnosis(e.target.value)}
-                className="bg-zinc-900 border-zinc-700 text-white"
-              />
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-gray-400">Diagnosis / Provisional Diagnosis</Label>
+                <Input
+                  placeholder="e.g. Acute Viral Fever"
+                  value={diagnosis}
+                  onChange={(e) => setDiagnosis(e.target.value)}
+                  className="bg-zinc-900 border-zinc-700 text-white"
+                />
+              </div>
+            </div>
+
+            {/* Common Findings (Vitals) — Select dropdown + type value */}
+            <div className="p-3 bg-zinc-800 rounded-xl border border-cyan-800/50">
+              <h4 className="text-sm font-bold text-cyan-300 mb-3 tracking-wide">Common Findings / Vitals</h4>
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <select
+                  value={selectedVitalKey}
+                  onChange={(e) => { setSelectedVitalKey(e.target.value); setCustomVitalName(''); setVitalInputValue(''); }}
+                  className="bg-black border-2 border-cyan-600 text-white text-sm rounded-lg h-9 px-3 flex-shrink-0 min-w-[140px]"
+                >
+                  <option value="">Select...</option>
+                  {Object.entries(VITALS_OPTIONS)
+                    .filter(([k]) => !vitals[k])
+                    .map(([k, opt]) => (
+                      <option key={k} value={k}>{opt.label}</option>
+                    ))}
+                  <option value="__other__">⊕ Others (Custom)</option>
+                </select>
+                {selectedVitalKey && selectedVitalKey !== '__other__' && (
+                  <>
+                    <Input
+                      type="text"
+                      placeholder={`Value (${VITALS_OPTIONS[selectedVitalKey]?.unit})`}
+                      value={vitalInputValue}
+                      onChange={(e) => setVitalInputValue(e.target.value)}
+                      className="bg-black border-2 border-cyan-600 text-white text-sm h-9 w-32 placeholder:text-gray-400"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && vitalInputValue.trim()) {
+                          setVitals({ ...vitals, [selectedVitalKey]: vitalInputValue.trim() });
+                          setSelectedVitalKey('');
+                          setVitalInputValue('');
+                        }
+                      }}
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        if (vitalInputValue.trim()) {
+                          setVitals({ ...vitals, [selectedVitalKey]: vitalInputValue.trim() });
+                          setSelectedVitalKey('');
+                          setVitalInputValue('');
+                        }
+                      }}
+                      className="bg-cyan-500 hover:bg-cyan-400 text-black h-9 px-4 text-sm font-bold"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </>
+                )}
+                {selectedVitalKey === '__other__' && (
+                  <>
+                    <Input
+                      type="text"
+                      placeholder="Name (e.g. RBS)"
+                      value={customVitalName}
+                      onChange={(e) => setCustomVitalName(e.target.value)}
+                      className="bg-black border-2 border-cyan-600 text-white text-sm h-9 w-32 placeholder:text-gray-400"
+                      autoFocus
+                    />
+                    <Input
+                      type="text"
+                      placeholder="Value"
+                      value={vitalInputValue}
+                      onChange={(e) => setVitalInputValue(e.target.value)}
+                      className="bg-black border-2 border-cyan-600 text-white text-sm h-9 w-28 placeholder:text-gray-400"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && customVitalName.trim() && vitalInputValue.trim()) {
+                          setVitals({ ...vitals, [customVitalName.trim()]: vitalInputValue.trim() });
+                          setCustomVitalName('');
+                          setVitalInputValue('');
+                        }
+                      }}
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        if (customVitalName.trim() && vitalInputValue.trim()) {
+                          setVitals({ ...vitals, [customVitalName.trim()]: vitalInputValue.trim() });
+                          setCustomVitalName('');
+                          setVitalInputValue('');
+                        }
+                      }}
+                      className="bg-cyan-500 hover:bg-cyan-400 text-black h-9 px-4 text-sm font-bold"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </>
+                )}
+              </div>
+              {Object.keys(vitals).length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(vitals).map(([key, val]) => {
+                    const opt = VITALS_OPTIONS[key];
+                    const label = opt ? opt.label : key;
+                    const unit = opt ? opt.unit : '';
+                    return (
+                      <span key={key} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-cyan-600/30 border border-cyan-400/60 text-white text-sm rounded-lg font-medium shadow-sm">
+                        <span className="text-cyan-200">{label}:</span> <strong>{val}</strong> {unit && <span className="text-cyan-300 text-xs">{unit}</span>}
+                        <button onClick={() => { const v = { ...vitals }; delete v[key]; setVitals(v); }} className="ml-1 text-cyan-200 hover:text-red-400 text-base leading-none font-bold">×</button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Pathology / Lab Values — Select dropdown + type value */}
+            <div className="p-3 bg-zinc-800 rounded-xl border border-amber-800/50">
+              <h4 className="text-sm font-bold text-amber-300 mb-3 tracking-wide">Pathology / Lab Values</h4>
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <select
+                  value={selectedPathKey}
+                  onChange={(e) => { setSelectedPathKey(e.target.value); setCustomPathName(''); setPathInputValue(''); }}
+                  className="bg-black border-2 border-amber-600 text-white text-sm rounded-lg h-9 px-3 flex-shrink-0 min-w-[140px]"
+                >
+                  <option value="">Select...</option>
+                  {Object.entries(PATHOLOGY_OPTIONS)
+                    .filter(([k]) => !pathology[k])
+                    .map(([k, opt]) => (
+                      <option key={k} value={k}>{opt.label}</option>
+                    ))}
+                  <option value="__other__">⊕ Others (Custom)</option>
+                </select>
+                {selectedPathKey && selectedPathKey !== '__other__' && (
+                  <>
+                    <Input
+                      type="text"
+                      placeholder={`Value (${PATHOLOGY_OPTIONS[selectedPathKey]?.unit})`}
+                      value={pathInputValue}
+                      onChange={(e) => setPathInputValue(e.target.value)}
+                      className="bg-black border-2 border-amber-600 text-white text-sm h-9 w-32 placeholder:text-gray-400"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && pathInputValue.trim()) {
+                          setPathology({ ...pathology, [selectedPathKey]: pathInputValue.trim() });
+                          setSelectedPathKey('');
+                          setPathInputValue('');
+                        }
+                      }}
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        if (pathInputValue.trim()) {
+                          setPathology({ ...pathology, [selectedPathKey]: pathInputValue.trim() });
+                          setSelectedPathKey('');
+                          setPathInputValue('');
+                        }
+                      }}
+                      className="bg-amber-500 hover:bg-amber-400 text-black h-9 px-4 text-sm font-bold"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </>
+                )}
+                {selectedPathKey === '__other__' && (
+                  <>
+                    <Input
+                      type="text"
+                      placeholder="Name (e.g. CRP)"
+                      value={customPathName}
+                      onChange={(e) => setCustomPathName(e.target.value)}
+                      className="bg-black border-2 border-amber-600 text-white text-sm h-9 w-32 placeholder:text-gray-400"
+                      autoFocus
+                    />
+                    <Input
+                      type="text"
+                      placeholder="Value"
+                      value={pathInputValue}
+                      onChange={(e) => setPathInputValue(e.target.value)}
+                      className="bg-black border-2 border-amber-600 text-white text-sm h-9 w-28 placeholder:text-gray-400"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && customPathName.trim() && pathInputValue.trim()) {
+                          setPathology({ ...pathology, [customPathName.trim()]: pathInputValue.trim() });
+                          setCustomPathName('');
+                          setPathInputValue('');
+                        }
+                      }}
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        if (customPathName.trim() && pathInputValue.trim()) {
+                          setPathology({ ...pathology, [customPathName.trim()]: pathInputValue.trim() });
+                          setCustomPathName('');
+                          setPathInputValue('');
+                        }
+                      }}
+                      className="bg-amber-500 hover:bg-amber-400 text-black h-9 px-4 text-sm font-bold"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </>
+                )}
+              </div>
+              {Object.keys(pathology).length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(pathology).map(([key, val]) => {
+                    const opt = PATHOLOGY_OPTIONS[key];
+                    const label = opt ? opt.label : key;
+                    const unit = opt ? opt.unit : '';
+                    return (
+                      <span key={key} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600/30 border border-amber-400/60 text-white text-sm rounded-lg font-medium shadow-sm">
+                        <span className="text-amber-200">{label}:</span> <strong>{val}</strong> {unit && <span className="text-amber-300 text-xs">{unit}</span>}
+                        <button onClick={() => { const p = { ...pathology }; delete p[key]; setPathology(p); }} className="ml-1 text-amber-200 hover:text-red-400 text-base leading-none font-bold">×</button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
@@ -443,10 +1059,12 @@ export default function DigitalRXMaker({
                 Medicines & Dosage
                 <span className="text-emerald-400 text-xs font-normal">(Use AI for suggestions)</span>
               </h3>
-              <Button onClick={addItem} size="sm" variant="outline" className="border-emerald-500/30 text-emerald-400 h-8 w-fit">
-                <Plus className="w-4 h-4 mr-1" /> Add Medicine
-              </Button>
             </div>
+
+            {/* Add Medicine Button - Top */}
+            <Button onClick={addItem} size="sm" variant="outline" className="border-emerald-500/30 text-emerald-400 h-9 w-full sm:w-fit">
+              <Plus className="w-4 h-4 mr-1" /> Add New Medicine
+            </Button>
 
             <div className="space-y-3">
               {items.map((item, index) => (
@@ -559,6 +1177,81 @@ export default function DigitalRXMaker({
               className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-3 text-sm text-white min-h-[80px]"
             />
           </div>
+
+          {/* Suggested Test Reports */}
+          <div className="p-3 bg-zinc-800 rounded-xl border border-violet-800/50">
+            <h4 className="text-sm font-bold text-violet-300 mb-3 tracking-wide">Suggested Test Reports</h4>
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <select
+                value={selectedTestKey}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val && val !== '__other__') {
+                    if (!suggestedTests.includes(val)) {
+                      setSuggestedTests([...suggestedTests, val]);
+                    }
+                    setSelectedTestKey('');
+                  } else {
+                    setSelectedTestKey(val);
+                    setCustomTestName('');
+                  }
+                }}
+                className="bg-black border-2 border-violet-600 text-white text-sm rounded-lg h-9 px-3 flex-shrink-0 min-w-[180px]"
+              >
+                <option value="">Select Test...</option>
+                {COMMON_TESTS
+                  .filter(t => !suggestedTests.includes(t))
+                  .map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                <option value="__other__">⊕ Others (Custom)</option>
+              </select>
+              {selectedTestKey === '__other__' && (
+                <>
+                  <Input
+                    type="text"
+                    placeholder="Test name (e.g. PFT)"
+                    value={customTestName}
+                    onChange={(e) => setCustomTestName(e.target.value)}
+                    className="bg-black border-2 border-violet-600 text-white text-sm h-9 w-40 placeholder:text-gray-400"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && customTestName.trim()) {
+                        if (!suggestedTests.includes(customTestName.trim())) {
+                          setSuggestedTests([...suggestedTests, customTestName.trim()]);
+                        }
+                        setCustomTestName('');
+                      }
+                    }}
+                  />
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      if (customTestName.trim()) {
+                        if (!suggestedTests.includes(customTestName.trim())) {
+                          setSuggestedTests([...suggestedTests, customTestName.trim()]);
+                        }
+                        setCustomTestName('');
+                      }
+                    }}
+                    className="bg-violet-500 hover:bg-violet-400 text-black h-9 px-4 text-sm font-bold"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </>
+              )}
+            </div>
+            {suggestedTests.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {suggestedTests.map((test, idx) => (
+                  <span key={idx} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-violet-600/30 border border-violet-400/60 text-white text-sm rounded-lg font-medium shadow-sm">
+                    <span className="text-violet-200">{test}</span>
+                    <button onClick={() => setSuggestedTests(suggestedTests.filter((_, i) => i !== idx))} className="ml-1 text-violet-200 hover:text-red-400 text-base leading-none font-bold">×</button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Footer */}
@@ -570,7 +1263,7 @@ export default function DigitalRXMaker({
           <div className="flex flex-wrap sm:flex-nowrap gap-2 sm:gap-3 w-full sm:w-auto justify-center sm:justify-end">
             {onPause && (
               <Button
-                onClick={() => onPause({ items, remarks, diagnosis })}
+                onClick={() => onPause({ items, remarks, diagnosis, vitals, pathology, suggestedTests })}
                 variant="outline"
                 size="sm"
                 className="flex-1 sm:flex-none border-zinc-700 text-gray-400 hover:text-white h-9 px-3"

@@ -231,6 +231,18 @@ service firebase.storage {
     }
 
     // ============================================
+    // WATERMARK LOGOS
+    // ============================================
+
+    match /watermarkLogos/{userId}/{allPaths=**} {
+      // Allow read by anyone (used in PDF generation)
+      allow read: if true;
+
+      // Allow write only by owner, must be image, max 10MB
+      allow write: if isOwner(userId) && isImageFile() && isValidImageSize();
+    }
+
+    // ============================================
     // DIET CHARTS
     // ============================================
 

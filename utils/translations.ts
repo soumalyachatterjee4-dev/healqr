@@ -821,6 +821,33 @@ export const translations = {
     bengali: 'আপনার স্বাস্থ্যের জন্য আমাদের বিশ্বাস করার জন্য ধন্যবাদ!',
   },
 
+  // Prescription Updated Notification
+  notifRxUpdatedTitle: {
+    english: 'UPDATED PRESCRIPTION',
+    hindi: 'अपडेटेड प्रिस्क्रिप्शन',
+    bengali: 'আপডেটেড প্রেসক্রিপশন',
+  },
+  notifRxUpdatedGreeting: {
+    english: 'Important Update!',
+    hindi: 'महत्वपूर्ण अपडेट!',
+    bengali: 'গুরুত্বপূর্ণ আপডেট!',
+  },
+  notifRxUpdatedMessage: {
+    english: 'Your doctor has sent an UPDATED prescription. Please ignore the previous prescription and use this latest version.',
+    hindi: 'आपके डॉक्टर ने एक अपडेटेड प्रिस्क्रिप्शन भेजा है। कृपया पिछले प्रिस्क्रिप्शन को अनदेखा करें और इस नवीनतम संस्करण का उपयोग करें।',
+    bengali: 'আপনার ডাক্তার একটি আপডেটেড প্রেসক্রিপশন পাঠিয়েছেন। অনুগ্রহ করে আগের প্রেসক্রিপশন উপেক্ষা করুন এবং এই সর্বশেষ সংস্করণটি ব্যবহার করুন।',
+  },
+  notifRxUpdatedIgnorePrevious: {
+    english: '⚠️ Please IGNORE the previous prescription notification',
+    hindi: '⚠️ कृपया पिछली प्रिस्क्रिप्शन सूचना को अनदेखा करें',
+    bengali: '⚠️ অনুগ্রহ করে আগের প্রেসক্রিপশন বিজ্ঞপ্তি উপেক্ষা করুন',
+  },
+  notifRxUpdatedDownload: {
+    english: 'Download Updated Prescription',
+    hindi: 'अपडेटेड प्रिस्क्रिप्शन डाउनलोड करें',
+    bengali: 'আপডেটেড প্রেসক্রিপশন ডাউনলোড করুন',
+  },
+
   // 3. Admin Alert Notification
   notifAdminAlertTitle: {
     english: 'URGENT ADMIN ALERT',

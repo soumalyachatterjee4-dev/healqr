@@ -17,7 +17,8 @@ import {
   Plus,
   X,
   Globe,
-  Stethoscope
+  Stethoscope,
+  Zap
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -76,6 +77,12 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
   const [bio, setBio] = useState('');
   const [serviceBadges, setServiceBadges] = useState<string[]>([]);
+  const [registrationNumber, setRegistrationNumber] = useState('');
+  const [showRegistrationOnRx, setShowRegistrationOnRx] = useState(false);
+  const [footerLine1, setFooterLine1] = useState('');
+  const [footerLine2, setFooterLine2] = useState('');
+  const [watermarkLogo, setWatermarkLogo] = useState<string | null>(null);
+  const [isUploadingWatermark, setIsUploadingWatermark] = useState(false);
 
   // UI states
   const [loading, setLoading] = useState(true);
@@ -126,6 +133,11 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
         setSelectedLanguages(data.languages || []);
         setBio(data.bio || '');
         setServiceBadges(data.serviceBadges || []);
+        if (data.registrationNumber) setRegistrationNumber(data.registrationNumber);
+        if (data.showRegistrationOnRx !== undefined) setShowRegistrationOnRx(data.showRegistrationOnRx);
+        if (data.footerLine1) setFooterLine1(data.footerLine1);
+        if (data.footerLine2) setFooterLine2(data.footerLine2);
+        if (data.watermarkLogo) setWatermarkLogo(data.watermarkLogo);
       } else {
         console.log('ℹ️ No clinic profile found');
       }
@@ -248,6 +260,30 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
     }
   };
 
+  const handleWatermarkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (!auth?.currentUser || !storage) {
+        alert('Please login again before uploading.');
+        return;
+      }
+      setIsUploadingWatermark(true);
+      const compressedFile = await compressImage(file);
+      const filePath = `watermarkLogos/${auth.currentUser.uid}/${Date.now()}_${file.name}`;
+      const storageRef = ref(storage, filePath);
+      await uploadBytes(storageRef, compressedFile);
+      const downloadURL = await getDownloadURL(storageRef);
+      setWatermarkLogo(downloadURL);
+      alert('Watermark logo uploaded successfully!');
+    } catch (error: any) {
+      console.error('❌ Watermark upload error:', error);
+      alert(`Failed to upload watermark: ${error?.message || 'Unknown error'}`);
+    } finally {
+      setIsUploadingWatermark(false);
+    }
+  };
+
   const addServiceBadge = () => {
     if (newServiceBadge && serviceBadges.length < 4 && !serviceBadges.includes(newServiceBadge)) {
       setServiceBadges([...serviceBadges, newServiceBadge]);
@@ -287,7 +323,12 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
         establishmentDate,
         languages: selectedLanguages,
         bio,
-        serviceBadges
+        serviceBadges,
+        registrationNumber,
+        showRegistrationOnRx,
+        footerLine1,
+        footerLine2,
+        watermarkLogo
       });
 
       setShowSaveConfirmation(true);
@@ -654,6 +695,118 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
                 )}
               </div>
             </div>
+          </div>
+
+          {/* Registration Number & Footer Lines */}
+          <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-8 mb-6">
+            <h2 className="mb-6 text-white">Legal & Footer Information</h2>
+            <p className="text-gray-400 text-sm mb-6">Registration details and custom footer lines for PDFs</p>
+
+            <div className="space-y-6">
+              {/* Registration Number */}
+              <div>
+                <Label className="mb-2 block text-gray-300">Clinic Registration Number (Optional)</Label>
+                <div className="relative mb-4">
+                  <Zap className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <Input
+                    type="text"
+                    value={registrationNumber}
+                    onChange={(e) => setRegistrationNumber(e.target.value)}
+                    placeholder="Enter your Clinic Registration Number"
+                    className="pl-12 bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-blue-500"
+                  />
+                </div>
+                <div className="flex items-start gap-3 p-4 bg-zinc-800/50 rounded-lg border border-zinc-700">
+                  <Checkbox
+                    id="showClinicRegistrationOnRx"
+                    checked={showRegistrationOnRx}
+                    onCheckedChange={(checked) => setShowRegistrationOnRx(checked as boolean)}
+                    className="mt-0.5"
+                  />
+                  <div className="flex-1">
+                    <label
+                      htmlFor="showClinicRegistrationOnRx"
+                      className="text-sm text-white cursor-pointer block mb-1"
+                    >
+                      Show Registration Number on Digital RX
+                    </label>
+                    <p className="text-xs text-gray-400">
+                      When enabled, your clinic registration number will be printed on generated prescriptions for legal compliance.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Custom Footer Lines */}
+              <div>
+                <Label className="mb-2 block text-gray-300">Custom RX Footer Lines (Optional)</Label>
+                <p className="text-xs text-gray-400 mb-3">
+                  Add up to 2 custom lines that will appear in the footer of Digital RX and Diet Chart PDFs. Use for emergency hospital contact, medico-legal cautions, disclaimers, etc.
+                </p>
+                <div className="space-y-3">
+                  <div className="relative">
+                    <Input
+                      type="text"
+                      value={footerLine1}
+                      onChange={(e) => setFooterLine1(e.target.value)}
+                      placeholder="e.g. In Emergency Contact: XYZ Hospital, Ph: 1234567890"
+                      className="bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-blue-500"
+                      maxLength={120}
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500">{footerLine1.length}/120</span>
+                  </div>
+                  <div className="relative">
+                    <Input
+                      type="text"
+                      value={footerLine2}
+                      onChange={(e) => setFooterLine2(e.target.value)}
+                      placeholder="e.g. Medico-Legal Notice: This prescription is valid for 30 days only"
+                      className="bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-blue-500"
+                      maxLength={120}
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500">{footerLine2.length}/120</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+              {/* Watermark Logo for Digital RX */}
+              <div>
+                <Label className="mb-2 block text-gray-300">RX Watermark Logo (Optional)</Label>
+                <p className="text-xs text-gray-400 mb-3">
+                  Upload your clinic logo/emblem to appear as a faint watermark in the center of Digital RX PDFs. Recommended: PNG with transparent background, 200x200px.
+                </p>
+                <div className="flex items-center gap-4">
+                  {watermarkLogo ? (
+                    <div className="relative">
+                      <img src={watermarkLogo} alt="Watermark" className="w-20 h-20 object-contain rounded-lg border border-zinc-700 bg-zinc-800 p-1" />
+                      <button
+                        onClick={() => setWatermarkLogo(null)}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="w-20 h-20 rounded-lg border border-dashed border-zinc-700 flex items-center justify-center text-gray-500 text-xs">
+                      No logo
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-sm text-white transition-colors">
+                      {isUploadingWatermark ? 'Uploading...' : 'Upload Watermark Logo'}
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={handleWatermarkUpload}
+                        disabled={isUploadingWatermark}
+                      />
+                    </label>
+                    <p className="text-[10px] text-gray-500 mt-1">PNG/JPG, max ~200KB recommended</p>
+                  </div>
+                </div>
+              </div>
           </div>
 
           {/* Save Button */}

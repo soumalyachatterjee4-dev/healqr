@@ -52,6 +52,7 @@ const PersonalizedTemplatesManager = lazy(() => import("./components/Personalize
 const EmergencyButtonManager = lazy(() => import("./components/EmergencyButtonManager"));
 const PatientNewRXViewer = lazy(() => import("./components/PatientNewRXViewer").then(module => ({ default: module.PatientNewRXViewer })));
 const ConsultationCompletedNotification = lazy(() => import("./components/ConsultationCompletedNotification"));
+const RxUpdatedNotification = lazy(() => import("./components/RxUpdatedNotification"));
 const FollowUpNotification = lazy(() => import("./components/FollowUpNotification"));
 const ReviewRequestNotification = lazy(() => import("./components/ReviewRequestNotification"));
 const AppointmentReminderNotification = lazy(() => import("./components/AppointmentReminderNotification"));
@@ -88,6 +89,7 @@ const AIRXReaderManager = lazy(() => import("./components/AIRXReaderManager"));
 const AIDietChartManager = lazy(() => import("./components/AIDietChartManager"));
 const SocialMediaKit = lazy(() => import("./components/SocialMediaKit"));
 const PatientVideoConsultation = lazy(() => import("./components/PatientVideoConsultation"));
+const BrainDeckManager = lazy(() => import("./components/BrainDeckManager"));
 
 // Loading Component
 const PageLoader = () => (
@@ -160,6 +162,7 @@ export default function App() {
     | "personalized-templates"
     | "testing-utilities"
     | "consultation-completed"
+    | "rx-updated"
     | "follow-up"
     | "review-request"
     | "appointment-reminder"
@@ -190,6 +193,7 @@ export default function App() {
     | "advertiser-gateway"
     | "purchase-history"
     | "video-call"
+    | "braindeck"
   >("landing");
   const [notifData, setNotifData] = useState<{
     bookingId?: string; // For smart data fetching from Firestore
@@ -209,6 +213,7 @@ export default function App() {
     nextSteps?: string[];
     serialNumber?: string;
     clinicName?: string;
+    rxUrl?: string;
   } | null>(null);
 
   const [chatToken, setChatToken] = useState("");
@@ -697,6 +702,29 @@ export default function App() {
       else setBookingLanguage('english');
 
       setCurrentPage('consultation-completed');
+    } else if (pageParam === 'rx-updated') {
+      const patientName = urlParams.get('patientName') || '';
+      const doctorName = urlParams.get('doctorName') || '';
+      const clinicName = urlParams.get('clinicName') || '';
+      const consultationDate = urlParams.get('consultationDate') || '';
+      const consultationTime = urlParams.get('consultationTime') || '';
+      const language = urlParams.get('language') || 'en';
+      const rxUrl = urlParams.get('rxUrl') || '';
+
+      setNotifData({
+        patientName,
+        doctorName,
+        message: clinicName,
+        date: consultationDate,
+        time: consultationTime,
+        rxUrl,
+      });
+
+      if (language === 'bengali' || language === 'bn') setBookingLanguage('bengali');
+      else if (language === 'hindi' || language === 'hi') setBookingLanguage('hindi');
+      else setBookingLanguage('english');
+
+      setCurrentPage('rx-updated');
     } else if (pageParam === 'follow-up') {
       const patientName = urlParams.get('patientName') || '';
       const doctorName = urlParams.get('doctorName') || '';
@@ -1043,6 +1071,7 @@ export default function App() {
       const pageParam = urlParams.get('page');
       const isNotificationPage = pageParam && (
         pageParam === 'consultation-completed' ||
+        pageParam === 'rx-updated' ||
         pageParam === 'follow-up' ||
         pageParam === 'review-request' ||
         pageParam === 'appointment-reminder' ||
@@ -1417,6 +1446,7 @@ export default function App() {
           const currentPageParam = currentUrlParams.get('page');
           const isOnNotificationPage = currentPageParam && (
             currentPageParam === 'consultation-completed' ||
+            currentPageParam === 'rx-updated' ||
             currentPageParam === 'follow-up' ||
             currentPageParam === 'review-request' ||
             currentPageParam === 'appointment-reminder' ||
@@ -2153,6 +2183,8 @@ export default function App() {
       setCurrentPage("ai-diet-chart");
     else if (menu === "monthly-planner")
       setCurrentPage("monthly-planner");
+    else if (menu === "braindeck")
+      setCurrentPage("braindeck");
   };
 
   // Proper logout handler with Firebase signOut
@@ -2345,6 +2377,15 @@ export default function App() {
           isSidebarCollapsed={isSidebarCollapsed}
           setIsSidebarCollapsed={setIsSidebarCollapsed}
         />
+      )}
+
+      {currentPage === "braindeck" && (
+        <Suspense fallback={<PageLoader />}>
+          <BrainDeckManager
+            onBack={() => setCurrentPage("dashboard")}
+            doctorName={userName}
+          />
+        </Suspense>
       )}
 
       {currentPage === "profile-manager" && (
@@ -2755,6 +2796,18 @@ export default function App() {
           clinicName={notifData?.message}
           consultationDate={notifData?.date}
           consultationTime={notifData?.time}
+        />
+      )}
+
+      {currentPage === "rx-updated" && (
+        <RxUpdatedNotification
+          language={bookingLanguage === 'hindi' ? 'hi' : bookingLanguage === 'bengali' ? 'bn' : 'en'}
+          patientName={notifData?.patientName}
+          doctorName={notifData?.doctorName}
+          clinicName={notifData?.message}
+          consultationDate={notifData?.date}
+          consultationTime={notifData?.time}
+          rxUrl={notifData?.rxUrl}
         />
       )}
 

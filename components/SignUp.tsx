@@ -2,7 +2,7 @@ import { Checkbox } from './ui/checkbox';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Mail, User, Calendar, MapPin, ArrowLeft, CheckCircle2, X, QrCode, Stethoscope } from 'lucide-react';
+import { Mail, User, Calendar, MapPin, ArrowLeft, CheckCircle2, X, QrCode, Stethoscope, Building2 } from 'lucide-react';
 import { useState } from 'react';
 import healqrLogo from '../assets/healqr-logo.png';
 import DoctorTermsConditions from './DoctorTermsConditions';
@@ -33,6 +33,7 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
   const [qrType, setQrType] = useState<'preprinted' | 'virtual'>('preprinted'); // NEW: QR type selection
   const [qrNumber, setQrNumber] = useState("");
   const [companyName, setCompanyName] = useState(""); // NEW: Company name for pre-printed QR
+  const [division, setDivision] = useState(""); // NEW: Division for pre-printed QR
   const [virtualQrGenerated, setVirtualQrGenerated] = useState(false); // NEW: Track if virtual QR is generated
   const [acceptedTerms, setAcceptedTerms] = useState(true); // Pre-checked
   const [acceptedNotifications, setAcceptedNotifications] = useState(true); // Pre-checked
@@ -72,6 +73,10 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
     if (qrType === 'preprinted') {
       if (!companyName) {
         toast.error('Please enter the company name');
+        return;
+      }
+      if (!division) {
+        toast.error('Please enter the division');
         return;
       }
       if (!qrNumber) {
@@ -213,6 +218,7 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
         qrNumber: finalQrNumber,
         qrType: qrType, // NEW: Store QR type
         companyName: qrType === 'preprinted' ? companyName : '', // NEW: Store company name for pre-printed QR
+        division: qrType === 'preprinted' ? division : '', // NEW: Store division for pre-printed QR
         acceptedNotifications
       };
 
@@ -621,6 +627,25 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
                 </div>
                 <p className="text-xs text-gray-400 mt-2">
                   Company/Organization that provided the QR standee
+                </p>
+              </div>
+
+              <div className="mb-6">
+                <label className="block mb-3">
+                  Division <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <Input
+                    type="text"
+                    value={division}
+                    onChange={(e) => setDivision(e.target.value)}
+                    placeholder="Enter division (e.g., North Division)"
+                    className="pl-12 bg-black border-zinc-800 text-white h-14 rounded-lg focus:border-emerald-500"
+                  />
+                </div>
+                <p className="text-xs text-gray-400 mt-2">
+                  Specific division or branch of the company
                 </p>
               </div>
 

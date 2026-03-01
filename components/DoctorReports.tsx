@@ -137,10 +137,26 @@ export default function DoctorReports({
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        const data: ReportData[] = snapshot.docs.map(docSnap => {
+        const data: ReportData[] = snapshot.docs
+          .filter(docSnap => {
+            const booking = docSnap.data();
+
+            // 🔒 PATIENT DATA ACCESS CONTROL: Exclude clinic patients if doctor is restricted
+            const bookingClinicId = booking.clinicId;
+            const isClinicRestricted = bookingClinicId ? clinicRestrictions[bookingClinicId] === true : false;
+
+            // If doctor is restricted for this clinic AND booking is from clinic QR, exclude it
+            if (isClinicRestricted && booking.bookingSource !== 'doctor_qr') {
+              console.log('🚫 Filtering out clinic booking from reports:', docSnap.id);
+              return false; // Exclude this booking
+            }
+
+            return true; // Include personal QR bookings
+          })
+          .map(docSnap => {
           const booking = docSnap.data();
 
-          // 🔒 PATIENT DATA ACCESS CONTROL: Masking check
+          // 🔒 PATIENT DATA ACCESS CONTROL: Masking check (kept for backward compatibility)
           const bookingClinicId = booking.clinicId;
           const isClinicRestricted = bookingClinicId ? clinicRestrictions[bookingClinicId] === true : false;
           const isMasked = isClinicRestricted && booking.bookingSource !== 'doctor_qr';

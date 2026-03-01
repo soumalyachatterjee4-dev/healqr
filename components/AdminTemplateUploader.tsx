@@ -55,6 +55,7 @@ const PLACEMENT_OPTIONS = [
   // Notification Templates (21 total)
   { id: 'notif-appointment-reminder', label: 'Appointment Reminder' },
   { id: 'notif-consultation-completed', label: 'Consultation Completed' },
+  { id: 'notif-rx-updated', label: 'Prescription Updated (Regen)' },
   { id: 'notif-slot-released', label: 'Appointment Slot Released' },
   { id: 'notif-admin-alert', label: 'Admin Alert' },
   { id: 'notif-follow-up', label: 'Follow-Up Reminder' },

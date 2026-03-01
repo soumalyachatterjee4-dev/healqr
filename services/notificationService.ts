@@ -249,6 +249,111 @@ export const sendConsultationCompleted = async (data: any) => {
   return result;
 };
 
+// ============================================
+// 📋 UPDATED PRESCRIPTION NOTIFICATION
+// Distinct from consultation_completed — tells patient to ignore previous RX
+// ============================================
+export const sendRxUpdatedNotification = async (data: any) => {
+  const { userId, phone10 } = normalizePatientTarget(data.patientPhone);
+
+  const deepLinkUrl = `https://teamhealqr.web.app/?page=rx-updated&rxUrl=${encodeURIComponent(data.rxUrl || '')}&doctorName=${encodeURIComponent(data.doctorName || '')}&patientName=${encodeURIComponent(data.patientName || '')}&clinicName=${encodeURIComponent(data.clinicName || '')}&consultationDate=${encodeURIComponent(data.consultationDate || '')}&consultationTime=${encodeURIComponent(data.consultationTime || '')}&language=${encodeURIComponent(data.language || 'english')}`;
+
+  const result = await sendFCM({
+    userId,
+    title: '⚠️ Updated Prescription — Please Check',
+    body: `Dr. ${data.doctorName} has sent an UPDATED prescription. Ignore the previous one & download the latest version.`,
+    data: {
+      type: 'rx_updated',
+      patientName: data.patientName,
+      doctorName: data.doctorName,
+      phone: phone10,
+      url: deepLinkUrl,
+    },
+  });
+
+  // 💾 Store in Firestore for Patient Dashboard > Notifications
+  try {
+    const { storeNotification } = await import('./patientNotificationStorage');
+    await storeNotification({
+      patientPhone: phone10,
+      patientName: data.patientName || 'Patient',
+      patientAge: data.age,
+      patientGender: data.sex,
+      type: 'rx_updated',
+      title: '⚠️ Updated Prescription',
+      message: `Dr. ${data.doctorName} has sent an UPDATED prescription. Please ignore the previous prescription and use this latest version.`,
+      bookingId: data.bookingId || '',
+      doctorId: data.doctorId,
+      doctorName: data.doctorName || 'Doctor',
+      doctorSpecialty: data.doctorSpecialty,
+      doctorPhoto: data.doctorPhoto,
+      chamberName: data.clinicName || data.chamber,
+      chamberAddress: data.chamberAddress,
+      appointmentDate: data.consultationDate,
+      appointmentTime: data.consultationTime,
+      fcmAttempted: true,
+      fcmSuccess: result?.success !== false,
+      fcmError: result?.error,
+      metadata: {
+        rxUrl: data.rxUrl,
+        isUpdated: true,
+      }
+    });
+    console.log('✅ RX Updated notification stored for patient:', phone10);
+  } catch (storageError) {
+    console.error('❌ Failed to store RX Updated notification:', storageError);
+  }
+
+  // Save to notification history
+  const expiryDate = new Date();
+  expiryDate.setDate(expiryDate.getDate() + 120);
+
+  await saveNotificationHistory({
+    patientPhone: phone10,
+    patientName: data.patientName || 'Patient',
+    age: data.age !== undefined ? String(data.age) : undefined,
+    sex: data.sex,
+    purpose: data.purpose,
+    doctorName: data.doctorName || 'Doctor',
+    clinicName: data.clinicName,
+    chamber: data.chamber,
+    notificationType: 'rx_updated',
+    bookingStatus: 'completed',
+    notificationStatus: result?.success === false ? 'failed' : 'sent',
+    messageId: result?.messageId,
+    timestamp: new Date(),
+    consultationDate: data.consultationDate || '',
+    consultationTime: data.consultationTime || '',
+    bookingId: data.bookingId,
+    doctorId: data.doctorId,
+    templateType: 'rx_updated',
+    templateData: {
+      greeting: `Important Update for ${data.patientName || 'Patient'}! 🔄`,
+      mainMessage: `Dr. ${data.doctorName} has sent an UPDATED prescription. Please ignore the previous prescription and download the latest version.`,
+      warningMessage: '⚠️ Please IGNORE the previous prescription notification',
+      consultationDetails: {
+        date: data.consultationDate || '',
+        time: data.consultationTime || '',
+        chamber: data.chamber || ''
+      },
+      adBanner: {
+        placement: 'notif-rx-updated'
+      }
+    },
+    doctorSpecialty: data.doctorSpecialty,
+    doctorInitials: data.doctorInitials,
+    doctorPhoto: data.doctorPhoto,
+    expiresAt: expiryDate,
+    isExpired: false,
+    readStatus: false,
+    userActions: {
+      opened: false
+    }
+  });
+
+  return result;
+};
+
 export const scheduleReviewRequest = async (data: any, seenAt: Date) => {
   const { userId, phone10 } = normalizePatientTarget(data.patientPhone);
   const scheduledAt = new Date(seenAt.getTime() + 24 * 60 * 60 * 1000);

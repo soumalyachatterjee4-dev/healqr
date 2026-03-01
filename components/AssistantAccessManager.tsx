@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, UserPlus, Users, Mail, CheckCircle, XCircle, Trash2, Eye, Edit, Trash } from 'lucide-react';
+import { ArrowLeft, Users, Mail, CheckCircle, XCircle, Eye, Edit, Trash } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -8,7 +8,6 @@ import { toast } from 'sonner';
 import { auth, db } from '../lib/firebase/config';
 import { collection, addDoc, getDocs, query, where, updateDoc, doc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { AuthService } from '../lib/firebase/auth.service';
 import DashboardSidebar from './DashboardSidebar';
 
 interface AssistantData {
@@ -40,13 +39,15 @@ const AVAILABLE_PAGES = [
   { id: 'advance-booking', label: 'Advance Booking', icon: '📆' },
   { id: 'analytics', label: 'Analytics', icon: '📈' },
   { id: 'reports', label: 'Reports', icon: '📄' },
-  { id: 'preview', label: 'Preview Center', icon: '👁️' },
+  { id: 'social-kit', label: 'Social Kit & Offers', icon: '📢' },
+  { id: 'monthly-planner', label: 'Monthly Planner', icon: '🗓️' },
+  { id: 'preview', label: 'Preview Centre', icon: '👁️' },
   { id: 'lab-referral-tracking', label: 'Lab Referral Tracking', icon: '🔬' },
   { id: 'personalized-templates', label: 'Personalized Templates', icon: '📝' },
-  { id: 'doctor-patient-chat', label: 'Doctor-Patient Chat', icon: '💬' },
   { id: 'video-consultation', label: 'Video Consultation', icon: '🎥' },
-  { id: 'ai-rx-reader', label: 'AI Rx Reader', icon: '🤖' },
-  { id: 'emergency-button', label: 'Emergency Button', icon: '🚨' },
+  { id: 'ai-rx-reader', label: 'AI RX Reader', icon: '🤖' },
+  { id: 'ai-diet-chart', label: 'AI Diet Chart', icon: '🍎' },
+  { id: 'emergency-button', label: 'Emergency Button', icon: '🚨' }
 ];
 
 // Page ID migration map (old -> new)
@@ -63,17 +64,16 @@ const migratePageIds = (pageIds: string[]): string[] => {
   return pageIds.map(id => PAGE_ID_MIGRATION[id] || id);
 };
 
-export default function AssistantAccessManager({ 
-  doctorName, 
-  email, 
-  onLogout, 
+export default function AssistantAccessManager({
+  doctorName,
+  email,
+  onLogout,
   onMenuChange,
-  activeAddOns 
+  activeAddOns
 }: AssistantAccessManagerProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeAssistants, setActiveAssistants] = useState<AssistantData[]>([]);
-  const [inactiveAssistants, setInactiveAssistants] = useState<AssistantData[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
 
@@ -81,10 +81,10 @@ export default function AssistantAccessManager({
   const [assistantName, setAssistantName] = useState('');
   const [assistantEmail, setAssistantEmail] = useState('');
   const [selectedPages, setSelectedPages] = useState<string[]>([]);
-  
+
   const [editingAssistant, setEditingAssistant] = useState<AssistantData | null>(null);
   const [editSelectedPages, setEditSelectedPages] = useState<string[]>([]);
-  
+
   // Modal for showing link + PIN after creation
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [generatedLink, setGeneratedLink] = useState('');
@@ -93,7 +93,7 @@ export default function AssistantAccessManager({
   // Wait for auth state to be ready
   useEffect(() => {
     if (!auth) return;
-    
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       console.log('🔐 Auth state changed:', user?.uid || 'No user');
       setCurrentUser(user);
@@ -113,7 +113,7 @@ export default function AssistantAccessManager({
   const loadAssistants = async () => {
     // Get doctor ID from currentUser state or localStorage
     const doctorId = currentUser?.uid || localStorage.getItem('userId');
-    
+
     if (!doctorId || !db) {
       console.log('Cannot load assistants - no doctorId or db');
       return;
@@ -130,7 +130,7 @@ export default function AssistantAccessManager({
         const data = doc.data();
         const rawAllowedPages = data.allowedPages || [];
         const migratedPages = migratePageIds(rawAllowedPages);
-        
+
         return {
           id: doc.id,
           assistantName: data.assistantName,
@@ -145,10 +145,8 @@ export default function AssistantAccessManager({
       });
 
       const active = assistants.filter(a => a.isActive);
-      const inactive = assistants.filter(a => !a.isActive);
 
       setActiveAssistants(active);
-      setInactiveAssistants(inactive);
     } catch (error) {
       console.error('Error loading assistants:', error);
     }
@@ -156,8 +154,8 @@ export default function AssistantAccessManager({
 
   // Handle page selection toggle
   const togglePageSelection = (pageId: string) => {
-    setSelectedPages(prev => 
-      prev.includes(pageId) 
+    setSelectedPages(prev =>
+      prev.includes(pageId)
         ? prev.filter(id => id !== pageId)
         : [...prev, pageId]
     );
@@ -180,7 +178,7 @@ export default function AssistantAccessManager({
     console.log('assistantEmail:', assistantEmail);
     console.log('selectedPages:', selectedPages);
     console.log('activeAssistants.length:', activeAssistants.length);
-    
+
     if (!assistantName.trim()) {
       console.log('❌ Name validation failed');
       toast.error('Assistant name required', {
@@ -218,18 +216,18 @@ export default function AssistantAccessManager({
       console.log('auth:', auth);
       console.log('auth.currentUser:', auth?.currentUser);
       console.log('db:', db);
-      
+
       // Try to get userId from localStorage as fallback
       const userId = localStorage.getItem('userId');
       console.log('userId from localStorage:', userId);
-      
+
       if (!db) {
         toast.error('Database not initialized', {
           description: 'Please refresh the page'
         });
         return;
       }
-      
+
       if (!auth?.currentUser && !userId) {
         toast.error('Not authenticated', {
           description: 'Please login again'
@@ -243,10 +241,10 @@ export default function AssistantAccessManager({
 
     try {
       console.log('🔍 Checking if email already exists...');
-      
+
       // Get doctor ID from currentUser state or localStorage
       const doctorId = currentUser?.uid || localStorage.getItem('userId');
-      
+
       if (!doctorId) {
         toast.error('Not authenticated', {
           description: 'Please refresh and login again'
@@ -254,9 +252,9 @@ export default function AssistantAccessManager({
         setLoading(false);
         return;
       }
-      
+
       console.log('Using doctorId:', doctorId);
-      
+
       // Check if email already exists
       const assistantsRef = collection(db, 'assistants');
       const emailQuery = query(assistantsRef, where('assistantEmail', '==', assistantEmail.trim().toLowerCase()));
@@ -275,14 +273,14 @@ export default function AssistantAccessManager({
       }
 
       console.log('✅ Email available, creating record...');
-      
+
       // Generate unique access token and 6-digit PIN
       const accessToken = `ast_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
       const accessPin = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit PIN
-      
+
       // Always include dashboard in allowed pages (avoid duplicates)
-      const pagesWithDashboard = selectedPages.includes('dashboard') 
-        ? selectedPages 
+      const pagesWithDashboard = selectedPages.includes('dashboard')
+        ? selectedPages
         : ['dashboard', ...selectedPages];
 
       // Create assistant record with token and PIN
@@ -300,11 +298,11 @@ export default function AssistantAccessManager({
       });
 
       console.log('✅ Assistant created successfully!');
-      
+
       // Generate the access link
       const baseUrl = window.location.origin;
       const accessLink = `${baseUrl}/assistant-login?token=${accessToken}`;
-      
+
       // Show modal with link and PIN
       setGeneratedLink(accessLink);
       setGeneratedPin(accessPin);
@@ -365,10 +363,10 @@ export default function AssistantAccessManager({
 
     try {
       // Ensure page IDs are in new format before saving
-      const pagesToSave = editSelectedPages.filter(pageId => 
+      const pagesToSave = editSelectedPages.filter(pageId =>
         AVAILABLE_PAGES.some(p => p.id === pageId) || pageId === 'dashboard'
       );
-      
+
       await updateDoc(doc(db, 'assistants', editingAssistant.id), {
         allowedPages: pagesToSave,
       });
@@ -403,33 +401,7 @@ export default function AssistantAccessManager({
     }
   };
 
-  // Reactivate assistant
-  const reactivateAssistant = async (assistantId: string) => {
-    if (!db || !currentUser) {
-      toast.error('Not authenticated');
-      return;
-    }
-
-    if (activeAssistants.length >= 2) {
-      toast.error('Maximum 2 active assistants allowed', {
-        description: 'Please deactivate an existing assistant first'
-      });
-      return;
-    }
-
-    try {
-      await updateDoc(doc(db, 'assistants', assistantId), {
-        isActive: true,
-        reactivatedAt: serverTimestamp(),
-      });
-
-      toast.success('Assistant reactivated');
-      loadAssistants();
-    } catch (error) {
-      console.error('Error reactivating assistant:', error);
-      toast.error('Failed to reactivate assistant');
-    }
-  };
+  // Reactivate assistant removed as it was unused in UI
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -641,7 +613,7 @@ export default function AssistantAccessManager({
                       {assistant.accessToken && assistant.accessPin && (
                         <div className="bg-zinc-900 border border-zinc-700 rounded p-3 space-y-3">
                           <p className="text-xs font-semibold text-blue-400">🔗 Access Credentials</p>
-                          
+
                           {/* Link - Full width with copy button */}
                           <div className="space-y-1">
                             <span className="text-xs text-gray-500">Link:</span>
