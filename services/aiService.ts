@@ -3,10 +3,10 @@
  * Handles advanced medical lookups and suggestions
  */
 
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 // Note: In production, this should be a backend call to keep API Key secure.
 // For MVP, we use the key from config if available.
-const API_KEY = 'AIzaSyB1AVXeao1bqTah8cD1bGAiAQMbZ5nw0WI'; // Reusing existing key from config
+const API_KEY = 'AIzaSyAEXO21T32uegMq4U57OnSDuBdA6CC_OOc'; // Gemini API key from AI Studio
 
 export async function getDrugSuggestionsFromGemini(query: string): Promise<any[]> {
   if (!query || query.length < 3) return [];

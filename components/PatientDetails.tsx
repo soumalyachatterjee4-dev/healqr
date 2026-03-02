@@ -832,7 +832,7 @@ export default function PatientDetails({
       const { doc: docRef, updateDoc: updateBooking } = await import('firebase/firestore');
       const { db: fireDb } = await import('../lib/firebase/config');
       const bookingRef = docRef(fireDb!, 'bookings', selectedPatientForFlow.id);
-      await updateBooking(bookingRef, { 
+      await updateBooking(bookingRef, {
         digitalRxUrl: downloadURL,
         ...(rxData ? { rxLastData: rxData } : {}),
       });
@@ -1991,7 +1991,7 @@ export default function PatientDetails({
                 )}
 
                 <p className="text-sm text-gray-400 leading-relaxed">
-                  Would you like to create a Digital Prescription for this patient? 
+                  Would you like to create a Digital Prescription for this patient?
                   The RX will be generated as a professional PDF and sent to the patient via notification.
                 </p>
               </div>

@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
-import { 
-  Upload, 
-  Plus, 
-  Eye, 
-  Edit, 
-  Trash2, 
+import {
+  Upload,
+  Plus,
+  Eye,
+  Edit,
+  Trash2,
   Copy,
   X,
   FileImage,
@@ -117,10 +117,10 @@ export default function AdminTemplateUploader() {
       try {
         const { db } = await import('../lib/firebase/config');
         const { doc, getDoc } = await import('firebase/firestore');
-        
+
         const adminRef = doc(db, 'adminProfiles', 'super_admin');
         const adminSnap = await getDoc(adminRef);
-        
+
         if (adminSnap.exists()) {
           const data = adminSnap.data();
           if (data.globalTemplates && Array.isArray(data.globalTemplates)) {
@@ -133,7 +133,7 @@ export default function AdminTemplateUploader() {
       } catch (error) {
         // Fallback to localStorage
       }
-      
+
       // Fallback to localStorage
       const saved = localStorage.getItem('healqr_global_templates');
       if (saved) {
@@ -147,7 +147,7 @@ export default function AdminTemplateUploader() {
         setTemplates([]);
       }
     };
-    
+
     loadTemplates();
   }, []);
 
@@ -161,17 +161,17 @@ export default function AdminTemplateUploader() {
           // Create canvas for compression
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d');
-          
+
           if (!ctx) {
             reject(new Error('Could not get canvas context'));
             return;
           }
-          
+
           // Calculate resize dimensions if image is too large
           let targetWidth = img.width;
           let targetHeight = img.height;
           const maxDimension = 1920; // Max width or height
-          
+
           if (img.width > maxDimension || img.height > maxDimension) {
             if (img.width > img.height) {
               targetWidth = maxDimension;
@@ -181,36 +181,36 @@ export default function AdminTemplateUploader() {
               targetWidth = (img.width / img.height) * maxDimension;
             }
           }
-          
+
           // Set canvas size to target dimensions
           canvas.width = targetWidth;
           canvas.height = targetHeight;
-          
+
           // Draw image on canvas with resize
           ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
-          
+
           // Compress image - start with quality 0.7 for better compression
           let quality = 0.7;
           let compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
-          
+
           // Calculate size in bytes (base64 string length * 0.75)
           let sizeInBytes = (compressedDataUrl.length * 0.75);
-          
+
           // Target: 750KB to leave buffer under 1MB Firestore limit
           const targetSize = 750000; // 750KB
           const minQuality = 0.2; // Minimum quality threshold
-          
+
           // If still too large, reduce quality aggressively
           while (sizeInBytes > targetSize && quality > minQuality) {
             quality -= 0.05; // Smaller steps for finer control
             compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
             sizeInBytes = (compressedDataUrl.length * 0.75);
           }
-          
+
           const originalSizeKB = (file.size / 1024).toFixed(0);
           const compressedSizeKB = (sizeInBytes / 1024).toFixed(0);
           const compressionRatio = ((1 - sizeInBytes / file.size) * 100).toFixed(1);
-          
+
           resolve(compressedDataUrl);
         };
         img.onerror = reject;
@@ -264,25 +264,25 @@ export default function AdminTemplateUploader() {
     const file = e.target.files?.[0];
     if (file && file.type.startsWith('image/')) {
       const fileSizeMB = file.size / (1024 * 1024);
-      
+
       if (fileSizeMB > 10) {
         alert('⚠️ Image too large! Please use an image smaller than 10MB.');
         return;
       }
-      
+
       setIsProcessingImage(true);
       fileToDataURL(file)
         .then(dataUrl => {
           const compressedSizeKB = (dataUrl.length * 0.75) / 1024;
           const compressedSizeMB = compressedSizeKB / 1024;
-          
+
           // Firestore document limit is 1MB (1,048,576 bytes)
           if (compressedSizeKB > 1000) {
             alert(`⚠️ Image still too large after compression (${compressedSizeKB.toFixed(0)}KB). Firestore limit is 1MB. Please use a smaller image.`);
             setIsProcessingImage(false);
             return;
           }
-          
+
           setFormData(prev => ({
             ...prev,
             imageFile: file,
@@ -309,29 +309,29 @@ export default function AdminTemplateUploader() {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    
+
     const file = e.dataTransfer.files[0];
     if (file && file.type.startsWith('image/')) {
       const fileSizeMB = file.size / (1024 * 1024);
-      
+
       if (fileSizeMB > 10) {
         alert('⚠️ Image too large! Please use an image smaller than 10MB.');
         return;
       }
-      
+
       setIsProcessingImage(true);
       fileToDataURL(file)
         .then(dataUrl => {
           const compressedSizeKB = (dataUrl.length * 0.75) / 1024;
           const compressedSizeMB = compressedSizeKB / 1024;
-          
+
           // Firestore document limit is 1MB (1,048,576 bytes)
           if (compressedSizeKB > 1000) {
             alert(`⚠️ Image still too large after compression (${compressedSizeKB.toFixed(0)}KB). Firestore limit is 1MB. Please use a smaller image.`);
             setIsProcessingImage(false);
             return;
           }
-          
+
           setFormData(prev => ({
             ...prev,
             imageFile: file,
@@ -386,24 +386,24 @@ export default function AdminTemplateUploader() {
     };
 
     const updatedTemplates = [newTemplate, ...templates];
-    
+
     setTemplates(updatedTemplates);
-    
+
     // Clean templates - remove any undefined or File objects
     const templatesToSave = updatedTemplates.map(t => {
       const { imageFile, ...cleanTemplate } = t as any;
       return cleanTemplate;
     });
-    
+
     try {
       const { db } = await import('../lib/firebase/config');
       const { doc, updateDoc, setDoc } = await import('firebase/firestore');
-      
+
       const adminRef = doc(db, 'adminProfiles', 'super_admin');
       await setDoc(adminRef, { globalTemplates: templatesToSave }, { merge: true });
-      
+
       alert(`✅ Template "${formData.name}" uploaded successfully!`);
-      
+
       // Trigger refresh in all components
       window.dispatchEvent(new CustomEvent('template-refresh'));
     } catch (error) {
@@ -411,7 +411,7 @@ export default function AdminTemplateUploader() {
       alert(`❌ Error saving template!\n\nError: ${error}\n\nPlease refresh the page and try again.`);
       return;
     }
-    
+
     resetForm();
     setIsAdding(false);
   };
@@ -433,10 +433,10 @@ export default function AdminTemplateUploader() {
   };
 
   const handleUpdate = async () => {
-    const updatedTemplates = templates.map(t => 
-      t.id === editingId 
-        ? { 
-            ...t, 
+    const updatedTemplates = templates.map(t =>
+      t.id === editingId
+        ? {
+            ...t,
             name: formData.name,
             description: formData.description,
             category: formData.category,
@@ -447,7 +447,7 @@ export default function AdminTemplateUploader() {
         : t
     );
     setTemplates(updatedTemplates);
-    
+
     // Clean templates - remove any undefined or File objects
     const templatesToSave = updatedTemplates.map(t => {
       const { imageFile, ...cleanTemplate } = t as any;
@@ -456,13 +456,13 @@ export default function AdminTemplateUploader() {
     try {
       const { db } = await import('../lib/firebase/config');
       const { doc, updateDoc } = await import('firebase/firestore');
-      
+
       const adminRef = doc(db, 'adminProfiles', 'super_admin');
       await updateDoc(adminRef, { globalTemplates: templatesToSave });
     } catch (error) {
       // Error updating template
     }
-    
+
     resetForm();
     setEditingId(null);
     setIsAdding(false);
@@ -472,7 +472,7 @@ export default function AdminTemplateUploader() {
     if (confirm('Are you sure you want to delete this template?')) {
       const updatedTemplates = templates.filter(t => t.id !== id);
       setTemplates(updatedTemplates);
-      
+
       // Clean templates - remove any undefined or File objects
       const templatesToSave = updatedTemplates.map(t => {
         const { imageFile, ...cleanTemplate } = t as any;
@@ -481,7 +481,7 @@ export default function AdminTemplateUploader() {
       try {
         const { db } = await import('../lib/firebase/config');
         const { doc, updateDoc } = await import('firebase/firestore');
-        
+
         const adminRef = doc(db, 'adminProfiles', 'super_admin');
         await updateDoc(adminRef, { globalTemplates: templatesToSave });
       } catch (error) {
@@ -502,7 +502,7 @@ export default function AdminTemplateUploader() {
       };
       const updatedTemplates = [duplicated, ...templates];
       setTemplates(updatedTemplates);
-      
+
       // Clean templates - remove any undefined or File objects
       const templatesToSave = updatedTemplates.map(t => {
         const { imageFile, ...cleanTemplate } = t as any;
@@ -511,7 +511,7 @@ export default function AdminTemplateUploader() {
       try {
         const { db } = await import('../lib/firebase/config');
         const { doc, updateDoc } = await import('firebase/firestore');
-        
+
         const adminRef = doc(db, 'adminProfiles', 'super_admin');
         await updateDoc(adminRef, { globalTemplates: templatesToSave });
       } catch (error) {
@@ -521,11 +521,11 @@ export default function AdminTemplateUploader() {
   };
 
   const handleTogglePublish = async (id: number) => {
-    const updatedTemplates = templates.map(t => 
+    const updatedTemplates = templates.map(t =>
       t.id === id ? { ...t, isPublished: !t.isPublished } : t
     );
     setTemplates(updatedTemplates);
-    
+
     // Clean templates - remove any undefined or File objects
     const templatesToSave = updatedTemplates.map(t => {
       const { imageFile, ...cleanTemplate } = t as any;
@@ -534,10 +534,10 @@ export default function AdminTemplateUploader() {
     try {
       const { db } = await import('../lib/firebase/config');
       const { doc, updateDoc } = await import('firebase/firestore');
-      
+
       const adminRef = doc(db, 'adminProfiles', 'super_admin');
       await updateDoc(adminRef, { globalTemplates: templatesToSave });
-      
+
       // Trigger refresh in all components
       window.dispatchEvent(new CustomEvent('template-refresh'));
     } catch (error) {
@@ -594,20 +594,20 @@ export default function AdminTemplateUploader() {
                 <Plus className="w-4 h-4 md:w-5 md:h-5 mr-2" />
                 Create New Template
               </Button>
-              
+
               {templates.length > 0 && (
                 <Button
                   onClick={async () => {
                     try {
                       const { auth, db } = await import('../lib/firebase/config');
                       const { doc, updateDoc } = await import('firebase/firestore');
-                      
+
                       let user = auth.currentUser;
                       if (!user) {
                         await new Promise(resolve => setTimeout(resolve, 1000));
                         user = auth.currentUser;
                       }
-                      
+
                       if (user) {
                         // Clean templates - remove ALL undefined values
                         const cleanTemplates = templates.map(t => {
@@ -621,14 +621,14 @@ export default function AdminTemplateUploader() {
                             uploadDate: t.uploadDate,
                             dimensions: t.dimensions
                           };
-                          
+
                           if (t.placements && t.placements.length > 0) {
                             clean.placements = t.placements;
                           }
-                          
+
                           return clean;
                         });
-                        
+
                         await updateDoc(doc(db, 'adminProfiles', 'super_admin'), {
                           globalTemplates: cleanTemplates
                         });
@@ -808,7 +808,7 @@ export default function AdminTemplateUploader() {
                   <Label className="text-sm mb-3 block text-white">
                     Upload Image * <span className="text-gray-400">({getDimensionsForCategory(formData.category)})</span>
                   </Label>
-                  
+
                   {/* Drag & Drop Area */}
                   <div
                     onDragOver={handleDragOver}
@@ -883,8 +883,8 @@ export default function AdminTemplateUploader() {
         {/* Templates Tabs */}
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)} className="w-full">
           <TabsList className="grid w-full grid-cols-3 bg-zinc-900 mb-6 h-auto p-1">
-            <TabsTrigger 
-              value="dashboard-promo" 
+            <TabsTrigger
+              value="dashboard-promo"
               className="flex items-center justify-center gap-2 py-3 text-sm data-[state=active]:bg-blue-500/20 data-[state=active]:text-blue-400 data-[state=active]:border-b-2 data-[state=active]:border-blue-500"
             >
               <FileImage className="w-4 h-4" />
@@ -894,8 +894,8 @@ export default function AdminTemplateUploader() {
                 {templates.filter(t => t.category === 'dashboard-promo').length}
               </Badge>
             </TabsTrigger>
-            <TabsTrigger 
-              value="health-tip" 
+            <TabsTrigger
+              value="health-tip"
               className="flex items-center justify-center gap-2 py-3 text-sm data-[state=active]:bg-green-500/20 data-[state=active]:text-green-400 data-[state=active]:border-b-2 data-[state=active]:border-green-500"
             >
               <FileImage className="w-4 h-4" />
@@ -905,8 +905,8 @@ export default function AdminTemplateUploader() {
                 {templates.filter(t => t.category === 'health-tip').length}
               </Badge>
             </TabsTrigger>
-            <TabsTrigger 
-              value="birthday-card" 
+            <TabsTrigger
+              value="birthday-card"
               className="flex items-center justify-center gap-2 py-3 text-sm data-[state=active]:bg-purple-500/20 data-[state=active]:text-purple-400 data-[state=active]:border-b-2 data-[state=active]:border-purple-500"
             >
               <Calendar className="w-4 h-4" />
@@ -1022,8 +1022,8 @@ export default function AdminTemplateUploader() {
                               onClick={() => handleTogglePublish(template.id)}
                               size="sm"
                               className={`h-9 text-sm ${
-                                template.isPublished 
-                                  ? 'bg-yellow-500 hover:bg-yellow-600 text-white' 
+                                template.isPublished
+                                  ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
                                   : 'bg-emerald-500 hover:bg-emerald-600 text-white'
                               }`}
                             >
@@ -1077,7 +1077,7 @@ export default function AdminTemplateUploader() {
                   <X className="w-4 h-4 md:w-5 md:h-5" />
                 </button>
               </div>
-              
+
               <div className="bg-zinc-900 rounded-lg p-3 md:p-4 mb-3 md:mb-4">
                 <img
                   src={previewTemplate.imageUrl}

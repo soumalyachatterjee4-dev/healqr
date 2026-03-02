@@ -41,7 +41,7 @@ export default function WalkInPatientsPage({ patients, onBack, onMenuChange }: W
   const [followUpModalOpen, setFollowUpModalOpen] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
-  
+
   const [doctorInfo, setDoctorInfo] = useState<{ id: string; name: string }>({
     id: '',
     name: ''
@@ -246,15 +246,15 @@ export default function WalkInPatientsPage({ patients, onBack, onMenuChange }: W
     }
     setDietPatient(null);
   };
-  
+
   // Get current date
   const getCurrentDate = () => {
     const today = new Date();
-    const options: Intl.DateTimeFormatOptions = { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+    const options: Intl.DateTimeFormatOptions = {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
     };
     return today.toLocaleDateString('en-US', options);
   };
@@ -270,7 +270,7 @@ export default function WalkInPatientsPage({ patients, onBack, onMenuChange }: W
   const handleFollowUp = (patientId: string) => {
     const patient = verifiedPatients.find(p => p.id === patientId);
     if (!patient) return;
-    
+
     setSelectedPatient(patient);
     setFollowUpModalOpen(true);
   };
@@ -281,14 +281,14 @@ export default function WalkInPatientsPage({ patients, onBack, onMenuChange }: W
         // Calculate follow-up date
         const followUpDate = new Date();
         followUpDate.setDate(followUpDate.getDate() + days);
-        
+
         // Update booking record in Firestore
         const { db, auth } = await import('../lib/firebase/config');
         const { doc, updateDoc, addDoc, collection, serverTimestamp } = await import('firebase/firestore');
-        
+
         const doctorId = auth.currentUser?.uid || '';
         const doctorName = localStorage.getItem('doctorName') || 'Doctor';
-        
+
         // Update booking with follow-up info
         await updateDoc(doc(db, 'bookings', selectedPatient.id), {
           followUpScheduled: true,
@@ -296,7 +296,7 @@ export default function WalkInPatientsPage({ patients, onBack, onMenuChange }: W
           doctorFollowUpMessage: message,
           followUpScheduledAt: new Date(),
         });
-        
+
         // Store in scheduledFollowUps collection (same as QR patients)
         await addDoc(collection(db, 'scheduledFollowUps'), {
           patientPhone: selectedPatient.whatsappNumber,
@@ -310,7 +310,7 @@ export default function WalkInPatientsPage({ patients, onBack, onMenuChange }: W
           createdAt: serverTimestamp(),
           bookingId: selectedPatient.id,
         });
-        
+
         // ============================================
         // 🔔 SEND FOLLOW-UP NOTIFICATION IMMEDIATELY
         // Per roadmap: Follow-up commitment is PERMANENT
@@ -318,7 +318,7 @@ export default function WalkInPatientsPage({ patients, onBack, onMenuChange }: W
         // ============================================
         try {
           const { sendFollowUp } = await import('../services/notificationService');
-          
+
           await sendFollowUp({
             patientPhone: selectedPatient.whatsappNumber,
             patientName: selectedPatient.patientName,
@@ -334,7 +334,7 @@ export default function WalkInPatientsPage({ patients, onBack, onMenuChange }: W
             customMessage: message,
             language: 'english', // Walk-in patients default to English
           });
-          
+
           console.log('✅ Follow-up notification scheduled via FCM');
         } catch (notifError) {
           console.warn('⚠️ Follow-up notification error (non-blocking):', notifError);
@@ -347,7 +347,7 @@ export default function WalkInPatientsPage({ patients, onBack, onMenuChange }: W
             followUpScheduled: true,
           }
         }));
-        
+
         console.log(`✅ Follow-up scheduled for ${days} days`);
       } catch (error) {
         console.error('❌ Error scheduling follow-up:', error);
@@ -389,7 +389,7 @@ export default function WalkInPatientsPage({ patients, onBack, onMenuChange }: W
             <Calendar className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
             <span className="text-xs md:text-sm">{getCurrentDate()}</span>
           </div>
-          
+
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
             <div className="text-sm md:text-base">
               <span className="text-gray-400">Home Call: </span>
@@ -418,7 +418,7 @@ export default function WalkInPatientsPage({ patients, onBack, onMenuChange }: W
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                   <h3 className="text-white text-lg md:text-xl font-semibold">{patient.patientName}</h3>
                   {/* Booking Channel Badge - SINGLE BADGE ONLY */}
-                  <Badge 
+                  <Badge
                     className={`w-fit text-xs md:text-sm font-semibold ${
                       patient.isWalkIn
                         ? 'bg-orange-500/20 text-orange-400 border-orange-500/30'
@@ -460,7 +460,7 @@ export default function WalkInPatientsPage({ patients, onBack, onMenuChange }: W
 
                 {/* Line 3: Action Buttons for Walk-In */}
                 <div className="flex items-center gap-3 mt-4 flex-wrap">
-                  
+
                   {/* 1. History Button */}
                   <div
                     onClick={() => {
@@ -547,8 +547,8 @@ export default function WalkInPatientsPage({ patients, onBack, onMenuChange }: W
                     title={
                       patient.verificationMethod === 'manual_override'
                         ? "Disabled (Manual Verification)"
-                        : patientStates[patient.id]?.reviewScheduled 
-                          ? "Review Request Scheduled (System sends after 24h)" 
+                        : patientStates[patient.id]?.reviewScheduled
+                          ? "Review Request Scheduled (System sends after 24h)"
                           : "Review Request (System sends after 24h)"
                     }
                   >
@@ -578,8 +578,8 @@ export default function WalkInPatientsPage({ patients, onBack, onMenuChange }: W
                     title={
                       patient.verificationMethod === 'manual_override'
                         ? "Disabled (Manual Verification)"
-                        : patientStates[patient.id]?.followUpScheduled 
-                          ? "Follow-Up Scheduled" 
+                        : patientStates[patient.id]?.followUpScheduled
+                          ? "Follow-Up Scheduled"
                           : "Schedule Follow-Up (As set)"
                     }
                   >

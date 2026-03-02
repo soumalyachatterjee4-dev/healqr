@@ -49,7 +49,7 @@ export default function VerifyWalkin({ bookingId }: VerifyWalkinProps) {
               // Try fetching from doctors collection first
               const doctorRef = doc(db, 'doctors', data.doctorId);
               const doctorSnap = await getDoc(doctorRef);
-              
+
               if (doctorSnap.exists()) {
                 setDoctorData(doctorSnap.data());
               } else {
@@ -90,7 +90,7 @@ export default function VerifyWalkin({ bookingId }: VerifyWalkinProps) {
         const trimmed = digits.replace(/^91/, '');
         const phone10 = trimmed.slice(-10);
         const userId = `patient_${phone10}`;
-        
+
         fcmToken = await requestNotificationPermission(userId, 'patient');
       } catch (err) {
         console.warn('FCM permission failed or denied:', err);
@@ -132,7 +132,7 @@ export default function VerifyWalkin({ bookingId }: VerifyWalkinProps) {
         // Walk-in verified — Doctor will press Eye button to start consultation flow
         // No auto 30-min notification anymore — flows through Eye → RX → Diet → Consultation Complete
         console.log('✅ Walk-in verified — awaiting doctor consultation flow');
-        
+
         // Schedule "Star" Notification (24 hours delay)
         // Check for Clinic Restrictions
         let isReviewRestricted = false;
@@ -154,13 +154,13 @@ export default function VerifyWalkin({ bookingId }: VerifyWalkinProps) {
         } else {
           console.log('🚫 Review request suppressed by Clinic settings');
         }
-        
+
         console.log('✅ Notifications scheduled successfully');
       } catch (notifErr) {
         console.error('⚠️ Failed to schedule notifications:', notifErr);
         // Non-blocking error
       }
-      
+
     } catch (err) {
       console.error('Verification failed:', err);
       toast.error('Verification failed. Please try again.');
@@ -212,7 +212,7 @@ export default function VerifyWalkin({ bookingId }: VerifyWalkinProps) {
             <div className="bg-gray-800/50 rounded-lg p-4 text-left mb-6">
               <p className="text-sm text-gray-500 mb-1">Patient Name</p>
               <p className="text-white font-medium text-lg mb-3">{bookingData.patientName}</p>
-              
+
               <div className="grid grid-cols-2 gap-4 mb-3">
                 <div>
                   <p className="text-sm text-gray-500 mb-1">Age</p>
@@ -230,7 +230,7 @@ export default function VerifyWalkin({ bookingId }: VerifyWalkinProps) {
                   <p className="text-white font-medium">{bookingData.purposeOfVisit}</p>
                 </div>
               )}
-              
+
               <p className="text-sm text-gray-500 mb-1">Doctor</p>
               <p className="text-white font-medium">{bookingData.doctorName}</p>
             </div>
@@ -271,7 +271,7 @@ export default function VerifyWalkin({ bookingId }: VerifyWalkinProps) {
               <label className="text-xs text-gray-500 uppercase tracking-wider">Patient Name</label>
               <p className="text-white text-lg font-medium">{bookingData.patientName}</p>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-xs text-gray-500 uppercase tracking-wider">Phone</label>
@@ -302,8 +302,8 @@ export default function VerifyWalkin({ bookingId }: VerifyWalkinProps) {
             )}
           </div>
 
-          <Button 
-            onClick={handleConfirm} 
+          <Button
+            onClick={handleConfirm}
             disabled={verifying}
             className="w-full bg-emerald-500 hover:bg-emerald-600 text-white h-12 text-lg font-medium"
           >
@@ -316,7 +316,7 @@ export default function VerifyWalkin({ bookingId }: VerifyWalkinProps) {
               'Confirm & Get Digital Record'
             )}
           </Button>
-          
+
           <p className="text-xs text-gray-500 text-center mt-4">
             By confirming, you agree to receive updates about your appointment.
           </p>
