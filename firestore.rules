@@ -64,6 +64,17 @@ service cloud.firestore {
 
       // No deletes allowed
       allow delete: if false;
+
+      // ============================================
+      // TEMP DOCTOR ACCESS SUBCOLLECTION
+      // ============================================
+      match /tempDoctorAccess/{accessId} {
+        // Allow read by anyone (temp doctors need to validate token/PIN without auth)
+        allow read: if true;
+
+        // Allow create/update/delete by clinic owner only
+        allow create, update, delete: if isAuthenticated() && request.auth.uid == clinicId;
+      }
     }
 
     // ============================================

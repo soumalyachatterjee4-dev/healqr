@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 /**
  * TempDoctorLogin — Login page for temporary doctor access.
  * URL: /temp-doctor-login?token=xxx
- * 
+ *
  * Flow:
  * 1. Reads `token` from URL params
  * 2. Looks up `tempDoctorAccess` subcollection under the clinic doc
@@ -35,6 +35,7 @@ const TempDoctorLogin: React.FC = () => {
     try {
       const urlParams = new URLSearchParams(window.location.search);
       const token = urlParams.get('token');
+      const clinicIdParam = urlParams.get('clinic');
 
       if (!token) {
         setError('Invalid access link. Please request a new link from the clinic.');
@@ -42,24 +43,34 @@ const TempDoctorLogin: React.FC = () => {
         return;
       }
 
-      // Search across all clinics' tempDoctorAccess subcollections
-      // We need to find which clinic this token belongs to
-      const clinicsRef = collection(db, 'clinics');
-      const clinicsSnap = await getDocs(clinicsRef);
-
       let foundData: any = null;
       let foundClinicId = '';
       let foundDocId = '';
 
-      for (const clinicDoc of clinicsSnap.docs) {
-        const tempAccessRef = collection(db, 'clinics', clinicDoc.id, 'tempDoctorAccess');
+      if (clinicIdParam) {
+        // Direct lookup using clinicId from URL (fast path)
+        const tempAccessRef = collection(db, 'clinics', clinicIdParam, 'tempDoctorAccess');
         const q = query(tempAccessRef, where('accessToken', '==', token), where('isActive', '==', true));
         const snap = await getDocs(q);
         if (!snap.empty) {
           foundData = snap.docs[0].data();
-          foundClinicId = clinicDoc.id;
+          foundClinicId = clinicIdParam;
           foundDocId = snap.docs[0].id;
-          break;
+        }
+      } else {
+        // Fallback: Search across all clinics (for old links without clinic param)
+        const clinicsRef = collection(db, 'clinics');
+        const clinicsSnap = await getDocs(clinicsRef);
+        for (const clinicDoc of clinicsSnap.docs) {
+          const tempAccessRef = collection(db, 'clinics', clinicDoc.id, 'tempDoctorAccess');
+          const q = query(tempAccessRef, where('accessToken', '==', token), where('isActive', '==', true));
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            foundData = snap.docs[0].data();
+            foundClinicId = clinicDoc.id;
+            foundDocId = snap.docs[0].id;
+            break;
+          }
         }
       }
 
@@ -128,13 +139,13 @@ const TempDoctorLogin: React.FC = () => {
 
   const parseTimeToMinutes = (timeStr: string): number => {
     if (!timeStr) return -1;
-    
+
     // Handle "HH:MM" format
     if (/^\d{1,2}:\d{2}$/.test(timeStr)) {
       const [h, m] = timeStr.split(':').map(Number);
       return h * 60 + m;
     }
-    
+
     // Handle "H:MM AM/PM" format
     const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
     if (match) {
@@ -145,7 +156,7 @@ const TempDoctorLogin: React.FC = () => {
       if (period === 'AM' && h === 12) h = 0;
       return h * 60 + m;
     }
-    
+
     return -1;
   };
 
@@ -189,12 +200,17 @@ const TempDoctorLogin: React.FC = () => {
         return;
       }
 
-      // Update last login
-      const docRef = doc(db, 'clinics', tokenData.clinicId, 'tempDoctorAccess', tokenData.docId);
-      await updateDoc(docRef, {
-        lastLoginAt: serverTimestamp(),
-        loginCount: (tokenData.loginCount || 0) + 1
-      });
+      // Update last login (non-blocking — may fail if unauthenticated, that's OK)
+      try {
+        const docRef = doc(db, 'clinics', tokenData.clinicId, 'tempDoctorAccess', tokenData.docId);
+        await updateDoc(docRef, {
+          lastLoginAt: serverTimestamp(),
+          loginCount: (tokenData.loginCount || 0) + 1
+        });
+      } catch (e) {
+        // Expected for unauthenticated temp doctors — login tracking is optional
+        console.log('Login tracking update skipped (expected for temp access)');
+      }
 
       // Set localStorage for temp doctor session
       localStorage.setItem('healqr_is_temp_doctor', 'true');

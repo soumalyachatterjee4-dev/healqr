@@ -205,7 +205,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
         loginCount: 0
       });
 
-      const link = `${window.location.origin}/temp-doctor-login?token=${accessToken}`;
+      const link = `${window.location.origin}/temp-doctor-login?token=${accessToken}&clinic=${clinicId}`;
       setTempAccessData(prev => ({
         ...prev,
         [doctor.uid]: { link, pin: accessPin, expiry: today }
