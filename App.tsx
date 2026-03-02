@@ -1095,8 +1095,10 @@ export default function App() {
       if (user) {
         // Check localStorage first for quick routing (set by VerifyLogin)
         const isClinicFromStorage = localStorage.getItem('healqr_is_clinic') === 'true';
+        const isAssistantFromStorage = localStorage.getItem('healqr_is_assistant') === 'true';
 
-        if (isClinicFromStorage) {
+        if (isClinicFromStorage && !isAssistantFromStorage) {
+          // Pure clinic owner - fast route to clinic dashboard (assistants need validation below)
           console.log('âœ… Clinic user detected from localStorage - routing to clinic dashboard');
           setCurrentPage('clinic-dashboard');
           setIsAuthInitialized(true);
@@ -1234,7 +1236,8 @@ export default function App() {
                 if (data.logoUrl) {
                   setUserProfilePhoto(data.logoUrl);
                 }
-                // Clinic specific sync...
+                // Route clinic users (including clinic assistants) to clinic dashboard
+                setCurrentPage('clinic-dashboard');
                 setIsAuthInitialized(true);
                 return;
               }
@@ -2308,9 +2311,9 @@ export default function App() {
 
             // Route based on user type
             if (isClinic) {
-              setCurrentPage("clinic-dashboard");
+              setCurrentPage("clinic-dashboard"); // Clinic owners AND clinic assistants
             } else if (isAssistant) {
-              setCurrentPage("dashboard"); // Assistants use doctor dashboard
+              setCurrentPage("dashboard"); // Doctor assistants use doctor dashboard
             } else {
               setCurrentPage("dashboard"); // Doctors
             }

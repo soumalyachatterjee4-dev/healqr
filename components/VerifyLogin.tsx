@@ -31,17 +31,17 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
       }
 
       // Get email from localStorage (multiple sources)
-      let email = localStorage.getItem('healqr_email_for_signin') 
+      let email = localStorage.getItem('healqr_email_for_signin')
                   || localStorage.getItem('healqr_user_email');
-      
+
       if (!email) {
         // If not in localStorage, ask user to enter their email
         email = window.prompt('Please enter the email address you used to login:');
-        
+
         if (!email || !email.includes('@')) {
           throw new Error('Valid email address is required for login');
         }
-        
+
         // Store for future use (normalized)
         email = email.toLowerCase().trim();
         localStorage.setItem('healqr_email_for_signin', email);
@@ -60,17 +60,17 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
       const { db } = await import('../lib/firebase/config');
       if (db) {
         const { collection, query, where, getDocs, limit, doc, getDoc } = await import('firebase/firestore');
-        
+
         // First check if this is an assistant (email-based)
         const assistantsRef = collection(db, 'assistants');
         const assistantQuery = query(
-          assistantsRef, 
-          where('assistantEmail', '==', email), 
+          assistantsRef,
+          where('assistantEmail', '==', email),
           where('isActive', '==', true),
           limit(1)
         );
         const assistantSnap = await getDocs(assistantQuery);
-        
+
         if (!assistantSnap.empty) {
           // This is an assistant - store minimal data, App.tsx will load full profile
           const assistantData = assistantSnap.docs[0].data();
@@ -80,27 +80,32 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
           localStorage.setItem('userId', assistantData.doctorId);
           localStorage.setItem('healqr_authenticated', 'true');
           localStorage.setItem('healqr_user_email', email);
-          
-          console.log('✅ Assistant login detected:', email);
+
+          // Check if assistant belongs to a clinic
+          if (assistantData.isClinic) {
+            localStorage.setItem('healqr_is_clinic', 'true');
+          }
+
+          console.log('✅ Assistant login detected:', email, assistantData.isClinic ? '(clinic)' : '(doctor)');
         } else {
           // Check if this is a clinic user (UID-based)
           const clinicDocRef = doc(db, 'clinics', user.uid);
           const clinicDoc = await getDoc(clinicDocRef);
-          
+
           if (clinicDoc.exists()) {
             // This is a clinic - store minimal data
             localStorage.setItem('userId', user.uid);
             localStorage.setItem('healqr_user_email', email);
             localStorage.setItem('healqr_authenticated', 'true');
             localStorage.setItem('healqr_is_clinic', 'true');
-            
+
             console.log('✅ Clinic login detected:', user.uid);
           } else {
             // Regular doctor - store just the UID, App.tsx will load full profile
             localStorage.setItem('userId', user.uid);
             localStorage.setItem('healqr_user_email', email);
             localStorage.setItem('healqr_authenticated', 'true');
-            
+
             console.log('✅ Doctor login detected:', user.uid);
           }
         }
@@ -124,7 +129,7 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
         window.history.replaceState({}, '', '/');
         // Force app to re-check auth state
         window.dispatchEvent(new Event('popstate'));
-        
+
         // Show success message briefly
         setTimeout(() => {
           window.location.reload();
@@ -133,19 +138,19 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
 
     } catch (error: any) {
       console.error('❌ Login verification error:', error);
-      
+
       // If link is invalid/expired, redirect to landing page
       if (error.code === 'auth/invalid-action-code' || error.code === 'auth/expired-action-code') {
         setStatus('error');
         setMessage('This login link has expired or was already used. Please request a new one.');
-        
+
         // Redirect to landing after 3 seconds
         setTimeout(() => {
           window.location.href = '/';
         }, 3000);
         return;
       }
-      
+
       setStatus('error');
       setMessage(error.message || 'Failed to verify login');
       if (onError) onError();

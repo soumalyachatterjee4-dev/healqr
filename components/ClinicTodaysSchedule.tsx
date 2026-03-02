@@ -279,6 +279,10 @@ function ChamberPatientDetailsLoader({
               clinicId: data.clinicId || '',
               digitalRxUrl: data.digitalRxUrl || '',
               dietChartUrl: data.dietChartUrl || '',
+              // Video consultation Firestore fields
+              vcPatientJoined: data.vcPatientJoined || false,
+              vcCompleted: data.vcCompleted || false,
+              vcLinkSentAt: data.vcLinkSentAt || null,
             };
           });
 

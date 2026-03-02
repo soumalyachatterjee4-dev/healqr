@@ -401,7 +401,7 @@ RULES:
 
     const data = await response.json();
     console.log('🔍 Full Gemini response structure:', JSON.stringify(data).substring(0, 500));
-    
+
     // Gemini 2.5 may return thinking + text parts
     const parts = data.candidates?.[0]?.content?.parts || [];
     let text = '';
@@ -411,18 +411,18 @@ RULES:
     if (!text) throw new Error('No response from AI');
 
     console.log('🤖 Gemini raw response:', text);
-    
+
     // Clean: remove markdown fences, thinking blocks, extra whitespace
     let cleanJson = text
       .replace(/```json\s*/gi, '')
       .replace(/```\s*/g, '')
       .replace(/<think>[\s\S]*?<\/think>/g, '') // Remove thinking tags if any
       .trim();
-    
+
     // Find the JSON object in the text (sometimes there's preamble text)
     const jsonMatch = cleanJson.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('Could not find JSON in AI response');
-    
+
     const parsed = JSON.parse(jsonMatch[0]);
     console.log('✅ Parsed result:', parsed);
     return parsed;
@@ -473,13 +473,13 @@ RULES:
     try {
       // Send BOTH full original images AND cropped portions for better AI context
       const filesToProcess: File[] = [];
-      
+
       // Always include full original images first (gives Gemini full context)
       for (let i = 0; i < selectedFiles.length; i++) {
         filesToProcess.push(selectedFiles[i]);
         console.log(`📄 Page ${i + 1}: added full original image`);
       }
-      
+
       // Then add cropped portions (helps Gemini focus on medicine area)
       for (let i = 0; i < selectedFiles.length; i++) {
         const region = savedRegions[i];
@@ -821,7 +821,7 @@ RULES:
                     onClick={handleDecodeAndTranslate}
                     disabled={!hasAnyCropSelection}
                     className={`w-full py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 transition-opacity shadow-lg ${
-                      hasAnyCropSelection 
+                      hasAnyCropSelection
                         ? 'bg-gradient-to-r from-pink-500 via-fuchsia-500 to-pink-600 text-white hover:opacity-90 shadow-pink-500/20'
                         : 'bg-gray-700 text-gray-500 cursor-not-allowed shadow-none'
                     }`}

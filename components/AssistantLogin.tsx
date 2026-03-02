@@ -46,7 +46,7 @@ export default function AssistantLogin() {
       }
 
       const data = snapshot.docs[0].data();
-      
+
       // Check if assistant is active
       if (!data.isActive) {
         setTokenValid(false);
@@ -108,15 +108,15 @@ export default function AssistantLogin() {
         'preview-center': 'preview',
         'personalized-template': 'personalized-templates',
       };
-      
+
       const migratePageIds = (pages: string[]): string[] => {
         return pages.map(pageId => PAGE_ID_MIGRATION[pageId] || pageId);
       };
-      
+
       // Get allowed pages and migrate them
       const rawAllowedPages = assistantData.allowedPages || [];
       const migratedPages = migratePageIds(rawAllowedPages);
-      
+
       console.log('🔐 LOGIN - Raw pages from DB:', rawAllowedPages);
       console.log('🔐 LOGIN - Migrated pages:', migratedPages);
 
@@ -129,7 +129,12 @@ export default function AssistantLogin() {
       localStorage.setItem('healqr_user_name', assistantData.doctorName); // Doctor's name - FIXED
       localStorage.setItem('healqr_authenticated', 'true'); // Required by App.tsx
       localStorage.setItem('healqr_qr_code', 'assistant'); // Dummy value to pass auth check
-      
+
+      // Check if assistant belongs to a clinic
+      if (assistantData.isClinic) {
+        localStorage.setItem('healqr_is_clinic', 'true');
+      }
+
       // Mark that profile is loaded so App.tsx goes to dashboard
       localStorage.setItem('healqr_profile_loaded', 'true');
 
@@ -137,9 +142,13 @@ export default function AssistantLogin() {
         description: `Welcome, ${assistantData.assistantName}`
       });
 
-      // Redirect to dashboard
+      // Redirect to appropriate dashboard based on parent type
       setTimeout(() => {
-        window.location.href = '/?page=dashboard';
+        if (assistantData.isClinic) {
+          window.location.href = '/?page=clinic-dashboard';
+        } else {
+          window.location.href = '/?page=dashboard';
+        }
       }, 1000);
 
     } catch (error: any) {

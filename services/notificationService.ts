@@ -1,4 +1,5 @@
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { Timestamp } from 'firebase/firestore';
 import { app } from '../lib/firebase/config';
 import { saveNotificationHistory } from './notificationHistoryService';
 
@@ -178,7 +179,17 @@ export const sendConsultationCompleted = async (data: any) => {
         isWalkIn: data.isWalkIn,
         walkInVerified: data.walkInVerified,
         rxUrl: data.rxUrl,
-      }
+        dietUrl: data.dietUrl,
+      },
+      // 🆕 Store download URLs with 72-hour expiry
+      ...(data.rxUrl || data.dietUrl ? {
+        downloadUrls: {
+          ...(data.rxUrl ? { rxUrl: data.rxUrl } : {}),
+          ...(data.dietUrl ? { dietUrl: data.dietUrl } : {}),
+          createdAt: Timestamp.now(),
+          expiresAt: Timestamp.fromDate(new Date(Date.now() + 72 * 60 * 60 * 1000)),
+        }
+      } : {}),
     });
     console.log('✅ Notification stored in Firestore for patient:', phone10);
   } catch (storageError) {
@@ -297,7 +308,15 @@ export const sendRxUpdatedNotification = async (data: any) => {
       metadata: {
         rxUrl: data.rxUrl,
         isUpdated: true,
-      }
+      },
+      // 🆕 Store download URL with 72-hour expiry
+      ...(data.rxUrl ? {
+        downloadUrls: {
+          rxUrl: data.rxUrl,
+          createdAt: Timestamp.now(),
+          expiresAt: Timestamp.fromDate(new Date(Date.now() + 72 * 60 * 60 * 1000)),
+        }
+      } : {}),
     });
     console.log('✅ RX Updated notification stored for patient:', phone10);
   } catch (storageError) {

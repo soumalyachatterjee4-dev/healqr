@@ -290,6 +290,10 @@ function PatientDetailsLoader({
               clinicId: bookingClinicId || '',
               digitalRxUrl: data.digitalRxUrl || '',
               dietChartUrl: data.dietChartUrl || '',
+              // Video consultation Firestore fields
+              vcPatientJoined: data.vcPatientJoined || false,
+              vcCompleted: data.vcCompleted || false,
+              vcLinkSentAt: data.vcLinkSentAt || null,
             };
           })
           // Filter out invalid patients (already filtered by date in query)

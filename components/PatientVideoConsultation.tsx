@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Video, Mic, MicOff, VideoOff, PhoneOff, MonitorUp, Settings, User, Clock, AlertCircle, CheckCircle, Calendar } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
+import { db } from '../lib/firebase/config';
 
 interface PatientVideoConsultationProps {
   meetingId?: string;
@@ -46,17 +47,63 @@ export default function PatientVideoConsultation({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Handle join call
-  const handleJoinCall = () => {
+  // Handle join call - update Firestore so doctor sees patient is waiting
+  const handleJoinCall = async () => {
     setCallStatus('connecting');
+
+    // Update Firestore: Mark patient as joined
+    try {
+      if (db && bookingId) {
+        const { collection, query, where, getDocs, updateDoc } = await import('firebase/firestore');
+        // Find the booking document by bookingId field
+        const bookingsRef = collection(db, 'bookings');
+        const q = query(bookingsRef, where('bookingId', '==', bookingId));
+        const snapshot = await getDocs(q);
+
+        if (!snapshot.empty) {
+          const bookingDoc = snapshot.docs[0];
+          await updateDoc(bookingDoc.ref, {
+            vcPatientJoined: true,
+            vcPatientJoinedAt: new Date(),
+          });
+          console.log('✅ Updated Firestore: Patient joined VC room');
+        } else {
+          console.warn('⚠️ Booking not found for ID:', bookingId);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to update patient join status:', err);
+    }
+
     setTimeout(() => {
       setCallStatus('connected');
     }, 2000);
   };
 
-  // Handle end call
-  const handleEndCall = () => {
+  // Handle end call - mark VC as completed
+  const handleEndCall = async () => {
     setCallStatus('ended');
+
+    // Update Firestore: Mark VC as completed
+    try {
+      if (db && bookingId) {
+        const { collection, query, where, getDocs, updateDoc } = await import('firebase/firestore');
+        const bookingsRef = collection(db, 'bookings');
+        const q = query(bookingsRef, where('bookingId', '==', bookingId));
+        const snapshot = await getDocs(q);
+
+        if (!snapshot.empty) {
+          const bookingDoc = snapshot.docs[0];
+          await updateDoc(bookingDoc.ref, {
+            vcCompleted: true,
+            vcCompletedAt: new Date(),
+          });
+          console.log('✅ Updated Firestore: VC completed');
+        }
+      }
+    } catch (err) {
+      console.error('Failed to mark VC as completed:', err);
+    }
   };
 
   // Waiting Room
@@ -162,7 +209,7 @@ export default function PatientVideoConsultation({
                     <p className="text-gray-400">Camera is off</p>
                   </div>
                 )}
-                
+
                 {/* Preview Controls */}
                 <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-3">
                   <button
@@ -298,8 +345,8 @@ export default function PatientVideoConsultation({
             <button
               onClick={() => setIsMicOn(!isMicOn)}
               className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${
-                isMicOn 
-                  ? 'bg-gray-700 hover:bg-gray-600' 
+                isMicOn
+                  ? 'bg-gray-700 hover:bg-gray-600'
                   : 'bg-red-500 hover:bg-red-600'
               }`}
               title={isMicOn ? 'Mute' : 'Unmute'}
@@ -315,8 +362,8 @@ export default function PatientVideoConsultation({
             <button
               onClick={() => setIsVideoOn(!isVideoOn)}
               className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${
-                isVideoOn 
-                  ? 'bg-gray-700 hover:bg-gray-600' 
+                isVideoOn
+                  ? 'bg-gray-700 hover:bg-gray-600'
                   : 'bg-red-500 hover:bg-red-600'
               }`}
               title={isVideoOn ? 'Turn off camera' : 'Turn on camera'}
@@ -332,8 +379,8 @@ export default function PatientVideoConsultation({
             <button
               onClick={() => setIsScreenSharing(!isScreenSharing)}
               className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${
-                isScreenSharing 
-                  ? 'bg-blue-500 hover:bg-blue-600' 
+                isScreenSharing
+                  ? 'bg-blue-500 hover:bg-blue-600'
                   : 'bg-gray-700 hover:bg-gray-600'
               }`}
               title="Share screen"

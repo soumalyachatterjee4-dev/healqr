@@ -1,16 +1,15 @@
 ﻿import { useState } from 'react';
-import { Video, Calendar, Clock, User, FileText, CheckCircle2, XCircle, Menu, Filter, ArrowLeft, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Video, Calendar, Clock, User, FileText, CheckCircle2, XCircle, Menu, Filter, ArrowLeft } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import ClinicSidebar from './ClinicSidebar';
-import { toast } from 'sonner';
 
 interface VideoConsultationHistory {
   id: string;
   date: string;
   time: string;
   patientName: string;
-  duration: string; // e.g., "25 min", "30 min"
+  duration: string;
   rxSent: boolean;
 }
 
@@ -20,25 +19,22 @@ interface ClinicVideoConsultationManagerProps {
   onMenuChange?: (menu: string) => void;
   onLogout?: () => void;
   activeAddOns?: string[];
-  isSidebarCollapsed?: boolean;
-  setIsSidebarCollapsed?: (collapsed: boolean) => void;
+  isAssistant?: boolean;
+  assistantAllowedPages?: string[];
 }
 
 export default function ClinicVideoConsultationManager({
-  clinicId,
-  clinicName,
   onMenuChange,
   onLogout,
-  activeAddOns = [],
-  isSidebarCollapsed = false,
-  setIsSidebarCollapsed
+  isAssistant = false,
+  assistantAllowedPages = []
 }: ClinicVideoConsultationManagerProps) {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<'today' | 'yesterday' | 'custom'>('today');
   const [selectedDate, setSelectedDate] = useState<string>('');
 
-  // Consultation history - Start empty (to be populated from backend later)
-  const [consultationHistory, setConsultationHistory] = useState<VideoConsultationHistory[]>([]);
+  // Consultation history - Start empty (to be populated from Firestore based on clinicId)
+  const [consultationHistory] = useState<VideoConsultationHistory[]>([]);
 
   const getTodayDate = () => {
     const today = new Date();
@@ -85,26 +81,22 @@ export default function ClinicVideoConsultationManager({
     }
   };
 
-  // Wait 1 second before showing the loading state, then show empty state.
-  // Real implementation would fetch from Firestore based on clinicId.
-
   return (
-    <div className="flex h-screen bg-gray-950 text-white">
+    <div className="min-h-screen bg-[#0a0f1a] text-white">
       {/* Sidebar */}
       <ClinicSidebar
         isOpen={isMobileSidebarOpen}
         onClose={() => setIsMobileSidebarOpen(false)}
-        activeMenu="video-consultation"
+        activeMenu="video-consult"
         onMenuChange={onMenuChange || (() => {})}
         onLogout={onLogout || (() => {})}
-        activeAddOns={activeAddOns}
-        isCollapsed={isSidebarCollapsed}
-        onToggleCollapse={() => setIsSidebarCollapsed?.(!isSidebarCollapsed)}
+        isAssistant={isAssistant}
+        assistantAllowedPages={assistantAllowedPages}
       />
 
       {/* Main Content */}
-      <div className={`flex-1 overflow-auto transition-all duration-300 ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`}>
-        {/* Header - Fixed */}
+      <div className="transition-all duration-300 lg:pl-64">
+        {/* Header */}
         <div className="border-b border-gray-800 bg-[#0a0f1a]/95 backdrop-blur sticky top-0 z-40">
           <div className="flex items-center justify-between px-4 lg:px-8 py-4">
             <div className="flex items-center gap-4">
@@ -116,20 +108,13 @@ export default function ClinicVideoConsultationManager({
               >
                 <Menu className="w-6 h-6" />
               </Button>
-              <button
-                onClick={() => setIsSidebarCollapsed?.(!isSidebarCollapsed)}
-                className="hidden lg:flex w-10 h-10 bg-zinc-900 hover:bg-zinc-800 rounded-lg items-center justify-center transition-colors"
-                title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-              >
-                <ChevronLeft className={`w-5 h-5 text-blue-500 transition-transform duration-300 ${isSidebarCollapsed ? 'rotate-180' : ''}`} />
-              </button>
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                  <Video className="w-6 h-6 text-blue-400" />
+                <div className="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center">
+                  <Video className="w-6 h-6 text-red-400" />
                 </div>
                 <div>
                   <h1 className="text-white text-xl uppercase font-black tracking-tight">Video Consultation History</h1>
-                  <p className="text-zinc-100 text-sm mt-0.5 font-semibold">View all past video consultations for {clinicName || 'Clinic'}</p>
+                  <p className="text-zinc-100 text-sm mt-1 font-semibold">View all past video consultations</p>
                 </div>
               </div>
             </div>
@@ -138,7 +123,7 @@ export default function ClinicVideoConsultationManager({
 
         {/* Content */}
         <div className="px-4 lg:px-8 py-8 max-w-7xl mx-auto">
-          {/* Back Button - Shifted on mobile to avoid overlap */}
+          {/* Back Button */}
           <Button
             onClick={() => onMenuChange?.('dashboard')}
             variant="ghost"
@@ -148,11 +133,10 @@ export default function ClinicVideoConsultationManager({
             Back to Dashboard
           </Button>
 
-
           {/* Date Filter */}
           <Card className="bg-gray-800/50 border-gray-700 p-6 mb-6">
             <div className="flex items-center gap-2 mb-4">
-              <Filter className="w-5 h-5 text-blue-400" />
+              <Filter className="w-5 h-5 text-emerald-400" />
               <h2 className="text-white">Filter by Date</h2>
             </div>
 
@@ -162,7 +146,7 @@ export default function ClinicVideoConsultationManager({
                 onClick={() => handleFilterChange('today')}
                 className={`${
                   selectedFilter === 'today'
-                    ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                    ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
                     : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
                 }`}
               >
@@ -174,7 +158,7 @@ export default function ClinicVideoConsultationManager({
                 onClick={() => handleFilterChange('yesterday')}
                 className={`${
                   selectedFilter === 'yesterday'
-                    ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                    ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
                     : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
                 }`}
               >
@@ -186,7 +170,7 @@ export default function ClinicVideoConsultationManager({
                 onClick={() => handleFilterChange('custom')}
                 className={`${
                   selectedFilter === 'custom'
-                    ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                    ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
                     : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
                 }`}
               >
@@ -200,7 +184,7 @@ export default function ClinicVideoConsultationManager({
                   type="date"
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="bg-gray-900 border border-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="bg-gray-900 border border-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               )}
 
@@ -219,7 +203,7 @@ export default function ClinicVideoConsultationManager({
             {/* Table Header */}
             <div className="bg-gray-900/50 border-b border-gray-700 px-6 py-4">
               <h2 className="text-white flex items-center gap-2">
-                <Clock className="w-5 h-5 text-blue-400" />
+                <Clock className="w-5 h-5 text-emerald-400" />
                 Consultation Records
               </h2>
             </div>
@@ -278,7 +262,7 @@ export default function ClinicVideoConsultationManager({
                           {/* Patient Name */}
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2">
-                              <User className="w-4 h-4 text-blue-400" />
+                              <User className="w-4 h-4 text-emerald-400" />
                               <span className="text-white font-medium">{item.patientName}</span>
                             </div>
                           </td>
@@ -294,7 +278,7 @@ export default function ClinicVideoConsultationManager({
                           {/* RX Sent Status */}
                           <td className="px-6 py-4">
                             {item.rxSent ? (
-                              <span className="inline-flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/30 text-blue-400 text-sm px-3 py-1 rounded-full">
+                              <span className="inline-flex items-center gap-1.5 bg-green-500/10 border border-green-500/30 text-green-400 text-sm px-3 py-1 rounded-full">
                                 <CheckCircle2 className="w-3.5 h-3.5" />
                                 Sent
                               </span>
@@ -332,7 +316,7 @@ export default function ClinicVideoConsultationManager({
                       </div>
                       <div className="flex items-center justify-between mt-2">
                         <div className="flex items-center gap-2">
-                          <User className="w-4 h-4 text-blue-400" />
+                          <User className="w-4 h-4 text-emerald-400" />
                           <span className="text-white font-medium">{item.patientName}</span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -349,7 +333,7 @@ export default function ClinicVideoConsultationManager({
                         </div>
                         <div className="flex items-center gap-2">
                           {item.rxSent ? (
-                            <span className="inline-flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/30 text-blue-400 text-sm px-3 py-1 rounded-full">
+                            <span className="inline-flex items-center gap-1.5 bg-green-500/10 border border-green-500/30 text-green-400 text-sm px-3 py-1 rounded-full">
                               <CheckCircle2 className="w-3.5 h-3.5" />
                               Sent
                             </span>
@@ -391,8 +375,8 @@ export default function ClinicVideoConsultationManager({
                       {filteredData.filter(item => item.rxSent).length}
                     </p>
                   </div>
-                  <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                    <CheckCircle2 className="w-6 h-6 text-blue-400" />
+                  <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
+                    <CheckCircle2 className="w-6 h-6 text-green-400" />
                   </div>
                 </div>
               </Card>

@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase/config';
 import { translateDataValue, transliterateName, type Language } from '../utils/translations';
-import { sendAppointmentRestored, sendAppointmentCancelled } from '../services/notificationService';
+import { sendAppointmentRestored, sendAppointmentCancelled, sendVideoCallLink } from '../services/notificationService';
 
 interface Patient {
   id: string;
@@ -79,6 +79,8 @@ interface PatientButtonStates {
     reminderEligible: boolean; // Is reminder eligible (6+ hours gap)
     videoLinkSent: boolean; // For video consultation - track if link sent (system controlled)
     patientWaiting: boolean; // For video consultation - track if patient is waiting on the other side
+    vcCompleted: boolean; // For video consultation - track if VC session is completed (doctor ended call)
+    vcLinkSentViaFCM: boolean; // Track if FCM VC link was actually sent (not just local state)
     prescriptionUploaded: boolean; // Track if doctor has uploaded today's prescription
     digitalRxUsed: boolean; // Track if Digital RX was generated for this patient
     dietChartUsed: boolean; // Track if AI Diet Chart was generated for this patient
@@ -177,8 +179,10 @@ export default function PatientDetails({
         reviewScheduled: patient.reviewScheduled || false,
         isCancelled: patient.isCancelled || false,
         reminderEligible: isReminderEligible,
-        videoLinkSent: videoLinkSent, // Set immediately if within 30-min window
-        patientWaiting: false, // System will set to true when patient clicks the link
+        videoLinkSent: videoLinkSent || !!(patient as any).vcLinkSentAt, // Set if within window OR previously sent
+        patientWaiting: !!(patient as any).vcPatientJoined, // Loaded from Firestore
+        vcCompleted: !!(patient as any).vcCompleted, // Loaded from Firestore
+        vcLinkSentViaFCM: !!(patient as any).vcLinkSentAt, // Track if FCM was actually sent
         prescriptionUploaded: false, // Initially no prescription uploaded
         digitalRxUsed: !!patient.digitalRxUrl, // True if Digital RX was already generated
         dietChartUsed: !!patient.dietChartUrl, // True if AI Diet Chart was already generated
@@ -489,50 +493,80 @@ export default function PatientDetails({
 
   // handleMarkedSeen replaced by multi-step flow: Eye → RX modal → Diet Chart → finalizeConsultation()
 
-  // Auto-send video link 30 minutes before appointment (System controlled)
+  // Auto-send video consultation link 30 minutes before appointment via FCM
   useEffect(() => {
-    const checkAndSendVideoLinks = () => {
+    const checkAndSendVideoLinks = async () => {
       const now = new Date();
 
-      patients.forEach(patient => {
+      for (const patient of patients) {
         const state = patientStates[patient.id];
 
         // Only for video consultation patients
-        if (patient.consultationType !== 'video') return;
+        if (patient.consultationType !== 'video') continue;
 
-        // Skip if link already sent or appointment cancelled
-        if (state.videoLinkSent || state.isCancelled) return;
+        // Skip if link already sent via FCM or appointment cancelled
+        if (state.vcLinkSentViaFCM || state.isCancelled) continue;
 
         // Calculate time until appointment
         const timeUntilAppointment = patient.appointmentTime.getTime() - now.getTime();
         const minutesUntilAppointment = timeUntilAppointment / (1000 * 60);
 
-        // Auto-send link if within 30 minute window
-        if (minutesUntilAppointment <= 30 && minutesUntilAppointment > 0) {
+        // Auto-send link if within 30 minute window (and appointment hasn't passed)
+        if (minutesUntilAppointment <= 30 && minutesUntilAppointment > -30) {
+          // Mark as sent locally immediately to prevent duplicate sends
           setPatientStates(prev => ({
             ...prev,
             [patient.id]: {
               ...prev[patient.id],
               videoLinkSent: true,
+              vcLinkSentViaFCM: true,
             }
           }));
 
-          // Simulate patient clicking link after 3-8 seconds (for demo purposes)
-          setTimeout(() => {
-            setPatientStates(prev => ({
-              ...prev,
-              [patient.id]: {
-                ...prev[patient.id],
-                patientWaiting: true,
+          // Send VC link via FCM notification to patient
+          try {
+            const doctorName = localStorage.getItem('healqr_user_name') || 'Doctor';
+            const doctorId = localStorage.getItem('userId') || '';
+
+            console.log(`📹 Sending VC link to ${patient.name} via FCM...`);
+
+            await sendVideoCallLink({
+              patientPhone: patient.phone,
+              patientName: patient.name,
+              doctorName: doctorName,
+              bookingId: patient.bookingId,
+              doctorId: doctorId,
+              language: patient.language || 'english',
+              appointmentDate: patient.appointmentTime.toLocaleDateString(),
+              appointmentTime: patient.appointmentTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+            });
+
+            // Update Firestore booking to track that link was sent
+            try {
+              const { db: fireDb } = await import('../lib/firebase/config');
+              const { doc: docRef, updateDoc: updateBooking } = await import('firebase/firestore');
+              if (fireDb) {
+                await updateBooking(docRef(fireDb, 'bookings', patient.id), {
+                  vcLinkSentAt: new Date(),
+                  vcLinkSentBy: 'system_auto',
+                });
               }
-            }));
-          }, Math.random() * 5000 + 3000); // Random 3-8 seconds for quick demo
+            } catch (e) {
+              console.error('Failed to update booking with VC link status:', e);
+            }
+
+            toast.success(`📹 Video link sent to ${patient.name}`, { duration: 3000 });
+            console.log(`✅ VC link sent to ${patient.name}`);
+          } catch (err) {
+            console.error(`❌ Failed to send VC link to ${patient.name}:`, err);
+            toast.error(`Failed to send video link to ${patient.name}`);
+          }
         }
-      });
+      }
     };
 
-    // Check every 5 seconds for demo (in production, use 60000 for every minute)
-    const interval = setInterval(checkAndSendVideoLinks, 5000);
+    // Check every 30 seconds
+    const interval = setInterval(checkAndSendVideoLinks, 30000);
 
     // Check immediately on mount
     checkAndSendVideoLinks();
@@ -540,38 +574,161 @@ export default function PatientDetails({
     return () => clearInterval(interval);
   }, [patients, patientStates]);
 
-  // Simulate patient joining waiting room for video consultations with link already sent
+  // Real-time Firestore listener: Watch for patient joining VC room
   useEffect(() => {
-    const simulatePatientWaiting = () => {
-      patients.forEach(patient => {
-        const state = patientStates[patient.id];
+    const unsubscribers: (() => void)[] = [];
 
+    const setupListeners = async () => {
+      const { db: fireDb } = await import('../lib/firebase/config');
+      const { doc: docRef, onSnapshot } = await import('firebase/firestore');
+      if (!fireDb) return;
+
+      patients.forEach(patient => {
         // Only for video consultation patients
         if (patient.consultationType !== 'video') return;
 
-        // Skip if already waiting or link not sent
-        if (state.patientWaiting || !state.videoLinkSent) return;
+        const bookingRef = docRef(fireDb, 'bookings', patient.id);
+        const unsub = onSnapshot(bookingRef, (snapshot) => {
+          if (!snapshot.exists()) return;
+          const data = snapshot.data();
 
-        // Simulate patient clicking link after 3-8 seconds
-        setTimeout(() => {
-          setPatientStates(prev => ({
-            ...prev,
-            [patient.id]: {
-              ...prev[patient.id],
-              patientWaiting: true,
+          setPatientStates(prev => {
+            const current = prev[patient.id];
+            if (!current) return prev;
+
+            const newState = { ...current };
+            let changed = false;
+
+            // Update patientWaiting when patient clicks the VC link
+            if (data.vcPatientJoined && !current.patientWaiting) {
+              newState.patientWaiting = true;
+              changed = true;
             }
-          }));
-        }, Math.random() * 5000 + 3000); // Random 3-8 seconds
+
+            // Update vcCompleted when doctor ends the call
+            if (data.vcCompleted && !current.vcCompleted) {
+              newState.vcCompleted = true;
+              changed = true;
+            }
+
+            // Update videoLinkSent from Firestore
+            if (data.vcLinkSentAt && !current.videoLinkSent) {
+              newState.videoLinkSent = true;
+              newState.vcLinkSentViaFCM = true;
+              changed = true;
+            }
+
+            if (!changed) return prev;
+            return { ...prev, [patient.id]: newState };
+          });
+        });
+
+        unsubscribers.push(unsub);
       });
     };
 
-    // Trigger simulation when component mounts or patientStates change
-    simulatePatientWaiting();
+    setupListeners();
+
+    return () => {
+      unsubscribers.forEach(unsub => unsub());
+    };
+  }, [patients]);
+
+  // 30-minute timeout check: Notify if neither party joined after 30 mins
+  useEffect(() => {
+    const checkVCTimeouts = () => {
+      const now = new Date();
+
+      patients.forEach(patient => {
+        const state = patientStates[patient.id];
+
+        // Only for video consultation patients with link already sent
+        if (patient.consultationType !== 'video') return;
+        if (!state.videoLinkSent || state.vcCompleted || state.isCancelled) return;
+
+        // Check if 30 minutes have passed since appointment time
+        const timeSinceAppointment = (now.getTime() - patient.appointmentTime.getTime()) / (1000 * 60);
+
+        if (timeSinceAppointment >= 30 && timeSinceAppointment < 35) {
+          // Show timeout toast only once (within 5-min window)
+          if (!state.patientWaiting) {
+            toast.warning(`⏰ ${patient.name}'s video consultation time has expired (30 min). Patient did not join.`, {
+              id: `vc-timeout-${patient.id}`,
+              duration: 10000,
+            });
+          }
+        }
+      });
+    };
+
+    const interval = setInterval(checkVCTimeouts, 60000); // Check every minute
+    checkVCTimeouts();
+
+    return () => clearInterval(interval);
   }, [patients, patientStates]);
 
-  const handleStartVideoConsultation = (patient: Patient) => {
-    // Open video consultation in new window
-    window.open(`/video-call/${patient.bookingId}`, '_blank');
+  const handleStartVideoConsultation = async (patient: Patient) => {
+    try {
+      // Update Firestore to indicate doctor joined the VC
+      const { db: fireDb } = await import('../lib/firebase/config');
+      const { doc: docRef, updateDoc: updateBooking } = await import('firebase/firestore');
+      if (fireDb) {
+        await updateBooking(docRef(fireDb, 'bookings', patient.id), {
+          vcDoctorJoined: true,
+          vcDoctorJoinedAt: new Date(),
+        });
+      }
+
+      toast.info(`Starting video consultation with ${patient.name}...`);
+
+      // Open video call page in a new window using query params matching the App routing
+      const doctorName = localStorage.getItem('healqr_user_name') || 'Doctor';
+      const vcParams = new URLSearchParams({
+        page: 'video-call',
+        bookingId: patient.bookingId || '',
+        patientName: patient.name || '',
+        doctorName: doctorName,
+      });
+      const vcWindow = window.open(`/?${vcParams.toString()}`, '_blank', 'width=1024,height=768');
+
+      // Poll to detect when VC window is closed → mark VC as completed
+      if (vcWindow) {
+        const pollInterval = setInterval(async () => {
+          if (vcWindow.closed) {
+            clearInterval(pollInterval);
+
+            // Mark VC as completed in Firestore
+            try {
+              if (fireDb) {
+                await updateBooking(docRef(fireDb, 'bookings', patient.id), {
+                  vcCompleted: true,
+                  vcCompletedAt: new Date(),
+                  vcDuration: null, // Will be calculated from join/end times
+                });
+              }
+            } catch (e) {
+              console.error('Failed to mark VC completed:', e);
+            }
+
+            // Update local state
+            setPatientStates(prev => ({
+              ...prev,
+              [patient.id]: {
+                ...prev[patient.id],
+                vcCompleted: true,
+              }
+            }));
+
+            toast.success(`✅ Video consultation with ${patient.name} completed. Tap the Eye button to proceed.`, {
+              duration: 8000,
+            });
+          }
+        }, 1000);
+      }
+    } catch (err) {
+      console.error('Failed to start video consultation:', err);
+      toast.error('Failed to start video consultation');
+    }
   };
 
   const handleFollowUp = (patientId: string) => {
@@ -1558,37 +1715,48 @@ export default function PatientDetails({
                         {/* Video Consultation Start Button */}
                         <button
                           onClick={() => handleStartVideoConsultation(patient)}
-                          disabled={isDisabled}
+                          disabled={isDisabled || state.vcCompleted}
                           className={`relative w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
-                            isDisabled
-                              ? 'bg-gray-800 border border-gray-700 opacity-50 cursor-not-allowed'
+                            isDisabled || state.vcCompleted
+                              ? state.vcCompleted
+                                ? 'bg-emerald-500/30 border border-emerald-500/50'
+                                : 'bg-gray-800 border border-gray-700 opacity-50 cursor-not-allowed'
                               : state.patientWaiting
-                              ? 'bg-red-500/20 hover:bg-red-500/30 border border-red-500/50'
+                              ? 'bg-red-500/30 hover:bg-red-500/40 border-2 border-red-500 animate-pulse shadow-lg shadow-red-500/30'
                               : 'bg-red-500/10 hover:bg-red-500/20 border border-red-500/30'
                           }`}
-                          title={state.patientWaiting ? "Patient is waiting! Click to start" : "Start Video Consultation"}
+                          title={
+                            state.vcCompleted ? "Video consultation completed ✓"
+                            : state.patientWaiting ? "🔴 Patient is waiting! Click to start consultation"
+                            : "Start Video Consultation"
+                          }
                         >
-                          <Video className="w-4 h-4 text-red-400" />
+                          <Video className={`w-4 h-4 ${state.vcCompleted ? 'text-emerald-300' : 'text-red-400'}`} />
                           {/* Patient Waiting Indicator - Pulsing User Icon */}
-                          {state.patientWaiting && (
-                            <div className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center border-2 border-[#0f1419] animate-pulse">
+                          {state.patientWaiting && !state.vcCompleted && (
+                            <div className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center border-2 border-[#0f1419] animate-bounce">
                               <UserCircle className="w-3 h-3 text-white" />
+                            </div>
+                          )}
+                          {state.vcCompleted && (
+                            <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center border-2 border-[#0f1419]">
+                              <Check className="w-2.5 h-2.5 text-white" />
                             </div>
                           )}
                         </button>
 
-                        {/* Normal Upload RX Button - Purple with Sparkle - For video consultation patients (NOT AI) */}
+                        {/* Normal Upload RX Button - Purple with Sparkle - For video consultation patients (Active after VC completed) */}
                         <button
                           onClick={() => handleNormalUploadPrescription(patient)}
-                          disabled={isDisabled || state.prescriptionUploaded}
+                          disabled={isDisabled || state.prescriptionUploaded || !state.vcCompleted}
                           className={`relative w-10 h-10 rounded-lg flex flex-col items-center justify-center transition-colors ${
-                            isDisabled
+                            isDisabled || !state.vcCompleted
                               ? 'bg-gray-800 border border-gray-700 opacity-50 cursor-not-allowed'
                               : state.prescriptionUploaded
                               ? 'bg-emerald-500/30 border border-emerald-500/50'
                               : 'bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 shadow-lg shadow-purple-500/20'
                           }`}
-                          title={state.prescriptionUploaded ? "Prescription Uploaded" : "Upload RX (Normal)"}
+                          title={!state.vcCompleted ? "Complete video consultation first" : state.prescriptionUploaded ? "Prescription Uploaded" : "Upload RX (Normal)"}
                         >
                           <Sparkles className={`w-3.5 h-3.5 ${state.prescriptionUploaded ? 'text-emerald-300' : 'text-purple-300'} mb-0.5`} />
                           {/* Upward Arrow */}
@@ -1639,24 +1807,30 @@ export default function PatientDetails({
                     )}
                     */}
 
-                    {/* AI RX Reader - Purple Sparkle Button (Disabled if Digital RX was used) */}
+                    {/* AI RX Reader - Purple Sparkle Button (Disabled if Digital RX was used OR VC not completed for video patients) */}
                     <button
                       onClick={() => {
                         setUploadTargetPatient(patient);
                         setAiUploadModalOpen(true);
                       }}
-                      disabled={isDisabled || state.digitalRxUsed}
+                      disabled={isDisabled || state.digitalRxUsed || (patient.consultationType === 'video' && !state.vcCompleted)}
                       className={`relative w-10 h-10 rounded-lg flex items-center justify-center transition-all ${
-                        isDisabled || state.digitalRxUsed
+                        isDisabled || state.digitalRxUsed || (patient.consultationType === 'video' && !state.vcCompleted)
                           ? 'bg-gray-800 border border-gray-700 opacity-50 cursor-not-allowed'
                           : 'bg-gradient-to-br from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 border border-purple-500/50 shadow-lg shadow-purple-500/30'
                       }`}
-                      title={state.digitalRxUsed ? "Digital RX already created - No need to decode" : "AI RX Reader"}
+                      title={
+                        (patient.consultationType === 'video' && !state.vcCompleted)
+                          ? "Complete video consultation first"
+                          : state.digitalRxUsed
+                          ? "Digital RX already created - No need to decode"
+                          : "AI RX Reader"
+                      }
                     >
                       <Sparkles className="w-4 h-4 text-white" />
                     </button>
 
-                    {/* Mark as Seen - Opens Multi-Step Consultation Flow */}
+                    {/* Mark as Seen - Opens Multi-Step Consultation Flow (For VC patients: only active after VC completed) */}
                     <button
                       onClick={() => {
                         setSelectedPatientForFlow(patient);
@@ -1664,15 +1838,21 @@ export default function PatientDetails({
                         setGeneratedDietUrl(null);
                         setRxConfirmModalOpen(true);
                       }}
-                      disabled={isDisabled || state.isMarkedSeen}
+                      disabled={isDisabled || state.isMarkedSeen || (patient.consultationType === 'video' && !state.vcCompleted)}
                       className={`relative w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
-                        isDisabled
+                        isDisabled || (patient.consultationType === 'video' && !state.vcCompleted)
                           ? 'bg-gray-800 border border-gray-700 opacity-50 cursor-not-allowed'
                           : state.isMarkedSeen
                           ? 'bg-green-500/30 border border-green-500/50'
                           : 'bg-green-500/10 hover:bg-green-500/20 border border-green-500/30'
                       }`}
-                      title={state.isMarkedSeen ? "Marked as Seen" : "Mark as Seen → Digital RX Flow"}
+                      title={
+                        (patient.consultationType === 'video' && !state.vcCompleted)
+                          ? "Complete video consultation first"
+                          : state.isMarkedSeen
+                          ? "Marked as Seen"
+                          : "Mark as Seen → Digital RX Flow"
+                      }
                     >
                       <Eye className={`w-4 h-4 ${state.isMarkedSeen ? 'text-green-300' : 'text-green-400'}`} />
                       {state.isMarkedSeen && (

@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect } from 'react';
-import { ArrowLeft, Users, Mail, CheckCircle, XCircle, Eye, Edit, Trash } from 'lucide-react';
+import { ArrowLeft, Users, Mail, CheckCircle, XCircle, Eye, Edit, Trash, Copy } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -391,7 +391,7 @@ export default function ClinicAssistantAccessManager({
                     }`}
                     onClick={() => togglePageSelection(page.id)}
                   >
-                    <Checkbox checked={selectedPages.includes(page.id)} onCheckedChange={() => togglePageSelection(page.id)} />
+                    <Checkbox checked={selectedPages.includes(page.id)} onCheckedChange={(e) => { /* handled by parent div onClick */ }} className="pointer-events-none" />
                     <span className="text-xl">{page.icon}</span>
                     <span className="text-sm font-medium">{page.label}</span>
                   </div>
@@ -433,6 +433,48 @@ export default function ClinicAssistantAccessManager({
                           </div>
                         )}
                       </div>
+
+                      {/* Login Link & PIN */}
+                      {assistant.accessToken && (
+                        <div className="bg-zinc-900/80 border border-zinc-700 rounded-lg p-3 space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[10px] text-gray-500 uppercase tracking-wider">Login Link</p>
+                              <p className="text-xs text-gray-300 truncate">{`${window.location.origin}/assistant-login?token=${assistant.accessToken}`}</p>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="shrink-0 h-7 px-2 text-xs text-blue-400 hover:text-blue-300"
+                              onClick={() => {
+                                navigator.clipboard.writeText(`${window.location.origin}/assistant-login?token=${assistant.accessToken}`);
+                                toast.success('Link copied!');
+                              }}
+                            >
+                              <Copy size={12} className="mr-1" /> Copy
+                            </Button>
+                          </div>
+                          {assistant.accessPin && (
+                            <div className="flex items-center justify-between gap-2">
+                              <div>
+                                <p className="text-[10px] text-gray-500 uppercase tracking-wider">Secure PIN</p>
+                                <p className="text-sm font-mono font-bold text-emerald-400 tracking-widest">{assistant.accessPin}</p>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="shrink-0 h-7 px-2 text-xs text-blue-400 hover:text-blue-300"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(assistant.accessPin!);
+                                  toast.success('PIN copied!');
+                                }}
+                              >
+                                <Copy size={12} className="mr-1" /> Copy
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       <div className="flex flex-wrap gap-2">
                         <Button
@@ -498,7 +540,7 @@ export default function ClinicAssistantAccessManager({
                       );
                     }}
                   >
-                    <Checkbox checked={editSelectedPages.includes(page.id)} onCheckedChange={() => {}} />
+                    <Checkbox checked={editSelectedPages.includes(page.id)} onCheckedChange={() => {}} className="pointer-events-none" />
                     <span className="text-xl">{page.icon}</span>
                     <span className="text-sm font-medium">{page.label}</span>
                   </div>

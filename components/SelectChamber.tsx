@@ -242,7 +242,7 @@ export default function SelectChamber({
 
   const [selectedChamber, setSelectedChamber] = useState<ChamberWithBookingCount | null>(null);
   const [, setSelectedChamberName] = useState<string>('');
-  const [consultationType, ] = useState<'chamber' | 'video'>('chamber');
+  const [consultationType, setConsultationType] = useState<'chamber' | 'video'>('chamber');
   const [chambersWithCounts, setChambersWithCounts] = useState<ChamberWithBookingCount[]>([]);
   const [loadingCounts, setLoadingCounts] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0); // Force refresh trigger
@@ -532,31 +532,31 @@ export default function SelectChamber({
           {/* Health Tip Image */}
           <TemplateDisplay placement="booking-select-chamber" className="mb-6" />
 
-          {/* Consultation Type Toggle - TEMPORARILY HIDDEN - Video consultation feature disabled */}
-          {/* {hasVideoConsultation && (
+          {/* Mode of Consultation Toggle */}
+          {hasVideoConsultation && (
             <div className="mb-6">
-              <h3 className="text-white mb-3">Consultation Type</h3>
+              <h3 className="text-white font-semibold mb-3">Mode of Consultation</h3>
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => setConsultationType('chamber')}
                   className={`border-2 rounded-xl p-4 transition-all ${
                     consultationType === 'chamber'
-                      ? `border-${accentColor}-500 bg-${accentColor}-500/10`
+                      ? 'border-emerald-500 bg-emerald-500/10'
                       : 'border-gray-700 bg-[#0f1419] hover:border-gray-600'
                   }`}
                 >
                   <div className="flex flex-col items-center gap-2">
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      consultationType === 'chamber' ? `bg-${accentColor}-500` : 'bg-gray-700'
+                      consultationType === 'chamber' ? 'bg-emerald-500' : 'bg-gray-700'
                     }`}>
                       <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                       </svg>
                     </div>
                     <span className={`text-sm font-medium ${
-                      consultationType === 'chamber' ? `text-${accentColor}-400` : 'text-gray-400'
+                      consultationType === 'chamber' ? 'text-emerald-400' : 'text-gray-400'
                     }`}>
-                      Chamber Consultation
+                      In-Chamber
                     </span>
                   </div>
                 </button>
@@ -564,20 +564,20 @@ export default function SelectChamber({
                   onClick={() => setConsultationType('video')}
                   className={`border-2 rounded-xl p-4 transition-all ${
                     consultationType === 'video'
-                      ? 'border-red-500 bg-red-500/10'
+                      ? 'border-blue-500 bg-blue-500/10'
                       : 'border-gray-700 bg-[#0f1419] hover:border-gray-600'
                   }`}
                 >
                   <div className="flex flex-col items-center gap-2">
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      consultationType === 'video' ? 'bg-red-500' : 'bg-gray-700'
+                      consultationType === 'video' ? 'bg-blue-500' : 'bg-gray-700'
                     }`}>
                       <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                       </svg>
                     </div>
                     <span className={`text-sm font-medium ${
-                      consultationType === 'video' ? 'text-red-400' : 'text-gray-400'
+                      consultationType === 'video' ? 'text-blue-400' : 'text-gray-400'
                     }`}>
                       Video Consultation
                     </span>
@@ -585,7 +585,7 @@ export default function SelectChamber({
                 </button>
               </div>
             </div>
-          )} */}
+          )}
 
           {/* Available Chambers - ONLY show if chamber consultation is selected */}
           {consultationType === 'chamber' && (

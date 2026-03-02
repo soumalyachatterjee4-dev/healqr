@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import healqrLogo from '../assets/healqr-logo.png';
 import { useState, useEffect } from 'react';
+import { Lock } from 'lucide-react';
 
 interface MenuItem {
   id: string;
@@ -44,6 +45,8 @@ interface ClinicSidebarProps {
   onLogout: () => void;
   isOpen?: boolean;
   onClose?: () => void;
+  isAssistant?: boolean;
+  assistantAllowedPages?: string[];
 }
 
 export default function ClinicSidebar({
@@ -51,7 +54,9 @@ export default function ClinicSidebar({
   onMenuChange,
   onLogout,
   isOpen = false,
-  onClose
+  onClose,
+  isAssistant = false,
+  assistantAllowedPages = []
 }: ClinicSidebarProps) {
   const [expandedSections, setExpandedSections] = useState({
     management: true,
@@ -123,6 +128,12 @@ export default function ClinicSidebar({
     }
   ];
 
+  // Helper function to check if page is accessible to assistant
+  const isPageAccessible = (pageId: string) => {
+    if (!isAssistant) return true; // Clinic owners have full access
+    return pageId === 'dashboard' || assistantAllowedPages.includes(pageId);
+  };
+
   const renderSection = (section: typeof sections[0]) => {
     const isExpanded = expandedSections[section.id as keyof typeof expandedSections];
 
@@ -138,17 +149,22 @@ export default function ClinicSidebar({
 
         {isExpanded && (
           <div className="mt-1 space-y-0.5">
-            {section.items.map((item) => (
+            {section.items.map((item) => {
+              const accessible = isPageAccessible(item.id);
+              return (
               <button
                 key={item.id}
                 onClick={() => {
+                  if (!accessible) return; // Block locked items
                   onMenuChange(item.id);
                   if (!isDesktop && onClose) {
                     onClose();
                   }
                 }}
                 className={`w-full flex items-center justify-between px-4 py-2 rounded-lg transition-all duration-200 group text-left ${
-                  activeMenu === item.id
+                  !accessible
+                    ? 'text-zinc-700 cursor-not-allowed opacity-50'
+                    : activeMenu === item.id
                     ? 'bg-sky-400/10 text-sky-400'
                     : item.isAddon
                       ? 'text-[#38bdf8] hover:bg-white/5'
@@ -159,11 +175,14 @@ export default function ClinicSidebar({
                   <item.icon className="w-4 h-4 shrink-0" />
                   <span className="text-[12px] font-normal whitespace-nowrap">{item.label}</span>
                 </div>
-                {item.isAddon && (
+                {!accessible ? (
+                  <Lock className="w-3 h-3 text-zinc-600 shrink-0" />
+                ) : item.isAddon ? (
                   <Check className="w-3 h-3 text-[#38bdf8] opacity-80 shrink-0" />
-                )}
+                ) : null}
               </button>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -217,7 +236,8 @@ export default function ClinicSidebar({
               {sections.map(section => renderSection(section))}
             </div>
 
-            {/* Logout Button */}
+            {/* Logout Button - hidden for assistants */}
+            {!isAssistant && (
             <div className="mt-8 mb-8 border-t border-zinc-900 pt-4">
               <button
                 onClick={onLogout}
@@ -227,6 +247,7 @@ export default function ClinicSidebar({
                 <span>Logout</span>
               </button>
             </div>
+            )}
           </div>
         </div>
       </aside>

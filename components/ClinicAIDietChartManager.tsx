@@ -105,8 +105,10 @@ export default function ClinicAIDietChartManager({
   doctorInfo,
 }: ClinicAIDietChartManagerProps) {
   const [usageCount, setUsageCount] = useState(0);
-  const [maxFreeUsage] = useState(3);
+  const maxFreeUsage = 10;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"create" | "history">("create");
+  const [isGenerating, setIsGenerating] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -148,7 +150,6 @@ export default function ClinicAIDietChartManager({
       return saved ? JSON.parse(saved) : [];
     },
   );
-  const maxFreeUsage = 10;
 
   // Derive usageCount from historyItems (current month only)
   useEffect(() => {
@@ -821,21 +822,21 @@ export default function ClinicAIDietChartManager({
                   Patient Assessment
                 </CardTitle>
               </CardHeader>
-              <CardContent className="pt-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <CardContent className="pt-8 px-3 sm:px-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 min-w-0">
                   {/* Personal Info */}
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-white">
+                  <div className="space-y-6 min-w-0">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                      <div className="space-y-2 min-w-0">
+                        <label className="text-xs sm:text-sm font-medium text-white truncate">
                           Patient Name <span className="text-red-500">*</span>
                         </label>
                         <div className="relative">
-                          <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white" />
+                          <User className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white" />
                           <input
                             type="text"
                             placeholder="Enter full name"
-                            className="w-full bg-black border border-zinc-800 rounded-xl pl-12 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                            className="w-full bg-black border border-zinc-800 rounded-xl pl-10 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 text-sm sm:text-base text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                             value={patientData.name}
                             onChange={(e) =>
                               setPatientData({
@@ -847,16 +848,16 @@ export default function ClinicAIDietChartManager({
                         </div>
                       </div>
 
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-white">
+                      <div className="space-y-2 min-w-0">
+                        <label className="text-xs sm:text-sm font-medium text-white truncate">
                           Phone Number
                         </label>
                         <div className="relative">
-                          <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white" />
+                          <CreditCard className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white" />
                           <input
                             type="tel"
                             placeholder="Enter phone number"
-                            className="w-full bg-black border border-zinc-800 rounded-xl pl-12 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                            className="w-full bg-black border border-zinc-800 rounded-xl pl-10 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 text-sm sm:text-base text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                             value={patientData.phone}
                             onChange={(e) =>
                               setPatientData({
@@ -869,9 +870,9 @@ export default function ClinicAIDietChartManager({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-white">
+                    <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                      <div className="space-y-2 min-w-0">
+                        <label className="text-xs sm:text-sm font-medium text-white">
                           Age
                         </label>
                         <div className="relative group">
@@ -879,7 +880,7 @@ export default function ClinicAIDietChartManager({
                           <input
                             type="number"
                             placeholder="Years"
-                            className="w-full bg-black border border-zinc-800 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                            className="w-full bg-black border border-zinc-800 rounded-xl pl-10 pr-3 sm:pr-4 py-2.5 sm:py-3 text-sm sm:text-base text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                             value={patientData.age}
                             onChange={(e) =>
                               setPatientData({
@@ -890,12 +891,12 @@ export default function ClinicAIDietChartManager({
                           />
                         </div>
                       </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-white">
+                      <div className="space-y-2 min-w-0">
+                        <label className="text-xs sm:text-sm font-medium text-white">
                           Gender
                         </label>
                         <select
-                          className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none"
+                          className="w-full bg-black border border-zinc-800 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none"
                           value={patientData.gender}
                           onChange={(e) =>
                             setPatientData({
@@ -911,9 +912,9 @@ export default function ClinicAIDietChartManager({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-white">
+                    <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                      <div className="space-y-2 min-w-0">
+                        <label className="text-xs sm:text-sm font-medium text-white">
                           Weight (kg)
                         </label>
                         <div className="relative group">
@@ -921,7 +922,7 @@ export default function ClinicAIDietChartManager({
                           <input
                             type="number"
                             placeholder="e.g. 70"
-                            className="w-full bg-black border border-zinc-800 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                            className="w-full bg-black border border-zinc-800 rounded-xl pl-10 pr-3 sm:pr-4 py-2.5 sm:py-3 text-sm sm:text-base text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                             value={patientData.weight}
                             onChange={(e) =>
                               setPatientData({
@@ -932,8 +933,8 @@ export default function ClinicAIDietChartManager({
                           />
                         </div>
                       </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-white">
+                      <div className="space-y-2 min-w-0">
+                        <label className="text-xs sm:text-sm font-medium text-white">
                           Height (cm)
                         </label>
                         <div className="relative group">
@@ -941,7 +942,7 @@ export default function ClinicAIDietChartManager({
                           <input
                             type="number"
                             placeholder="e.g. 175"
-                            className="w-full bg-black border border-zinc-800 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                            className="w-full bg-black border border-zinc-800 rounded-xl pl-10 pr-3 sm:pr-4 py-2.5 sm:py-3 text-sm sm:text-base text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                             value={patientData.height}
                             onChange={(e) =>
                               setPatientData({
@@ -956,12 +957,12 @@ export default function ClinicAIDietChartManager({
                   </div>
 
                   {/* Medical Info */}
-                  <div className="space-y-6">
+                  <div className="space-y-6 min-w-0">
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-white">
+                      <label className="text-xs sm:text-sm font-medium text-white">
                         Activity Level
                       </label>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                         {["sedentary", "moderate", "active"].map((level) => (
                           <button
                             key={level}
@@ -971,7 +972,7 @@ export default function ClinicAIDietChartManager({
                                 activityLevel: level,
                               })
                             }
-                            className={`px-3 py-2 rounded-lg text-xs font-semibold capitalize transition-all border ${
+                            className={`px-2 sm:px-3 py-2 rounded-lg text-[10px] sm:text-xs font-semibold capitalize transition-all border ${
                               patientData.activityLevel === level
                                 ? "bg-blue-500/20 border-blue-500 text-blue-400"
                                 : "bg-black border-zinc-800 text-white hover:border-zinc-700"
@@ -984,7 +985,7 @@ export default function ClinicAIDietChartManager({
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-white flex items-center gap-2">
+                      <label className="text-xs sm:text-sm font-medium text-white flex flex-wrap items-center gap-1 sm:gap-2">
                         Medical Conditions / Complaints
                         <Badge
                           variant="outline"
@@ -995,7 +996,7 @@ export default function ClinicAIDietChartManager({
                       </label>
                       <textarea
                         placeholder="Mention 'None' if applicable. e.g. Diabetes, Hypertension..."
-                        className="w-full h-24 bg-black border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all resize-none"
+                        className="w-full h-24 bg-black border border-zinc-800 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all resize-none"
                         value={patientData.conditions}
                         onChange={(e) =>
                           setPatientData({
@@ -1007,12 +1008,12 @@ export default function ClinicAIDietChartManager({
                     </div>
 
                     <div className="space-y-4">
-                      <label className="text-sm font-medium text-white">
+                      <label className="text-xs sm:text-sm font-medium text-white">
                         Dietary Preferences & Lifestyle
                       </label>
                       <textarea
                         placeholder="e.g. Vegetarian, No Dairy, High Protein..."
-                        className="w-full h-16 bg-black border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all resize-none mb-2"
+                        className="w-full h-16 bg-black border border-zinc-800 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all resize-none mb-2"
                         value={patientData.preferences}
                         onChange={(e) =>
                           setPatientData({
@@ -1022,13 +1023,13 @@ export default function ClinicAIDietChartManager({
                         }
                       />
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <label className="text-[12px] text-white">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2 min-w-0">
+                          <label className="text-[11px] sm:text-[12px] text-white">
                             Regional Culture
                           </label>
                           <select
-                            className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-blue-500 appearance-none"
+                            className="w-full bg-black border border-zinc-800 rounded-xl px-3 sm:px-4 py-2 text-sm text-white focus:outline-none focus:border-blue-500 appearance-none"
                             value={patientData.region}
                             onChange={(e) =>
                               setPatientData({
@@ -1048,7 +1049,7 @@ export default function ClinicAIDietChartManager({
                           </select>
                         </div>
 
-                        <div className="flex items-center gap-4 pt-6">
+                        <div className="flex flex-wrap items-center gap-3 sm:gap-4 pt-2 sm:pt-6">
                           <label className="flex items-center gap-2 cursor-pointer group">
                             <div
                               onClick={() =>
@@ -1092,14 +1093,14 @@ export default function ClinicAIDietChartManager({
                   </div>
 
                   {/* Special Instructions / Remarks (🆕 Phase 20) */}
-                  <div className="md:col-span-2 space-y-2">
-                    <label className="text-sm font-medium text-white flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-blue-500" />
+                  <div className="md:col-span-2 space-y-2 min-w-0">
+                    <label className="text-xs sm:text-sm font-medium text-white flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-blue-500 shrink-0" />
                       Special Instructions / Remarks
                     </label>
                     <textarea
                       placeholder="e.g. Avoid sugar, specific allergies, include more seasonal fruits, etc."
-                      className="w-full h-24 bg-black border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all resize-none"
+                      className="w-full h-24 bg-black border border-zinc-800 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all resize-none"
                       value={patientData.remarks}
                       onChange={(e) =>
                         setPatientData({
@@ -1115,7 +1116,7 @@ export default function ClinicAIDietChartManager({
                   <Button
                     onClick={handleGenerate}
                     disabled={isGenerating}
-                    className="h-16 !px-[80px] bg-blue-500 hover:bg-blue-600 text-white rounded-full !text-[16px] font-bold shadow-[0_0_30px_rgba(16,185,129,0.4)] hover:shadow-[0_0_40px_rgba(16,185,129,0.6)] transition-all group overflow-hidden relative min-w-max"
+                    className="h-14 sm:h-16 px-10 sm:!px-[80px] bg-blue-500 hover:bg-blue-600 text-white rounded-full text-sm sm:!text-[16px] font-bold shadow-[0_0_30px_rgba(16,185,129,0.4)] hover:shadow-[0_0_40px_rgba(16,185,129,0.6)] transition-all group overflow-hidden relative w-full sm:w-auto"
                   >
                     {isGenerating ? (
                       <span className="flex items-center gap-3 whitespace-nowrap">

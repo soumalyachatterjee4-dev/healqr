@@ -12,6 +12,174 @@ import PatientSearch from './PatientSearchPage';
 import PatientHealthCardProfile from './PatientHealthCardProfile';
 import DashboardPromoDisplay from './DashboardPromoDisplay';
 
+// PWA Install Instructions Banner
+const PWAInstallBanner = () => {
+  const [dismissed, setDismissed] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
+  const [showIOSSteps, setShowIOSSteps] = useState(false);
+  const [showAndroidSteps, setShowAndroidSteps] = useState(false);
+
+  useEffect(() => {
+    // Detect iOS
+    const ua = navigator.userAgent;
+    setIsIOS(/iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+    // Detect if already installed as PWA
+    setIsStandalone(window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true);
+    // Check if already dismissed
+    if (localStorage.getItem('pwa_install_dismissed') === 'true') {
+      setDismissed(true);
+    }
+  }, []);
+
+  if (dismissed || isStandalone) return null;
+
+  return (
+    <div className="bg-gradient-to-r from-blue-600/20 to-purple-600/20 border border-blue-500/30 rounded-xl p-5">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-blue-500/30 rounded-xl flex items-center justify-center">
+            <svg className="w-6 h-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-white font-semibold">Install HealQR App</p>
+            <p className="text-gray-400 text-xs">Add to home screen for quick access</p>
+          </div>
+        </div>
+        <button
+          onClick={() => {
+            setDismissed(true);
+            localStorage.setItem('pwa_install_dismissed', 'true');
+          }}
+          className="text-gray-500 hover:text-gray-300 p-1"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Android Instructions */}
+      {!isIOS && (
+        <div>
+          <button
+            onClick={() => setShowAndroidSteps(!showAndroidSteps)}
+            className="w-full flex items-center justify-between bg-green-500/20 border border-green-500/30 rounded-lg px-4 py-3 text-green-300 hover:bg-green-500/30 transition-all"
+          >
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.523 2.273l1.564 1.58-2.426 2.449c1.455 1.269 2.339 3.125 2.339 5.198h-14c0-2.073.884-3.929 2.339-5.198L4.913 3.853l1.564-1.58 2.571 2.596A7.003 7.003 0 0112 4c1.07 0 2.087.24 2.952.669l2.571-2.396zM7 9.5a1.5 1.5 0 103.001.001A1.5 1.5 0 007 9.5zm7 0a1.5 1.5 0 103.001.001A1.5 1.5 0 0014 9.5zM5 13h14v8c0 .55-.45 1-1 1h-1v2.5c0 .83-.67 1.5-1.5 1.5s-1.5-.67-1.5-1.5V22h-4v2.5c0 .83-.67 1.5-1.5 1.5S7 25.33 7 24.5V22H6c-.55 0-1-.45-1-1v-8z"/></svg>
+              <span className="font-medium text-sm">Android — Install Steps</span>
+            </div>
+            <svg className={`w-4 h-4 transition-transform ${showAndroidSteps ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {showAndroidSteps && (
+            <div className="mt-3 bg-gray-800/60 rounded-lg p-4 space-y-3 text-sm">
+              <div className="flex items-start gap-3">
+                <span className="bg-green-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
+                <p className="text-gray-300">Tap the <strong className="text-white">⋮ three dots</strong> menu (top-right corner of Chrome)</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="bg-green-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
+                <p className="text-gray-300">Select <strong className="text-white">"Add to Home screen"</strong></p>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="bg-green-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">3</span>
+                <p className="text-gray-300">Tap <strong className="text-white">"Install"</strong> — the HealQR app icon will appear on your home screen</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* iOS Instructions */}
+      {isIOS && (
+        <div>
+          <button
+            onClick={() => setShowIOSSteps(!showIOSSteps)}
+            className="w-full flex items-center justify-between bg-blue-500/20 border border-blue-500/30 rounded-lg px-4 py-3 text-blue-300 hover:bg-blue-500/30 transition-all"
+          >
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+              <span className="font-medium text-sm">iPhone / iPad — Install Steps</span>
+            </div>
+            <svg className={`w-4 h-4 transition-transform ${showIOSSteps ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {showIOSSteps && (
+            <div className="mt-3 bg-gray-800/60 rounded-lg p-4 space-y-3 text-sm">
+              <div className="flex items-start gap-3">
+                <span className="bg-blue-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
+                <p className="text-gray-300">Open this page in <strong className="text-white">Safari</strong> (not Chrome)</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="bg-blue-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
+                <p className="text-gray-300">Tap the <strong className="text-white">Share button</strong> (square with arrow at bottom)</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="bg-blue-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">3</span>
+                <p className="text-gray-300">Scroll down and tap <strong className="text-white">"Add to Home Screen"</strong></p>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="bg-blue-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">4</span>
+                <p className="text-gray-300">Tap <strong className="text-white">"Add"</strong> — the HealQR icon will appear on your home screen</p>
+              </div>
+              <div className="mt-2 p-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                <p className="text-yellow-300 text-xs">⚠️ <strong>Important:</strong> Must use Safari on iOS. Chrome does not support "Add to Home Screen" on iPhone.</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Show both if on desktop */}
+      {!isIOS && typeof window !== 'undefined' && !/Android/i.test(navigator.userAgent) && (
+        <div className="mt-3">
+          <button
+            onClick={() => setShowIOSSteps(!showIOSSteps)}
+            className="w-full flex items-center justify-between bg-blue-500/20 border border-blue-500/30 rounded-lg px-4 py-3 text-blue-300 hover:bg-blue-500/30 transition-all"
+          >
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+              <span className="font-medium text-sm">iPhone / iPad — Install Steps</span>
+            </div>
+            <svg className={`w-4 h-4 transition-transform ${showIOSSteps ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {showIOSSteps && (
+            <div className="mt-3 bg-gray-800/60 rounded-lg p-4 space-y-3 text-sm">
+              <div className="flex items-start gap-3">
+                <span className="bg-blue-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
+                <p className="text-gray-300">Open this page in <strong className="text-white">Safari</strong> (not Chrome)</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="bg-blue-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
+                <p className="text-gray-300">Tap the <strong className="text-white">Share button</strong> (square with arrow at bottom)</p>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="bg-blue-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">3</span>
+                <p className="text-gray-300">Scroll down and tap <strong className="text-white">"Add to Home Screen"</strong></p>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="bg-blue-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">4</span>
+                <p className="text-gray-300">Tap <strong className="text-white">"Add"</strong> — the HealQR icon will appear on your home screen</p>
+              </div>
+              <div className="mt-2 p-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                <p className="text-yellow-300 text-xs">⚠️ <strong>Important:</strong> Must use Safari on iOS. Chrome does not support "Add to Home Screen" on iPhone.</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const PatientDashboardNew = () => {
   const [patientData, setPatientData] = useState<any>(null);
   const [currentView, setCurrentView] = useState('dashboard');
@@ -75,7 +243,7 @@ const PatientDashboardNew = () => {
       }
 
       const db = getFirestore();
-      
+
       // Load patient data from last booking
       const bookingsRef = collection(db, 'bookings');
       const q = query(bookingsRef, where('patientPhone', '==', patientPhone), limit(1));
@@ -110,7 +278,7 @@ const PatientDashboardNew = () => {
       const db = getFirestore();
       const healthCardRef = doc(db, 'patientHealthCards', patientPhone);
       const healthCardSnap = await getDoc(healthCardRef);
-      
+
       if (healthCardSnap.exists()) {
         setHealthCardData(healthCardSnap.data());
       }
@@ -221,14 +389,17 @@ const PatientDashboardNew = () => {
         </div>
 
         {/* Health Tip Card */}
-        <DashboardPromoDisplay 
-          category="health-tip" 
+        <DashboardPromoDisplay
+          category="health-tip"
           placement="patient-dashboard"
           className="shadow-lg"
         />
 
+        {/* PWA Install Instructions */}
+        <PWAInstallBanner />
+
         {/* Health Card - Now Clickable */}
-        <div 
+        <div
           onClick={() => setCurrentView('health-card')}
           className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl p-8 text-white cursor-pointer hover:shadow-2xl hover:shadow-orange-500/50 transition-all duration-300"
         >
@@ -279,13 +450,13 @@ const PatientDashboardNew = () => {
               Specialty-wise Consultations
             </h3>
           </div>
-          
+
           {specialtyStats.length > 0 ? (
             <div className="space-y-4">
               {specialtyStats.map((item, index) => {
                 const maxVisits = Math.max(...specialtyStats.map(s => s.visits));
                 const percentage = (item.visits / maxVisits) * 100;
-                
+
                 return (
                   <div key={index} className="space-y-2">
                     <div className="flex items-center justify-between">

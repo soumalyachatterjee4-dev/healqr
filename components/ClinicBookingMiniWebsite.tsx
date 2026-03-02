@@ -1,4 +1,4 @@
-import { Lightbulb, Calendar, Phone, Sparkles, MapPin, Users, Star } from 'lucide-react';
+import { Lightbulb, Calendar, Phone, Sparkles, MapPin, Users, Star, AlertCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { useState, useEffect } from 'react';
@@ -6,6 +6,7 @@ import { t, type Language } from '../utils/translations';
 import TemplateDisplay from './TemplateDisplay';
 import BookingFlowLayout from './BookingFlowLayout';
 import ReviewCard from './ReviewCard';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './ui/dialog';
 
 interface Review {
   id: number;
@@ -31,6 +32,9 @@ export default function ClinicBookingMiniWebsite({
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [allReviewsForStats, setAllReviewsForStats] = useState<Review[]>([]);
+  const [emergencyButtonActive, setEmergencyButtonActive] = useState(false);
+  const [emergencyPhone, setEmergencyPhone] = useState('');
+  const [showEmergencyDialog, setShowEmergencyDialog] = useState(false);
 
   useEffect(() => {
     trackQRScan();
@@ -81,15 +85,26 @@ export default function ClinicBookingMiniWebsite({
 
       const { db } = await import('../lib/firebase/config');
       if (!db) return;
-      
+
       const { doc, getDoc, collection, query, where, getDocs, orderBy, limit } = await import('firebase/firestore');
 
       const clinicRef = doc(db, 'clinics', bookingClinicId);
       const clinicSnap = await getDoc(clinicRef);
 
       if (clinicSnap.exists()) {
-        setClinicProfile({ id: clinicSnap.id, ...clinicSnap.data() });
-        
+        const clinicData = clinicSnap.data();
+        setClinicProfile({ id: clinicSnap.id, ...clinicData });
+
+        // Load emergency button status
+        const phone = clinicData.emergencyPhone || '';
+        setEmergencyPhone(phone);
+        const scheduling = clinicData.emergencyScheduling || null;
+        const shouldBeActive = checkEmergencyButtonSchedule(
+          clinicData.emergencyButtonActive || false,
+          scheduling
+        );
+        setEmergencyButtonActive(shouldBeActive);
+
         // Load clinic reviews
         try {
           const reviewsQuery = query(
@@ -99,7 +114,7 @@ export default function ClinicBookingMiniWebsite({
             orderBy('date', 'desc'),
             limit(10)
           );
-          
+
           const reviewsSnap = await getDocs(reviewsQuery);
           const loadedReviews = reviewsSnap.docs.map((doc, index) => ({
             id: index + 1,
@@ -109,7 +124,7 @@ export default function ClinicBookingMiniWebsite({
             comment: doc.data().comment || '',
             verified: doc.data().verified || true,
           }));
-          
+
           setReviews(loadedReviews.slice(0, 2));
           setAllReviewsForStats(loadedReviews);
         } catch (reviewError) {
@@ -121,6 +136,29 @@ export default function ClinicBookingMiniWebsite({
     } finally {
       setLoadingProfile(false);
     }
+  };
+
+  const checkEmergencyButtonSchedule = (buttonActive: boolean, scheduling: any): boolean => {
+    if (!buttonActive) return false;
+    if (!scheduling || !scheduling.enabled) return buttonActive;
+    const timeSlots = scheduling.timeSlots || [];
+    if (timeSlots.length === 0) return false;
+    const now = new Date();
+    const currentDay = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][now.getDay()];
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    for (const slot of timeSlots) {
+      if (!slot.days || !slot.days.includes(currentDay)) continue;
+      const [startHour, startMin] = slot.startTime.split(':').map(Number);
+      const [endHour, endMin] = slot.endTime.split(':').map(Number);
+      const startMinutes = startHour * 60 + startMin;
+      const endMinutes = endHour * 60 + endMin;
+      if (endMinutes < startMinutes) {
+        if (currentMinutes >= startMinutes || currentMinutes < endMinutes) return true;
+      } else {
+        if (currentMinutes >= startMinutes && currentMinutes < endMinutes) return true;
+      }
+    }
+    return false;
   };
 
   return (
@@ -142,6 +180,19 @@ export default function ClinicBookingMiniWebsite({
             <Calendar className="w-5 h-5" />
             {t('bookAppointmentNow', language)}
           </Button>
+
+          {/* Emergency Button */}
+          {emergencyButtonActive && emergencyPhone && (
+            <Button
+              onClick={() => setShowEmergencyDialog(true)}
+              className="w-full h-12 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center justify-center gap-2 mt-3 animate-pulse"
+            >
+              <AlertCircle className="w-5 h-5" />
+              {language === 'english' && 'Emergency Consultation'}
+              {language === 'hindi' && 'आपातकालीन परामर्श'}
+              {language === 'bengali' && 'জরুরী পরামর্শ'}
+            </Button>
+          )}
         </div>
 
         {/* Know Your Clinic Section */}
@@ -416,6 +467,63 @@ export default function ClinicBookingMiniWebsite({
           </div>
         )}
       </div>
+
+      {/* Emergency Call Confirmation Dialog */}
+      <Dialog open={showEmergencyDialog} onOpenChange={setShowEmergencyDialog}>
+        <DialogContent className="bg-zinc-900 text-white border-zinc-800">
+          <DialogHeader>
+            <DialogTitle className="text-xl text-white flex items-center gap-2">
+              <AlertCircle className="w-6 h-6 text-red-500" />
+              {language === 'english' && 'Emergency Consultation'}
+              {language === 'hindi' && 'आपातकालीन परामर्श'}
+              {language === 'bengali' && 'জরুরী পরামর্শ'}
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              {language === 'english' && 'You are about to call the clinic directly for an emergency consultation.'}
+              {language === 'hindi' && 'आप आपातकालीन परामर्श के लिए क्लिनिक को सीधे कॉल करने वाले हैं।'}
+              {language === 'bengali' && 'আপনি জরুরী পরামর্শের জন্য সরাসরি ক্লিনিকে কল করতে যাচ্ছেন।'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 my-4">
+            <div className="flex gap-3">
+              <Phone className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-red-500 mb-2">
+                  {language === 'english' && 'Emergency Contact'}
+                  {language === 'hindi' && 'आपातकालीन संपर्क'}
+                  {language === 'bengali' && 'জরুরি যোগাযোগ'}
+                </h4>
+                <p className="text-white text-xl mb-2">{emergencyPhone}</p>
+                <p className="text-sm text-gray-300">
+                  {language === 'english' && 'Please explain your emergency clearly when someone answers.'}
+                  {language === 'hindi' && 'जब कोई उत्तर दे तो कृपया अपनी आपातस्थिति स्पष्ट रूप से समझाएं।'}
+                  {language === 'bengali' && 'কেউ উত্তর দিলে আপনার জরুরী অবস্থা স্পষ্টভাবে ব্যাখ্যা করুন।'}
+                </p>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowEmergencyDialog(false)}
+              className="bg-transparent border-zinc-700 text-white hover:bg-zinc-800"
+            >
+              {language === 'english' && 'Cancel'}
+              {language === 'hindi' && 'रद्द करें'}
+              {language === 'bengali' && 'বাতিল'}
+            </Button>
+            <Button
+              onClick={() => { setShowEmergencyDialog(false); window.location.href = `tel:${emergencyPhone}`; }}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              <Phone className="w-4 h-4 mr-2" />
+              {language === 'english' && 'Call Now'}
+              {language === 'hindi' && 'अभी कॉल करें'}
+              {language === 'bengali' && 'এখনই কল করুন'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </BookingFlowLayout>
   );
 }

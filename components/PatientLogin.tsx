@@ -15,7 +15,14 @@ interface PatientLoginProps {
 
 export default function PatientLogin({ onSuccess, onBack }: PatientLoginProps) {
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
-  const [phoneNumber, setPhoneNumber] = useState('');
+  // Pre-fill phone from URL param if available
+  const urlPhone = (() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('phone')?.replace(/\D/g, '').slice(-10) || '';
+    } catch { return ''; }
+  })();
+  const [phoneNumber, setPhoneNumber] = useState(urlPhone);
   const [otp, setOtp] = useState('');
   const [generatedOtp, setGeneratedOtp] = useState('');
   const [loading, setLoading] = useState(false);
@@ -25,7 +32,7 @@ export default function PatientLogin({ onSuccess, onBack }: PatientLoginProps) {
   useEffect(() => {
     const savedPatient = localStorage.getItem('patient_phone');
     const sessionExpiry = localStorage.getItem('patient_session_expiry');
-    
+
     if (savedPatient && sessionExpiry) {
       const expiryTime = parseInt(sessionExpiry);
       if (Date.now() < expiryTime) {
@@ -76,7 +83,7 @@ export default function PatientLogin({ onSuccess, onBack }: PatientLoginProps) {
 
       for (const collectionName of collections) {
         const collectionRef = collection(db, collectionName);
-        
+
         // Try querying with each field and format combination
         for (const fieldName of phoneFields) {
           for (const format of formats) {
@@ -85,7 +92,7 @@ export default function PatientLogin({ onSuccess, onBack }: PatientLoginProps) {
               const q = query(collectionRef, where(fieldName, '==', format));
               const snapshot = await getDocs(q);
               console.log('📊 Results:', snapshot.size);
-              
+
               if (!snapshot.empty) {
                 querySnapshot = snapshot;
                 matchedFormat = format;
@@ -164,8 +171,8 @@ export default function PatientLogin({ onSuccess, onBack }: PatientLoginProps) {
     }
 
     // OTP verified successfully
-    const formattedPhone = phoneNumber.startsWith('+91') 
-      ? phoneNumber 
+    const formattedPhone = phoneNumber.startsWith('+91')
+      ? phoneNumber
       : `+91${phoneNumber}`;
 
     // Store session (10 years - essentially forever)
@@ -182,8 +189,8 @@ export default function PatientLogin({ onSuccess, onBack }: PatientLoginProps) {
     setGeneratedOtp(newOtp);
     setOtp('');
 
-    const formattedPhone = phoneNumber.startsWith('+91') 
-      ? phoneNumber 
+    const formattedPhone = phoneNumber.startsWith('+91')
+      ? phoneNumber
       : `+91${phoneNumber}`;
 
     await sendOtpNotification(formattedPhone, newOtp);

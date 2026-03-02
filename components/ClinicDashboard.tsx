@@ -36,6 +36,20 @@ import ClinicScheduleManager from './ClinicScheduleManager';
 import ClinicTodaysSchedule from './ClinicTodaysSchedule';
 import ManageDoctors from './ManageDoctors';
 import BrainDeckManager from './BrainDeckManager';
+import ClinicAdvanceBooking from './ClinicAdvanceBooking';
+import ClinicAnalytics from './ClinicAnalytics';
+import ClinicReports from './ClinicReports';
+import ClinicSocialMediaKit from './ClinicSocialMediaKit';
+import ClinicMonthlyPlanner from './ClinicMonthlyPlanner';
+import ClinicPreviewCenter from './ClinicPreviewCenter';
+import ClinicAssistantAccessManager from './ClinicAssistantAccessManager';
+import ClinicLabReferralManager from './ClinicLabReferralManager';
+import ClinicPersonalizedTemplatesManager from './ClinicPersonalizedTemplatesManager';
+import ClinicEmergencyButtonManager from './ClinicEmergencyButtonManager';
+import ClinicAIDietChartManager from './ClinicAIDietChartManager';
+import ClinicAIRXReaderManager from './ClinicAIRXReaderManager';
+import ClinicVideoConsultationManager from './ClinicVideoConsultationManager';
+import VideoLibrary from './VideoLibrary';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 
 interface ClinicData {
@@ -83,6 +97,17 @@ export default function ClinicDashboard() {
   const [todaysChambers, setTodaysChambers] = useState<TodayChamber[]>([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0); // Real-time refresh trigger
 
+  // Assistant detection
+  const isAssistant = localStorage.getItem('healqr_is_assistant') === 'true';
+  const assistantAllowedPages: string[] = isAssistant
+    ? (() => { try { return JSON.parse(localStorage.getItem('healqr_assistant_pages') || '["dashboard"]'); } catch { return ['dashboard']; } })()
+    : [];
+
+  // Resolve the clinic ID: for assistants, use parent clinic's ID
+  const resolvedClinicId = isAssistant
+    ? localStorage.getItem('healqr_assistant_doctor_id') || auth?.currentUser?.uid || ''
+    : auth?.currentUser?.uid || '';
+
   // Analytics State
   const [analyticsData, setAnalyticsData] = useState({
     totalScans: 0,
@@ -99,14 +124,14 @@ export default function ClinicDashboard() {
   // Load data whenever refreshTrigger changes or user changes
   useEffect(() => {
     const fetchData = async () => {
-      if (!auth.currentUser) {
+      if (!resolvedClinicId) {
         setLoading(false);
         return;
       }
 
       try {
-        // Fetch clinic data first as it's needed for other calculations
-        const clinicRef = doc(db, 'clinics', auth.currentUser.uid);
+        // For assistants, load the parent clinic's data
+        const clinicRef = doc(db, 'clinics', resolvedClinicId);
         const clinicSnap = await getDoc(clinicRef);
 
         if (clinicSnap.exists()) {
@@ -129,18 +154,17 @@ export default function ClinicDashboard() {
     };
 
     fetchData();
-  }, [refreshTrigger, auth.currentUser]);
+  }, [refreshTrigger, resolvedClinicId]);
 
   // 🔥 REAL-TIME LISTENER: Triggers refresh via state change
   useEffect(() => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) return;
+    if (!resolvedClinicId) return;
 
     let timeoutId: NodeJS.Timeout | null = null;
 
     const bookingsQuery = query(
       collection(db, 'bookings'),
-      where('clinicId', '==', currentUser.uid)
+      where('clinicId', '==', resolvedClinicId)
     );
 
     const unsubscribe = onSnapshot(bookingsQuery, (snapshot) => {
@@ -160,11 +184,10 @@ export default function ClinicDashboard() {
       if (timeoutId) clearTimeout(timeoutId);
       unsubscribe();
     };
-  }, [auth.currentUser]);
+  }, [resolvedClinicId]);
 
   const loadClinicAnalytics = async (data: ClinicData) => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) return;
+    if (!resolvedClinicId) return;
 
     try {
       // Get current month date range for client-side filtering
@@ -180,7 +203,7 @@ export default function ClinicDashboard() {
           const clinicBookingsQuery = query(
             collection(db, 'bookings'),
             where('doctorId', '==', docId),
-            where('clinicId', '==', currentUser.uid)
+            where('clinicId', '==', resolvedClinicId)
           );
           return await getDocs(clinicBookingsQuery);
         } catch (err) {
@@ -195,7 +218,7 @@ export default function ClinicDashboard() {
           const scansQuery = query(
             collection(db, 'qrScans'),
             where('scannedBy', '==', 'clinic'),
-            where('clinicId', '==', currentUser.uid)
+            where('clinicId', '==', resolvedClinicId)
           );
           return await getDocs(scansQuery);
         } catch (err) {
@@ -267,8 +290,7 @@ export default function ClinicDashboard() {
   };
 
   const loadTodaysSchedule = async (data: ClinicData) => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) return;
+    if (!resolvedClinicId) return;
 
     try {
       const linkedDoctors = data.linkedDoctorsDetails;
@@ -294,7 +316,7 @@ export default function ClinicDashboard() {
 
           // Filter chambers for this clinic and for TODAY
           const todayChambers = (doctorData.chambers as any[]).filter((chamber: any) => {
-            if (!chamber || chamber.clinicId !== currentUser.uid) return false;
+            if (!chamber || chamber.clinicId !== resolvedClinicId) return false;
             if (chamber.frequency === 'Custom') {
               return chamber.customDate === today.toISOString().split('T')[0];
             }
@@ -400,90 +422,176 @@ export default function ClinicDashboard() {
     }} />;
   }
 
+  // Render Advance Booking if menu is active
+  if (activeMenu === 'advance-booking') {
+    return <ClinicAdvanceBooking onMenuChange={(menu) => setActiveMenu(menu)} onLogout={handleLogout} />;
+  }
+
+  // Render Analytics if menu is active
+  if (activeMenu === 'analytics') {
+    return (
+      <ClinicAnalytics
+        onMenuChange={(menu) => setActiveMenu(menu)}
+        onLogout={handleLogout}
+        isSidebarCollapsed={false}
+        setIsSidebarCollapsed={() => {}}
+      />
+    );
+  }
+
+  // Render Reports if menu is active
+  if (activeMenu === 'reports') {
+    return (
+      <ClinicReports
+        onMenuChange={(menu) => setActiveMenu(menu)}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  // Render Social Kit & Offers if menu is active
+  if (activeMenu === 'social-kit') {
+    return (
+      <ClinicSocialMediaKit
+        clinicName={clinicData?.name || 'Clinic'}
+        clinicAddress={clinicData?.address || ''}
+        clinicPhone={clinicData?.phone || ''}
+        qrUrl={`https://healqr.com?clinicId=${resolvedClinicId}`}
+        clinicLogo={clinicData?.logoUrl || null}
+        onMenuChange={(menu) => setActiveMenu(menu)}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  // Render Monthly Planner if menu is active
+  if (activeMenu === 'monthly-planner') {
+    return (
+      <ClinicMonthlyPlanner
+        onMenuChange={(menu) => setActiveMenu(menu)}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  // Render Preview Centre if menu is active
+  if (activeMenu === 'preview') {
+    return (
+      <ClinicPreviewCenter
+        onMenuChange={(menu) => setActiveMenu(menu)}
+        onLogout={handleLogout}
+        clinicData={clinicData}
+      />
+    );
+  }
+
+  // Render Assistant Access if menu is active
+  if (activeMenu === 'assistant') {
+    return (
+      <ClinicAssistantAccessManager
+        clinicName={clinicData?.name || 'Clinic'}
+        email={clinicData?.email || auth.currentUser?.email || ''}
+        onMenuChange={(menu) => setActiveMenu(menu)}
+        onLogout={handleLogout}
+        activeAddOns={[]}
+      />
+    );
+  }
+
+  // Render Lab Referral Tracking if menu is active
+  if (activeMenu === 'lab-referral') {
+    return (
+      <ClinicLabReferralManager
+        clinicName={clinicData?.name || 'Clinic'}
+        clinicId={resolvedClinicId}
+        onMenuChange={(menu) => setActiveMenu(menu)}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  // Render Personalized Templates if menu is active
+  if (activeMenu === 'templates') {
+    return (
+      <ClinicPersonalizedTemplatesManager
+        clinicId={resolvedClinicId}
+        onMenuChange={(menu) => setActiveMenu(menu)}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  // Render Emergency Button if menu is active
+  if (activeMenu === 'emergency') {
+    return (
+      <ClinicEmergencyButtonManager
+        clinicId={resolvedClinicId}
+        onMenuChange={(menu) => setActiveMenu(menu)}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  // Render AI Diet Chart if menu is active
+  if (activeMenu === 'ai-diet') {
+    return (
+      <ClinicAIDietChartManager
+        clinicId={resolvedClinicId}
+        clinicName={clinicData?.name || 'Clinic'}
+        onMenuChange={(menu) => setActiveMenu(menu)}
+        onLogout={handleLogout}
+        activeAddOns={[]}
+      />
+    );
+  }
+
+  // Render AI RX Reader if menu is active
+  if (activeMenu === 'ai-rx') {
+    return (
+      <ClinicAIRXReaderManager
+        clinicName={clinicData?.name || 'Clinic'}
+        clinicId={resolvedClinicId}
+        onMenuChange={(menu) => setActiveMenu(menu)}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
   // Render BrainDeck Manager if menu is active
   if (activeMenu === 'braindeck') {
     return <BrainDeckManager onBack={() => setActiveMenu('dashboard')} doctorName={clinicData?.name || 'Clinic'} />;
   }
 
-  // Render Video Library if menu is active
+  // Render Video Consultation History if menu is active
   if (activeMenu === 'video-consult') {
-    const videos = [
-      { id: 1, title: 'How to Boost Your Energy', thumbnail: 'https://img.youtube.com/vi/dQw4w9WgXcQ/maxresdefault.jpg', duration: '5:30' },
-      { id: 2, title: 'Digital Health Tips for Doctors', thumbnail: 'https://img.youtube.com/vi/jNQXAC9IVRw/maxresdefault.jpg', duration: '3:45' },
-      { id: 3, title: 'Using HealQR for Your Practice', thumbnail: 'https://img.youtube.com/vi/9bZkp7q19f0/maxresdefault.jpg', duration: '7:12' },
-      { id: 4, title: 'Patient Engagement Strategies', thumbnail: 'https://img.youtube.com/vi/kJQP7kiw5Fk/maxresdefault.jpg', duration: '4:20' },
-    ];
-
     return (
-      <div className="min-h-screen bg-black text-white flex flex-col lg:flex-row">
-        <ClinicSidebar
-          activeMenu={activeMenu}
-          onMenuChange={(menu) => setActiveMenu(menu)}
-          onLogout={handleLogout}
-          isOpen={mobileMenuOpen}
-          onClose={() => setMobileMenuOpen(false)}
-        />
-        <div className="flex-1 lg:ml-64 overflow-y-auto">
-          <div className="p-6 space-y-6">
-            {/* Back to Dashboard */}
-            <button
-              onClick={() => setActiveMenu('dashboard')}
-              className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-sm"
-            >
-              <ArrowRight className="w-4 h-4 rotate-180" />
-              Back to Dashboard
-            </button>
+      <ClinicVideoConsultationManager
+        clinicId={resolvedClinicId}
+        clinicName={clinicData?.name || 'Clinic'}
+        onMenuChange={(menu) => setActiveMenu(menu)}
+        onLogout={handleLogout}
+        activeAddOns={[]}
+        isAssistant={isAssistant}
+        assistantAllowedPages={assistantAllowedPages}
+      />
+    );
+  }
 
-            {/* Header */}
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#0d9488' }}>
-                <Video className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-white">Video Library</h1>
-                <p className="text-sm text-gray-400">Learn how to make the most of HealQR</p>
-              </div>
-            </div>
-
-            {/* Video Grid */}
-            <div className="space-y-5">
-              {videos.map((video) => (
-                <div
-                  key={video.id}
-                  className="relative rounded-2xl overflow-hidden cursor-pointer group"
-                >
-                  <div className="aspect-video bg-zinc-800 relative">
-                    <img
-                      src={video.thumbnail}
-                      alt={video.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = '';
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
-                    {/* Duration badge */}
-                    <div className="absolute bottom-3 right-3 bg-black/70 text-white text-xs font-medium px-2 py-1 rounded">
-                      {video.duration}
-                    </div>
-                    {/* Close/dismiss button */}
-                    <button className="absolute top-3 right-3 w-8 h-8 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                      ×
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
+  // Render Video Library if menu is active (from navbar icon)
+  if (activeMenu === 'video-library') {
+    return (
+      <VideoLibrary
+        onBack={() => setActiveMenu('dashboard')}
+        source="dashboard"
+      />
     );
   }
 
   // Handle unimplemented features
   const implementedMenus = [
     'dashboard', 'profile', 'qr-manager', 'schedule', 'schedule-manager',
-    'todays-schedule', 'doctors', 'braindeck', 'video-consult'
+    'todays-schedule', 'doctors', 'braindeck', 'video-consult', 'advance-booking', 'analytics', 'reports', 'social-kit', 'monthly-planner', 'preview', 'assistant',
+    'lab-referral', 'templates', 'emergency', 'ai-diet', 'ai-rx'
   ];
 
   if (!implementedMenus.includes(activeMenu)) {
@@ -495,6 +603,8 @@ export default function ClinicDashboard() {
           onLogout={handleLogout}
           isOpen={mobileMenuOpen}
           onClose={() => setMobileMenuOpen(false)}
+          isAssistant={isAssistant}
+          assistantAllowedPages={assistantAllowedPages}
         />
         <div className="flex-1 lg:ml-64 flex flex-col items-center justify-center p-8">
           <div className="text-center space-y-4">
@@ -551,6 +661,8 @@ export default function ClinicDashboard() {
         onLogout={handleLogout}
         isOpen={mobileMenuOpen}
         onClose={() => setMobileMenuOpen(false)}
+        isAssistant={isAssistant}
+        assistantAllowedPages={assistantAllowedPages}
       />
 
       {/* Main Content Container */}
@@ -590,8 +702,9 @@ export default function ClinicDashboard() {
 
             {/* Video Library */}
             <button
-              onClick={() => setActiveMenu('video-consult')}
+              onClick={() => setActiveMenu('video-library')}
               className="relative w-10 h-10 bg-zinc-900 hover:bg-zinc-800 rounded-lg flex items-center justify-center transition-colors"
+              title="Video Library"
             >
               <Video className="w-5 h-5" />
             </button>
