@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { auth, db } from '../lib/firebase/config';
 import { sendSignInLinkToEmail } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { DatabaseService } from '../lib/firebase/db.service';
 import { Card, CardHeader } from './ui/card';
 import { Button } from './ui/button';
@@ -33,7 +33,9 @@ import {
   Info,
   Menu,
   Check,
-  AlertTriangle
+  AlertTriangle,
+  Key,
+  ExternalLink
 } from 'lucide-react';
 import ClinicSidebar from './ClinicSidebar';
 import { toast } from 'sonner';
@@ -155,10 +157,75 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
   const [searchedDoctor, setSearchedDoctor] = useState<any>(null);
   const [searchLoading, setSearchLoading] = useState(false);
 
+  // Temp Doctor Access states
+  const [tempAccessLoading, setTempAccessLoading] = useState<string | null>(null); // doctorId currently generating
+  const [tempAccessData, setTempAccessData] = useState<{ [doctorId: string]: { link: string; pin: string; expiry: string } }>({});
+  const [copiedTempField, setCopiedTempField] = useState<string>('');
+
   useEffect(() => {
     loadClinicData();
     loadAllDoctors();
   }, []);
+
+  // Generate Temporary Doctor Access (link + PIN)
+  const handleGenerateTempAccess = async (doctor: LinkedDoctor) => {
+    if (!auth?.currentUser) return;
+    const clinicId = auth.currentUser.uid;
+    setTempAccessLoading(doctor.uid);
+
+    try {
+      const accessToken = `tmp_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+      const accessPin = Math.floor(100000 + Math.random() * 900000).toString();
+      const today = new Date().toISOString().split('T')[0];
+
+      // Get clinic name
+      const clinicDoc = await getDoc(doc(db, 'clinics', clinicId));
+      const clinicName = clinicDoc.exists() ? (clinicDoc.data().clinicName || clinicDoc.data().name || '') : '';
+
+      // Deactivate any existing active tokens for this doctor
+      const existingRef = collection(db, 'clinics', clinicId, 'tempDoctorAccess');
+      const existingQ = query(existingRef, where('doctorId', '==', doctor.uid), where('isActive', '==', true));
+      const existingSnap = await getDocs(existingQ);
+      for (const existingDoc of existingSnap.docs) {
+        await updateDoc(existingDoc.ref, { isActive: false });
+      }
+
+      // Create new temp access doc
+      await addDoc(collection(db, 'clinics', clinicId, 'tempDoctorAccess'), {
+        doctorId: doctor.uid,
+        doctorName: doctor.name,
+        clinicId,
+        clinicName,
+        accessToken,
+        accessPin,
+        isActive: true,
+        expiryDate: today, // Valid for today only
+        chambers: (doctor.chambers || []).filter(ch => ch.clinicId === clinicId || !ch.clinicId),
+        createdAt: serverTimestamp(),
+        loginCount: 0
+      });
+
+      const link = `${window.location.origin}/temp-doctor-login?token=${accessToken}`;
+      setTempAccessData(prev => ({
+        ...prev,
+        [doctor.uid]: { link, pin: accessPin, expiry: today }
+      }));
+
+      toast.success(`Temp access generated for Dr. ${doctor.name}`);
+    } catch (err) {
+      console.error('Error generating temp access:', err);
+      toast.error('Failed to generate temporary access');
+    } finally {
+      setTempAccessLoading(null);
+    }
+  };
+
+  const copyTempField = (text: string, fieldId: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedTempField(fieldId);
+    toast.success('Copied to clipboard!');
+    setTimeout(() => setCopiedTempField(''), 2000);
+  };
 
   // Load all doctors for search/add
   const loadAllDoctors = async () => {
@@ -1663,6 +1730,109 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
                           </div>
                         </div>
                       )}
+                  </div>
+
+                  {/* Temporary Doctor Access Section */}
+                  <div className="border-t border-gray-700 pt-4 mb-4">
+                    <h4 className="text-gray-300 text-sm font-medium mb-3 flex items-center gap-2">
+                      <Key className="w-4 h-4 text-blue-400" />
+                      Temporary Device Access
+                    </h4>
+                    <p className="text-gray-500 text-xs mb-3">
+                      Generate a one-day access link + PIN so this doctor can use any device at the clinic to view today's patients and write Digital RX.
+                    </p>
+
+                    {tempAccessData[doctor.uid] ? (
+                      <div className="space-y-2">
+                        {/* Generated Link */}
+                        <div className="bg-gray-900/50 border border-blue-700/30 rounded-lg p-3">
+                          <Label className="text-blue-400 text-xs mb-1 block">Access Link</Label>
+                          <div className="flex items-center gap-2">
+                            <code className="text-gray-300 text-xs flex-1 break-all bg-gray-900/70 rounded px-2 py-1.5 max-h-16 overflow-auto">
+                              {tempAccessData[doctor.uid].link}
+                            </code>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => copyTempField(tempAccessData[doctor.uid].link, `link-${doctor.uid}`)}
+                              className="flex-shrink-0 h-8 w-8 p-0"
+                            >
+                              {copiedTempField === `link-${doctor.uid}` ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5 text-gray-400" />
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Generated PIN */}
+                        <div className="bg-gray-900/50 border border-blue-700/30 rounded-lg p-3">
+                          <Label className="text-blue-400 text-xs mb-1 block">Access PIN</Label>
+                          <div className="flex items-center gap-2">
+                            <span className="text-white font-mono text-lg tracking-[0.3em]">
+                              {tempAccessData[doctor.uid].pin}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => copyTempField(tempAccessData[doctor.uid].pin, `pin-${doctor.uid}`)}
+                              className="flex-shrink-0 h-8 w-8 p-0"
+                            >
+                              {copiedTempField === `pin-${doctor.uid}` ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5 text-gray-400" />
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Copy both for WhatsApp */}
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            const text = `🏥 Temporary Doctor Access\n\nDr. ${doctor.name}, use this link to access today's patient schedule:\n\n🔗 Link: ${tempAccessData[doctor.uid].link}\n🔑 PIN: ${tempAccessData[doctor.uid].pin}\n\n⏰ Valid today during chamber hours only.`;
+                            copyTempField(text, `whatsapp-${doctor.uid}`);
+                          }}
+                          variant="outline"
+                          className="w-full border-emerald-700/50 text-emerald-400 hover:bg-emerald-900/30 text-xs h-8"
+                        >
+                          <ExternalLink className="w-3 h-3 mr-2" />
+                          {copiedTempField === `whatsapp-${doctor.uid}` ? '✓ Copied for sharing!' : 'Copy Link + PIN for WhatsApp/SMS'}
+                        </Button>
+
+                        {/* Regenerate */}
+                        <Button
+                          size="sm"
+                          onClick={() => handleGenerateTempAccess(doctor)}
+                          variant="ghost"
+                          className="w-full text-gray-400 hover:text-white text-xs h-7"
+                          disabled={tempAccessLoading === doctor.uid}
+                        >
+                          Regenerate Access
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        size="sm"
+                        onClick={() => handleGenerateTempAccess(doctor)}
+                        disabled={tempAccessLoading === doctor.uid}
+                        className="w-full bg-blue-600/20 border border-blue-600/40 text-blue-400 hover:bg-blue-600/30 text-xs h-9"
+                      >
+                        {tempAccessLoading === doctor.uid ? (
+                          <div className="flex items-center gap-2">
+                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-400"></div>
+                            Generating...
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <Key className="w-3.5 h-3.5" />
+                            Generate Temp Access for Today
+                          </div>
+                        )}
+                      </Button>
+                    )}
                   </div>
 
                   {/* Actions - Same for all doctors */}

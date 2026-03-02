@@ -90,6 +90,8 @@ const AIDietChartManager = lazy(() => import("./components/AIDietChartManager"))
 const SocialMediaKit = lazy(() => import("./components/SocialMediaKit"));
 const PatientVideoConsultation = lazy(() => import("./components/PatientVideoConsultation"));
 const BrainDeckManager = lazy(() => import("./components/BrainDeckManager"));
+const TempDoctorLogin = lazy(() => import("./components/TempDoctorLogin"));
+const TempDoctorDashboard = lazy(() => import("./components/TempDoctorDashboard"));
 
 // Loading Component
 const PageLoader = () => (
@@ -124,6 +126,8 @@ export default function App() {
     | "verify-email"
     | "verify-login"
     | "assistant-login"
+    | "temp-doctor-login"
+    | "temp-doctor-dashboard"
     | "admin-verify"
     | "login"
     | "dashboard"
@@ -650,6 +654,14 @@ export default function App() {
       setVideoLibrarySource(source);
       setCurrentPage('video-library');
       return;
+    } else if (pageParam === 'temp-doctor-dashboard') {
+      // Temp doctor dashboard — check localStorage for valid session
+      if (localStorage.getItem('healqr_is_temp_doctor') === 'true') {
+        setCurrentPage('temp-doctor-dashboard');
+      } else {
+        setCurrentPage('landing');
+      }
+      return;
     }
 
     // Video Call routing
@@ -1028,6 +1040,8 @@ export default function App() {
     // Detect Firebase email link OR specific verification paths
     if (pathname.includes('/admin-verify')) {
       setCurrentPage('admin-verify');
+    } else if (pathname.includes('/temp-doctor-login')) {
+      setCurrentPage('temp-doctor-login');
     } else if (pathname.includes('/assistant-login')) {
       setCurrentPage('assistant-login');
     } else if (pathname.includes('/verify-login')) {
@@ -1087,7 +1101,7 @@ export default function App() {
       const isClinicPage = currentPage === 'clinic-login' || currentPage === 'clinic-signup' || pageParam === 'clinic-login' || pageParam === 'clinic-signup';
       const isAdvertiserPage = currentPage === 'advertiser-login' || currentPage === 'advertiser-signup' || pageParam === 'advertiser-login' || pageParam === 'advertiser-signup';
 
-      if (isVerificationLink || isBookingMode || hasBookingDoctorId || isNotificationPage || isVerifyVisit || isClinicPage || isAdvertiserPage || currentPage === 'verify-email' || currentPage === 'verify-login' || currentPage === 'assistant-login' || currentPage === 'admin-verify' || currentPage === 'verify-walkin' || currentPage.startsWith('booking-')) {
+      if (isVerificationLink || isBookingMode || hasBookingDoctorId || isNotificationPage || isVerifyVisit || isClinicPage || isAdvertiserPage || currentPage === 'verify-email' || currentPage === 'verify-login' || currentPage === 'assistant-login' || currentPage === 'temp-doctor-login' || currentPage === 'temp-doctor-dashboard' || currentPage === 'admin-verify' || currentPage === 'verify-walkin' || currentPage.startsWith('booking-')) {
         setIsAuthInitialized(true);
         return;
       }
@@ -2323,6 +2337,10 @@ export default function App() {
       )}
 
       {currentPage === "assistant-login" && <AssistantLogin />}
+
+      {currentPage === "temp-doctor-login" && <TempDoctorLogin />}
+
+      {currentPage === "temp-doctor-dashboard" && <TempDoctorDashboard />}
 
       {currentPage === "admin-verify" && (
         <AdminVerifyLogin
