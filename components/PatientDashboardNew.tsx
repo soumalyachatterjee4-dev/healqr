@@ -192,6 +192,7 @@ const PatientDashboardNew = () => {
     prescriptions: 0
   });
   const [specialtyStats, setSpecialtyStats] = useState<any[]>([]);
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [demoMode, setDemoMode] = useState(false);
   const [healthCardData, setHealthCardData] = useState<any>(null);
 
@@ -296,19 +297,60 @@ const PatientDashboardNew = () => {
     const specialtyCount: { [key: string]: number } = {};
     let upcoming = 0;
     let totalRx = 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     snapshot.docs.forEach(doc => {
       const data = doc.data();
       const specialty = data.specialty || 'General Medicine';
       specialtyCount[specialty] = (specialtyCount[specialty] || 0) + 1;
 
+      // Upcoming: only future/today bookings with active status
       if (data.status === 'confirmed' || data.status === 'in-queue') {
-        upcoming++;
+        const bookingDateStr = data.bookingDate || data.consultationDate;
+        if (bookingDateStr) {
+          const bookingDate = new Date(bookingDateStr);
+          bookingDate.setHours(0, 0, 0, 0);
+          if (bookingDate >= today) {
+            upcoming++;
+          }
+        } else {
+          // No date field — count as upcoming if status is active
+          upcoming++;
+        }
       }
-      if (data.prescriptionImages && data.prescriptionImages.length > 0) {
+
+      // Prescriptions: count prescriptionImages, prescriptionUrl, or digitalRxUrl
+      if (
+        (data.prescriptionImages && data.prescriptionImages.length > 0) ||
+        data.prescriptionUrl ||
+        data.digitalRxUrl ||
+        data.rxPdfUrl
+      ) {
         totalRx++;
       }
     });
+
+    // Fetch unread notifications count
+    let unreadCount = 0;
+    try {
+      const phone10 = phone.replace(/\D/g, '').replace(/^91/, '').slice(-10);
+      const notifRef = collection(db, 'patient_notifications');
+      const notifQuery = query(notifRef, where('patientPhone', '==', phone10), where('read', '==', false));
+      const notifSnap = await getDocs(notifQuery);
+      unreadCount = notifSnap.size;
+    } catch (e) {
+      // Also try without read filter (in case read field doesn't exist)
+      try {
+        const phone10 = phone.replace(/\D/g, '').replace(/^91/, '').slice(-10);
+        const notifRef = collection(db, 'patient_notifications');
+        const notifQuery = query(notifRef, where('patientPhone', '==', phone10));
+        const notifSnap = await getDocs(notifQuery);
+        unreadCount = notifSnap.size;
+      } catch (e2) {
+        console.error('Error fetching notifications count:', e2);
+      }
+    }
 
     const colors = ['#FF9800', '#FF6B6B', '#FFB347', '#FFA500', '#FF8C00'];
     const specialtyData = Object.entries(specialtyCount).map(([specialty, visits], index) => ({
@@ -320,11 +362,84 @@ const PatientDashboardNew = () => {
     setStats({
       totalConsultations: snapshot.size,
       upcomingAppointments: upcoming,
-      unreadNotifications: 0,
+      unreadNotifications: unreadCount,
       prescriptions: totalRx
     });
 
     setSpecialtyStats(specialtyData);
+
+    // Build recent activity from real bookings
+    const activities: any[] = [];
+    snapshot.docs.forEach(docSnap => {
+      const data = docSnap.data();
+      const bookingDate = data.bookingDate || data.consultationDate || (data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : null);
+      const timestamp = bookingDate ? new Date(bookingDate).getTime() : 0;
+      const doctor = data.doctorName || 'Doctor';
+      const spec = data.specialty || 'General Medicine';
+
+      // Consultation status activity
+      if (data.isCompleted || data.consultationStatus === 'completed' || data.isMarkedSeen) {
+        activities.push({
+          type: 'consultation_completed',
+          title: 'Consultation Completed',
+          description: `${doctor} - ${spec}`,
+          timestamp,
+          date: bookingDate
+        });
+      } else if (data.status === 'confirmed' || data.status === 'in-queue') {
+        activities.push({
+          type: 'booking_confirmed',
+          title: data.status === 'in-queue' ? 'In Queue' : 'Booking Confirmed',
+          description: `${doctor} - ${spec}`,
+          timestamp,
+          date: bookingDate
+        });
+      } else {
+        activities.push({
+          type: 'visited',
+          title: 'Visit Recorded',
+          description: `${doctor} - ${spec}`,
+          timestamp,
+          date: bookingDate
+        });
+      }
+
+      // Prescription activity
+      if (data.prescriptionImages && data.prescriptionImages.length > 0) {
+        activities.push({
+          type: 'prescription',
+          title: 'Prescription Received',
+          description: `Digital RX from ${doctor}`,
+          timestamp: timestamp + 1, // slightly after consultation
+          date: bookingDate
+        });
+      }
+    });
+
+    // Sort by most recent first, limit to 10
+    activities.sort((a, b) => b.timestamp - a.timestamp);
+    setRecentActivity(activities.slice(0, 10));
+  };
+
+  // Helper to format relative time
+  const getTimeAgo = (dateStr: string): string => {
+    try {
+      const date = new Date(dateStr);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
+
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins} min ago`;
+      if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+      if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+      if (diffDays < 30) return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) > 1 ? 's' : ''} ago`;
+      return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    } catch {
+      return '';
+    }
   };
 
   const handleLogout = () => {
@@ -337,52 +452,103 @@ const PatientDashboardNew = () => {
   const renderDashboardContent = () => {
     return (
       <div className="space-y-6">
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-gray-800 rounded-lg p-6 border border-orange-500/20">
+        {/* Full-width Encrypted Badge - Orange */}
+        <div className="w-full flex items-center justify-center rounded-xl bg-orange-500 text-white font-bold py-3 text-base shadow shadow-orange-200">
+          <Lock className="w-5 h-5 mr-2" />
+          Data is encrypted
+        </div>
+
+        {/* Stats Overview - White + Blue */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="bg-white rounded-xl p-4 border border-blue-100 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-400 text-sm">Total Consultations</p>
-                <p className="text-3xl font-bold text-white mt-2">{stats.totalConsultations}</p>
+                <p className="text-blue-400 text-xs font-medium">Total Consultations</p>
+                <p className="text-2xl font-bold text-blue-600 mt-1">{stats.totalConsultations}</p>
               </div>
-              <div className="bg-orange-500/20 p-3 rounded-lg">
-                <Stethoscope className="w-6 h-6 text-orange-500" />
+              <div className="bg-blue-50 p-2.5 rounded-lg">
+                <Stethoscope className="w-5 h-5 text-blue-500" />
               </div>
             </div>
           </div>
 
-          <div className="bg-gray-800 rounded-lg p-6 border border-orange-500/20">
+          <div className="bg-white rounded-xl p-4 border border-blue-100 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-400 text-sm">Upcoming</p>
-                <p className="text-3xl font-bold text-white mt-2">{stats.upcomingAppointments}</p>
+                <p className="text-blue-400 text-xs font-medium">Upcoming</p>
+                <p className="text-2xl font-bold text-blue-600 mt-1">{stats.upcomingAppointments}</p>
               </div>
-              <div className="bg-orange-500/20 p-3 rounded-lg">
-                <Calendar className="w-6 h-6 text-orange-500" />
+              <div className="bg-blue-50 p-2.5 rounded-lg">
+                <Calendar className="w-5 h-5 text-blue-500" />
               </div>
             </div>
           </div>
 
-          <div className="bg-gray-800 rounded-lg p-6 border border-orange-500/20">
+          <div className="bg-white rounded-xl p-4 border border-blue-100 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-400 text-sm">Notifications</p>
-                <p className="text-3xl font-bold text-white mt-2">{stats.unreadNotifications}</p>
+                <p className="text-blue-400 text-xs font-medium">Notifications</p>
+                <p className="text-2xl font-bold text-blue-600 mt-1">{stats.unreadNotifications}</p>
               </div>
-              <div className="bg-orange-500/20 p-3 rounded-lg">
-                <Bell className="w-6 h-6 text-orange-500" />
+              <div className="bg-blue-50 p-2.5 rounded-lg">
+                <Bell className="w-5 h-5 text-blue-500" />
               </div>
             </div>
           </div>
 
-          <div className="bg-gray-800 rounded-lg p-6 border border-orange-500/20">
+          <div className="bg-white rounded-xl p-4 border border-blue-100 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-400 text-sm">Prescriptions</p>
-                <p className="text-3xl font-bold text-white mt-2">{stats.prescriptions}</p>
+                <p className="text-blue-400 text-xs font-medium">Prescriptions</p>
+                <p className="text-2xl font-bold text-blue-600 mt-1">{stats.prescriptions}</p>
               </div>
-              <div className="bg-orange-500/20 p-3 rounded-lg">
-                <Activity className="w-6 h-6 text-orange-500" />
+              <div className="bg-blue-50 p-2.5 rounded-lg">
+                <Activity className="w-5 h-5 text-blue-500" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Health Card - Now Clickable - Green */}
+        <div
+          onClick={() => setCurrentView('health-card')}
+          className="rounded-xl p-8 text-white cursor-pointer hover:shadow-2xl hover:shadow-emerald-500/50 transition-all duration-300"
+          style={{ background: 'linear-gradient(to bottom right, rgb(16, 185, 129), rgb(5, 150, 105))' }}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <Heart className="w-6 h-6" />
+                <h3 className="text-2xl font-bold">Health Card</h3>
+              </div>
+              {healthCardData?.mission && (
+                <p className="text-emerald-50 italic mb-4">&ldquo;{healthCardData.mission}&rdquo;</p>
+              )}
+              {!healthCardData?.mission && (
+                <p className="text-emerald-100 mb-4">Your complete health profile at a glance</p>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
+                <div>
+                  <p className="text-emerald-100 text-sm">Name</p>
+                  <p className="font-semibold text-lg">{healthCardData?.name || patientData?.name || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-emerald-100 text-sm">Age / Gender</p>
+                  <p className="font-semibold text-lg">{healthCardData?.age || patientData?.age || 'N/A'} / {healthCardData?.gender || patientData?.gender || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-emerald-100 text-sm">Blood Group</p>
+                  <p className="font-semibold text-lg">{healthCardData?.bloodGroup || patientData?.bloodGroup || 'Not Set'}</p>
+                </div>
+              </div>
+              <div className="mt-4 text-sm text-emerald-100 flex items-center gap-2">
+                <span>Click to view & edit full profile</span>
+                <span>→</span>
+              </div>
+            </div>
+            <div className="hidden lg:block ml-6">
+              <div className="w-32 h-32 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+                <Activity className="w-16 h-16 text-white" />
               </div>
             </div>
           </div>
@@ -397,50 +563,6 @@ const PatientDashboardNew = () => {
 
         {/* PWA Install Instructions */}
         <PWAInstallBanner />
-
-        {/* Health Card - Now Clickable */}
-        <div
-          onClick={() => setCurrentView('health-card')}
-          className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl p-8 text-white cursor-pointer hover:shadow-2xl hover:shadow-orange-500/50 transition-all duration-300"
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                <Heart className="w-6 h-6" />
-                <h3 className="text-2xl font-bold">Health Card</h3>
-              </div>
-              {healthCardData?.mission && (
-                <p className="text-orange-50 italic mb-4">&ldquo;{healthCardData.mission}&rdquo;</p>
-              )}
-              {!healthCardData?.mission && (
-                <p className="text-orange-100 mb-4">Your complete health profile at a glance</p>
-              )}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
-                <div>
-                  <p className="text-orange-100 text-sm">Name</p>
-                  <p className="font-semibold text-lg">{healthCardData?.name || patientData?.name || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-orange-100 text-sm">Age / Gender</p>
-                  <p className="font-semibold text-lg">{healthCardData?.age || patientData?.age || 'N/A'} / {healthCardData?.gender || patientData?.gender || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-orange-100 text-sm">Blood Group</p>
-                  <p className="font-semibold text-lg">{healthCardData?.bloodGroup || patientData?.bloodGroup || 'Not Set'}</p>
-                </div>
-              </div>
-              <div className="mt-4 text-sm text-orange-100 flex items-center gap-2">
-                <span>Click to view & edit full profile</span>
-                <span>→</span>
-              </div>
-            </div>
-            <div className="hidden lg:block ml-6">
-              <div className="w-32 h-32 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-                <Activity className="w-16 h-16 text-white" />
-              </div>
-            </div>
-          </div>
-        </div>
 
         {/* Specialty-wise Visits Chart */}
         <div className="bg-gray-800 rounded-lg p-6 border border-orange-500/20">
@@ -487,24 +609,32 @@ const PatientDashboardNew = () => {
         {/* Recent Activity */}
         <div className="bg-gray-800 rounded-lg p-6 border border-orange-500/20">
           <h3 className="text-xl font-bold text-white mb-4">Recent Activity</h3>
-          <div className="space-y-3">
-            <div className="flex items-start gap-3 p-3 bg-gray-700/50 rounded-lg">
-              <div className="w-2 h-2 bg-orange-500 rounded-full mt-2"></div>
-              <div>
-                <p className="text-white font-medium">Consultation Completed</p>
-                <p className="text-gray-400 text-sm">Dr. Rajesh Kumar - General Medicine</p>
-                <p className="text-gray-500 text-xs mt-1">2 days ago</p>
-              </div>
+          {recentActivity.length > 0 ? (
+            <div className="space-y-3">
+              {recentActivity.map((activity, index) => {
+                const timeAgo = activity.date ? getTimeAgo(activity.date) : '';
+                const dotColor = activity.type === 'consultation_completed' ? 'bg-green-500'
+                  : activity.type === 'prescription' ? 'bg-blue-500'
+                  : activity.type === 'booking_confirmed' ? 'bg-yellow-500'
+                  : 'bg-orange-500';
+                return (
+                  <div key={index} className="flex items-start gap-3 p-3 bg-gray-700/50 rounded-lg">
+                    <div className={`w-2 h-2 ${dotColor} rounded-full mt-2`}></div>
+                    <div>
+                      <p className="text-white font-medium">{activity.title}</p>
+                      <p className="text-gray-400 text-sm">{activity.description}</p>
+                      {timeAgo && <p className="text-gray-500 text-xs mt-1">{timeAgo}</p>}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <div className="flex items-start gap-3 p-3 bg-gray-700/50 rounded-lg">
-              <div className="w-2 h-2 bg-orange-500 rounded-full mt-2"></div>
-              <div>
-                <p className="text-white font-medium">Prescription Received</p>
-                <p className="text-gray-400 text-sm">New prescription added to your locker</p>
-                <p className="text-gray-500 text-xs mt-1">3 days ago</p>
-              </div>
+          ) : (
+            <div className="text-center text-gray-400 py-6">
+              <Activity className="w-10 h-10 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No recent activity yet</p>
             </div>
-          </div>
+          )}
         </div>
       </div>
     );
@@ -717,10 +847,7 @@ const PatientDashboardNew = () => {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <button className="hidden lg:flex items-center gap-2 bg-orange-500/20 text-orange-500 px-4 py-2 rounded-lg border border-orange-500/30">
-                <Lock className="w-4 h-4" />
-                <span className="text-sm font-medium">Data is encrypted</span>
-              </button>
+              {/* Encrypted badge moved to dashboard content area */}
             </div>
           </div>
         </header>

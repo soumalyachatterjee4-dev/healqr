@@ -1024,6 +1024,58 @@ service cloud.firestore {
     }
 
     // ============================================
+    // PHARMA COMPANIES COLLECTION
+    // ============================================
+
+    match /pharmaCompanies/{companyId} {
+      // Public read needed for login verification (email check before auth)
+      // Public create needed for signup (before auth)
+      // Only authenticated users can update/delete
+      allow read: if true;
+      allow create: if true;
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
+    match /pharmaCompanies/{companyId}/distributedDoctors/{doctorId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    match /pharmaCompanies/{companyId}/supportMessages/{messageId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ============================================
+    // PHARMA ANALYTICS (PRE-AGGREGATED)
+    // ============================================
+
+    match /pharmaAnalytics/{companyId}/{document=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // ============================================
+    // ADVERTISER ANALYTICS (PINCODE-LEVEL AGGREGATES)
+    // ============================================
+
+    match /advertiserAnalytics/{document=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // ============================================
+    // PAGE DISTRIBUTION (AD SLOT MANAGEMENT)
+    // ============================================
+
+    match /pageDistribution/{pageId} {
+      // Anyone can read (pages need to render ad slots)
+      allow read: if true;
+      // Only authenticated users (admin) can write
+      allow write: if isAuthenticated();
+    }
+
+    // ============================================
     // DEFAULT DENY
     // ============================================
 

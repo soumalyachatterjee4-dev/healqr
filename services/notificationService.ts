@@ -1,7 +1,8 @@
-import { getFunctions, httpsCallable } from 'firebase/functions';
+﻿import { getFunctions, httpsCallable } from 'firebase/functions';
 import { Timestamp } from 'firebase/firestore';
 import { app } from '../lib/firebase/config';
 import { saveNotificationHistory } from './notificationHistoryService';
+import { storeNotification as storePatientNotification } from './patientNotificationStorage';
 
 const functions = getFunctions(app!);
 
@@ -19,7 +20,7 @@ const normalizePatientTarget = (phoneOrId: string) => {
 
 const sendFCM = async (payload: { userId: string; title: string; body: string; data?: Record<string, any> }) => {
   try {
-    console.log('📤 Sending FCM notification:', {
+    console.log('ðŸ“¤ Sending FCM notification:', {
       userId: payload.userId,
       title: payload.title,
       type: payload.data?.type
@@ -30,17 +31,17 @@ const sendFCM = async (payload: { userId: string; title: string; body: string; d
     const res: any = result.data;
 
     if (res?.success === false) {
-      console.warn('⚠️ FCM send failed (patient may not have registered for notifications):', res.error);
-      console.warn('💡 To fix: Patient needs to enable notifications after booking. Check BookingConfirmation component.');
-      console.warn('📋 Patient ID:', payload.userId);
+      console.warn('âš ï¸ FCM send failed (patient may not have registered for notifications):', res.error);
+      console.warn('ðŸ’¡ To fix: Patient needs to enable notifications after booking. Check BookingConfirmation component.');
+      console.warn('ðŸ“‹ Patient ID:', payload.userId);
       return { success: false, error: res.error };
     } else {
-      console.log('✅ FCM sent successfully:', res);
+      console.log('âœ… FCM sent successfully:', res);
       return res;
     }
   } catch (error) {
-    console.warn('⚠️ FCM notification failed (non-critical):', error);
-    console.warn('💡 Patient likely has not registered for notifications. They should see a prompt after booking.');
+    console.warn('âš ï¸ FCM notification failed (non-critical):', error);
+    console.warn('ðŸ’¡ Patient likely has not registered for notifications. They should see a prompt after booking.');
     return { success: false, error: 'Patient not registered for notifications' };
   }
 };
@@ -51,12 +52,12 @@ const scheduleFCM = async (payload: { userId: string; title: string; body: strin
     const result = await schedule({ ...payload, sendAt: payload.sendAt.toISOString() });
     const res: any = result.data;
     if (res?.success === false) {
-      console.warn('⚠️ Schedule failed (patient may not have registered for notifications):', res.error);
+      console.warn('âš ï¸ Schedule failed (patient may not have registered for notifications):', res.error);
       return { success: false, error: res.error };
     }
     return res;
   } catch (error) {
-    console.warn('⚠️ FCM schedule failed (non-critical):', error);
+    console.warn('âš ï¸ FCM schedule failed (non-critical):', error);
     return { success: false, error: 'Patient not registered for notifications' };
   }
 };
@@ -81,7 +82,7 @@ export const scheduleConsultationConfirmation = async (data: any) => {
   const fcmResult = await scheduleFCM({
     userId,
     sendAt: scheduledAt,
-    title: '✅ Visit Verified',
+    title: 'âœ… Visit Verified',
     body: `Your visit with ${data.doctorName} has been verified. Thank you!`,
     data: {
       type: 'consultation_completed',
@@ -135,7 +136,7 @@ export const sendConsultationCompleted = async (data: any) => {
 
   const result = await sendFCM({
     userId,
-    title: '✅ Consultation Completed',
+    title: 'âœ… Consultation Completed',
     body: `Your consultation with ${data.doctorName} is complete. Thank you for visiting!`,
     data: {
       type: 'consultation_completed',
@@ -150,16 +151,16 @@ export const sendConsultationCompleted = async (data: any) => {
     },
   });
 
-  // 💾 ALWAYS STORE IN FIRESTORE (regardless of FCM success/failure)
+  // ðŸ’¾ ALWAYS STORE IN FIRESTORE (regardless of FCM success/failure)
   try {
-    const { storeNotification } = await import('./patientNotificationStorage');
+    const storeNotification = storePatientNotification;
     await storeNotification({
       patientPhone: phone10,
       patientName: data.patientName || 'Patient',
       patientAge: data.age,
       patientGender: data.sex,
       type: 'consultation_completed',
-      title: '✅ Consultation Completed',
+      title: 'âœ… Consultation Completed',
       message: `Your consultation with ${data.doctorName} is complete. Thank you for visiting!`,
       bookingId: data.bookingId || '',
       doctorId: data.doctorId,
@@ -181,7 +182,7 @@ export const sendConsultationCompleted = async (data: any) => {
         rxUrl: data.rxUrl,
         dietUrl: data.dietUrl,
       },
-      // 🆕 Store download URLs with 72-hour expiry
+      // ðŸ†• Store download URLs with 72-hour expiry
       ...(data.rxUrl || data.dietUrl ? {
         downloadUrls: {
           ...(data.rxUrl ? { rxUrl: data.rxUrl } : {}),
@@ -191,9 +192,9 @@ export const sendConsultationCompleted = async (data: any) => {
         }
       } : {}),
     });
-    console.log('✅ Notification stored in Firestore for patient:', phone10);
+    console.log('âœ… Notification stored in Firestore for patient:', phone10);
   } catch (storageError) {
-    console.error('❌ Failed to store notification in Firestore:', storageError);
+    console.error('âŒ Failed to store notification in Firestore:', storageError);
     // Don't throw - notification storage failure shouldn't break the flow
   }
 
@@ -227,10 +228,10 @@ export const sendConsultationCompleted = async (data: any) => {
       'Schedule recommended tests',
       'Book follow-up if advised'
     ],
-    // 🆕 120-DAY TEMPLATE STORAGE
+    // ðŸ†• 120-DAY TEMPLATE STORAGE
     templateType: 'consultation_completed',
     templateData: {
-      greeting: `Hello ${data.patientName || 'there'}, 👋`,
+      greeting: `Hello ${data.patientName || 'there'}, ðŸ‘‹`,
       mainMessage: `Thank you for visiting ${data.clinicName || 'our clinic'}. Your consultation has been successfully completed.`,
       consultationDetails: {
         date: data.consultationDate || '',
@@ -261,8 +262,8 @@ export const sendConsultationCompleted = async (data: any) => {
 };
 
 // ============================================
-// 📋 UPDATED PRESCRIPTION NOTIFICATION
-// Distinct from consultation_completed — tells patient to ignore previous RX
+// ðŸ“‹ UPDATED PRESCRIPTION NOTIFICATION
+// Distinct from consultation_completed â€” tells patient to ignore previous RX
 // ============================================
 export const sendRxUpdatedNotification = async (data: any) => {
   const { userId, phone10 } = normalizePatientTarget(data.patientPhone);
@@ -271,7 +272,7 @@ export const sendRxUpdatedNotification = async (data: any) => {
 
   const result = await sendFCM({
     userId,
-    title: '⚠️ Updated Prescription — Please Check',
+    title: 'âš ï¸ Updated Prescription â€” Please Check',
     body: `Dr. ${data.doctorName} has sent an UPDATED prescription. Ignore the previous one & download the latest version.`,
     data: {
       type: 'rx_updated',
@@ -282,16 +283,16 @@ export const sendRxUpdatedNotification = async (data: any) => {
     },
   });
 
-  // 💾 Store in Firestore for Patient Dashboard > Notifications
+  // ðŸ’¾ Store in Firestore for Patient Dashboard > Notifications
   try {
-    const { storeNotification } = await import('./patientNotificationStorage');
+    const storeNotification = storePatientNotification;
     await storeNotification({
       patientPhone: phone10,
       patientName: data.patientName || 'Patient',
       patientAge: data.age,
       patientGender: data.sex,
       type: 'rx_updated',
-      title: '⚠️ Updated Prescription',
+      title: 'âš ï¸ Updated Prescription',
       message: `Dr. ${data.doctorName} has sent an UPDATED prescription. Please ignore the previous prescription and use this latest version.`,
       bookingId: data.bookingId || '',
       doctorId: data.doctorId,
@@ -309,7 +310,7 @@ export const sendRxUpdatedNotification = async (data: any) => {
         rxUrl: data.rxUrl,
         isUpdated: true,
       },
-      // 🆕 Store download URL with 72-hour expiry
+      // ðŸ†• Store download URL with 72-hour expiry
       ...(data.rxUrl ? {
         downloadUrls: {
           rxUrl: data.rxUrl,
@@ -318,9 +319,9 @@ export const sendRxUpdatedNotification = async (data: any) => {
         }
       } : {}),
     });
-    console.log('✅ RX Updated notification stored for patient:', phone10);
+    console.log('âœ… RX Updated notification stored for patient:', phone10);
   } catch (storageError) {
-    console.error('❌ Failed to store RX Updated notification:', storageError);
+    console.error('âŒ Failed to store RX Updated notification:', storageError);
   }
 
   // Save to notification history
@@ -347,9 +348,9 @@ export const sendRxUpdatedNotification = async (data: any) => {
     doctorId: data.doctorId,
     templateType: 'rx_updated',
     templateData: {
-      greeting: `Important Update for ${data.patientName || 'Patient'}! 🔄`,
+      greeting: `Important Update for ${data.patientName || 'Patient'}! ðŸ”„`,
       mainMessage: `Dr. ${data.doctorName} has sent an UPDATED prescription. Please ignore the previous prescription and download the latest version.`,
-      warningMessage: '⚠️ Please IGNORE the previous prescription notification',
+      warningMessage: 'âš ï¸ Please IGNORE the previous prescription notification',
       consultationDetails: {
         date: data.consultationDate || '',
         time: data.consultationTime || '',
@@ -380,7 +381,7 @@ export const scheduleReviewRequest = async (data: any, seenAt: Date) => {
   const result = await scheduleFCM({
     userId,
     sendAt: scheduledAt,
-    title: '⭐ Share your experience',
+    title: 'â­ Share your experience',
     body: `How was your visit with ${data.doctorName}?`,
     data: {
       type: 'review_request',
@@ -413,10 +414,10 @@ export const scheduleReviewRequest = async (data: any, seenAt: Date) => {
     consultationTime: data.consultationTime || '',
     bookingId: data.bookingId,
     doctorId: data.doctorId,
-    // 🆕 120-DAY TEMPLATE STORAGE
+    // ðŸ†• 120-DAY TEMPLATE STORAGE
     templateType: 'review_request',
     templateData: {
-      greeting: `Hello ${data.patientName || 'there'}, 👋`,
+      greeting: `Hello ${data.patientName || 'there'}, ðŸ‘‹`,
       mainMessage: `We hope you are feeling better after your visit with Dr. ${data.doctorName}.\n\nWould you mind sharing your experience?\nYour feedback helps us improve.`,
       adBanner: {
         placement: 'notif-review-request'
@@ -447,13 +448,13 @@ export const sendFollowUp = async (data: any) => {
   const now = new Date();
   const finalSendAt = sendAt.getTime() < now.getTime() ? now : sendAt;
 
-  // ⚠️ CRITICAL: Follow-up is a PERMANENT COMMITMENT
+  // âš ï¸ CRITICAL: Follow-up is a PERMANENT COMMITMENT
   // This notification MUST be sent even if doctor's subscription expires
   // The cloud function should bypass subscription checks for follow-up notifications
   const result = await scheduleFCM({
     userId,
     sendAt: finalSendAt,
-    title: '📅 Follow-up Reminder',
+    title: 'ðŸ“… Follow-up Reminder',
     body: data.customMessage || 'Your doctor has scheduled a follow-up. Please check your appointment.',
     data: {
       type: 'follow_up',
@@ -489,10 +490,10 @@ export const sendFollowUp = async (data: any) => {
     bookingId: data.bookingId,
     message: data.customMessage,
     doctorId: data.doctorId,
-    // 🆕 120-DAY TEMPLATE STORAGE
+    // ðŸ†• 120-DAY TEMPLATE STORAGE
     templateType: 'follow_up',
     templateData: {
-      greeting: `Hello ${data.patientName || 'there'}, 👋`,
+      greeting: `Hello ${data.patientName || 'there'}, ðŸ‘‹`,
       mainMessage: data.customMessage || 'Your doctor has scheduled a follow-up. Please check your appointment.',
       followUpDays: data.followUpDays,
       adBanner: {
@@ -509,9 +510,9 @@ export const sendFollowUp = async (data: any) => {
       opened: false
     }
   });
-  // 💾 ALWAYS STORE IN FIRESTORE (regardless of FCM success/failure)
+  // ðŸ’¾ ALWAYS STORE IN FIRESTORE (regardless of FCM success/failure)
   try {
-    const { storeNotification } = await import('./patientNotificationStorage');
+    const storeNotification = storePatientNotification;
     const followUpParams = new URLSearchParams({
       page: 'follow-up',
       doctorId: data.doctorId || '',
@@ -528,7 +529,7 @@ export const sendFollowUp = async (data: any) => {
       patientAge: data.age,
       patientGender: data.sex,
       type: 'follow_up',
-      title: '📅 Follow-up Reminder',
+      title: 'ðŸ“… Follow-up Reminder',
       message: data.customMessage || 'Your doctor has scheduled a follow-up. Please check your appointment.',
       bookingId: data.bookingId || '',
       doctorId: data.doctorId,
@@ -552,9 +553,9 @@ export const sendFollowUp = async (data: any) => {
         language: data.language || 'english'
       }
     });
-    console.log('✅ Follow-up notification stored in Firestore');
+    console.log('âœ… Follow-up notification stored in Firestore');
   } catch (error) {
-    console.error('❌ Failed to store follow-up notification:', error);
+    console.error('âŒ Failed to store follow-up notification:', error);
   }
   return result;
 };
@@ -575,7 +576,7 @@ export const sendAppointmentCancelled = async (data: any) => {
 
   const result = await sendFCM({
     userId,
-    title: '❌ Appointment Cancelled',
+    title: 'âŒ Appointment Cancelled',
     body: data.message || 'Your appointment has been cancelled. Please contact the clinic for details.',
     data: {
       type: 'cancellation',
@@ -608,10 +609,10 @@ export const sendAppointmentCancelled = async (data: any) => {
     bookingId: data.bookingId,
     message: data.message,
     doctorId: data.doctorId,
-    // 🆕 120-DAY TEMPLATE STORAGE
+    // ðŸ†• 120-DAY TEMPLATE STORAGE
     templateType: 'appointment_cancelled',
     templateData: {
-      greeting: `Hello ${data.patientName || 'there'}, 👋`,
+      greeting: `Hello ${data.patientName || 'there'}, ðŸ‘‹`,
       mainMessage: data.message || 'Your appointment has been cancelled. Please contact the clinic for details.',
       cancellationReason: data.message || 'Cancelled by doctor',
       consultationDetails: {
@@ -634,16 +635,16 @@ export const sendAppointmentCancelled = async (data: any) => {
     }
   });
 
-  // 💾 ALWAYS STORE IN FIRESTORE (regardless of FCM success/failure)
+  // ðŸ’¾ ALWAYS STORE IN FIRESTORE (regardless of FCM success/failure)
   try {
-    const { storeNotification } = await import('./patientNotificationStorage');
+    const storeNotification = storePatientNotification;
     await storeNotification({
       patientPhone: phone10,
       patientName: data.patientName || 'Patient',
       patientAge: data.age,
       patientGender: data.sex,
       type: 'booking_cancelled',
-      title: '❌ Appointment Cancelled',
+      title: 'âŒ Appointment Cancelled',
       message: data.message || 'Your appointment has been cancelled. Please contact the clinic for details.',
       bookingId: data.bookingId || '',
       doctorId: data.doctorId,
@@ -667,9 +668,9 @@ export const sendAppointmentCancelled = async (data: any) => {
         language: data.language || 'english'
       }
     });
-    console.log('✅ Cancellation notification stored in Firestore');
+    console.log('âœ… Cancellation notification stored in Firestore');
   } catch (error) {
-    console.error('❌ Failed to store cancellation notification:', error);
+    console.error('âŒ Failed to store cancellation notification:', error);
     // Don't fail the whole operation if storage fails
   }
 
@@ -694,7 +695,7 @@ export const sendAppointmentRestored = async (data: any) => {
 
   const result = await sendFCM({
     userId,
-    title: '✅ Appointment Restored',
+    title: 'âœ… Appointment Restored',
     body: data.message || 'Your appointment has been restored and confirmed again.',
     data: {
       type: 'restoration',
@@ -727,16 +728,16 @@ export const sendAppointmentRestored = async (data: any) => {
     doctorId: data.doctorId
   });
 
-  // 💾 ALWAYS STORE IN FIRESTORE (regardless of FCM success/failure)
+  // ðŸ’¾ ALWAYS STORE IN FIRESTORE (regardless of FCM success/failure)
   try {
-    const { storeNotification } = await import('./patientNotificationStorage');
+    const storeNotification = storePatientNotification;
     await storeNotification({
       patientPhone: phone10,
       patientName: data.patientName || 'Patient',
       patientAge: data.age,
       patientGender: data.sex,
       type: 'booking_restored',
-      title: '✅ Appointment Restored',
+      title: 'âœ… Appointment Restored',
       message: data.message || 'Your appointment has been restored and confirmed again.',
       bookingId: data.bookingId || '',
       doctorId: data.doctorId,
@@ -760,9 +761,9 @@ export const sendAppointmentRestored = async (data: any) => {
         language: data.language || 'english'
       }
     });
-    console.log('✅ Restoration notification stored in Firestore');
+    console.log('âœ… Restoration notification stored in Firestore');
   } catch (error) {
-    console.error('❌ Failed to store restoration notification:', error);
+    console.error('âŒ Failed to store restoration notification:', error);
     // Don't fail the whole operation if storage fails
   }
 
@@ -800,7 +801,7 @@ export const sendBatchCancellation = async (
       });
       sent += 1;
     } catch (err) {
-      console.error('❌ Batch cancellation failed for', p.patientPhone || p.phone, err);
+      console.error('âŒ Batch cancellation failed for', p.patientPhone || p.phone, err);
       failed += 1;
     }
   }
@@ -839,14 +840,14 @@ export const sendBatchRestoration = async (
       });
       sent += 1;
     } catch (err) {
-      console.error('❌ Batch restoration failed for', p.patientPhone || p.phone, err);
+      console.error('âŒ Batch restoration failed for', p.patientPhone || p.phone, err);
       failed += 1;
     }
   }
   return { sent, failed };
 };
 
-// 🔔 SEND APPOINTMENT REMINDER IMMEDIATELY (Manual send by doctor via bell icon)
+// ðŸ”” SEND APPOINTMENT REMINDER IMMEDIATELY (Manual send by doctor via bell icon)
 export const sendAppointmentReminder = async (data: any, bookingCreatedAt: Date) => {
   const { userId, phone10 } = normalizePatientTarget(data.patientPhone);
   const appointmentTime = data.appointmentTime ? new Date(data.appointmentTime) : null;
@@ -856,7 +857,7 @@ export const sendAppointmentReminder = async (data: any, bookingCreatedAt: Date)
     const diffMs = appointmentTime.getTime() - bookingCreatedAt.getTime();
     const diffHours = diffMs / (1000 * 60 * 60);
     if (diffHours < 6) {
-      console.log('⏩ Skipping reminder (booking made less than 6h before appointment)');
+      console.log('â© Skipping reminder (booking made less than 6h before appointment)');
       return { skipped: true } as any;
     }
   }
@@ -876,7 +877,7 @@ export const sendAppointmentReminder = async (data: any, bookingCreatedAt: Date)
 
   const result = await sendFCM({
     userId,
-    title: '⏰ Appointment Reminder',
+    title: 'â° Appointment Reminder',
     body: `Reminder: Your appointment with ${data.doctorName} is coming up. Please arrive on time.`,
     data: {
       type: 'appointment_reminder',
@@ -920,7 +921,7 @@ export const scheduleBookingReminder = async (data: any) => {
     const diffMs = appointmentTime.getTime() - bookingCreatedAt.getTime();
     const diffHours = diffMs / (1000 * 60 * 60);
     if (diffHours < 6) {
-      console.log('⏩ Skipping reminder (booking made less than 6h before appointment)');
+      console.log('â© Skipping reminder (booking made less than 6h before appointment)');
       return { skipped: true } as any;
     }
   }
@@ -932,7 +933,7 @@ export const scheduleBookingReminder = async (data: any) => {
   return scheduleFCM({
     userId,
     sendAt,
-    title: '⏰ Appointment Reminder',
+    title: 'â° Appointment Reminder',
     body: data.body || 'Reminder: your appointment is coming up. Please arrive on time.',
     data: {
       type: 'booking_reminder',
@@ -957,7 +958,7 @@ export const sendVideoCallLink = async (data: any) => {
 
   const result = await sendFCM({
     userId,
-    title: '🎥 Join Video Consultation',
+    title: 'ðŸŽ¥ Join Video Consultation',
     body: `Dr. ${data.doctorName} is ready for your video consultation. Click to join now!`,
     data: {
       type: 'video_call_link',
@@ -967,16 +968,16 @@ export const sendVideoCallLink = async (data: any) => {
     },
   });
 
-  // 💾 ALWAYS STORE IN FIRESTORE
+  // ðŸ’¾ ALWAYS STORE IN FIRESTORE
   try {
-    const { storeNotification } = await import('./patientNotificationStorage');
+    const storeNotification = storePatientNotification;
     await storeNotification({
       patientPhone: phone10,
       patientName: data.patientName || 'Patient',
       patientAge: data.age,
       patientGender: data.sex,
       type: 'video_call_link',
-      title: '🎥 Join Video Consultation',
+      title: 'ðŸŽ¥ Join Video Consultation',
       message: `Dr. ${data.doctorName} is ready for your video consultation. Click to join now!`,
       bookingId: data.bookingId || '',
       doctorId: data.doctorId,
@@ -998,9 +999,9 @@ export const sendVideoCallLink = async (data: any) => {
         language: data.language || 'english'
       }
     });
-    console.log('✅ Video call notification stored in Firestore');
+    console.log('âœ… Video call notification stored in Firestore');
   } catch (error) {
-    console.error('❌ Failed to store video call notification:', error);
+    console.error('âŒ Failed to store video call notification:', error);
   }
 
   // Save to notification history
@@ -1043,7 +1044,7 @@ export const scheduleVideoCallLink = async (data: any, appointmentTime: Date) =>
   const result = await scheduleFCM({
     userId,
     sendAt: finalSendAt,
-    title: '🎥 Join Video Consultation',
+    title: 'ðŸŽ¥ Join Video Consultation',
     body: `Dr. ${data.doctorName} will be ready for your video consultation soon. Click inside to get ready!`,
     data: {
       type: 'video_call_link',
@@ -1055,12 +1056,12 @@ export const scheduleVideoCallLink = async (data: any, appointmentTime: Date) =>
 
   // Store basic info in Firestore that link is scheduled
   try {
-    const { storeNotification } = await import('./patientNotificationStorage');
+    const storeNotification = storePatientNotification;
     await storeNotification({
       patientPhone: phone10,
       patientName: data.patientName || 'Patient',
       type: 'video_call_link',
-      title: '🎥 Video Consultation Scheduled',
+      title: 'ðŸŽ¥ Video Consultation Scheduled',
       message: `Link automatically scheduled for 30 minutes before your appointment.`,
       bookingId: data.bookingId || '',
       doctorId: data.doctorId,
@@ -1073,7 +1074,7 @@ export const scheduleVideoCallLink = async (data: any, appointmentTime: Date) =>
       fcmError: result?.error,
     });
   } catch (error) {
-    console.error('❌ Failed to store scheduled video call notification:', error);
+    console.error('âŒ Failed to store scheduled video call notification:', error);
   }
 
   // Save to notification history
@@ -1095,7 +1096,7 @@ export const scheduleVideoCallLink = async (data: any, appointmentTime: Date) =>
   return result;
 };
 
-// 🚨 ADMIN ALERT - Send to Doctor when patients not marked seen after chamber end
+// ðŸš¨ ADMIN ALERT - Send to Doctor when patients not marked seen after chamber end
 export const sendAdminAlert = async (data: {
   doctorId: string;
   doctorName: string;
@@ -1108,13 +1109,13 @@ export const sendAdminAlert = async (data: {
   // Send to doctor (not patient)
   const doctorUserId = `doctor_${data.doctorId}`;
 
-  console.log('🚨 Sending admin alert to doctor:', doctorUserId);
+  console.log('ðŸš¨ Sending admin alert to doctor:', doctorUserId);
 
   const patientList = data.unmarkedPatients.map(p => p.name).join(', ');
 
   return sendFCM({
     userId: doctorUserId,
-    title: '🚨 URGENT ADMIN ALERT',
+    title: 'ðŸš¨ URGENT ADMIN ALERT',
     body: `${data.unmarkedPatients.length} patient(s) not marked as seen: ${patientList}`,
     data: {
       type: 'admin_alert',

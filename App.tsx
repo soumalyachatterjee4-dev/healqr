@@ -49,7 +49,7 @@ const AdminQRGeneration = lazy(() => import("./components/AdminQRGeneration"));
 const AdminQRManagement = lazy(() => import("./components/AdminQRManagement"));
 const LabReferralTrackingManager = lazy(() => import("./components/LabReferralTrackingManager"));
 const PersonalizedTemplatesManager = lazy(() => import("./components/PersonalizedTemplatesManager"));
-const EmergencyButtonManager = lazy(() => import("./components/EmergencyButtonManager"));
+import EmergencyButtonManager from "./components/EmergencyButtonManager";
 const PatientNewRXViewer = lazy(() => import("./components/PatientNewRXViewer").then(module => ({ default: module.PatientNewRXViewer })));
 const ConsultationCompletedNotification = lazy(() => import("./components/ConsultationCompletedNotification"));
 const RxUpdatedNotification = lazy(() => import("./components/RxUpdatedNotification"));
@@ -92,6 +92,10 @@ const PatientVideoConsultation = lazy(() => import("./components/PatientVideoCon
 const BrainDeckManager = lazy(() => import("./components/BrainDeckManager"));
 const TempDoctorLogin = lazy(() => import("./components/TempDoctorLogin"));
 const TempDoctorDashboard = lazy(() => import("./components/TempDoctorDashboard"));
+const PharmaLogin = lazy(() => import("./components/PharmaLogin"));
+const PharmaVerifyLogin = lazy(() => import("./components/PharmaVerifyLogin"));
+const PharmaPortal = lazy(() => import("./components/PharmaPortal"));
+const PharmaSignUp = lazy(() => import("./components/PharmaSignUp"));
 
 // Loading Component
 const PageLoader = () => (
@@ -177,6 +181,10 @@ export default function App() {
     | "advertiser-signup"
     | "advertiser-login"
     | "advertiser-dashboard"
+    | "pharma-login"
+    | "pharma-verify"
+    | "pharma-portal"
+    | "pharma-signup"
     | "upgrade"
     | "clinic-profile"
     | "clinic-booking-flow"
@@ -218,6 +226,7 @@ export default function App() {
     serialNumber?: string;
     clinicName?: string;
     rxUrl?: string;
+    dietUrl?: string;
   } | null>(null);
 
   const [chatToken, setChatToken] = useState("");
@@ -298,11 +307,17 @@ export default function App() {
     trialStartDate: Date | null;
   }>({ bookingsCount: 0, bookingsLimit: 100, daysRemaining: 10, trialEndDate: null, trialStartDate: null });
 
-  // Doctor stats state (cumulative, never decreases)
+  // Doctor stats state (cumulative, never decreases) - initialize from localStorage cache
   const [doctorStats, setDoctorStats] = useState<{
     averageRating: number;
     totalReviews: number;
-  }>({ averageRating: 0, totalReviews: 0 });
+  }>(() => {
+    try {
+      const cached = localStorage.getItem('healqr_doctor_stats');
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return { averageRating: 0, totalReviews: 0 };
+  });
 
   // Real-time listener for doctor profile and subscription data
   useEffect(() => {
@@ -332,10 +347,12 @@ export default function App() {
 
               // âœ… Reload doctor stats (Live Rating/Reviews Update)
               if (data.stats) {
-                setDoctorStats({
+                const updatedStats = {
                   averageRating: data.stats.averageRating || 0,
                   totalReviews: data.stats.totalReviews || 0
-                });
+                };
+                setDoctorStats(updatedStats);
+                localStorage.setItem('healqr_doctor_stats', JSON.stringify(updatedStats));
               }
 
               // Reload full profile data
@@ -649,6 +666,22 @@ export default function App() {
     } else if (pageParam === 'patient-history') {
       setCurrentPage('patient-history');
       return;
+    } else if (pageParam === 'pharma-login') {
+      setCurrentPage('pharma-login');
+      return;
+    } else if (pageParam === 'pharma-signup') {
+      setCurrentPage('pharma-signup');
+      return;
+    } else if (pageParam === 'pharma-verify') {
+      setCurrentPage('pharma-verify');
+      return;
+    } else if (pageParam === 'pharma-portal') {
+      if (localStorage.getItem('healqr_pharma_authenticated') === 'true') {
+        setCurrentPage('pharma-portal');
+      } else {
+        setCurrentPage('pharma-login');
+      }
+      return;
     } else if (pageParam === 'video-library') {
       const source = urlParams.get('source') as "landing" | "dashboard" | "patient-search" || "landing";
       setVideoLibrarySource(source);
@@ -697,6 +730,8 @@ export default function App() {
       const consultationDate = urlParams.get('consultationDate') || '';
       const consultationTime = urlParams.get('consultationTime') || '';
       const language = urlParams.get('language') || 'en';
+      const rxUrl = urlParams.get('rxUrl') || '';
+      const dietUrl = urlParams.get('dietUrl') || '';
 
       setNotifData({
         bookingId,
@@ -706,7 +741,9 @@ export default function App() {
         doctorInitials,
         message: clinicName, // clinicName stored in message field
         date: consultationDate,
-        time: consultationTime
+        time: consultationTime,
+        rxUrl,
+        dietUrl,
       });
 
       if (language === 'bengali' || language === 'bn') setBookingLanguage('bengali');
@@ -1100,8 +1137,9 @@ export default function App() {
       const isVerifyVisit = window.location.pathname.includes('/verify-visit/');
       const isClinicPage = currentPage === 'clinic-login' || currentPage === 'clinic-signup' || pageParam === 'clinic-login' || pageParam === 'clinic-signup';
       const isAdvertiserPage = currentPage === 'advertiser-login' || currentPage === 'advertiser-signup' || pageParam === 'advertiser-login' || pageParam === 'advertiser-signup';
+      const isPharmaPage = currentPage === 'pharma-login' || currentPage === 'pharma-verify' || currentPage === 'pharma-portal' || currentPage === 'pharma-signup' || pageParam === 'pharma-login' || pageParam === 'pharma-verify' || pageParam === 'pharma-portal' || pageParam === 'pharma-signup';
 
-      if (isVerificationLink || isBookingMode || hasBookingDoctorId || isNotificationPage || isVerifyVisit || isClinicPage || isAdvertiserPage || currentPage === 'verify-email' || currentPage === 'verify-login' || currentPage === 'assistant-login' || currentPage === 'temp-doctor-login' || currentPage === 'temp-doctor-dashboard' || currentPage === 'admin-verify' || currentPage === 'verify-walkin' || currentPage.startsWith('booking-')) {
+      if (isVerificationLink || isBookingMode || hasBookingDoctorId || isNotificationPage || isVerifyVisit || isClinicPage || isAdvertiserPage || isPharmaPage || currentPage === 'verify-email' || currentPage === 'verify-login' || currentPage === 'assistant-login' || currentPage === 'temp-doctor-login' || currentPage === 'temp-doctor-dashboard' || currentPage === 'admin-verify' || currentPage === 'verify-walkin' || currentPage.startsWith('booking-')) {
         setIsAuthInitialized(true);
         return;
       }
@@ -1377,6 +1415,7 @@ export default function App() {
                     totalReviews: actualTotal
                   };
                   setDoctorStats(updatedStats);
+                  localStorage.setItem('healqr_doctor_stats', JSON.stringify(updatedStats));
 
                   // Update Firestore to fix the inconsistency permanently
                   try {
@@ -1388,6 +1427,7 @@ export default function App() {
                   }
                 } else {
                   setDoctorStats(currentStoredStats);
+                  localStorage.setItem('healqr_doctor_stats', JSON.stringify(currentStoredStats));
                 }
               } catch (reviewError) {
                 console.error('âŒ Error loading patient reviews:', reviewError);
@@ -2273,6 +2313,7 @@ export default function App() {
           onAdvertiserSignUp={() => setCurrentPage("advertiser-signup")}
           onAdvertiserLogin={() => setCurrentPage("advertiser-login")}
           onAdvertiserGateway={() => setCurrentPage("advertiser-gateway")}
+          onPharmaLogin={() => setCurrentPage("pharma-login")}
         />
       )}
 
@@ -2817,6 +2858,8 @@ export default function App() {
           clinicName={notifData?.message}
           consultationDate={notifData?.date}
           consultationTime={notifData?.time}
+          rxUrl={notifData?.rxUrl}
+          dietUrl={notifData?.dietUrl}
         />
       )}
 
@@ -3180,6 +3223,36 @@ export default function App() {
         <AdvertiserDashboard
           onLogout={() => setCurrentPage("landing")}
         />
+      )}
+
+      {currentPage === "pharma-login" && (
+        <Suspense fallback={<PageLoader />}>
+          <PharmaLogin
+            onBack={() => setCurrentPage("landing")}
+            onSignUp={() => setCurrentPage("pharma-signup")}
+          />
+        </Suspense>
+      )}
+
+      {currentPage === "pharma-signup" && (
+        <Suspense fallback={<PageLoader />}>
+          <PharmaSignUp
+            onBack={() => setCurrentPage("landing")}
+            onLogin={() => setCurrentPage("pharma-login")}
+          />
+        </Suspense>
+      )}
+
+      {currentPage === "pharma-verify" && (
+        <Suspense fallback={<PageLoader />}>
+          <PharmaVerifyLogin />
+        </Suspense>
+      )}
+
+      {currentPage === "pharma-portal" && (
+        <Suspense fallback={<PageLoader />}>
+          <PharmaPortal onLogout={() => setCurrentPage("landing")} />
+        </Suspense>
       )}
 
       {currentPage === "upgrade" && (

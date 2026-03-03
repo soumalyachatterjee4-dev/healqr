@@ -1,0 +1,1346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HealQR — Business Plan & Revenue Model</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --primary: #FF9800;
+    --primary-dark: #E65100;
+    --bg-dark: #0a0f1a;
+    --bg-card: #111827;
+    --bg-card2: #1a2332;
+    --text: #e5e7eb;
+    --text-muted: #9ca3af;
+    --border: rgba(255,152,0,0.15);
+    --green: #10b981;
+    --blue: #3b82f6;
+    --red: #ef4444;
+    --purple: #8b5cf6;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg-dark);
+    color: var(--text);
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  /* ===== SLIDER CONTAINER ===== */
+  .slider-container {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .slider-container::-webkit-scrollbar { display: none; }
+
+  .slide {
+    min-width: 100vw;
+    min-height: 100vh;
+    scroll-snap-align: start;
+    padding: 40px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    position: relative;
+  }
+
+  .slide-inner {
+    max-width: 900px;
+    width: 100%;
+  }
+
+  /* ===== NAV DOTS ===== */
+  .nav-dots {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    z-index: 100;
+    background: rgba(0,0,0,0.7);
+    padding: 8px 16px;
+    border-radius: 20px;
+    backdrop-filter: blur(10px);
+  }
+  .nav-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: #444;
+    cursor: pointer;
+    transition: all 0.3s;
+    border: none;
+  }
+  .nav-dot.active { background: var(--primary); transform: scale(1.3); }
+  .nav-dot:hover { background: #888; }
+
+  /* ===== NAV ARROWS ===== */
+  .nav-arrow {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 100;
+    background: rgba(0,0,0,0.6);
+    border: 1px solid rgba(255,152,0,0.3);
+    color: var(--primary);
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(8px);
+    transition: all 0.3s;
+  }
+  .nav-arrow:hover { background: var(--primary); color: #fff; }
+  .nav-arrow.left { left: 12px; }
+  .nav-arrow.right { right: 12px; }
+
+  /* ===== SLIDE COUNTER ===== */
+  .slide-counter {
+    position: fixed;
+    top: 16px;
+    right: 20px;
+    z-index: 100;
+    background: rgba(0,0,0,0.6);
+    padding: 6px 14px;
+    border-radius: 12px;
+    font-size: 13px;
+    color: var(--text-muted);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+
+  /* ===== TYPOGRAPHY ===== */
+  .slide-title {
+    font-size: clamp(24px, 5vw, 40px);
+    font-weight: 800;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, var(--primary), #FFD54F);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .slide-subtitle {
+    font-size: clamp(14px, 2.5vw, 18px);
+    color: var(--text-muted);
+    margin-bottom: 32px;
+  }
+  .section-header {
+    font-size: clamp(16px, 3vw, 22px);
+    font-weight: 700;
+    color: #fff;
+    margin: 24px 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-header .icon { font-size: 20px; }
+
+  /* ===== DATA PRIVACY BANNER ===== */
+  .privacy-banner {
+    background: linear-gradient(135deg, rgba(16,185,129,0.12), rgba(59,130,246,0.12));
+    border: 1px solid rgba(16,185,129,0.3);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 28px;
+    text-align: center;
+  }
+  .privacy-banner .shield { font-size: 36px; margin-bottom: 8px; }
+  .privacy-banner h3 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--green);
+    margin-bottom: 6px;
+  }
+  .privacy-banner p {
+    font-size: 14px;
+    color: var(--text-muted);
+    max-width: 600px;
+    margin: 0 auto;
+    line-height: 1.7;
+  }
+
+  /* ===== FEATURE CARDS ===== */
+  .feature-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  @media (min-width: 600px) {
+    .feature-grid { grid-template-columns: 1fr 1fr; }
+  }
+  .feature-item {
+    background: var(--bg-card2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 13px;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    transition: transform 0.2s;
+  }
+  .feature-item:hover { transform: translateY(-2px); }
+  .feature-item .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    margin-top: 6px;
+    flex-shrink: 0;
+  }
+  .feature-item .dot.live { background: var(--green); }
+  .feature-item .dot.proposed { background: var(--blue); }
+  .feature-item .tag {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: auto;
+    flex-shrink: 0;
+    align-self: center;
+  }
+  .tag.live { background: rgba(16,185,129,0.15); color: var(--green); }
+  .tag.proposed { background: rgba(59,130,246,0.15); color: var(--blue); }
+
+  /* ===== COST TABLE ===== */
+  .cost-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin: 16px 0;
+    font-size: 13px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .cost-table th {
+    background: var(--bg-card2);
+    color: var(--primary);
+    padding: 12px 10px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .cost-table td {
+    padding: 10px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+    vertical-align: top;
+  }
+  .cost-table tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+  .cost-table .highlight-row td {
+    background: rgba(255,152,0,0.08);
+    font-weight: 600;
+    color: var(--primary);
+  }
+  .cost-table .total-row td {
+    background: rgba(255,152,0,0.12);
+    font-weight: 700;
+    color: #fff;
+    border-top: 2px solid var(--primary);
+  }
+
+  /* ===== PHASE CARDS ===== */
+  .phase-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 14px;
+    position: relative;
+    overflow: hidden;
+  }
+  .phase-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 4px; height: 100%;
+  }
+  .phase-card.p1::before { background: var(--green); }
+  .phase-card.p2::before { background: var(--blue); }
+  .phase-card.p3::before { background: var(--purple); }
+  .phase-card.p4::before { background: var(--primary); }
+  .phase-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+  .phase-card.p1 .phase-label { color: var(--green); }
+  .phase-card.p2 .phase-label { color: var(--blue); }
+  .phase-card.p3 .phase-label { color: var(--purple); }
+  .phase-card.p4 .phase-label { color: var(--primary); }
+  .phase-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 8px;
+  }
+  .phase-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 10px;
+  }
+  .phase-stat {
+    background: rgba(255,255,255,0.05);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+  .phase-stat .num {
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    display: block;
+  }
+  .phase-stat .lbl { color: var(--text-muted); }
+
+  /* ===== REVENUE CARDS ===== */
+  .rev-card {
+    background: linear-gradient(135deg, var(--bg-card2), var(--bg-card));
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 12px;
+  }
+  .rev-card h4 {
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 6px;
+  }
+  .rev-card p { font-size: 13px; color: var(--text-muted); }
+  .rev-card .pages {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .rev-card .page-tag {
+    background: rgba(255,152,0,0.12);
+    color: var(--primary);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 6px;
+  }
+
+  /* ===== ASSUMPTION BOX ===== */
+  .assumption-box {
+    background: rgba(255,152,0,0.06);
+    border: 1px dashed rgba(255,152,0,0.3);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin: 16px 0;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .assumption-box strong { color: var(--primary); }
+
+  /* ===== SUMMARY BIG NUMBER ===== */
+  .big-number {
+    font-size: clamp(36px, 8vw, 56px);
+    font-weight: 900;
+    background: linear-gradient(135deg, var(--primary), #FFD54F);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-align: center;
+    margin: 8px 0;
+  }
+
+  /* ===== LEGEND ===== */
+  .legend {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .legend-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+  }
+
+  /* ===== LOGO ===== */
+  .logo-header {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+  .logo-header .logo-text {
+    font-size: 28px;
+    font-weight: 900;
+    color: var(--primary);
+  }
+  .logo-header .tagline {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  /* ===== MOBILE RESPONSIVE ===== */
+  @media (max-width: 480px) {
+    .slide { padding: 24px 14px; }
+    .nav-arrow { width: 36px; height: 36px; font-size: 16px; }
+    .nav-arrow.left { left: 6px; }
+    .nav-arrow.right { right: 6px; }
+    .cost-table { font-size: 11px; }
+    .cost-table th, .cost-table td { padding: 8px 6px; }
+    .phase-stats { gap: 8px; }
+    .phase-stat { padding: 6px 8px; }
+    .phase-stat .num { font-size: 15px; }
+  }
+
+  /* ===== SWIPE HINT ===== */
+  .swipe-hint {
+    position: fixed;
+    bottom: 56px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px;
+    color: var(--text-muted);
+    opacity: 0.6;
+    z-index: 100;
+    text-align: center;
+  }
+
+  /* ===== NOTES ===== */
+  .note-box {
+    background: rgba(59,130,246,0.08);
+    border-left: 3px solid var(--blue);
+    border-radius: 0 8px 8px 0;
+    padding: 12px 14px;
+    margin: 12px 0;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .cta-box {
+    background: linear-gradient(135deg, rgba(255,152,0,0.15), rgba(255,152,0,0.05));
+    border: 1px solid rgba(255,152,0,0.3);
+    border-radius: 14px;
+    padding: 24px;
+    text-align: center;
+    margin-top: 20px;
+  }
+  .cta-box h3 { color: var(--primary); font-size: 20px; margin-bottom: 8px; }
+  .cta-box p { color: var(--text-muted); font-size: 14px; }
+
+  .divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,152,0,0.3), transparent);
+    margin: 24px 0;
+  }
+</style>
+</head>
+<body>
+
+<!-- Navigation -->
+<button class="nav-arrow left" onclick="prevSlide()">&#8249;</button>
+<button class="nav-arrow right" onclick="nextSlide()">&#8250;</button>
+<div class="slide-counter" id="slideCounter">1 / 7</div>
+<div class="swipe-hint">Swipe or use arrows to navigate &rarr;</div>
+
+<div class="nav-dots" id="navDots"></div>
+
+<!-- ======================== SLIDES ======================== -->
+<div class="slider-container" id="slider">
+
+<!-- ===== SLIDE 1: COVER ===== -->
+<section class="slide" style="justify-content: center;">
+  <div class="slide-inner" style="text-align: center;">
+    <div class="logo-header">
+      <div class="logo-text">heal<span style="color:#FFD54F">Qr</span></div>
+      <div class="tagline">Healthcare Reimagined Through QR Technology</div>
+    </div>
+
+    <div class="privacy-banner">
+      <div class="shield">🛡️</div>
+      <h3>Our Data Privacy Commitment</h3>
+      <p>We respect patient data privacy above all else. <strong style="color:#fff;">We will NEVER sell, share, or monetize any patient booking data, personal information, or doctor prescriptions to any third party — ever.</strong> Patient data is encrypted at rest in our database. Our revenue model is purely based on ethical 3rd party advertising on patient-facing pages.</p>
+    </div>
+
+    <h1 class="slide-title" style="font-size: clamp(28px, 6vw, 48px);">Business Plan &<br>Revenue Model</h1>
+    <p class="slide-subtitle">Comprehensive overview for strategic partners</p>
+
+    <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-top: 24px;">
+      <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 24px; text-align: center;">
+        <div style="font-size: 24px; font-weight: 800; color: var(--green);">100%</div>
+        <div style="font-size: 12px; color: var(--text-muted);">Free for Doctors,<br>Clinics & Patients</div>
+      </div>
+      <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 24px; text-align: center;">
+        <div style="font-size: 24px; font-weight: 800; color: var(--primary);">100K</div>
+        <div style="font-size: 12px; color: var(--text-muted);">Target Users<br>(Phase 4)</div>
+      </div>
+      <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 24px; text-align: center;">
+        <div style="font-size: 24px; font-weight: 800; color: var(--blue);">1M+</div>
+        <div style="font-size: 12px; color: var(--text-muted);">Daily Bookings<br>(Phase 4)</div>
+      </div>
+    </div>
+
+    <div style="margin-top: 32px; font-size: 12px; color: var(--text-muted);">
+      March 2026 &bull; Confidential
+    </div>
+  </div>
+</section>
+
+<!-- ===== SLIDE 2: FEATURES — SOLO DOCTOR ===== -->
+<section class="slide">
+  <div class="slide-inner">
+    <h2 class="slide-title">🩺 Solo Doctor Features</h2>
+    <p class="slide-subtitle">Complete practice management — zero cost to the doctor</p>
+
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div> Live (Deployed)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div> Proposed (API Integration)</div>
+    </div>
+
+    <div class="section-header"><span class="icon">📊</span> Dashboard & Core</div>
+    <div class="feature-grid">
+      <div class="feature-item"><div class="dot live"></div><div>Live dashboard — today's bookings, capacity, ratings</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Real-time push notifications (FCM) — 12+ event types</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Profile manager — degrees, specialties, photo, prefix</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>QR code generator & chamber assignment</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Schedule manager — chambers, frequency, time slots, planned off</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Share profile (WhatsApp, Facebook, Twitter, LinkedIn, Email)</div><span class="tag live">Live</span></div>
+    </div>
+
+    <div class="section-header"><span class="icon">🏥</span> Practice Tools</div>
+    <div class="feature-grid">
+      <div class="feature-item"><div class="dot live"></div><div>Today's schedule — QR + walk-in patients merged per chamber</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Patient details with mark seen, cancel, restore actions</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div><strong>Digital RX Maker</strong> — PDF prescriptions, auto-uploaded</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Share RX PDF via WhatsApp (native share on mobile)</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Follow-up scheduling with push notification</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Advance booking, analytics, reports, monthly planner</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Preview centre, social media kit, lab referral tracking</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Assistant access — token + PIN, page-level permissions</div><span class="tag live">Live</span></div>
+    </div>
+
+    <div class="section-header"><span class="icon">🤖</span> AI & Premium Tools</div>
+    <div class="feature-grid">
+      <div class="feature-item"><div class="dot live"></div><div><strong>AI Diet Chart</strong> — Gemini AI-powered 7-day diet plans</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div><strong>AI RX Reader</strong> — Gemini 2.5 Flash prescription analysis</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Video consultation, video library, BrainDeck flashcards</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Doctor-patient chat (real-time messaging)</div><span class="tag live">Live</span></div>
+    </div>
+
+    <div class="section-header"><span class="icon">🌐</span> Proposed API Enhancements</div>
+    <div class="feature-grid">
+      <div class="feature-item"><div class="dot proposed"></div><div><strong>Geocoding Search</strong> — "ENT doctor near Howrah Maidan" style search</div><span class="tag proposed">Proposed</span></div>
+      <div class="feature-item"><div class="dot proposed"></div><div><strong>Real-time Translation</strong> — Full UI + input/output in patient's chosen language (20+ languages)</div><span class="tag proposed">Proposed</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SLIDE 3: FEATURES — CLINIC/HOSPITAL ===== -->
+<section class="slide">
+  <div class="slide-inner">
+    <h2 class="slide-title">🏥 Clinic / Hospital Features</h2>
+    <p class="slide-subtitle">Everything in Solo Doctor + multi-doctor management</p>
+
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div> Live</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div> Proposed</div>
+    </div>
+
+    <div class="section-header"><span class="icon">👥</span> Multi-Doctor Management</div>
+    <div class="feature-grid">
+      <div class="feature-item"><div class="dot live"></div><div><strong>All Solo Doctor features</strong> included for every linked doctor</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Manage doctors — link/unlink, chamber assignments, data access control</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Clinic code system — unique code for doctor linking</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Clinic profile — logo, address, contact, branding</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Clinic-wide today's schedule (all doctors, all chambers)</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Clinic-wide analytics, reports & advance booking</div><span class="tag live">Live</span></div>
+    </div>
+
+    <div class="section-header"><span class="icon">🔐</span> Access Management</div>
+    <div class="feature-grid">
+      <div class="feature-item"><div class="dot live"></div><div><strong>Assistant access</strong> — token + PIN, page-level permissions with lock icons</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div><strong>Temp doctor access</strong> — time-locked device login for visiting doctors</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Temp doctor dashboard — minimal: schedule → patient → RX only</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Per-doctor patient data access restriction</div><span class="tag live">Live</span></div>
+    </div>
+
+    <div class="section-header"><span class="icon">📱</span> Clinic Booking Flow</div>
+    <div class="feature-grid">
+      <div class="feature-item"><div class="dot live"></div><div>Clinic public profile with doctor list & booking</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Full flow: doctor selection → date → chamber → form → confirm</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Clinic-branded social media kit & marketing materials</div><span class="tag live">Live</span></div>
+    </div>
+
+    <div class="section-header"><span class="icon">🌐</span> Proposed Enhancements</div>
+    <div class="feature-grid">
+      <div class="feature-item"><div class="dot proposed"></div><div><strong>Geocoding</strong> — patients discover clinic by location search</div><span class="tag proposed">Proposed</span></div>
+      <div class="feature-item"><div class="dot proposed"></div><div><strong>Translation API</strong> — entire booking flow in patient's language</div><span class="tag proposed">Proposed</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SLIDE 4: FEATURES — PATIENT ===== -->
+<section class="slide">
+  <div class="slide-inner">
+    <h2 class="slide-title">🧑‍⚕️ Patient Features</h2>
+    <p class="slide-subtitle">Complete health management portal — 100% free</p>
+
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div> Live</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div> Proposed</div>
+    </div>
+
+    <div class="section-header"><span class="icon">📱</span> Booking Flow (6 Pages — Ad Placement)</div>
+    <div class="feature-grid">
+      <div class="feature-item"><div class="dot live"></div><div>Language selection (English / Hindi / Bengali)</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Doctor/Clinic mini-website (public profile)</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Date selection calendar</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Chamber selection</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Patient details form (encrypted at rest)</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Booking confirmation (serial #, HQL-ID, QR code)</div><span class="tag live">Live</span></div>
+    </div>
+
+    <div class="section-header"><span class="icon">💊</span> Dashboard & Health Records</div>
+    <div class="feature-grid">
+      <div class="feature-item"><div class="dot live"></div><div>Patient dashboard — stats, specialty analytics, recent activity</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Health card profile — allergies, conditions, emergency contacts</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Consultation history — past visits with doctor details</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Live tracker — real-time queue position</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Notifications — reminders, RX updates, follow-ups, video links</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Medico locker — secure medical records (coming soon)</div><span class="tag live">Live</span></div>
+    </div>
+
+    <div class="section-header"><span class="icon">🔍</span> Discovery & Communication</div>
+    <div class="feature-grid">
+      <div class="feature-item"><div class="dot live"></div><div>Find a Doctor — search by name or specialty</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Digital RX viewer with AI analysis</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>Video consultation, doctor chat, review submission</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div>PWA — installable on mobile (iOS + Android)</div><span class="tag live">Live</span></div>
+    </div>
+
+    <div class="section-header"><span class="icon">🌐</span> Proposed Enhancements</div>
+    <div class="feature-grid">
+      <div class="feature-item"><div class="dot proposed"></div><div><strong>Geocoding Search</strong> — "Cardiologist near Park Street" with map results</div><span class="tag proposed">Proposed</span></div>
+      <div class="feature-item"><div class="dot proposed"></div><div><strong>Full Translation</strong> — entire UI, inputs, outputs, RX in chosen language (20+ supported)</div><span class="tag proposed">Proposed</span></div>
+    </div>
+
+    <div class="note-box">
+      🔒 <strong>Security:</strong> All patient data (name, phone, age, gender, visit purpose) is AES-encrypted at rest in Firestore. Firestore security rules enforce role-based access control.
+    </div>
+  </div>
+</section>
+
+<!-- ===== SLIDE 5: COST BREAKDOWN ===== -->
+<section class="slide">
+  <div class="slide-inner">
+    <h2 class="slide-title">💰 Monthly Cost Breakdown</h2>
+    <p class="slide-subtitle">Phase-wise infrastructure cost to run HealQR</p>
+
+    <div class="assumption-box">
+      <strong>Key Assumptions:</strong> 10 bookings per QR per day &bull; Each booking = ~8 Firestore reads + 3 writes &bull; Geocoding: 1 search request/booking &bull; Translation: ~500 chars per booking interaction &bull; Google Cloud $200/month free tier applied &bull; Firebase Blaze (pay-as-you-go) plan
+    </div>
+
+    <!-- Phase 1 -->
+    <div class="phase-card p1">
+      <div class="phase-label">Phase 1</div>
+      <div class="phase-title">10,000 Doctors + Clinics</div>
+      <div class="phase-stats">
+        <div class="phase-stat"><span class="num">100K</span><span class="lbl">Bookings/day</span></div>
+        <div class="phase-stat"><span class="num">3M</span><span class="lbl">Bookings/month</span></div>
+      </div>
+    </div>
+
+    <table class="cost-table">
+      <thead>
+        <tr><th>Service</th><th>Usage / Month</th><th>Rate</th><th>Cost (₹)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Firebase Firestore (reads)</td><td>24M reads</td><td>₹51/1M reads</td><td>₹1,224</td></tr>
+        <tr><td>Firebase Firestore (writes)</td><td>9M writes</td><td>₹153/1M writes</td><td>₹1,377</td></tr>
+        <tr><td>Firebase Storage</td><td>~50 GB (RX PDFs)</td><td>₹2.17/GB</td><td>₹109</td></tr>
+        <tr><td>Firebase Hosting</td><td>~100 GB transfer</td><td>₹10.6/GB after 10GB</td><td>₹954</td></tr>
+        <tr><td>Firebase FCM (Push)</td><td>~6M messages</td><td>Free</td><td>₹0</td></tr>
+        <tr><td>Gemini AI (Diet + RX)</td><td>~300K requests</td><td>Free tier (2M/month)</td><td>₹0</td></tr>
+        <tr><td><strong>Google Geocoding API</strong></td><td>3M requests</td><td>₹420/1K after 40K free</td><td>₹12,43,200</td></tr>
+        <tr><td style="padding-left:20px; color:var(--green);">↳ With caching (90% hit)</td><td>300K actual API calls</td><td>₹420/1K</td><td>₹1,24,320</td></tr>
+        <tr><td><strong>Google Translation API</strong></td><td>1.5B chars</td><td>₹1,680/1M chars</td><td>₹25,20,000</td></tr>
+        <tr><td style="padding-left:20px; color:var(--green);">↳ With caching (95% hit)</td><td>75M unique chars</td><td>₹1,680/1M</td><td>₹1,26,000</td></tr>
+        <tr class="highlight-row"><td colspan="3"><strong>Subtotal (without caching)</strong></td><td>₹27,65,864</td></tr>
+        <tr class="total-row"><td colspan="3"><strong>PHASE 1 TOTAL (with smart caching)</strong></td><td><strong>₹1,53,984</strong></td></tr>
+      </tbody>
+    </table>
+
+    <div class="note-box">
+      💡 <strong>Caching Strategy:</strong> Geocoding results cached by location string (90%+ cache hit — most patients search same area repeatedly). Translation cached per language pair per UI string (95%+ hit — same UI strings translated millions of times). This is standard industry practice and dramatically reduces API costs.
+    </div>
+  </div>
+</section>
+
+<!-- ===== SLIDE 6: COST ALL PHASES ===== -->
+<section class="slide">
+  <div class="slide-inner">
+    <h2 class="slide-title">📊 All Phase Cost Summary</h2>
+    <p class="slide-subtitle">Scaling from 10K to 100K users</p>
+
+    <table class="cost-table">
+      <thead>
+        <tr><th>Item</th><th>Phase 1<br>10K</th><th>Phase 2<br>30K</th><th>Phase 3<br>60K</th><th>Phase 4<br>100K</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Bookings/day</td>
+          <td>100K</td>
+          <td>300K</td>
+          <td>600K</td>
+          <td>1M</td>
+        </tr>
+        <tr>
+          <td>Bookings/month</td>
+          <td>3M</td>
+          <td>9M</td>
+          <td>18M</td>
+          <td>30M</td>
+        </tr>
+        <tr>
+          <td>Firebase (Firestore + Storage + Hosting)</td>
+          <td>₹3,664</td>
+          <td>₹10,992</td>
+          <td>₹21,984</td>
+          <td>₹36,640</td>
+        </tr>
+        <tr>
+          <td>Geocoding API (with 90% cache)</td>
+          <td>₹1,24,320</td>
+          <td>₹3,72,960</td>
+          <td>₹7,45,920</td>
+          <td>₹12,43,200</td>
+        </tr>
+        <tr>
+          <td>Translation API (with 95% cache)</td>
+          <td>₹1,26,000</td>
+          <td>₹3,78,000</td>
+          <td>₹7,56,000</td>
+          <td>₹12,60,000</td>
+        </tr>
+        <tr>
+          <td>Server / CDN / Misc</td>
+          <td>₹5,000</td>
+          <td>₹10,000</td>
+          <td>₹20,000</td>
+          <td>₹35,000</td>
+        </tr>
+        <tr class="total-row">
+          <td><strong>TOTAL / MONTH</strong></td>
+          <td><strong>₹2,58,984</strong></td>
+          <td><strong>₹7,71,952</strong></td>
+          <td><strong>₹15,43,904</strong></td>
+          <td><strong>₹25,74,840</strong></td>
+        </tr>
+        <tr class="highlight-row">
+          <td>Cost per Booking</td>
+          <td>₹0.086</td>
+          <td>₹0.086</td>
+          <td>₹0.086</td>
+          <td>₹0.086</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div style="text-align: center; margin: 24px 0;">
+      <div style="font-size: 14px; color: var(--text-muted);">Cost per Booking (all phases)</div>
+      <div class="big-number">₹0.086</div>
+      <div style="font-size: 14px; color: var(--text-muted);">less than 9 paise per booking</div>
+    </div>
+
+    <div class="note-box">
+      📝 <strong>Without Geocoding + Translation APIs</strong> (current state — hardcoded translations only):<br>
+      Phase 1: <strong>₹8,664/month</strong> &bull; Phase 4: <strong>₹71,640/month</strong> &bull; Cost/booking: <strong>₹0.002</strong><br>
+      The APIs account for ~97% of the cost. If we delay API integration until Phase 2+, Phase 1 costs are extremely low.
+    </div>
+
+    <!-- Phase Timeline -->
+    <div class="section-header" style="margin-top: 24px;"><span class="icon">📅</span> Phase Timeline (Infrastructure Only)</div>
+    <div class="phase-card p1">
+      <div class="phase-label">Phase 1 — May to Jul 2026</div>
+      <div class="phase-title">10K users • ₹2.59L/month (infra)</div>
+      <div style="font-size: 13px; color: var(--text-muted);">Focus: Onboarding doctors/clinics via QR. Hardcoded translations. Minimal API cost.</div>
+    </div>
+    <div class="phase-card p2">
+      <div class="phase-label">Phase 2 — Aug to Oct 2026</div>
+      <div class="phase-title">30K users • ₹7.72L/month (infra)</div>
+      <div style="font-size: 13px; color: var(--text-muted);">Activate Geocoding + Translation APIs. Ad revenue should cover costs by now.</div>
+    </div>
+    <div class="phase-card p3">
+      <div class="phase-label">Phase 3 — Nov 2026 to Jan 2027</div>
+      <div class="phase-title">60K users • ₹15.44L/month (infra)</div>
+      <div style="font-size: 13px; color: var(--text-muted);">Scale across India. Premium ad placements. Pharma partnerships.</div>
+    </div>
+    <div class="phase-card p4">
+      <div class="phase-label">Phase 4 — Feb to Mar 2027</div>
+      <div class="phase-title">100K users • ₹25.75L/month (infra)</div>
+      <div style="font-size: 13px; color: var(--text-muted);">1M+ bookings/day. Full ad network. Self-sustaining revenue.</div>
+    </div>
+    <div class="note-box">⚠️ These are <strong>infrastructure costs only</strong>. See next slides for full operational expense including team, AI monitoring & professional services.</div>
+  </div>
+</section>
+
+<!-- ===== SLIDE 7: FULL OPERATIONAL EXPENSE ===== -->
+<section class="slide">
+  <div class="slide-inner">
+    <h2 class="slide-title">🏢 Full Operational Expense</h2>
+    <p class="slide-subtitle">Team, AI monitoring, professional services — phase-wise</p>
+
+    <div class="section-header"><span class="icon">👨‍💻</span> Team & Services Breakdown</div>
+
+    <table class="cost-table">
+      <thead>
+        <tr><th>Expense Item</th><th>Phase 1<br><small>May–Jul '26</small></th><th>Phase 2<br><small>Aug–Oct '26</small></th><th>Phase 3<br><small>Nov '26–Jan '27</small></th><th>Phase 4<br><small>Feb–Mar '27</small></th></tr>
+      </thead>
+      <tbody>
+        <tr><td colspan="5" style="background:rgba(255,152,0,0.08); font-weight:700; color:var(--primary); font-size:12px; text-transform:uppercase; letter-spacing:0.5px;">👥 Development Team</td></tr>
+        <tr>
+          <td>Senior Developer (Full-Stack Lead)</td>
+          <td>₹1,50,000</td>
+          <td>₹1,50,000</td>
+          <td>₹1,75,000</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td>Junior Developer</td>
+          <td>₹50,000</td>
+          <td>₹50,000</td>
+          <td>₹60,000</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td>Additional Jr. Developer</td>
+          <td>—</td>
+          <td>₹50,000</td>
+          <td>₹50,000</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td>Professional Maintenance House (TCS/Infosys tier)<br><small style="color:var(--text-muted)">Dedicated team of 4-5 engineers, QA, DevOps</small></td>
+          <td>—</td>
+          <td>—</td>
+          <td>—</td>
+          <td>₹8,00,000</td>
+        </tr>
+
+        <tr><td colspan="5" style="background:rgba(59,130,246,0.08); font-weight:700; color:var(--blue); font-size:12px; text-transform:uppercase; letter-spacing:0.5px;">🤖 AI & Monitoring Infrastructure</td></tr>
+        <tr>
+          <td>Google AI Cluster (Gemini Pro)<br><small style="color:var(--text-muted)">AI RX analysis, Diet Chart generation</small></td>
+          <td>₹25,000</td>
+          <td>₹25,000</td>
+          <td>₹40,000</td>
+          <td>₹60,000</td>
+        </tr>
+        <tr>
+          <td>AI Health Monitor / Anomaly Detection<br><small style="color:var(--text-muted)">Sentry / Datadog — error tracking, malfunction alerts, uptime monitoring</small></td>
+          <td>₹5,000</td>
+          <td>₹10,000</td>
+          <td>₹20,000</td>
+          <td>₹35,000</td>
+        </tr>
+
+        <tr><td colspan="5" style="background:rgba(139,92,246,0.08); font-weight:700; color:var(--purple); font-size:12px; text-transform:uppercase; letter-spacing:0.5px;">⚖️ Professional Services (Contractual)</td></tr>
+        <tr>
+          <td>Accounts / CA Firm (GST, TDS, Compliance)<br><small style="color:var(--text-muted)">Contractual — monthly retainer</small></td>
+          <td>₹10,000</td>
+          <td>₹15,000</td>
+          <td>₹25,000</td>
+          <td>₹40,000</td>
+        </tr>
+        <tr>
+          <td>Legal / Compliance Team<br><small style="color:var(--text-muted)">Contractual — data privacy, DPDPA, terms, contracts</small></td>
+          <td>₹10,000</td>
+          <td>₹15,000</td>
+          <td>₹25,000</td>
+          <td>₹35,000</td>
+        </tr>
+
+        <tr><td colspan="5" style="background:rgba(255,152,0,0.08); font-weight:700; color:var(--primary); font-size:12px; text-transform:uppercase; letter-spacing:0.5px;">☁️ Infrastructure (from previous slide)</td></tr>
+        <tr>
+          <td>Firebase + APIs + CDN + Misc</td>
+          <td>₹2,58,984</td>
+          <td>₹7,71,952</td>
+          <td>₹15,43,904</td>
+          <td>₹25,74,840</td>
+        </tr>
+
+        <tr class="total-row">
+          <td><strong>TOTAL MONTHLY EXPENSE</strong></td>
+          <td><strong>₹5,08,984</strong></td>
+          <td><strong>₹11,86,952</strong></td>
+          <td><strong>₹19,38,904</strong></td>
+          <td><strong>₹36,44,840</strong></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="note-box">
+      💡 <strong>Phase 4 Strategy:</strong> At Phase 4, we transition from in-house developers to a <strong>professional IT maintenance house</strong> (TCS / Infosys / Wipro tier). This eliminates hiring/firing headache, provides guaranteed SLA, dedicated team with QA + DevOps, and 24/7 production support. The ₹8L/month covers a full team of 4-5 engineers.
+    </div>
+
+    <div class="section-header" style="margin-top: 20px;"><span class="icon">📊</span> Updated Revenue vs Total Expense</div>
+    <table class="cost-table">
+      <thead>
+        <tr><th></th><th>Phase 1</th><th>Phase 2</th><th>Phase 3</th><th>Phase 4</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Ad Revenue / Month</td>
+          <td>₹19.2L</td>
+          <td>₹72L</td>
+          <td>₹1.73Cr</td>
+          <td>₹3.6Cr</td>
+        </tr>
+        <tr>
+          <td>Total Expense / Month</td>
+          <td>₹5.09L</td>
+          <td>₹11.87L</td>
+          <td>₹19.39L</td>
+          <td>₹36.45L</td>
+        </tr>
+        <tr class="total-row">
+          <td><strong>NET PROFIT / MONTH</strong></td>
+          <td><strong style="color:var(--green)">₹14.11L</strong></td>
+          <td><strong style="color:var(--green)">₹60.13L</strong></td>
+          <td><strong style="color:var(--green)">₹1.54Cr</strong></td>
+          <td><strong style="color:var(--green)">₹3.24Cr</strong></td>
+        </tr>
+        <tr class="highlight-row">
+          <td>Profit Margin</td>
+          <td>73.5%</td>
+          <td>83.5%</td>
+          <td>88.8%</td>
+          <td>89.9%</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ===== SLIDE 8: PWA vs NATIVE APP ===== -->
+<section class="slide">
+  <div class="slide-inner">
+    <h2 class="slide-title">📱 PWA vs Native App</h2>
+    <p class="slide-subtitle">Strategic comparison — why we start with PWA, when to go native</p>
+
+    <div class="section-header"><span class="icon">⚡</span> Feature Comparison</div>
+    <table class="cost-table">
+      <thead>
+        <tr><th>Capability</th><th>PWA (Current)</th><th>Native App (Android + iOS)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Push Notifications</td><td style="color:var(--green)">✅ Supported (FCM)</td><td style="color:var(--green)">✅ Full support</td></tr>
+        <tr><td>Offline Access</td><td style="color:var(--green)">✅ Service Worker cache</td><td style="color:var(--green)">✅ Full offline</td></tr>
+        <tr><td>Camera Access (QR Scan)</td><td style="color:var(--green)">✅ Web API</td><td style="color:var(--green)">✅ Native API</td></tr>
+        <tr><td>Install on Home Screen</td><td style="color:var(--green)">✅ Add to Home Screen</td><td style="color:var(--green)">✅ App Store/Play Store</td></tr>
+        <tr><td>GPS / Location</td><td style="color:var(--green)">✅ Geolocation API</td><td style="color:var(--green)">✅ Native GPS</td></tr>
+        <tr><td>Biometric Auth (Fingerprint/Face)</td><td style="color:var(--text-muted)">⚠️ Limited (WebAuthn)</td><td style="color:var(--green)">✅ Full native</td></tr>
+        <tr><td>Background Sync</td><td style="color:var(--text-muted)">⚠️ Limited</td><td style="color:var(--green)">✅ Full support</td></tr>
+        <tr><td>App Store Presence</td><td style="color:var(--red)">❌ No (web only)</td><td style="color:var(--green)">✅ Google Play + Apple App Store</td></tr>
+        <tr><td>Perceived Premium Feel</td><td style="color:var(--text-muted)">⚠️ Good, not premium</td><td style="color:var(--green)">✅ Premium native feel</td></tr>
+        <tr><td>Instant Updates (no store review)</td><td style="color:var(--green)">✅ Deploy anytime</td><td style="color:var(--red)">❌ 1-3 day review cycle</td></tr>
+        <tr><td>Cross-Platform (single codebase)</td><td style="color:var(--green)">✅ One codebase, all platforms</td><td style="color:var(--text-muted)">⚠️ React Native = single, but complex</td></tr>
+        <tr><td>No Download Required</td><td style="color:var(--green)">✅ Works on any browser</td><td style="color:var(--red)">❌ Must download (50-100MB)</td></tr>
+      </tbody>
+    </table>
+
+    <div class="divider"></div>
+
+    <div class="section-header"><span class="icon">💰</span> Cost Comparison</div>
+    <table class="cost-table">
+      <thead>
+        <tr><th>Cost Item</th><th>PWA</th><th>Native App<br>(React Native)</th><th>Native App<br>(Kotlin + Swift)</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Initial Development</td>
+          <td style="color:var(--green)"><strong>₹0</strong><br><small>Already built</small></td>
+          <td>₹15-25L<br><small>3-4 months</small></td>
+          <td>₹30-50L<br><small>5-6 months, 2 teams</small></td>
+        </tr>
+        <tr>
+          <td>Monthly Maintenance</td>
+          <td style="color:var(--green)">₹2L/month</td>
+          <td>₹3-4L/month</td>
+          <td>₹5-7L/month</td>
+        </tr>
+        <tr>
+          <td>App Store Fees</td>
+          <td style="color:var(--green)">₹0</td>
+          <td>₹2,100/yr (Google)<br>₹8,300/yr (Apple)</td>
+          <td>₹2,100/yr (Google)<br>₹8,300/yr (Apple)</td>
+        </tr>
+        <tr>
+          <td>Update Deployment</td>
+          <td style="color:var(--green)">Instant (seconds)</td>
+          <td>1-3 days (store review)</td>
+          <td>1-3 days (store review)</td>
+        </tr>
+        <tr>
+          <td>Team Required</td>
+          <td style="color:var(--green)">1 Full-Stack Dev</td>
+          <td>1 RN Dev + 1 Backend</td>
+          <td>1 Android + 1 iOS + 1 Backend</td>
+        </tr>
+        <tr class="total-row">
+          <td><strong>Year 1 Total Cost</strong></td>
+          <td><strong style="color:var(--green)">~₹24L</strong></td>
+          <td><strong>~₹61-73L</strong></td>
+          <td><strong>~₹90-134L</strong></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="divider"></div>
+
+    <div class="section-header"><span class="icon">🎯</span> Our Recommended Strategy</div>
+    <div class="phase-card p1">
+      <div class="phase-label">Phase 1 & 2 — PWA Only</div>
+      <div class="phase-title">May 2026 → Oct 2026</div>
+      <div style="font-size: 13px; color: var(--text-muted);">PWA covers 95% of required features. Zero additional cost. Instant deployments. Focus budget on user acquisition and API integrations. No app store dependency.</div>
+    </div>
+    <div class="phase-card p3">
+      <div class="phase-label">Phase 3 — Evaluate Native App</div>
+      <div class="phase-title">Nov 2026 → Jan 2027</div>
+      <div style="font-size: 13px; color: var(--text-muted);">At 60K users, if App Store presence becomes a business requirement (investor pressure, premium branding, biometric auth), initiate React Native build. Reuse 70% of existing React codebase. Estimated cost: ₹15-20L one-time + ₹3L/month maintenance.</div>
+    </div>
+    <div class="phase-card p4">
+      <div class="phase-label">Phase 4 — PWA + Native Hybrid</div>
+      <div class="phase-title">Feb 2027 → Mar 2027</div>
+      <div style="font-size: 13px; color: var(--text-muted);">Both PWA and Native App live. QR-based booking flow stays PWA (no download friction). Doctor/Patient dashboards get native app for premium experience. Best of both worlds.</div>
+    </div>
+
+    <div class="note-box">
+      💡 <strong>Key Insight:</strong> Our QR-based booking flow <strong>must remain PWA</strong> even with a native app — patients scan a QR, they shouldn't need to download an app first. The PWA loads instantly in any browser. Native app would be an <strong>optional premium add-on</strong> for frequent users (doctors & returning patients).
+    </div>
+  </div>
+</section>
+
+<!-- ===== SLIDE 9: CONSOLIDATED TIMELINE ===== -->
+<section class="slide">
+  <div class="slide-inner">
+    <h2 class="slide-title">📅 Execution Timeline</h2>
+    <p class="slide-subtitle">From launch to 100K users — 11 month roadmap</p>
+
+    <div style="position: relative; padding-left: 24px; border-left: 3px solid rgba(255,152,0,0.3);">
+
+      <!-- Phase 0 -->
+      <div style="margin-bottom: 28px; position: relative;">
+        <div style="position:absolute; left:-32px; top:0; width:18px; height:18px; border-radius:50%; background:var(--red); border:3px solid var(--bg-dark);"></div>
+        <div class="phase-label" style="color: var(--red);">NOW — March/April 2026</div>
+        <div style="font-size: 16px; font-weight: 700; color: #fff; margin: 4px 0;">Pre-Launch Preparation</div>
+        <div style="font-size: 13px; color: var(--text-muted); line-height: 1.8;">
+          ✅ Platform fully built & deployed (teamhealqr.web.app)<br>
+          ✅ All doctor, clinic, patient features live<br>
+          ⬜ Final QA & stress testing<br>
+          ⬜ Legal: Privacy Policy, Terms of Service, DPDPA compliance<br>
+          ⬜ Onboard Accounts team (CA firm on retainer)<br>
+          ⬜ Setup Sentry/Datadog for AI health monitoring
+        </div>
+      </div>
+
+      <!-- Phase 1 -->
+      <div style="margin-bottom: 28px; position: relative;">
+        <div style="position:absolute; left:-32px; top:0; width:18px; height:18px; border-radius:50%; background:var(--green); border:3px solid var(--bg-dark);"></div>
+        <div class="phase-label" style="color: var(--green);">PHASE 1 — May to July 2026</div>
+        <div style="font-size: 16px; font-weight: 700; color: #fff; margin: 4px 0;">10,000 Doctors + Clinics Onboarded</div>
+        <div class="phase-stats">
+          <div class="phase-stat"><span class="num">10K</span><span class="lbl">Users</span></div>
+          <div class="phase-stat"><span class="num">100K</span><span class="lbl">Bookings/day</span></div>
+          <div class="phase-stat"><span class="num">₹5.09L</span><span class="lbl">Expense/mo</span></div>
+          <div class="phase-stat"><span class="num" style="color:var(--green)">₹14.11L</span><span class="lbl">Profit/mo</span></div>
+        </div>
+        <div style="font-size: 13px; color: var(--text-muted); margin-top: 8px; line-height: 1.8;">
+          🎯 QR distribution through field agents in West Bengal<br>
+          🎯 Target: Private clinics, solo practitioners, small hospitals<br>
+          🎯 Team: Sr. Developer + Jr. Developer (2 person dev team)<br>
+          🎯 Ad network integration — start generating revenue from Day 1
+        </div>
+      </div>
+
+      <!-- Phase 2 -->
+      <div style="margin-bottom: 28px; position: relative;">
+        <div style="position:absolute; left:-32px; top:0; width:18px; height:18px; border-radius:50%; background:var(--blue); border:3px solid var(--bg-dark);"></div>
+        <div class="phase-label" style="color: var(--blue);">PHASE 2 — August to October 2026</div>
+        <div style="font-size: 16px; font-weight: 700; color: #fff; margin: 4px 0;">30,000 Total Users (10K + 20K new)</div>
+        <div class="phase-stats">
+          <div class="phase-stat"><span class="num">30K</span><span class="lbl">Users</span></div>
+          <div class="phase-stat"><span class="num">300K</span><span class="lbl">Bookings/day</span></div>
+          <div class="phase-stat"><span class="num">₹11.87L</span><span class="lbl">Expense/mo</span></div>
+          <div class="phase-stat"><span class="num" style="color:var(--green)">₹60.13L</span><span class="lbl">Profit/mo</span></div>
+        </div>
+        <div style="font-size: 13px; color: var(--text-muted); margin-top: 8px; line-height: 1.8;">
+          🌐 Activate Google Geocoding + Translation APIs<br>
+          👨‍💻 Add 3rd developer (Jr.) for API integration work<br>
+          🎯 Expand to Bihar, Jharkhand, Odisha<br>
+          📊 Pharma ad partnerships (targeted health ads)
+        </div>
+      </div>
+
+      <!-- Phase 3 -->
+      <div style="margin-bottom: 28px; position: relative;">
+        <div style="position:absolute; left:-32px; top:0; width:18px; height:18px; border-radius:50%; background:var(--purple); border:3px solid var(--bg-dark);"></div>
+        <div class="phase-label" style="color: var(--purple);">PHASE 3 — November 2026 to January 2027</div>
+        <div style="font-size: 16px; font-weight: 700; color: #fff; margin: 4px 0;">60,000 Total Users (30K + 30K new)</div>
+        <div class="phase-stats">
+          <div class="phase-stat"><span class="num">60K</span><span class="lbl">Users</span></div>
+          <div class="phase-stat"><span class="num">600K</span><span class="lbl">Bookings/day</span></div>
+          <div class="phase-stat"><span class="num">₹19.39L</span><span class="lbl">Expense/mo</span></div>
+          <div class="phase-stat"><span class="num" style="color:var(--green)">₹1.54Cr</span><span class="lbl">Profit/mo</span></div>
+        </div>
+        <div style="font-size: 13px; color: var(--text-muted); margin-top: 8px; line-height: 1.8;">
+          📱 Evaluate & potentially launch React Native app (if needed)<br>
+          🇮🇳 Pan-India expansion — metro cities + tier-2 towns<br>
+          ⚖️ Scale legal + accounts team for multi-state compliance<br>
+          🏥 Enterprise partnerships with hospital chains
+        </div>
+      </div>
+
+      <!-- Phase 4 -->
+      <div style="margin-bottom: 12px; position: relative;">
+        <div style="position:absolute; left:-32px; top:0; width:18px; height:18px; border-radius:50%; background:var(--primary); border:3px solid var(--bg-dark);"></div>
+        <div class="phase-label" style="color: var(--primary);">PHASE 4 — February to March 2027</div>
+        <div style="font-size: 16px; font-weight: 700; color: #fff; margin: 4px 0;">100,000 Total Users (60K + 40K new)</div>
+        <div class="phase-stats">
+          <div class="phase-stat"><span class="num">100K</span><span class="lbl">Users</span></div>
+          <div class="phase-stat"><span class="num">1M+</span><span class="lbl">Bookings/day</span></div>
+          <div class="phase-stat"><span class="num">₹36.45L</span><span class="lbl">Expense/mo</span></div>
+          <div class="phase-stat"><span class="num" style="color:var(--green)">₹3.24Cr</span><span class="lbl">Profit/mo</span></div>
+        </div>
+        <div style="font-size: 13px; color: var(--text-muted); margin-top: 8px; line-height: 1.8;">
+          🏢 Transition to professional IT house (TCS/Infosys tier) — zero hiring/firing headache<br>
+          🔒 Full legal + compliance team on retainer<br>
+          📊 Full accounts team — GST, TDS, multi-state compliance<br>
+          🚀 1M+ bookings/day — self-sustaining platform with ₹3.24Cr/month profit
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="cta-box">
+      <h3>11-Month Journey to ₹3.24 Cr/month</h3>
+      <p>May 2026 → March 2027 &bull; From 10K to 100K users &bull; <strong style="color:var(--green)">Profitable from Phase 1</strong></p>
+      <div style="margin-top: 16px; display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;">
+        <div style="background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.3); border-radius:8px; padding: 8px 16px;">
+          <span style="font-size:18px; font-weight:800; color:var(--green);">₹14.11L</span>
+          <span style="font-size:11px; color:var(--text-muted); display:block;">Phase 1 Profit/mo</span>
+        </div>
+        <div style="background:rgba(59,130,246,0.12); border:1px solid rgba(59,130,246,0.3); border-radius:8px; padding: 8px 16px;">
+          <span style="font-size:18px; font-weight:800; color:var(--blue);">₹60.13L</span>
+          <span style="font-size:11px; color:var(--text-muted); display:block;">Phase 2 Profit/mo</span>
+        </div>
+        <div style="background:rgba(139,92,246,0.12); border:1px solid rgba(139,92,246,0.3); border-radius:8px; padding: 8px 16px;">
+          <span style="font-size:18px; font-weight:800; color:var(--purple);">₹1.54Cr</span>
+          <span style="font-size:11px; color:var(--text-muted); display:block;">Phase 3 Profit/mo</span>
+        </div>
+        <div style="background:rgba(255,152,0,0.12); border:1px solid rgba(255,152,0,0.3); border-radius:8px; padding: 8px 16px;">
+          <span style="font-size:18px; font-weight:800; color:var(--primary);">₹3.24Cr</span>
+          <span style="font-size:11px; color:var(--text-muted); display:block;">Phase 4 Profit/mo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SLIDE 10: REVENUE MODEL ===== -->
+<section class="slide">
+  <div class="slide-inner">
+    <h2 class="slide-title">💎 Revenue Model</h2>
+    <p class="slide-subtitle">Ethical advertising on patient-facing pages — zero cost to users</p>
+
+    <div class="privacy-banner" style="margin-bottom: 20px;">
+      <div class="shield">🛡️</div>
+      <h3>Zero Data Selling — EVER</h3>
+      <p>Revenue comes <strong style="color:#fff;">exclusively from 3rd party display advertisements</strong> on patient-facing pages. No patient data, no booking data, no prescriptions — nothing is ever sold or shared.</p>
+    </div>
+
+    <div class="section-header"><span class="icon">📱</span> Primary Ad Placement — Booking Flow (6 Pages)</div>
+    <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">Every single booking passes through these 6 pages — guaranteed impressions</p>
+
+    <div class="rev-card">
+      <h4>🎯 Booking Flow Pages (Highest Value)</h4>
+      <p>Every patient booking generates 6 page views. At Phase 4 (1M bookings/day) = <strong style="color: var(--primary);">6M ad impressions/day just from bookings.</strong></p>
+      <div class="pages">
+        <span class="page-tag">Language Selection</span>
+        <span class="page-tag">Doctor Profile</span>
+        <span class="page-tag">Date Selection</span>
+        <span class="page-tag">Chamber Selection</span>
+        <span class="page-tag">Patient Form</span>
+        <span class="page-tag">Confirmation Page</span>
+      </div>
+    </div>
+
+    <div class="section-header"><span class="icon">🔔</span> Secondary Ad Placement — Notifications & Search</div>
+    <div class="rev-card">
+      <h4>📬 Notification Pages</h4>
+      <p>Patients open notification pages frequently — high engagement, high value.</p>
+      <div class="pages">
+        <span class="page-tag">Consultation Complete</span>
+        <span class="page-tag">Review Request</span>
+        <span class="page-tag">RX Received</span>
+        <span class="page-tag">Follow-up Reminder</span>
+        <span class="page-tag">Video Call Link</span>
+        <span class="page-tag">Appointment Reminder</span>
+      </div>
+    </div>
+
+    <div class="rev-card">
+      <h4>🔍 Search & Discovery Pages</h4>
+      <p>Find-a-doctor, search results, doctor profiles — premium ad real estate for pharma, diagnostics, and health brands.</p>
+      <div class="pages">
+        <span class="page-tag">Find a Doctor</span>
+        <span class="page-tag">Search Results</span>
+        <span class="page-tag">Doctor Mini-Website</span>
+        <span class="page-tag">Patient Dashboard</span>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section-header"><span class="icon">💰</span> Revenue Projection</div>
+    <table class="cost-table">
+      <thead>
+        <tr><th></th><th>Phase 1<br>10K</th><th>Phase 2<br>30K</th><th>Phase 3<br>60K</th><th>Phase 4<br>100K</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Ad Impressions/day<br><small style="color:var(--text-muted)">Booking (6pg) + Notifications + Search</small></td>
+          <td>~800K</td>
+          <td>~2.4M</td>
+          <td>~4.8M</td>
+          <td>~8M</td>
+        </tr>
+        <tr>
+          <td>Ad Impressions/month</td>
+          <td>24M</td>
+          <td>72M</td>
+          <td>144M</td>
+          <td>240M</td>
+        </tr>
+        <tr>
+          <td>Est. CPM (₹)<br><small style="color:var(--text-muted)">Healthcare audience — premium</small></td>
+          <td>₹80</td>
+          <td>₹100</td>
+          <td>₹120</td>
+          <td>₹150</td>
+        </tr>
+        <tr class="highlight-row">
+          <td><strong>Ad Revenue / Month</strong></td>
+          <td><strong>₹19.2L</strong></td>
+          <td><strong>₹72L</strong></td>
+          <td><strong>₹1.73Cr</strong></td>
+          <td><strong>₹3.6Cr</strong></td>
+        </tr>
+        <tr>
+          <td>Total Monthly Expense<br><small style="color:var(--text-muted)">(Infra + Team + AI + Legal + Accounts)</small></td>
+          <td>₹5.09L</td>
+          <td>₹11.87L</td>
+          <td>₹19.39L</td>
+          <td>₹36.45L</td>
+        </tr>
+        <tr class="total-row">
+          <td><strong>NET PROFIT / MONTH</strong></td>
+          <td><strong style="color:var(--green)">₹14.11L</strong></td>
+          <td><strong style="color:var(--green)">₹60.13L</strong></td>
+          <td><strong style="color:var(--green)">₹1.54Cr</strong></td>
+          <td><strong style="color:var(--green)">₹3.24Cr</strong></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="note-box">
+      📊 <strong>CPM Benchmark:</strong> Healthcare digital ads in India average ₹80-200 CPM. Our audience is highly targeted (patients actively seeking medical care) which commands premium rates. Pharma companies, diagnostic labs, and health insurance are top advertisers.
+    </div>
+
+    <div class="cta-box">
+      <h3>🚀 Bottom Line</h3>
+      <p>Platform is <strong>profitable from Phase 1</strong>. At Phase 4 (100K users), we project <strong style="color: var(--green); font-size: 18px;">₹3.24 Cr net profit/month</strong> with zero charges to doctors, clinics, or patients.<br><small style="color:var(--text-muted);">Expense includes full team + professional IT house + legal + accounts + AI monitoring</small></p>
+    </div>
+  </div>
+</section>
+
+</div><!-- end slider -->
+
+<script>
+  const slider = document.getElementById('slider');
+  const slides = document.querySelectorAll('.slide');
+  const totalSlides = slides.length;
+  let currentSlide = 0;
+
+  // Create nav dots
+  const dotsContainer = document.getElementById('navDots');
+  for (let i = 0; i < totalSlides; i++) {
+    const dot = document.createElement('button');
+    dot.className = 'nav-dot' + (i === 0 ? ' active' : '');
+    dot.onclick = () => goToSlide(i);
+    dotsContainer.appendChild(dot);
+  }
+
+  function updateUI() {
+    // Update dots
+    document.querySelectorAll('.nav-dot').forEach((d, i) => {
+      d.classList.toggle('active', i === currentSlide);
+    });
+    // Update counter
+    document.getElementById('slideCounter').textContent = `${currentSlide + 1} / ${totalSlides}`;
+  }
+
+  function goToSlide(index) {
+    currentSlide = Math.max(0, Math.min(index, totalSlides - 1));
+    slides[currentSlide].scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'start' });
+    updateUI();
+  }
+
+  function nextSlide() { goToSlide(currentSlide + 1); }
+  function prevSlide() { goToSlide(currentSlide - 1); }
+
+  // Keyboard navigation
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') nextSlide();
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') prevSlide();
+  });
+
+  // Track scroll position to update dots
+  let scrollTimeout;
+  slider.addEventListener('scroll', () => {
+    clearTimeout(scrollTimeout);
+    scrollTimeout = setTimeout(() => {
+      const scrollLeft = slider.scrollLeft;
+      const slideWidth = window.innerWidth;
+      currentSlide = Math.round(scrollLeft / slideWidth);
+      updateUI();
+    }, 50);
+  });
+
+  // Touch swipe support is handled by CSS scroll-snap
+</script>
+
+</body>
+</html>

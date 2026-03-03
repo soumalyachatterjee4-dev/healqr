@@ -10,39 +10,41 @@ interface SocialMediaPromoBannerProps {
 export default function SocialMediaPromoBanner({ onNavigate, onDismiss, compact = false }: SocialMediaPromoBannerProps) {
   if (compact) {
     return (
-      <div className="flex items-center justify-between h-full w-full gap-4">
-        <div className="flex-1">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between h-full w-full gap-3 sm:gap-4">
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-             <span className="px-2 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-medium backdrop-blur-sm flex items-center gap-1 w-fit">
+             <span className="px-2 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-medium backdrop-blur-sm flex items-center gap-1 w-fit shrink-0">
               <Sparkles className="w-3 h-3" />
               New
             </span>
-            <h3 className="text-lg font-bold text-white">Social Media Kit</h3>
+            <h3 className="text-sm sm:text-lg font-bold text-white whitespace-nowrap">Social Media Kit</h3>
           </div>
-          <p className="text-emerald-50 text-xs md:text-sm mb-2 leading-relaxed opacity-90">
+          <p className="text-emerald-50 text-xs mb-2 leading-relaxed opacity-90">
              Create branded posts for Instagram & WhatsApp.
           </p>
 
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-md bg-white/10 hover:bg-white/20 transition-colors">
-              <Instagram className="w-3 h-3 text-pink-200" />
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-md bg-white/10 hover:bg-white/20 transition-colors">
+                <Instagram className="w-3 h-3 text-pink-200" />
+              </div>
+              <div className="p-1.5 rounded-md bg-white/10 hover:bg-white/20 transition-colors">
+                <Facebook className="w-3 h-3 text-blue-200" />
+              </div>
+              <div className="p-1.5 rounded-md bg-white/10 hover:bg-white/20 transition-colors">
+                <Share2 className="w-3 h-3 text-emerald-200" />
+              </div>
             </div>
-            <div className="p-1.5 rounded-md bg-white/10 hover:bg-white/20 transition-colors">
-              <Facebook className="w-3 h-3 text-blue-200" />
-            </div>
-            <div className="p-1.5 rounded-md bg-white/10 hover:bg-white/20 transition-colors">
-              <Share2 className="w-3 h-3 text-emerald-200" />
-            </div>
-            <span className="text-[10px] text-emerald-100/70 ml-1">One-click share</span>
+            <span className="text-[10px] text-emerald-100/70">One-click share</span>
           </div>
         </div>
 
         <Button
           onClick={(e) => {
-            e.stopPropagation(); // Prevent bubbling issues
+            e.stopPropagation();
             onNavigate();
           }}
-          className="relative z-50 bg-white text-emerald-600 hover:bg-emerald-50 hover:scale-105 transition-all duration-300 font-bold px-4 py-2 h-auto text-sm shadow-lg whitespace-nowrap cursor-pointer"
+          className="relative z-50 bg-white text-emerald-600 hover:bg-emerald-50 hover:scale-105 transition-all duration-300 font-bold px-4 py-2 h-auto text-sm shadow-lg whitespace-nowrap cursor-pointer w-fit shrink-0"
         >
           Try Now
           <ArrowRight className="w-3 h-3 ml-1.5" />

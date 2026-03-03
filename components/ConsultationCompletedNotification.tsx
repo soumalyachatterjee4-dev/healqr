@@ -13,7 +13,8 @@ interface ConsultationCompletedNotificationProps {
   clinicName?: string;
   consultationDate?: string;
   consultationTime?: string;
-  rxUrl?: string; // New prop for prescription link
+  rxUrl?: string; // Prescription download link
+  dietUrl?: string; // AI Diet Chart download link
 }
 
 export default function ConsultationCompletedNotification({
@@ -27,6 +28,7 @@ export default function ConsultationCompletedNotification({
   consultationDate = 'October 10, 2025',
   consultationTime = '09:30 AM',
   rxUrl,
+  dietUrl,
 }: ConsultationCompletedNotificationProps) {
   const lang = getLanguageFromCode(language) as any;
 
@@ -116,7 +118,7 @@ export default function ConsultationCompletedNotification({
 
               {/* 📄 DOWNLOAD PRESCRIPTION BUTTON */}
               {rxUrl && (
-                <div className="mb-6 px-2">
+                <div className="mb-3 px-2">
                   <a
                     href={rxUrl}
                     target="_blank"
@@ -126,8 +128,37 @@ export default function ConsultationCompletedNotification({
                     <Download className="w-5 h-5" />
                     {translations.downloadPrescription?.[lang] || 'Download Digital Prescription'}
                   </a>
-                  <p className="text-[10px] text-gray-400 text-center mt-2 italic">
-                    {translations.rxSecureLink?.[lang] || 'Securely generated digital prescription'}
+                </div>
+              )}
+
+              {/* 🥗 DOWNLOAD AI DIET CHART BUTTON */}
+              {dietUrl && (
+                <div className="mb-3 px-2">
+                  <a
+                    href={dietUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 active:scale-[0.98] transition-all"
+                  >
+                    <Download className="w-5 h-5" />
+                    {translations.downloadDietChart?.[lang] || 'Download AI Diet Chart'}
+                  </a>
+                </div>
+              )}
+
+              {/* Secure link note */}
+              {(rxUrl || dietUrl) && (
+                <p className="text-[10px] text-gray-400 text-center mb-4 italic">
+                  {translations.rxSecureLink?.[lang] || 'Securely generated digital prescription'}
+                </p>
+              )}
+
+              {/* ⚠️ 72-HOUR EXPIRY WARNING */}
+              {(rxUrl || dietUrl) && (
+                <div className="mx-2 mb-5 border border-blue-200 bg-blue-50 rounded-xl p-4 text-center">
+                  <p className="text-blue-800 font-bold text-sm mb-1">⚠️ IMPORTANT NOTICE</p>
+                  <p className="text-blue-700 text-xs leading-relaxed">
+                    Above links will expire in 72 hours. Please download and save the documents.
                   </p>
                 </div>
               )}

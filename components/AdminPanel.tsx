@@ -14,6 +14,9 @@ import AdminDiscountCards from './AdminDiscountCards';
 import AdminNotificationPanel from './AdminNotificationPanel';
 import AdminPromoManager from './AdminPromoManager';
 import AdminDataStandardization from './AdminDataStandardization';
+import AdminPharmaManagement from './AdminPharmaManagement';
+import AdminAdvertiserManagement from './AdminAdvertiserManagement';
+import AdminPageDistribution from './AdminPageDistribution';
 
 interface DoctorTestimonial {
   id: number;
@@ -49,7 +52,7 @@ interface AdminPanelProps {
 
 export default function AdminPanel({ adminEmail, onLogout, onStartDemo, uploadedTestimonials = [], onUploadTestimonial, supportRequests = [], onNavigateToQRGenerator, onNavigateToQRGeneration, onNavigateToQRManagement }: AdminPanelProps) {
   const [currentPage, setCurrentPage] = useState<
-    'dashboard' | 'profile' | 'revenue' | 'doctors' | 'patients' | 'personal-management' | 'templates' | 'videos' | 'discount-cards' | 'promo-manager' | 'data-cleanup'
+    'dashboard' | 'profile' | 'revenue' | 'doctors' | 'patients' | 'personal-management' | 'templates' | 'videos' | 'discount-cards' | 'promo-manager' | 'data-cleanup' | 'pharma-management' | 'advertiser-management' | 'page-distribution'
   >('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
@@ -67,6 +70,9 @@ export default function AdminPanel({ adminEmail, onLogout, onStartDemo, uploaded
     'discount-cards': 'Discount Cards',
     'promo-manager': 'Promo Manager',
     'data-cleanup': 'Data Standardization',
+    'pharma-management': 'Pharma Companies',
+    'advertiser-management': 'Advertiser Management',
+    'page-distribution': 'Page Distribution',
   };
 
   // Load unread notification count
@@ -75,22 +81,22 @@ export default function AdminPanel({ adminEmail, onLogout, onStartDemo, uploaded
       try {
         const { db } = await import('../lib/firebase/config');
         const { collection, getDocs } = await import('firebase/firestore');
-        
+
         const supportRequestsRef = collection(db, 'supportRequests');
         const snapshot = await getDocs(supportRequestsRef);
-        
+
         // Filter unread in memory (no index needed)
         const unreadDocs = snapshot.docs.filter(doc => doc.data().status === 'unread');
-        
+
         setUnreadCount(unreadDocs.length);
         console.log('✅ Unread notifications:', unreadDocs.length);
       } catch (error) {
         console.error('❌ Error loading unread count:', error);
       }
     };
-    
+
     loadUnreadCount();
-    
+
     // Refresh every 30 seconds
     const interval = setInterval(loadUnreadCount, 30000);
     return () => clearInterval(interval);
@@ -116,7 +122,7 @@ export default function AdminPanel({ adminEmail, onLogout, onStartDemo, uploaded
           <Menu className="w-6 h-6 text-emerald-500" />
         </button>
         <h1 className="text-lg flex-1">{pageTitles[currentPage]}</h1>
-        
+
         {/* Notification Bell */}
         <button
           onClick={() => setIsNotificationPanelOpen(true)}
@@ -130,7 +136,7 @@ export default function AdminPanel({ adminEmail, onLogout, onStartDemo, uploaded
           )}
         </button>
       </div>
-      
+
       {/* Desktop Header with Bell Icon */}
       <div className="hidden lg:block fixed top-0 right-0 left-64 h-16 bg-black border-b border-zinc-900 flex items-center justify-end px-6 z-30">
         <button
@@ -159,8 +165,8 @@ export default function AdminPanel({ adminEmail, onLogout, onStartDemo, uploaded
       {/* Main Content */}
       <div className="flex-1 lg:ml-64 pt-16 lg:pt-16">
         {currentPage === 'dashboard' && (
-          <AdminDashboard 
-            adminEmail={adminEmail} 
+          <AdminDashboard
+            adminEmail={adminEmail}
             onStartDemo={onStartDemo}
             uploadedTestimonials={uploadedTestimonials}
             onUploadTestimonial={onUploadTestimonial}
@@ -180,6 +186,9 @@ export default function AdminPanel({ adminEmail, onLogout, onStartDemo, uploaded
         {currentPage === 'discount-cards' && <AdminDiscountCards />}
         {currentPage === 'promo-manager' && <AdminPromoManager />}
         {currentPage === 'data-cleanup' && <AdminDataStandardization />}
+        {currentPage === 'pharma-management' && <AdminPharmaManagement />}
+        {currentPage === 'advertiser-management' && <AdminAdvertiserManagement />}
+        {currentPage === 'page-distribution' && <AdminPageDistribution />}
       </div>
     </div>
   );

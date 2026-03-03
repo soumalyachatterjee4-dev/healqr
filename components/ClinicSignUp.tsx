@@ -7,6 +7,7 @@ import healqrLogo from '../assets/healqr-logo.png';
 import { auth, db } from '../lib/firebase/config';
 import { sendSignInLinkToEmail, createUserWithEmailAndPassword } from 'firebase/auth';
 import { toast } from 'sonner';
+import { getStateFromPincode } from '../utils/pincodeMapping';
 
 interface ClinicSignUpProps {
   onNext?: (data: any) => void; // Optional for now as we might redirect
@@ -150,6 +151,7 @@ export default function ClinicSignUp({ onBack, onLogin }: ClinicSignUpProps) {
         clinicName,
         address,
         pinCode,
+        state: getStateFromPincode(pinCode), // Auto-derived from pincode — locked field
         qrNumber: finalQrNumber,
         qrType: qrType,
         companyName: qrType === 'preprinted' ? companyName : '',
@@ -272,6 +274,13 @@ export default function ClinicSignUp({ onBack, onLogin }: ClinicSignUpProps) {
                 placeholder="e.g. 700001"
               />
             </div>
+            {pinCode.length === 6 && getStateFromPincode(pinCode) !== 'Unknown' && (
+              <div className="mt-2 flex items-center gap-2 bg-blue-500/10 border border-blue-500/30 rounded-lg px-3 py-2">
+                <MapPin className="w-4 h-4 text-blue-500 shrink-0" />
+                <span className="text-blue-400 text-sm font-medium">State: {getStateFromPincode(pinCode)}</span>
+                <span className="text-gray-500 text-xs">(auto-detected, locked after signup)</span>
+              </div>
+            )}
           </div>
 
           {/* QR Type Selection */}

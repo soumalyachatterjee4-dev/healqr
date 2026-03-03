@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react';
-import { 
-  LayoutDashboard, 
-  Megaphone, 
-  BarChart3, 
-  Wallet, 
-  LogOut, 
+import {
+  LayoutDashboard,
+  Megaphone,
+  BarChart3,
+  Wallet,
+  LogOut,
   Bell,
   Menu,
   Eye,
   ArrowUpRight,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Search,
+  Heart
 } from 'lucide-react';
 import { AuthService } from '../lib/firebase/auth.service';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
@@ -19,6 +21,8 @@ import healQRAdsLogo from '../assets/healQRADS_LOGO.svg';
 import AdvertiserCampaigns from './AdvertiserCampaigns';
 import AdvertiserAnalytics from './AdvertiserAnalytics';
 import AdvertiserWallet from './AdvertiserWallet';
+import AdvertiserMarketResearch from './AdvertiserMarketResearch';
+import AdvertiserHealthTips from './AdvertiserHealthTips';
 
 interface AdvertiserDashboardProps {
   onLogout: () => void;
@@ -124,7 +128,7 @@ export default function AdvertiserDashboard({ onLogout }: AdvertiserDashboardPro
                   <h2 className="text-lg font-semibold text-white">Active Campaigns</h2>
                   <button onClick={() => setActiveTab('campaign')} className="text-sm text-emerald-500 hover:text-emerald-400 font-medium">View All</button>
                 </div>
-                
+
                 <div className="space-y-6">
                   {activeCampaigns.map((campaign) => (
                     <div key={campaign.id} className="group">
@@ -140,9 +144,9 @@ export default function AdvertiserDashboard({ onLogout }: AdvertiserDashboardPro
                           <span className="text-xs text-zinc-500"> / {campaign.totalViews.toLocaleString()} views</span>
                         </div>
                       </div>
-                      
+
                       <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
-                        <div 
+                        <div
                           className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full transition-all duration-500 ease-out"
                           style={{ width: `${(campaign.views / campaign.totalViews) * 100}%` }}
                         />
@@ -156,7 +160,7 @@ export default function AdvertiserDashboard({ onLogout }: AdvertiserDashboardPro
                         <Megaphone className="w-6 h-6 text-zinc-600" />
                       </div>
                       <p className="text-zinc-500">No active campaigns running</p>
-                      <button 
+                      <button
                         onClick={() => setActiveTab('campaign')}
                         className="mt-4 text-sm text-emerald-500 hover:text-emerald-400 font-medium"
                       >
@@ -171,7 +175,7 @@ export default function AdvertiserDashboard({ onLogout }: AdvertiserDashboardPro
               <div className="w-full lg:w-80 shrink-0">
                 <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl p-6 h-full min-h-[250px] flex flex-col justify-between relative overflow-hidden group">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-16 -mt-16 transition-transform group-hover:scale-150 duration-700"></div>
-                  
+
                   <div>
                     <span className="inline-block px-3 py-1 bg-white/20 rounded-full text-xs font-medium text-white mb-4 backdrop-blur-sm">
                       Premium
@@ -199,6 +203,10 @@ export default function AdvertiserDashboard({ onLogout }: AdvertiserDashboardPro
         return <AdvertiserAnalytics />;
       case 'wallet':
         return <AdvertiserWallet />;
+      case 'market-research':
+        return <AdvertiserMarketResearch />;
+      case 'health-tips':
+        return <AdvertiserHealthTips />;
       default:
         return null;
     }
@@ -222,7 +230,7 @@ export default function AdvertiserDashboard({ onLogout }: AdvertiserDashboardPro
       `}>
         <div className={`p-6 flex items-center border-b border-zinc-900 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
           {!isCollapsed && <img src={healQRAdsLogo} alt="HealQR Ads" className="h-14 w-auto" />}
-          <button 
+          <button
             onClick={() => setIsCollapsed(!isCollapsed)}
             className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
           >
@@ -235,6 +243,8 @@ export default function AdvertiserDashboard({ onLogout }: AdvertiserDashboardPro
             { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
             { id: 'campaign', label: 'Campaigns', icon: Megaphone },
             { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+            { id: 'market-research', label: 'Market Research', icon: Search },
+            { id: 'health-tips', label: 'Health Tips', icon: Heart },
             { id: 'wallet', label: 'Wallet', icon: Wallet },
           ].map((item) => (
             <button
@@ -244,14 +254,14 @@ export default function AdvertiserDashboard({ onLogout }: AdvertiserDashboardPro
                 setIsSidebarOpen(false);
               }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group relative ${
-                activeTab === item.id 
-                  ? 'bg-emerald-500 text-white' 
+                activeTab === item.id
+                  ? 'bg-emerald-500 text-white'
                   : 'text-gray-400 hover:bg-zinc-900 hover:text-white'
               } ${isCollapsed ? 'justify-center' : ''}`}
             >
               <item.icon className="w-5 h-5 shrink-0" />
               {!isCollapsed && <span className="text-sm">{item.label}</span>}
-              
+
               {/* Tooltip for collapsed state */}
               {isCollapsed && (
                 <div className="absolute left-full ml-2 px-2 py-1 bg-zinc-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">
@@ -301,7 +311,7 @@ export default function AdvertiserDashboard({ onLogout }: AdvertiserDashboardPro
 
       {/* Overlay for mobile sidebar */}
       {isSidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/80 z-40 md:hidden backdrop-blur-sm"
           onClick={() => setIsSidebarOpen(false)}
         />

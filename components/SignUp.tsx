@@ -13,6 +13,7 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { MEDICAL_SPECIALTIES } from '../utils/medicalSpecialties';
 import { Badge } from './ui/badge';
+import { getStateFromPincode } from '../utils/pincodeMapping';
 
 interface SignUpProps {
   onNext: (data: { email: string; name: string; dob: string; specialties: string[]; pinCode: string; qrNumber: string; }) => void;
@@ -214,6 +215,7 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
         dob,
         specialties,
         pinCode,
+        state: getStateFromPincode(pinCode), // Auto-derived from pincode — locked field
         landmark,
         qrNumber: finalQrNumber,
         qrType: qrType, // NEW: Store QR type
@@ -530,6 +532,13 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
                 className="pl-12 bg-black border-zinc-800 text-white h-14 rounded-lg focus:border-emerald-500"
               />
             </div>
+            {pinCode.length === 6 && getStateFromPincode(pinCode) !== 'Unknown' && (
+              <div className="mt-2 flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-3 py-2">
+                <MapPin className="w-4 h-4 text-emerald-500 shrink-0" />
+                <span className="text-emerald-400 text-sm font-medium">State: {getStateFromPincode(pinCode)}</span>
+                <span className="text-gray-500 text-xs">(auto-detected, locked after signup)</span>
+              </div>
+            )}
           </div>
 
           {/* Clinic Landmark Field */}

@@ -4,6 +4,7 @@ import { isSignInWithEmailLink, signInWithEmailLink } from 'firebase/auth';
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import healqrLogo from '../assets/healqr-logo.png';
 import QRCode from 'qrcode';
+import { getStateFromPincode } from '../utils/pincodeMapping';
 
 interface VerifyEmailProps {
   onSuccess?: () => void;
@@ -175,6 +176,7 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
                 name: signupData.clinicName,
                 address: signupData.address || '',
                 pinCode: signupData.pinCode,
+                state: signupData.state || getStateFromPincode(signupData.pinCode || ''), // Locked state field
                 landmark: signupData.landmark || '',
                 qrNumber: signupData.qrNumber,
                 qrType: signupData.qrType || 'preprinted',
@@ -333,6 +335,7 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
           dob: signupData.dob || '',
           address: signupData.address || '',
           pinCode: signupData.pinCode || '',
+          state: signupData.state || getStateFromPincode(signupData.pinCode || ''), // Locked state field
           landmark: signupData.landmark || '',
           qrNumber: signupData.qrNumber, // Always store the provided QR
           qrType: signupData.qrType || 'preprinted', // QR type (preprinted or virtual)
@@ -362,23 +365,6 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
         });
         // Extra debug: Confirm doctor profile created with QR
         console.log('🟢 DOCTOR PROFILE CREATED with QR:', signupData.qrNumber);
-
-        // Save company data to companies collection (if pre-printed QR with company name)
-        if (signupData.companyName && signupData.qrType === 'preprinted') {
-          const { collection, doc, setDoc, serverTimestamp, increment } = await import('firebase/firestore');
-          const companiesRef = collection(db, 'companies');
-          const companyDocRef = doc(companiesRef, signupData.companyName.toLowerCase().replace(/\s+/g, '-'));
-
-          // Save/update company record
-          await setDoc(companyDocRef, {
-            companyName: signupData.companyName,
-            doctors: increment(1), // Count of doctors using this company's QR
-            lastDoctorSignup: serverTimestamp(),
-            createdAt: serverTimestamp(),
-          }, { merge: true });
-
-          console.log('✅ Company data saved:', signupData.companyName);
-        }
 
         // OPTIMIZE: Link QR codes in background (non-blocking)
         Promise.all([

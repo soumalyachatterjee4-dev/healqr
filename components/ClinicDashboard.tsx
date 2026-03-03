@@ -749,20 +749,24 @@ export default function ClinicDashboard() {
                     <span className="text-blue-500 text-sm hover:underline cursor-pointer">2 reviews</span>
                   </div>
 
-                  {/* Badges block: Encrypted and BrainDeck - Same Row */}
-                  <div className="flex flex-wrap items-center gap-3 mb-4">
-                    <button className="flex items-center gap-2 text-white px-4 py-2 rounded-lg font-medium cursor-default" style={{ backgroundColor: '#2563eb' }}>
-                      <LucideLock className="w-4 h-4" />
-                      <span>Data is encrypted</span>
-                    </button>
 
+                  {/* Full-width Encrypted Badge */}
+                  <div className="w-full mb-3">
+                    <div className="w-full flex items-center justify-center rounded-xl bg-orange-500 text-white font-bold py-3 text-base shadow shadow-orange-200">
+                      <LucideLock className="w-5 h-5 mr-2" />
+                      Data is encrypted
+                    </div>
+                  </div>
+
+                  {/* Full-width BrainDeck Button */}
+                  <div className="w-full mb-3">
                     <button
                       onClick={() => setActiveMenu('braindeck')}
-                      className="flex items-center gap-2 text-white px-4 py-2 rounded-lg font-medium shadow-lg shadow-orange-500/20 transition-all cursor-pointer hover:opacity-90 active:scale-[0.98]"
-                      style={{ backgroundColor: '#f97316' }}
+                      className="w-full flex items-center justify-center rounded-xl bg-white text-blue-600 font-bold py-3 text-base border border-blue-200 shadow"
+                      style={{ letterSpacing: '0.02em' }}
                     >
-                      <BrainCircuit className="w-5 h-5" />
-                      <span className="font-bold tracking-wide italic">healQR BrainDeck</span>
+                      <BrainCircuit className="w-5 h-5 mr-2" />
+                      healQR BrainDeck
                     </button>
                   </div>
 
@@ -781,15 +785,15 @@ export default function ClinicDashboard() {
                 </div>
               </div>
 
-              {/* Social Media Kit Card - Blue Banner */}
+              {/* Social Media Kit Card - Green Banner */}
               <div
                 className="rounded-2xl p-6 relative overflow-hidden shadow-xl"
-                style={{ backgroundColor: '#2b63f1' }}
+                style={{ background: 'linear-gradient(to bottom right, rgb(16, 185, 129), rgb(5, 150, 105))' }}
               >
                 {/* Top: Free + Active badges */}
                 <div className="flex gap-2 mb-3">
                   <Badge variant="outline" className="text-white border-white/40 bg-transparent text-[10px] px-2 py-0 h-5">Free</Badge>
-                  <Badge className="bg-white/20 hover:bg-white/30 text-white border-none text-[10px] px-2 py-0 h-5">Active</Badge>
+                  <Badge className="bg-green-700 text-white border-none text-[10px] px-2 py-0 h-5">Active</Badge>
                 </div>
 
                 {/* Bookings Count */}
@@ -798,7 +802,7 @@ export default function ClinicDashboard() {
                     <span className="text-4xl font-bold text-white">{analyticsData.monthlyBookings}</span>
                     <span className="text-2xl font-semibold text-white">Bookings</span>
                   </div>
-                  <p className="text-[11px] text-blue-100/70 font-medium">
+                  <p className="text-[11px] text-emerald-100 opacity-80 font-medium">
                     {new Date().toLocaleString('default', { month: 'short' })} 1, 2026 – {new Date().toLocaleString('default', { month: 'short' })} 31, 2026
                   </p>
                 </div>
@@ -809,14 +813,14 @@ export default function ClinicDashboard() {
                 {/* Social Kit Info */}
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <Badge className="hover:bg-white border-none text-[10px] font-bold px-2 py-0 h-5 shrink-0" style={{ backgroundColor: 'white', color: '#2b63f1' }}>
-                      <Sparkles className="w-3 h-3 mr-1" style={{ fill: '#2b63f1' }} />
+                    <Badge className="hover:bg-white border-none text-[10px] font-bold px-2 py-0 h-5 shrink-0" style={{ backgroundColor: 'white', color: '#059669' }}>
+                      <Sparkles className="w-3 h-3 mr-1" style={{ fill: '#059669' }} />
                       New
                     </Badge>
                     <h3 className="text-sm font-bold text-white whitespace-nowrap">Social Media Kit</h3>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-xs text-blue-100/80">Create branded posts for Instagram & WhatsApp.</p>
+                    <p className="text-xs text-emerald-100/80">Create branded posts for Instagram & WhatsApp.</p>
                     <button
                       onClick={() => setActiveMenu('social-kit')}
                       className="hover:bg-slate-50 px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-1.5 transition-all shadow-lg shrink-0"

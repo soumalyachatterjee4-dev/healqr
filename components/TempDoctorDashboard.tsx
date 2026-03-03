@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { db } from '../lib/firebase/config';
+import { db, auth } from '../lib/firebase/config';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { signInAnonymously } from 'firebase/auth';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -122,6 +123,21 @@ const TempDoctorDashboard: React.FC = () => {
     const interval = setInterval(checkTimeWindow, 60000); // Check every minute
     return () => clearInterval(interval);
   }, [chambers]);
+
+  // Ensure Firebase Auth session for storage uploads (anonymous sign-in)
+  useEffect(() => {
+    const ensureAuth = async () => {
+      try {
+        if (auth && !auth.currentUser) {
+          await signInAnonymously(auth);
+          console.log('✅ Temp doctor: anonymous auth established for storage access');
+        }
+      } catch (err) {
+        console.warn('⚠️ Anonymous auth failed (PDF uploads may not work):', err);
+      }
+    };
+    ensureAuth();
+  }, []);
 
   // Load today's schedule
   useEffect(() => {

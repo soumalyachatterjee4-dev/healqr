@@ -112,7 +112,7 @@ export default function PatientDetails({
   useEffect(() => {
     const checkClinicRestrictions = async () => {
       try {
-        const userId = localStorage.getItem('userId');
+        const userId = localStorage.getItem('userId') || localStorage.getItem('healqr_temp_doctor_id');
         if (!userId) return;
         console.log('🔍 [PatientDetails] Checking restrictions for doctor:', userId);
 
@@ -458,8 +458,8 @@ export default function PatientDetails({
       if (unmarkedPatients.length > 0 && timeSinceChamberEnd >= 60 && timeSinceChamberEnd < 65) {
         try {
           const { sendAdminAlert } = await import('../services/notificationService');
-          const doctorId = localStorage.getItem('userId') || '';
-          const doctorName = localStorage.getItem('healqr_user_name') || 'Doctor';
+          const doctorId = localStorage.getItem('userId') || localStorage.getItem('healqr_temp_doctor_id') || '';
+          const doctorName = localStorage.getItem('healqr_user_name') || localStorage.getItem('healqr_temp_doctor_name') || 'Doctor';
 
           await sendAdminAlert({
             doctorId,
@@ -525,8 +525,8 @@ export default function PatientDetails({
 
           // Send VC link via FCM notification to patient
           try {
-            const doctorName = localStorage.getItem('healqr_user_name') || 'Doctor';
-            const doctorId = localStorage.getItem('userId') || '';
+            const doctorName = localStorage.getItem('healqr_user_name') || localStorage.getItem('healqr_temp_doctor_name') || 'Doctor';
+            const doctorId = localStorage.getItem('userId') || localStorage.getItem('healqr_temp_doctor_id') || '';
 
             console.log(`📹 Sending VC link to ${patient.name} via FCM...`);
 
@@ -746,8 +746,8 @@ export default function PatientDetails({
     if (selectedPatient && db) {
       try {
         // Get doctor info from localStorage
-        const doctorName = localStorage.getItem('healqr_user_name') || localStorage.getItem('doctorName') || 'Doctor';
-        const doctorId = localStorage.getItem('userId') || '';
+        const doctorName = localStorage.getItem('healqr_user_name') || localStorage.getItem('healqr_temp_doctor_name') || localStorage.getItem('doctorName') || 'Doctor';
+        const doctorId = localStorage.getItem('userId') || localStorage.getItem('healqr_temp_doctor_id') || '';
         const doctorSpecialty = localStorage.getItem('healqr_specialty') || '';
         const doctorPhoto = localStorage.getItem('healqr_profile_photo') || '';
 
@@ -1078,9 +1078,10 @@ export default function PatientDetails({
       toast.loading('Completing consultation...', { id: 'mark-seen' });
 
       const isAssistant = localStorage.getItem('healqr_is_assistant') === 'true';
-      const userId = localStorage.getItem('userId');
-      const doctorName = localStorage.getItem('healqr_user_name') || localStorage.getItem('doctorName') || 'Doctor';
-      const markedBy = isAssistant ? localStorage.getItem('healqr_user_email') : userId;
+      const isTempDoctor = localStorage.getItem('healqr_is_temp_doctor') === 'true';
+      const userId = localStorage.getItem('userId') || localStorage.getItem('healqr_temp_doctor_id');
+      const doctorName = localStorage.getItem('healqr_user_name') || localStorage.getItem('healqr_temp_doctor_name') || localStorage.getItem('doctorName') || 'Doctor';
+      const markedBy = isAssistant ? localStorage.getItem('healqr_user_email') : (isTempDoctor ? `temp_${userId}` : userId);
 
       if (!userId) throw new Error('User ID not found');
 

@@ -35,6 +35,7 @@ import {
 } from './ui/alert-dialog';
 import { auth, storage } from '../lib/firebase/config';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { getStateFromPincode } from '../utils/pincodeMapping';
 
 interface ProfileManagerProps {
   onMenuChange?: (menu: string) => void;
@@ -574,6 +575,22 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
                     />
                   </div>
                 </div>
+
+                {/* State (Locked — auto-derived from pincode) */}
+                {residentialPincodeState && getStateFromPincode(residentialPincodeState) !== 'Unknown' && (
+                  <div>
+                    <Label className="mb-2 block">State <span className="text-xs text-gray-600 font-normal">(Locked)</span></Label>
+                    <div className="relative">
+                      <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                      <Input
+                        type="text"
+                        value={getStateFromPincode(residentialPincodeState)}
+                        disabled
+                        className="pl-12 bg-zinc-950 border-zinc-800 text-gray-500 h-12 rounded-lg cursor-not-allowed"
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {/* Landmark (Read-Only) */}
                 <div>

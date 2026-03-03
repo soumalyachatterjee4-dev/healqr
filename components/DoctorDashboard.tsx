@@ -779,8 +779,10 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
   // Reviews data - Use cumulative stats from Firestore via props
   // Compare with local arrays to ensure real-time accuracy and fix 0.0 rating issue
   const localTotal = incomingReviews.length + selfCreatedReviews.length;
-  // STRICT FORMULA: Trust the local count of actual review objects
-  const totalReviews = localTotal;
+  // Use doctorStats.totalReviews as primary (loaded via real-time listener), fallback to local count
+  const totalReviews = (doctorStats?.totalReviews && doctorStats.totalReviews > 0)
+    ? doctorStats.totalReviews
+    : localTotal;
 
   // Calculate average rating with fallback to local calculation if Firestore stats are zero
   const localAllReviews = [...incomingReviews, ...selfCreatedReviews];
@@ -1163,22 +1165,27 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
               </div>
             </div>
 
-            <div className="flex gap-3 flex-wrap">
-              <Button
-                onClick={() => onMenuChange?.('braindeck')}
-                className="bg-orange-500 hover:bg-orange-600 text-white font-semibold transition-all shadow-lg hover:shadow-orange-500/25"
-              >
-                <BrainCircuit className="w-4 h-4 mr-2" />
-                healQR BrainDeck
-              </Button>
-              <Button className="bg-emerald-500 hover:bg-emerald-600 text-white">
-                <Lock className="w-4 h-4 mr-2" />
+
+            {/* Full-width Encrypted Badge */}
+            <div className="w-full mb-3">
+              <div className="w-full flex items-center justify-center rounded-xl bg-orange-500 text-white font-bold py-3 text-base shadow shadow-orange-200">
+                <Lock className="w-5 h-5 mr-2" />
                 Data is encrypted
-              </Button>
+              </div>
+            </div>
+
+            {/* Full-width BrainDeck Button */}
+            <div className="w-full mb-3">
+              <button
+                onClick={() => onMenuChange?.('braindeck')}
+                className="w-full flex items-center justify-center rounded-xl bg-white text-blue-600 font-bold py-3 text-base border border-blue-200 shadow"
+                style={{ letterSpacing: '0.02em' }}
+              >
+                <BrainCircuit className="w-5 h-5 mr-2" />
+                healQR BrainDeck
+              </button>
             </div>
           </div>
-
-
 
           {/* Single Column Layout */}
           <div className="max-w-4xl mx-auto space-y-6 md:space-y-8">

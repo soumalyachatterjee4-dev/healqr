@@ -35,23 +35,25 @@ interface LandingPageProps {
   onAdvertiserSignUp?: () => void;
   onAdvertiserLogin?: () => void;
   onAdvertiserGateway?: () => void;
+  onPharmaLogin?: () => void;
 }
 
-export default function LandingPage({ 
-  onGetStarted, 
-  onLogin, 
-  onVideoLibrary, 
-  onPrivacyPolicy, 
-  onTermsOfService, 
-  onRefundPolicy, 
-  onAdminLogin, 
-  onTestTemplateUploader, 
-  isDemoMode, 
-  onBackToAdmin, 
+export default function LandingPage({
+  onGetStarted,
+  onLogin,
+  onVideoLibrary,
+  onPrivacyPolicy,
+  onTermsOfService,
+  onRefundPolicy,
+  onAdminLogin,
+  onTestTemplateUploader,
+  isDemoMode,
+  onBackToAdmin,
   uploadedTestimonials = [],
   onAdvertiserSignUp,
   onAdvertiserLogin,
-  onAdvertiserGateway
+  onAdvertiserGateway,
+  onPharmaLogin
 }: LandingPageProps) {
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [showAdvertiserModal, setShowAdvertiserModal] = useState(false);
@@ -59,7 +61,7 @@ export default function LandingPage({
   const [showClinicOptions, setShowClinicOptions] = useState(false);
   const [showAdvertiserOptions, setShowAdvertiserOptions] = useState(false);
   const [showPatientOptions, setShowPatientOptions] = useState(false);
-  
+
   // Real-time stats
   const [stats, setStats] = useState({
     doctorsCount: 0,
@@ -67,7 +69,7 @@ export default function LandingPage({
     monthlyBookings: 0,
     averageRating: 0
   });
-  
+
   // Default testimonials if none uploaded
   const defaultTestimonials: DoctorTestimonial[] = [
     {
@@ -100,8 +102,8 @@ export default function LandingPage({
   ];
 
   // Use uploaded testimonials if available (max 3), otherwise use defaults
-  const displayTestimonials = uploadedTestimonials.length > 0 
-    ? uploadedTestimonials.slice(0, 3) 
+  const displayTestimonials = uploadedTestimonials.length > 0
+    ? uploadedTestimonials.slice(0, 3)
     : defaultTestimonials;
 
   // Fetch real-time stats
@@ -145,7 +147,7 @@ export default function LandingPage({
           monthlyBookings,
           averageRating: parseFloat(averageRating)
         });
-        
+
         console.log('✅ Landing page stats loaded:', { doctorsCount, clinicsCount, monthlyBookings, averageRating });
       } catch (error) {
         console.error('❌ Error fetching landing page stats:', error);
@@ -179,7 +181,7 @@ export default function LandingPage({
           {/* Right Side Actions */}
           <div className="flex items-center gap-4">
             {/* Video Library Icon */}
-            <button 
+            <button
               onClick={onVideoLibrary}
               className="w-10 h-10 bg-gray-800 rounded-md flex items-center justify-center hover:bg-gray-700 transition-colors"
               title="Video Library"
@@ -195,9 +197,9 @@ export default function LandingPage({
         <div className="max-w-6xl mx-auto">
           {/* Hero Image */}
           <div className="flex justify-center mb-12">
-            <img 
-              src={doctorsHeroImage} 
-              alt="Healthcare Professionals Team" 
+            <img
+              src={doctorsHeroImage}
+              alt="Healthcare Professionals Team"
               className="w-full max-w-2xl h-auto object-contain"
             />
           </div>
@@ -222,7 +224,7 @@ export default function LandingPage({
 
             {/* 3-Way Entry Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto mb-16">
-              
+
               {/* 1. Doctors */}
               <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 hover:border-emerald-500/50 transition-all group">
                 <div className="h-12 w-12 bg-emerald-500/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-emerald-500/20 transition-colors">
@@ -231,7 +233,7 @@ export default function LandingPage({
                 <h3 className="text-xl font-semibold text-white mb-2">For Doctors</h3>
                 <p className="text-gray-400 text-sm mb-6">Your practice with instant QR booking</p>
                 <div className="flex flex-col gap-2">
-                  <Button 
+                  <Button
                     onClick={() => setShowDoctorOptions(true)}
                     className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
                   >
@@ -248,7 +250,7 @@ export default function LandingPage({
                 <h3 className="text-xl font-semibold text-white mb-2">For Clinics</h3>
                 <p className="text-gray-400 text-sm mb-6">Manage Multiple Doctors under One QR</p>
                 <div className="flex flex-col gap-2">
-                  <Button 
+                  <Button
                     onClick={() => setShowClinicOptions(true)}
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                   >
@@ -265,7 +267,7 @@ export default function LandingPage({
                 <h3 className="text-xl font-semibold text-white mb-2">For Patients</h3>
                 <p className="text-gray-400 text-sm mb-6">Find doctors or access your medical locker.</p>
                 <div className="flex flex-col gap-2">
-                  <Button 
+                  <Button
                     onClick={() => setShowPatientOptions(true)}
                     className="w-full bg-orange-600 hover:bg-orange-700 text-white"
                   >
@@ -571,11 +573,11 @@ export default function LandingPage({
                 {/* Stars */}
                 <div className="flex gap-1 mb-6">
                   {[...Array(5)].map((_, i) => (
-                    <Star 
+                    <Star
                       key={i}
                       className={`w-4 h-4 ${
-                        i < testimonial.rating 
-                          ? 'text-emerald-500 fill-emerald-500' 
+                        i < testimonial.rating
+                          ? 'text-emerald-500 fill-emerald-500'
                           : 'text-gray-600'
                       }`}
                     />
@@ -624,25 +626,25 @@ export default function LandingPage({
 
               {/* Social Icons */}
               <div className="flex gap-4">
-                <a 
-                  href="https://twitter.com/healqr" 
-                  target="_blank" 
+                <a
+                  href="https://twitter.com/healqr"
+                  target="_blank"
                   rel="noopener noreferrer"
                   className="text-gray-400 hover:text-emerald-500 transition-colors"
                 >
                   <Twitter className="w-5 h-5" />
                 </a>
-                <a 
-                  href="https://linkedin.com/company/healqr" 
-                  target="_blank" 
+                <a
+                  href="https://linkedin.com/company/healqr"
+                  target="_blank"
                   rel="noopener noreferrer"
                   className="text-gray-400 hover:text-emerald-500 transition-colors"
                 >
                   <Linkedin className="w-5 h-5" />
                 </a>
-                <a 
-                  href="https://facebook.com/healqr" 
-                  target="_blank" 
+                <a
+                  href="https://facebook.com/healqr"
+                  target="_blank"
                   rel="noopener noreferrer"
                   className="text-gray-400 hover:text-emerald-500 transition-colors"
                 >
@@ -656,7 +658,7 @@ export default function LandingPage({
               <h3 className="mb-4">For Doctors</h3>
               <ul className="space-y-3">
                 <li>
-                  <button 
+                  <button
                     onClick={onGetStarted}
                     className="text-gray-400 hover:text-emerald-500 transition-colors text-sm text-left"
                   >
@@ -664,7 +666,7 @@ export default function LandingPage({
                   </button>
                 </li>
                 <li>
-                  <button 
+                  <button
                     onClick={onLogin}
                     className="text-gray-400 hover:text-emerald-500 transition-colors text-sm text-left"
                   >
@@ -672,8 +674,8 @@ export default function LandingPage({
                   </button>
                 </li>
                 <li>
-                  <a 
-                    href="#pricing" 
+                  <a
+                    href="#pricing"
                     className="text-gray-400 hover:text-emerald-500 transition-colors text-sm"
                     onClick={(e) => {
                       e.preventDefault();
@@ -710,6 +712,14 @@ export default function LandingPage({
                     className="text-gray-400 hover:text-emerald-500 transition-colors text-sm text-left"
                   >
                     Advertiser Gateway
+                  </button>
+                </li>
+                <li>
+                  <button
+                    onClick={onPharmaLogin}
+                    className="text-gray-400 hover:text-emerald-500 transition-colors text-sm text-left"
+                  >
+                    healQR Distributors
                   </button>
                 </li>
                 <li>
@@ -806,7 +816,7 @@ export default function LandingPage({
             >
               ✕
             </button>
-            
+
             <div className="text-center mb-6">
               <div className="h-16 w-16 bg-emerald-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <User className="w-8 h-8 text-emerald-500" />
@@ -816,7 +826,7 @@ export default function LandingPage({
             </div>
 
             <div className="flex flex-col gap-3">
-              <Button 
+              <Button
                 onClick={() => {
                   setShowDoctorOptions(false);
                   onGetStarted();
@@ -825,7 +835,7 @@ export default function LandingPage({
               >
                 Sign Up
               </Button>
-              <Button 
+              <Button
                 onClick={() => {
                   setShowDoctorOptions(false);
                   onLogin?.();
@@ -850,7 +860,7 @@ export default function LandingPage({
             >
               ✕
             </button>
-            
+
             <div className="text-center mb-6">
               <div className="h-16 w-16 bg-blue-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <Building2 className="w-8 h-8 text-blue-500" />
@@ -860,7 +870,7 @@ export default function LandingPage({
             </div>
 
             <div className="flex flex-col gap-3">
-              <Button 
+              <Button
                 onClick={() => {
                   setShowClinicOptions(false);
                   window.location.href = '/?page=clinic-signup';
@@ -869,7 +879,7 @@ export default function LandingPage({
               >
                 Sign Up
               </Button>
-              <Button 
+              <Button
                 onClick={() => {
                   setShowClinicOptions(false);
                   window.location.href = '/?page=clinic-login';
@@ -894,7 +904,7 @@ export default function LandingPage({
             >
               ✕
             </button>
-            
+
             <div className="text-center mb-6">
               <div className="h-16 w-16 bg-purple-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <MonitorPlay className="w-8 h-8 text-purple-500" />
@@ -904,7 +914,7 @@ export default function LandingPage({
             </div>
 
             <div className="flex flex-col gap-3">
-              <Button 
+              <Button
                 onClick={() => {
                   setShowAdvertiserOptions(false);
                   onAdvertiserSignUp?.();
@@ -913,7 +923,7 @@ export default function LandingPage({
               >
                 Sign Up
               </Button>
-              <Button 
+              <Button
                 onClick={() => {
                   setShowAdvertiserOptions(false);
                   onAdvertiserLogin?.();
@@ -938,7 +948,7 @@ export default function LandingPage({
             >
               ✕
             </button>
-            
+
             <div className="text-center mb-6">
               <div className="h-16 w-16 bg-orange-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <Users className="w-8 h-8 text-orange-500" />
@@ -953,7 +963,7 @@ export default function LandingPage({
             </div>
 
             <div className="flex flex-col gap-3">
-              <Button 
+              <Button
                 onClick={() => {
                   setShowPatientOptions(false);
                   window.location.href = '/?page=patient-search';
@@ -962,7 +972,7 @@ export default function LandingPage({
               >
                 Find Doctor & Visit History
               </Button>
-              <Button 
+              <Button
                 onClick={() => {
                   setShowPatientOptions(false);
                   window.location.href = '/?page=patient-login';

@@ -507,13 +507,13 @@ export default function AssistantAccessManager({
               </div>
 
               {/* Page Access Control */}
-              <div className="bg-zinc-900 rounded-lg border border-zinc-800 p-6 space-y-6">
-                <div className="flex items-center justify-between">
+              <div className="bg-zinc-900 rounded-lg border border-zinc-800 p-4 sm:p-6 space-y-4 sm:space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div>
                     <h2 className="text-lg font-semibold">Page Access Control</h2>
                     <p className="text-sm text-gray-400 mt-1">Dashboard is always accessible</p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 shrink-0">
                     <Button
                       variant="outline"
                       size="sm"
@@ -585,7 +585,7 @@ export default function AssistantAccessManager({
                   {activeAssistants.map((assistant) => (
                     <div
                       key={assistant.id}
-                      className="bg-zinc-800 rounded-lg border border-zinc-700 p-4 space-y-3"
+                      className="bg-zinc-800 rounded-lg border border-zinc-700 p-4 space-y-3 overflow-hidden"
                     >
                       <div className="flex items-start justify-between">
                         <div>
@@ -618,7 +618,7 @@ export default function AssistantAccessManager({
                           <div className="space-y-1">
                             <span className="text-xs text-gray-500">Link:</span>
                             <div className="flex items-center gap-2">
-                              <code className="flex-1 text-xs bg-zinc-800 px-2 py-2 rounded text-blue-400 break-all">
+                              <code className="flex-1 text-xs bg-zinc-800 px-2 py-2 rounded text-blue-400 break-all overflow-hidden min-w-0">
                                 {window.location.origin}/assistant/{assistant.accessToken}
                               </code>
                               <button
@@ -668,27 +668,28 @@ export default function AssistantAccessManager({
                         </div>
                       )}
 
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <Button
                           onClick={() => openEditModal(assistant)}
-                          className="flex-1 bg-blue-600 hover:bg-blue-700"
+                          className="flex-1 min-w-[120px] bg-blue-600 hover:bg-blue-700"
                           size="sm"
                         >
-                          <Edit className="w-4 h-4 mr-2" />
+                          <Edit className="w-4 h-4 mr-1" />
                           Edit Pages
                         </Button>
                         <Button
                           onClick={() => deactivateAssistant(assistant.id)}
-                          className="bg-orange-600 hover:bg-orange-700"
+                          className="flex-1 min-w-[120px] bg-orange-600 hover:bg-orange-700"
                           size="sm"
                         >
-                          <XCircle className="w-4 h-4 mr-2" />
+                          <XCircle className="w-4 h-4 mr-1" />
                           Deactivate
                         </Button>
                         <Button
                           onClick={() => deleteAssistant(assistant.id, assistant.assistantName)}
                           variant="destructive"
                           size="sm"
+                          className="shrink-0"
                         >
                           <Trash className="w-4 h-4" />
                         </Button>

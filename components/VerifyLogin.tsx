@@ -86,6 +86,25 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
             localStorage.setItem('healqr_is_clinic', 'true');
           }
 
+          // Pre-fetch doctor/clinic name for instant dashboard display
+          try {
+            if (assistantData.isClinic) {
+              const clinicRef = doc(db, 'clinics', assistantData.doctorId);
+              const clinicSnap = await getDoc(clinicRef);
+              if (clinicSnap.exists() && clinicSnap.data().name) {
+                localStorage.setItem('healqr_user_name', clinicSnap.data().name);
+              }
+            } else {
+              const drRef = doc(db, 'doctors', assistantData.doctorId);
+              const drSnap = await getDoc(drRef);
+              if (drSnap.exists() && drSnap.data().name) {
+                localStorage.setItem('healqr_user_name', drSnap.data().name);
+              }
+            }
+          } catch (prefetchErr) {
+            console.warn('Could not pre-fetch profile name:', prefetchErr);
+          }
+
           console.log('✅ Assistant login detected:', email, assistantData.isClinic ? '(clinic)' : '(doctor)');
         } else {
           // Check if this is a clinic user (UID-based)
@@ -94,17 +113,45 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
 
           if (clinicDoc.exists()) {
             // This is a clinic - store minimal data
+            const clinicData = clinicDoc.data();
             localStorage.setItem('userId', user.uid);
             localStorage.setItem('healqr_user_email', email);
             localStorage.setItem('healqr_authenticated', 'true');
             localStorage.setItem('healqr_is_clinic', 'true');
+            if (clinicData.name) {
+              localStorage.setItem('healqr_user_name', clinicData.name);
+            }
 
             console.log('✅ Clinic login detected:', user.uid);
           } else {
-            // Regular doctor - store just the UID, App.tsx will load full profile
+            // Regular doctor - load name + profile from Firestore for instant dashboard display
             localStorage.setItem('userId', user.uid);
             localStorage.setItem('healqr_user_email', email);
             localStorage.setItem('healqr_authenticated', 'true');
+
+            // Pre-fetch doctor profile so dashboard shows name immediately
+            try {
+              const doctorDocRef = doc(db, 'doctors', user.uid);
+              const doctorDoc = await getDoc(doctorDocRef);
+              if (doctorDoc.exists()) {
+                const doctorData = doctorDoc.data();
+                if (doctorData.name) {
+                  localStorage.setItem('healqr_user_name', doctorData.name);
+                }
+                if (doctorData.profileImage) {
+                  localStorage.setItem('healqr_profile_photo', doctorData.profileImage);
+                }
+                // Pre-cache doctor stats for instant review display
+                if (doctorData.stats) {
+                  localStorage.setItem('healqr_doctor_stats', JSON.stringify({
+                    averageRating: doctorData.stats.averageRating || 0,
+                    totalReviews: doctorData.stats.totalReviews || 0
+                  }));
+                }
+              }
+            } catch (prefetchErr) {
+              console.warn('Could not pre-fetch doctor profile:', prefetchErr);
+            }
 
             console.log('✅ Doctor login detected:', user.uid);
           }

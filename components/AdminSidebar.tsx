@@ -1,10 +1,10 @@
-import { 
+import {
   LayoutDashboard,
-  User, 
-  DollarSign, 
-  Users, 
-  Briefcase, 
-  FileText, 
+  User,
+  DollarSign,
+  Users,
+  Briefcase,
+  FileText,
   Video,
   LogOut,
   X,
@@ -14,7 +14,11 @@ import {
   Percent,
   Megaphone,
   Heart,
-  Database
+  Database,
+  Building2,
+  MapPinned,
+  BarChart2,
+  LayoutGrid
 } from 'lucide-react';
 import { useState } from 'react';
 import healqrLogo from '../assets/healqr-logo.png';
@@ -27,15 +31,16 @@ interface AdminSidebarProps {
   onClose?: () => void;
 }
 
-export default function AdminSidebar({ 
-  currentPage, 
-  onNavigate, 
+export default function AdminSidebar({
+  currentPage,
+  onNavigate,
   onLogout,
   isOpen = true,
   onClose
 }: AdminSidebarProps) {
   const [isManagementOpen, setIsManagementOpen] = useState(true);
   const [isContentOpen, setIsContentOpen] = useState(true);
+  const [isPartnersOpen, setIsPartnersOpen] = useState(false);
 
   const managementTools = [
     { id: 'profile', label: 'Profile Manager', icon: User },
@@ -53,6 +58,12 @@ export default function AdminSidebar({
     { id: 'data-cleanup', label: 'Data Standardization', icon: Database },
   ];
 
+  const partnerTools = [
+    { id: 'pharma-management', label: 'Pharma Companies', icon: Building2 },
+    { id: 'advertiser-management', label: 'Advertisers', icon: BarChart2 },
+    { id: 'page-distribution', label: 'Page Distribution', icon: LayoutGrid },
+  ];
+
   const handleMenuClick = (menuId: string) => {
     onNavigate(menuId);
     if (onClose) {
@@ -64,7 +75,7 @@ export default function AdminSidebar({
     <>
       {/* Mobile Overlay */}
       {isOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={onClose}
         />
@@ -95,8 +106,8 @@ export default function AdminSidebar({
           <button
             onClick={() => handleMenuClick('dashboard')}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg mb-3 transition-colors ${
-              currentPage === 'dashboard' 
-                ? 'bg-emerald-500 text-white' 
+              currentPage === 'dashboard'
+                ? 'bg-emerald-500 text-white'
                 : 'text-gray-400 hover:bg-zinc-900 hover:text-white'
             }`}
           >
@@ -129,8 +140,8 @@ export default function AdminSidebar({
                     key={item.id}
                     onClick={() => handleMenuClick(item.id)}
                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-                      currentPage === item.id 
-                        ? 'bg-emerald-500 text-white' 
+                      currentPage === item.id
+                        ? 'bg-emerald-500 text-white'
                         : 'text-gray-400 hover:bg-zinc-900 hover:text-white'
                     }`}
                   >
@@ -164,8 +175,43 @@ export default function AdminSidebar({
                     key={item.id}
                     onClick={() => handleMenuClick(item.id)}
                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-                      currentPage === item.id 
-                        ? 'bg-emerald-500 text-white' 
+                      currentPage === item.id
+                        ? 'bg-emerald-500 text-white'
+                        : 'text-gray-400 hover:bg-zinc-900 hover:text-white'
+                    }`}
+                  >
+                    <item.icon className="w-4 h-4" />
+                    <span className="text-sm">{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* PARTNERS & DISTRIBUTION */}
+          <div className="mb-3">
+            <button
+              onClick={() => setIsPartnersOpen(!isPartnersOpen)}
+              className="w-full flex items-center gap-2 px-3 py-2 text-gray-500 hover:text-gray-300 transition-colors"
+            >
+              <span className="text-xs uppercase tracking-wider flex-1 text-left">
+                Partners & Distribution
+              </span>
+              {isPartnersOpen ? (
+                <ChevronDown className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronRight className="w-3.5 h-3.5" />
+              )}
+            </button>
+            {isPartnersOpen && (
+              <div className="mt-1 space-y-0.5">
+                {partnerTools.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => handleMenuClick(item.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+                      currentPage === item.id
+                        ? 'bg-emerald-500 text-white'
                         : 'text-gray-400 hover:bg-zinc-900 hover:text-white'
                     }`}
                   >
@@ -180,7 +226,7 @@ export default function AdminSidebar({
 
         {/* Logout */}
         <div className="p-4 border-t border-zinc-900 flex-shrink-0">
-          <button 
+          <button
             onClick={() => {
               onLogout();
               if (onClose) onClose();
