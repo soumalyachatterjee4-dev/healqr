@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { db } from '../lib/firebase/config';
+import { storage } from '../lib/firebase/config';
 import {
   doc,
   getDoc,
@@ -10,10 +11,11 @@ import {
   arrayUnion,
   arrayRemove
 } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { toast } from 'sonner';
 import { getAllStates } from '../utils/pincodeMapping';
 import { Button } from './ui/button';
-import { Globe, Plus, Trash2, Loader2 } from 'lucide-react';
+import { Globe, Plus, Trash2, Loader2, Upload, X } from 'lucide-react';
 
 const ALL_SPECIALTIES = [
   "Clinic",
@@ -62,6 +64,7 @@ export default function PharmaProfileManager({ companyId }: PharmaProfileManager
   const [contactPerson, setContactPerson] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [savingContact, setSavingContact] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   // territory change state
   const [territoryAdd, setTerritoryAdd] = useState<string[]>([]);
@@ -110,6 +113,62 @@ export default function PharmaProfileManager({ companyId }: PharmaProfileManager
       toast.error('Failed to save contact info');
     } finally {
       setSavingContact(false);
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !db || !storage || !companyId) return;
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size should be less than 5MB');
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      const imageRef = ref(storage, `pharmaCompanies/${companyId}/logo`);
+      const snapshot = await uploadBytes(imageRef, file);
+      const downloadURL = await getDownloadURL(snapshot.ref);
+      
+      await updateDoc(doc(db, 'pharmaCompanies', companyId), {
+        logoUrl: downloadURL,
+        updatedAt: serverTimestamp(),
+      });
+      
+      // Update profile with new image
+      setProfile((prev: any) => ({ ...prev, logoUrl: downloadURL }));
+      toast.success('Company logo updated');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to upload image');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleRemoveImage = async () => {
+    if (!db || !companyId) return;
+    setUploadingImage(true);
+    try {
+      await updateDoc(doc(db, 'pharmaCompanies', companyId), {
+        logoUrl: null,
+        updatedAt: serverTimestamp(),
+      });
+      setProfile((prev: any) => ({ ...prev, logoUrl: null }));
+      toast.success('Logo removed');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to remove logo');
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -169,6 +228,53 @@ export default function PharmaProfileManager({ companyId }: PharmaProfileManager
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <h2 className="text-2xl font-bold">Company Profile</h2>
+
+      {/* Company Logo Section */}
+      <div className="bg-zinc-900 rounded-xl p-6">
+        <h3 className="font-semibold mb-4">Company Logo</h3>
+        <div className="flex items-center gap-6">
+          {/* Logo Preview */}
+          <div className="w-32 h-32 bg-zinc-800 rounded-lg border border-zinc-700 flex items-center justify-center overflow-hidden">
+            {profile?.logoUrl ? (
+              <img
+                src={profile.logoUrl}
+                alt="Company Logo"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-gray-500 text-sm text-center px-4">No logo uploaded</span>
+            )}
+          </div>
+          
+          {/* Upload Controls */}
+          <div className="flex-1 space-y-3">
+            <label className="block">
+              <div className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-fit">
+                <Upload className="w-4 h-4" />
+                <span>{uploadingImage ? 'Uploading...' : 'Upload Logo'}</span>
+              </div>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                disabled={uploadingImage}
+                className="hidden"
+              />
+            </label>
+            {profile?.logoUrl && (
+              <button
+                onClick={handleRemoveImage}
+                disabled={uploadingImage}
+                className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-fit"
+              >
+                <X className="w-4 h-4" />
+                <span>Remove Logo</span>
+              </button>
+            )}
+            <p className="text-xs text-gray-400">JPG, PNG (Max 5MB)</p>
+          </div>
+        </div>
+      </div>
 
       {/* Locked information section */}
       <div className="bg-zinc-900 rounded-xl p-6 space-y-4">
