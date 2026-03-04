@@ -74,7 +74,12 @@ export default function WalkInPatientsPage({ patients, onBack, onMenuChange }: W
         const { db } = await import('../lib/firebase/config');
         const { doc, getDoc } = await import('firebase/firestore');
 
-        const doctorDoc = await getDoc(doc(db!, 'doctors', userId));
+        if (!db) {
+          console.error('Firestore not initialized');
+          return;
+        }
+
+        const doctorDoc = await getDoc(doc(db, 'doctors', userId));
         if (!doctorDoc.exists()) return;
         const d = doctorDoc.data();
 
@@ -141,8 +146,7 @@ export default function WalkInPatientsPage({ patients, onBack, onMenuChange }: W
           name: d.name || 'Doctor',
           degree: d.degree || d.degrees?.[0] || '',
           degrees: d.degrees || (d.degree ? [d.degree] : []),
-          specialty: d.specialty || d.specialities?.[0] || '',
-          specialities: d.specialities || (d.specialty ? [d.specialty] : []),
+          specialties: d.specialties || d.specialities || (d.specialty ? [d.specialty] : []),
           qrNumber: d.qrNumber || '',
           clinicName: clinicInfo?.name || d.clinicName || '',
           doctorId: userId,
@@ -286,7 +290,12 @@ export default function WalkInPatientsPage({ patients, onBack, onMenuChange }: W
         const { db, auth } = await import('../lib/firebase/config');
         const { doc, updateDoc, addDoc, collection, serverTimestamp } = await import('firebase/firestore');
 
-        const doctorId = auth.currentUser?.uid || '';
+        if (!db || !auth || !auth.currentUser) {
+          toast.error('Authentication failed. Please try again.');
+          return;
+        }
+
+        const doctorId = auth.currentUser.uid;
         const doctorName = localStorage.getItem('doctorName') || 'Doctor';
 
         // Update booking with follow-up info
@@ -323,10 +332,10 @@ export default function WalkInPatientsPage({ patients, onBack, onMenuChange }: W
             patientPhone: selectedPatient.whatsappNumber,
             patientName: selectedPatient.patientName,
             age: selectedPatient.age,
-            sex: selectedPatient.sex,
-            purpose: selectedPatient.purpose,
-            chamber: selectedChamber,
-            clinicName: chamberName,
+            sex: selectedPatient.gender, // Fixed from sex
+            purpose: selectedPatient.purposeOfVisit, // Fixed from purpose
+            chamber: fullDoctorInfo?.clinicName || 'Chamber', // Fixed undefined
+            clinicName: fullDoctorInfo?.clinicName || 'Chamber', // Fixed undefined
             doctorId: doctorId,
             doctorName: doctorName,
             followUpDate: followUpDate.toISOString(),

@@ -20,8 +20,8 @@ export interface SessionConfig {
 class SessionPersistence {
   private config: SessionConfig;
   private sessionData: SessionData | null = null;
-  private warningTimer: NodeJS.Timeout | null = null;
-  private expiryTimer: NodeJS.Timeout | null = null;
+  private warningTimer: any = null;
+  private expiryTimer: any = null;
 
   constructor(config: Partial<SessionConfig> = {}) {
     this.config = {
@@ -67,7 +67,7 @@ class SessionPersistence {
   // Create or update session
   public createSession(data: Partial<SessionData>): void {
     const now = Date.now();
-    
+
     this.sessionData = {
       userId: data.userId || '',
       userEmail: data.userEmail || '',
@@ -142,7 +142,7 @@ class SessionPersistence {
     console.log('🗑️ Session cleared');
     this.sessionData = null;
     this.stopSessionMonitoring();
-    
+
     try {
       localStorage.removeItem(this.config.storageKey);
     } catch (error) {
@@ -159,7 +159,7 @@ class SessionPersistence {
     try {
       // Update last seen timestamp
       this.sessionData.lastSeen = Date.now();
-      
+
       localStorage.setItem(
         this.config.storageKey,
         JSON.stringify(this.sessionData)
@@ -176,7 +176,7 @@ class SessionPersistence {
       const stored = localStorage.getItem(this.config.storageKey);
       if (stored) {
         const data = JSON.parse(stored) as SessionData;
-        
+
         // Check if session is still valid
         const sessionAge = Date.now() - data.loginTime;
         if (sessionAge < this.config.sessionTimeout) {
@@ -193,10 +193,10 @@ class SessionPersistence {
   }
 
   // Handle page unload
-  private handleBeforeUnload(event: BeforeUnloadEvent): void {
+  private handleBeforeUnload(_event: BeforeUnloadEvent): void {
     console.log('💾 Saving session before page unload');
     this.saveSession();
-    
+
     // Don't show confirmation dialog for session save
     // Only show if there are unsaved changes in forms, etc.
   }
@@ -209,7 +209,7 @@ class SessionPersistence {
     } else {
       console.log('👁️ Page visible - checking session validity');
       this.loadSession();
-      
+
       // Update last seen when page becomes visible
       if (this.sessionData) {
         this.sessionData.lastSeen = Date.now();

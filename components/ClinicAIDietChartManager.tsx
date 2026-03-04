@@ -1,26 +1,21 @@
 import { useState, useEffect } from "react";
 import {
   Apple,
-  Plus,
-  History,
   Sparkles,
+  History,
   CheckCircle2,
   Loader2,
   AlertCircle,
   FileText,
   User,
   Activity,
-  Weight,
-  Scale,
   Calendar,
   ChevronRight,
-  CreditCard,
   Menu,
   Search,
   X,
   Pencil,
   Trash2,
-  PlusCircle,
   Save,
   Send,
   QrCode as QrIcon,
@@ -31,16 +26,12 @@ import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { toast } from "sonner";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db, auth, app } from "../lib/firebase/config";
+import { db } from "../lib/firebase/config";
 import {
   doc,
-  getDoc,
   updateDoc,
   serverTimestamp,
-  setDoc,
-  onSnapshot,
 } from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
 import ClinicSidebar from "./ClinicSidebar";
 
 interface ClinicAIDietChartManagerProps {
@@ -59,6 +50,7 @@ interface ClinicAIDietChartManagerProps {
     degrees?: string[];
     specialty: string;
     specialities?: string[];
+    specialties?: string[];
     qrNumber?: string;
     clinicName?: string;
     doctorId: string;
@@ -104,8 +96,6 @@ export default function ClinicAIDietChartManager({
   onComplete,
   doctorInfo,
 }: ClinicAIDietChartManagerProps) {
-  const [usageCount, setUsageCount] = useState(0);
-  const maxFreeUsage = 10;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"create" | "history">("create");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -151,22 +141,7 @@ export default function ClinicAIDietChartManager({
     },
   );
 
-  // Derive usageCount from historyItems (current month only)
-  useEffect(() => {
-    const now = new Date();
-    const currentMonth = now.getMonth() + 1; // 1-12
-    const currentYear = now.getFullYear();
 
-    const monthlyItems = historyItems.filter((item) => {
-      if (!item.date) return false;
-      const parts = item.date.split("/");
-      if (parts.length !== 3) return false;
-      const [, month, year] = parts.map(Number);
-      return month === currentMonth && year === currentYear;
-    });
-
-    setUsageCount(monthlyItems.length);
-  }, [historyItems]);
 
   // Save history to localStorage
   useEffect(() => {
@@ -347,7 +322,7 @@ export default function ClinicAIDietChartManager({
 
     setHistoryItems((prev) => [newChart, ...prev]);
     setIsGenerating(false);
-    setUsageCount((prev) => prev + 1);
+    // setUsageCount removed as it's unused in UI
     toast.success("AI Diet Chart generated successfully!");
     setSelectedChart(newChart); // Auto-open modal after generation
   };
@@ -432,6 +407,7 @@ export default function ClinicAIDietChartManager({
       doc.setTextColor(37, 99, 235); // blue-600
       doc.text(
         (
+          doctorInfo?.specialties?.join(" • ") ||
           doctorInfo?.specialities?.join(" • ") ||
           doctorInfo?.specialty ||
           "General Physician"
@@ -567,7 +543,7 @@ export default function ClinicAIDietChartManager({
         const colWidth = (pageWidth - 50) / 2;
         day.meals.forEach((meal, mIdx) => {
           const xPos = mIdx % 2 === 0 ? 25 : 25 + colWidth + 5;
-          const initialMealY = currentY;
+          // initialMealY removed as it was unused
 
           doc.setFont("helvetica", "bold");
           doc.setFontSize(9);
@@ -680,11 +656,11 @@ export default function ClinicAIDietChartManager({
   };
 
   const handleAddItem = (day: number, mealType: string) => {
-    setTempPlan((prev) => {
+    setTempPlan((prev: any[]) => {
       const newPlan = [...(prev || [])];
       const dayPlan = newPlan.find((d) => d.day === day);
       if (dayPlan) {
-        const meal = dayPlan.meals.find((m) => m.type === mealType);
+        const meal = dayPlan.meals.find((m: any) => m.type === mealType);
         if (meal) {
           meal.items.push({ name: "New Item", weight: "0 GM", kcal: "0 KCAL" });
         }
@@ -694,11 +670,11 @@ export default function ClinicAIDietChartManager({
   };
 
   const handleDeleteItem = (day: number, mealType: string, itemIdx: number) => {
-    setTempPlan((prev) => {
+    setTempPlan((prev: any[]) => {
       const newPlan = [...(prev || [])];
       const dayPlan = newPlan.find((d) => d.day === day);
       if (dayPlan) {
-        const meal = dayPlan.meals.find((m) => m.type === mealType);
+        const meal = dayPlan.meals.find((m: any) => m.type === mealType);
         if (meal) {
           meal.items.splice(itemIdx, 1);
         }
@@ -714,7 +690,7 @@ export default function ClinicAIDietChartManager({
     field: string,
     value: string,
   ) => {
-    setTempPlan((prev) => {
+    setTempPlan((prev: any[]) => {
       const newPlan = JSON.parse(JSON.stringify(prev || []));
       const dayPlan = newPlan.find((d: any) => d.day === day);
       if (dayPlan) {
@@ -747,9 +723,6 @@ export default function ClinicAIDietChartManager({
         onLogout={onLogout}
         isOpen={mobileMenuOpen}
         onClose={() => setMobileMenuOpen(false)}
-        activeAddOns={activeAddOns}
-        isCollapsed={isSidebarCollapsed}
-        onToggleCollapse={() => setIsSidebarCollapsed?.(!isSidebarCollapsed)}
       />
 
       <main
@@ -1503,7 +1476,7 @@ export default function ClinicAIDietChartManager({
                   <div className="space-y-8">
                     {(editingSection ? tempPlan : selectedChart.plan) ? (
                       (editingSection ? tempPlan : selectedChart.plan)?.map(
-                        (dayData) => (
+                        (dayData: any) => (
                           <div key={dayData.day} className="space-y-4">
                             <div className="flex items-center gap-2 border-l-4 border-emerald-500 pl-3 py-1 bg-emerald-500/5">
                               <h5 className="text-white font-bold text-base uppercase tracking-widest">
@@ -1512,7 +1485,7 @@ export default function ClinicAIDietChartManager({
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              {dayData.meals.map((meal, mIdx) => {
+                              {dayData.meals.map((meal: any, mIdx: number) => {
                                 const isEditing =
                                   editingSection?.day === dayData.day &&
                                   editingSection?.mealType === meal.type;
@@ -1603,7 +1576,7 @@ export default function ClinicAIDietChartManager({
                                     </div>
 
                                     <div className="space-y-3">
-                                      {meal.items.map((item, iIdx) => (
+                                      {meal.items.map((item: any, iIdx: number) => (
                                         <div
                                           key={iIdx}
                                           className="group relative"

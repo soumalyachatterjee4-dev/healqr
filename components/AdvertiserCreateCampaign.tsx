@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage, auth } from '../lib/firebase/config';
-import { MapPin, Stethoscope, X, ArrowRight, Users, Activity, List, LayoutGrid, MonitorPlay, Image as ImageIcon, CheckCircle2, Clock, AlertCircle, Calendar, UploadCloud, CreditCard, FileVideo, FileImage, Trash2, Play, Tag } from 'lucide-react';
+import { MapPin, Stethoscope, X, ArrowRight, Users, Activity, List, LayoutGrid, MonitorPlay, Image as ImageIcon, CheckCircle2, Clock, AlertCircle, Calendar, UploadCloud, CreditCard, FileVideo, FileImage, Trash2, Tag } from 'lucide-react';
 import SelectionModal from './SelectionModal';
 import { Badge } from './ui/badge';
 
@@ -12,16 +12,16 @@ interface AudienceStats {
 }
 
 const COMMON_SPECIALTIES = [
-  "General Physician", "Cardiologist", "Dermatologist", "Gynecologist", 
-  "Pediatrician", "Orthopedist", "Neurologist", "Psychiatrist", "Dentist", 
-  "ENT Specialist", "Ophthalmologist", "Urologist", "Gastroenterologist", 
-  "Pulmonologist", "Endocrinologist", "Rheumatologist", "Nephrologist", 
+  "General Physician", "Cardiologist", "Dermatologist", "Gynecologist",
+  "Pediatrician", "Orthopedist", "Neurologist", "Psychiatrist", "Dentist",
+  "ENT Specialist", "Ophthalmologist", "Urologist", "Gastroenterologist",
+  "Pulmonologist", "Endocrinologist", "Rheumatologist", "Nephrologist",
   "Oncologist", "Surgeon", "Physiotherapist", "Ayurveda", "Homeopathy"
 ];
 
 const SAMPLE_PINCODES = [
-  "400001", "400050", "400099", "110001", "110020", "110099", 
-  "700001", "700091", "600001", "600040", "560001", "560100", 
+  "400001", "400050", "400099", "110001", "110020", "110099",
+  "700001", "700091", "600001", "600040", "560001", "560100",
   "500001", "500081", "380001", "411001"
 ];
 
@@ -44,7 +44,7 @@ const VIEW_BUNDLES = [
 
 export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => void }) {
   const [step, setStep] = useState(1);
-  
+
   // Step 1 & 2 State
   const [pincodes, setPincodes] = useState<string[]>([]);
   const [specialities, setSpecialities] = useState<string[]>([]);
@@ -59,7 +59,7 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
   const [selectedPlacementIds, setSelectedPlacementIds] = useState<string[]>([]);
   const [selectedBundle, setSelectedBundle] = useState<number>(1000);
   const [adType, setAdType] = useState<'static' | 'video'>('static');
-  
+
   // Step 4 State
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -74,7 +74,7 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
     currentAdProgress?: number; // percentage
     details?: string;
   }>({ position: 0, estDays: 0, status: 'available' });
-  
+
   const [totalAmount, setTotalAmount] = useState(0);
 
   // Coupon State
@@ -86,18 +86,24 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
 
   const verifyCoupon = async () => {
     if (!couponCode.trim()) return;
-    
+
     setVerifyingCoupon(true);
     setCouponError('');
-    
+
     try {
+      if (!db) {
+        setCouponError('Database not initialized');
+        setVerifyingCoupon(false);
+        return;
+      }
+
       const q = query(
-        collection(db, 'discountCards'), 
+        collection(db, 'discountCards'),
         where('code', '==', couponCode.trim())
       );
-      
+
       const querySnapshot = await getDocs(q);
-      
+
       if (querySnapshot.empty) {
         setCouponError('Invalid coupon code');
         setVerifyingCoupon(false);
@@ -105,7 +111,7 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
       }
 
       const couponData = querySnapshot.docs[0].data();
-      
+
       if (!couponData.isActive) {
         setCouponError('This coupon is no longer active');
         setVerifyingCoupon(false);
@@ -125,7 +131,7 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
       setDiscountPercentage(couponData.discountPercentage);
       setIsCouponApplied(true);
       setCouponError('');
-      
+
     } catch (error) {
       console.error('Error verifying coupon:', error);
       setCouponError('Error verifying coupon');
@@ -143,13 +149,13 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [debugLog, setDebugLog] = useState<string[]>([]);
-  const addLog = (msg: string) => setDebugLog(prev => [...prev, `${new Date().toLocaleTimeString()}: ${msg}`]);
+  // addLog removed as debugLog is unused
+  const addLog = (_msg: string) => {};
 
   const handleCreateCampaign = async () => {
     // NON-BLOCKING LOGGING
     addLog("Button clicked - Handler Started");
-    
+
     // Check dependencies immediately
     addLog(`Storage available: ${!!storage}`);
     addLog(`Auth available: ${!!auth}`);
@@ -165,30 +171,30 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
         addLog("Error: No file selected");
         return;
     }
-    if (!auth.currentUser) {
+    if (!auth?.currentUser) {
         addLog("Error: No user logged in");
         return;
     }
-    
+
     setIsSubmitting(true);
     try {
       addLog("Starting upload process...");
-      const storagePath = `campaigns/${auth.currentUser.uid}/${Date.now()}_${uploadedFile.name}`;
+      const storagePath = `campaigns/${auth?.currentUser?.uid || 'anonymous'}/${Date.now()}_${uploadedFile.name}`;
       addLog(`Target Path: ${storagePath}`);
-      
+
       const fileRef = ref(storage, storagePath);
       addLog("Storage Ref created");
-      
+
       addLog("Uploading bytes...");
       await uploadBytes(fileRef, uploadedFile);
       addLog("Upload complete!");
-      
+
       addLog("Getting download URL...");
       const downloadUrl = await getDownloadURL(fileRef);
       addLog("Got download URL");
 
       const campaignData = {
-        advertiserId: auth.currentUser.uid,
+        advertiserId: auth?.currentUser?.uid || 'anonymous',
         createdAt: serverTimestamp(),
         status: 'pending',
         pincodes,
@@ -208,9 +214,10 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
       };
 
       addLog("Saving to Firestore...");
+      if (!db) throw new Error("Firestore not initialized");
       await addDoc(collection(db, 'advertiser_campaigns'), campaignData);
       addLog("Saved to DB! SUCCESS!");
-      
+
       // Only alert on success
       alert("Campaign Created Successfully!");
 
@@ -218,7 +225,7 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
       setTimeout(() => {
         onBack();
       }, 2000);
-      
+
     } catch (error: any) {
       console.error("Error creating campaign:", error);
       addLog(`EXCEPTION: ${error.message || JSON.stringify(error)}`);
@@ -227,7 +234,7 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
       // Keep isSubmitting true if successful so user can't double click while redirecting
       // Only set false on error
       // But for now, let's leave it to ensure UI updates
-      // setIsSubmitting(false); 
+      // setIsSubmitting(false);
     }
   };
 
@@ -235,26 +242,26 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
   const calculateStats = async () => {
     setLoadingStats(true);
     await new Promise(resolve => setTimeout(resolve, 300));
-    
+
     let baseDoctors = 0;
-    
+
     if (pincodes.length > 0) {
-      baseDoctors += pincodes.length * 12; 
+      baseDoctors += pincodes.length * 12;
     }
-    
+
     if (specialities.length > 0) {
       if (baseDoctors > 0) {
-        baseDoctors = Math.floor(baseDoctors * 0.4); 
+        baseDoctors = Math.floor(baseDoctors * 0.4);
       } else {
-        baseDoctors = specialities.length * 50; 
+        baseDoctors = specialities.length * 50;
       }
     }
 
     if (pincodes.length === 0 && specialities.length === 0) {
-      baseDoctors = 5000; 
+      baseDoctors = 5000;
     }
 
-    const mockReach = baseDoctors * 25; 
+    const mockReach = baseDoctors * 25;
 
     setStats({
       doctorCount: baseDoctors,
@@ -278,7 +285,7 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
       selectedPlacementIds.forEach(id => {
         const placement = AD_PLACEMENTS.find(p => p.id === id);
         const isBusy = placement?.demand === 'high' || (placement?.demand === 'medium' && Math.random() > 0.5);
-        
+
         if (isBusy) {
           busyCount++;
           const currentViews = Math.floor(Math.random() * 9000);
@@ -287,7 +294,7 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
           const reach = stats.dailyPatientReach || 100;
           const daysToFinish = Math.ceil(remainingViews / reach);
           const totalWait = daysToFinish + 3;
-          
+
           if (totalWait > maxWaitDays) maxWaitDays = totalWait;
           const pos = Math.floor(Math.random() * 5) + 1;
           if (pos > maxPosition) maxPosition = pos;
@@ -298,7 +305,7 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
       });
 
       const avgProgress = busyCount > 0 ? totalProgress / busyCount : 0;
-      
+
       if (busyCount === selectedPlacementIds.length) {
         // All busy
         setQueueInfo({
@@ -339,8 +346,8 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
 
       // Formula: (Bundle / 1000) * AvgBasePrice * (VideoMultiplier)
       const bundleMultiplier = selectedBundle / 1000;
-      const typeMultiplier = adType === 'video' ? 2 : 1; 
-      
+      const typeMultiplier = adType === 'video' ? 2 : 1;
+
       const price = avgBasePrice * bundleMultiplier * typeMultiplier;
       setTotalAmount(Math.round(price)); // Round to nearest integer
     }
@@ -458,7 +465,7 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Main Content */}
         <div className="lg:col-span-2 space-y-6">
-          
+
           {/* STEP 1: PINCODES */}
           {step === 1 && (
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 animate-in slide-in-from-left-4 duration-300">
@@ -472,7 +479,7 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
                     <p className="text-sm text-zinc-400">Choose pincodes where you want your ad to appear</p>
                   </div>
                 </div>
-                <button 
+                <button
                   onClick={() => setShowPincodeModal(true)}
                   className="text-sm text-emerald-500 hover:text-emerald-400 flex items-center gap-1"
                 >
@@ -480,7 +487,7 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
                   Browse List
                 </button>
               </div>
-              
+
               <div className="flex gap-2 mb-6">
                 <input
                   type="text"
@@ -490,7 +497,7 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
                   className="flex-1 bg-black border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none"
                   onKeyDown={(e) => e.key === 'Enter' && addPincode()}
                 />
-                <button 
+                <button
                   onClick={addPincode}
                   className="px-6 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors font-medium"
                 >
@@ -527,7 +534,7 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
                     <p className="text-sm text-zinc-400">Target specific types of doctors</p>
                   </div>
                 </div>
-                <button 
+                <button
                   onClick={() => setShowSpecialtyModal(true)}
                   className="text-sm text-blue-500 hover:text-blue-400 flex items-center gap-1"
                 >
@@ -535,7 +542,7 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
                   Browse List
                 </button>
               </div>
-              
+
               <div className="flex gap-2 mb-6">
                 <input
                   type="text"
@@ -545,7 +552,7 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
                   className="flex-1 bg-black border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none"
                   onKeyDown={(e) => e.key === 'Enter' && addSpeciality()}
                 />
-                <button 
+                <button
                   onClick={addSpeciality}
                   className="px-6 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors font-medium"
                 >
@@ -572,7 +579,7 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
           {/* STEP 3: PLACEMENT & BUNDLE */}
           {step === 3 && (
             <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-              
+
               {/* 1. Select Placement */}
               <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -580,7 +587,7 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
                     <LayoutGrid className="w-5 h-5 text-emerald-500" />
                     1. Select Ad Placement
                   </h3>
-                  <button 
+                  <button
                     onClick={toggleAllPlacements}
                     className="text-sm text-emerald-500 hover:text-emerald-400 font-medium"
                   >
@@ -589,12 +596,12 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {AD_PLACEMENTS.map(placement => (
-                    <div 
+                    <div
                       key={placement.id}
                       onClick={() => togglePlacement(placement.id)}
                       className={`relative p-4 rounded-lg border-2 cursor-pointer transition-all ${
                         selectedPlacementIds.includes(placement.id)
-                          ? 'bg-emerald-500/10 border-emerald-500' 
+                          ? 'bg-emerald-500/10 border-emerald-500'
                           : 'bg-black border-zinc-800 hover:border-zinc-700'
                       }`}
                     >
@@ -606,7 +613,7 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
                       </div>
                       <div className="flex items-center gap-2 mt-2">
                         <Badge variant="outline" className={`text-[10px] border-zinc-700 ${
-                          placement.demand === 'high' ? 'text-red-400' : 
+                          placement.demand === 'high' ? 'text-red-400' :
                           placement.demand === 'medium' ? 'text-yellow-400' : 'text-emerald-400'
                         }`}>
                           {placement.demand.toUpperCase()} DEMAND
@@ -650,8 +657,8 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
                   <label className={`flex items-center gap-4 p-4 rounded-xl border cursor-pointer transition-all ${
                     adType === 'static' ? 'bg-purple-500/10 border-purple-500' : 'bg-black border-zinc-800 hover:border-zinc-700'
                   }`}>
-                    <input 
-                      type="radio" 
+                    <input
+                      type="radio"
                       name="adType"
                       checked={adType === 'static'}
                       onChange={() => setAdType('static')}
@@ -669,8 +676,8 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
                   <label className={`flex items-center gap-4 p-4 rounded-xl border cursor-pointer transition-all ${
                     adType === 'video' ? 'bg-purple-500/10 border-purple-500' : 'bg-black border-zinc-800 hover:border-zinc-700'
                   }`}>
-                    <input 
-                      type="radio" 
+                    <input
+                      type="radio"
                       name="adType"
                       checked={adType === 'video'}
                       onChange={() => setAdType('video')}
@@ -693,19 +700,19 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
           {/* STEP 4: UPLOAD & PAY */}
           {step === 4 && (
             <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-              
+
               {/* Upload Area */}
               <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
                 <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                   <UploadCloud className="w-5 h-5 text-emerald-500" />
                   Upload Creative
                 </h3>
-                
+
                 {!uploadedFile ? (
-                  <div 
+                  <div
                     className={`border-2 border-dashed rounded-xl p-8 text-center transition-all ${
-                      isDragging 
-                        ? 'border-emerald-500 bg-emerald-500/10' 
+                      isDragging
+                        ? 'border-emerald-500 bg-emerald-500/10'
                         : 'border-zinc-700 hover:border-zinc-600 bg-black/50'
                     }`}
                     onDrop={handleDrop}
@@ -723,8 +730,8 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
                       Drag & drop your {adType} here
                     </h4>
                     <p className="text-zinc-400 text-sm mb-6">
-                      {adType === 'video' 
-                        ? 'Supports MP4, MOV (Max 15 seconds)' 
+                      {adType === 'video'
+                        ? 'Supports MP4, MOV (Max 15 seconds)'
                         : 'Supports JPG, PNG (Max 6 seconds duration)'}
                     </p>
                     <input
@@ -734,7 +741,7 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
                       accept={adType === 'video' ? "video/*" : "image/*"}
                       onChange={handleFileSelect}
                     />
-                    <button 
+                    <button
                       onClick={() => fileInputRef.current?.click()}
                       className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium transition-colors"
                     >
@@ -757,26 +764,26 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
                           <div className="text-zinc-500 text-xs">{(uploadedFile.size / 1024 / 1024).toFixed(2)} MB</div>
                         </div>
                       </div>
-                      <button 
+                      <button
                         onClick={removeFile}
                         className="p-2 hover:bg-red-500/10 text-zinc-400 hover:text-red-500 rounded-lg transition-colors"
                       >
                         <Trash2 className="w-5 h-5" />
                       </button>
                     </div>
-                    
+
                     <div className="relative aspect-video bg-black flex items-center justify-center">
                       {previewUrl && (
                         adType === 'video' ? (
-                          <video 
-                            src={previewUrl} 
-                            controls 
+                          <video
+                            src={previewUrl}
+                            controls
                             className="max-h-[400px] w-full object-contain"
                           />
                         ) : (
-                          <img 
-                            src={previewUrl} 
-                            alt="Preview" 
+                          <img
+                            src={previewUrl}
+                            alt="Preview"
                             className="max-h-[400px] w-full object-contain"
                           />
                         )
@@ -792,7 +799,7 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
                   <CreditCard className="w-5 h-5 text-blue-500" />
                   Payment Details
                 </h3>
-                
+
                 <div className="bg-black/50 border border-zinc-800 rounded-xl p-6 flex flex-col items-center justify-center text-center space-y-4">
                   <div className="w-12 h-12 bg-blue-500/10 rounded-full flex items-center justify-center">
                     <CreditCard className="w-6 h-6 text-blue-500" />
@@ -859,7 +866,7 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
                         ₹{((totalAmount - (isCouponApplied ? (totalAmount * discountPercentage) / 100 : 0)) * 0.18).toLocaleString()}
                       </span>
                     </div>
-                    
+
                     <div className="border-t border-zinc-700/50 my-2 pt-2 flex justify-between font-bold">
                       <span className="text-white">Total</span>
                       <span className="text-emerald-400">
@@ -914,20 +921,20 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
                 <>
                   {/* Queue Status */}
                   <div className={`rounded-lg p-4 border animate-in fade-in ${
-                    queueInfo.status === 'busy' 
-                      ? 'bg-orange-900/10 border-orange-500/30' 
+                    queueInfo.status === 'busy'
+                      ? 'bg-orange-900/10 border-orange-500/30'
                       : queueInfo.status === 'mixed'
                       ? 'bg-yellow-900/10 border-yellow-500/30'
                       : 'bg-emerald-900/10 border-emerald-500/30'
                   }`}>
                     <div className="flex items-center gap-3 mb-2">
                       <Clock className={`w-5 h-5 ${
-                        queueInfo.status === 'busy' ? 'text-orange-500' : 
+                        queueInfo.status === 'busy' ? 'text-orange-500' :
                         queueInfo.status === 'mixed' ? 'text-yellow-500' : 'text-emerald-500'
                       }`} />
                       <span className="text-zinc-400 text-sm">Availability Status</span>
                     </div>
-                    
+
                     {queueInfo.status === 'busy' || queueInfo.status === 'mixed' ? (
                       <>
                         <div className={`text-lg font-bold mb-1 ${
@@ -936,7 +943,7 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
                           {queueInfo.status === 'busy' ? 'High Demand' : 'Partial Availability'}
                         </div>
                         <div className="w-full bg-zinc-800 h-1.5 rounded-full mb-2 overflow-hidden">
-                          <div 
+                          <div
                             className={`h-full rounded-full ${
                               queueInfo.status === 'busy' ? 'bg-orange-500' : 'bg-yellow-500'
                             }`}
@@ -994,12 +1001,12 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
               {/* Navigation Buttons */}
               <div className="pt-4 space-y-3">
                 {step < 4 ? (
-                  <button 
+                  <button
                     type="button"
                     onClick={() => setStep(step + 1)}
                     className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     disabled={
-                      loadingStats || 
+                      loadingStats ||
                       (step === 1 && pincodes.length === 0) ||
                       (step === 3 && selectedPlacementIds.length === 0)
                     }
@@ -1009,21 +1016,21 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
                   </button>
                 ) : (
                   <>
-                    <button 
+                    <button
                       type="button"
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        alert("TEST MODE: Button Clicked Successfully!");
-                        // handleCreateCampaign();
+                        // alert("TEST MODE: Button Clicked Successfully!");
+                        handleCreateCampaign();
                       }}
                       className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed z-50 relative"
                       disabled={!uploadedFile || isSubmitting}
                     >
-                      {isSubmitting ? 'Launching Campaign...' : 'Pay & Launch (TEST MODE)'}
+                      {isSubmitting ? 'Launching Campaign...' : 'Pay & Launch'}
                       {!isSubmitting && <ArrowRight className="w-4 h-4" />}
                     </button>
-                    
+
                     {/* SUPER VISIBLE DEBUG LOG - COMMENTED OUT FOR NOW
                     <div className="fixed top-0 left-0 w-full h-48 bg-white text-black z-[9999] overflow-y-auto p-4 border-b-4 border-red-600 shadow-2xl opacity-90 pointer-events-none">
                         <h3 className="font-bold text-red-600">DEBUG CONSOLE (Take Screenshot if stuck)</h3>
@@ -1037,7 +1044,7 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
                 )}
 
                 {step > 1 && (
-                  <button 
+                  <button
                     type="button"
                     onClick={() => setStep(step - 1)}
                     className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium rounded-lg transition-colors"

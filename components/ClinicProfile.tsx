@@ -1,18 +1,17 @@
 import { useState, useEffect } from 'react';
-import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { Badge } from './ui/badge';
-import { MapPin, Clock, Phone, Star, ChevronRight, Search } from 'lucide-react';
+import { MapPin, Clock, Star, ChevronRight, Search } from 'lucide-react';
 import { Input } from './ui/input';
-import { t, type Language } from '../utils/translations';
+import { type Language } from '../utils/translations';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { MEDICAL_SPECIALTIES } from '../utils/specialties';
+import { MEDICAL_SPECIALTIES } from '../utils/medicalSpecialties';
 
 interface Doctor {
   id: string;
   name: string;
-  specialities: string[];
+  specialities?: string[];
+  specialties?: string[];
   degrees: string[];
   profileImage?: string;
   experience?: number;
@@ -37,7 +36,7 @@ interface ClinicProfileProps {
   language: Language;
 }
 
-export default function ClinicProfile({ clinicId, onDoctorSelect, language }: ClinicProfileProps) {
+export default function ClinicProfile({ clinicId, onDoctorSelect }: ClinicProfileProps) {
   const [clinic, setClinic] = useState<Clinic | null>(null);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,7 +48,8 @@ export default function ClinicProfile({ clinicId, onDoctorSelect, language }: Cl
       try {
         setLoading(true);
         const { db } = await import('../lib/firebase/config');
-        const { doc, getDoc, collection, query, where, getDocs, documentId } = await import('firebase/firestore');
+        if (!db) return;
+        const { doc, getDoc, collection, query, where, getDocs } = await import('firebase/firestore');
 
         // 1. Fetch Clinic Details
         const clinicRef = doc(db, 'clinics', clinicId);
@@ -83,11 +83,12 @@ export default function ClinicProfile({ clinicId, onDoctorSelect, language }: Cl
     }
   }, [clinicId]);
   const filteredDoctors = doctors.filter(doc => {
+    const docSpecialties = doc.specialties || doc.specialities || [];
     const matchesSearch = doc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doc.specialities.some(s => s.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    const matchesSpecialty = selectedSpecialty === 'all' || 
-      doc.specialities.some(s => s === selectedSpecialty);
+      docSpecialties.some(s => s.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    const matchesSpecialty = selectedSpecialty === 'all' ||
+      docSpecialties.some(s => s === selectedSpecialty);
 
     return matchesSearch && matchesSpecialty;
   });
@@ -124,7 +125,7 @@ export default function ClinicProfile({ clinicId, onDoctorSelect, language }: Cl
             </Avatar>
           </div>
         </div>
-        
+
         <div className="mt-12 px-6">
           <h1 className="text-2xl font-bold text-gray-900">{clinic.name}</h1>
           <div className="flex items-center text-gray-600 mt-1 text-sm">
@@ -142,14 +143,14 @@ export default function ClinicProfile({ clinicId, onDoctorSelect, language }: Cl
       <div className="px-4 mt-6 space-y-3">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input 
-            placeholder="Search doctor by name..." 
+          <Input
+            placeholder="Search doctor by name..."
             className="pl-10 bg-white"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        
+
         <Select value={selectedSpecialty} onValueChange={setSelectedSpecialty}>
             <SelectTrigger className="bg-white w-full">
                 <SelectValue placeholder="Filter by Specialty" />
@@ -157,7 +158,7 @@ export default function ClinicProfile({ clinicId, onDoctorSelect, language }: Cl
             <SelectContent>
                 <SelectItem value="all">All Specialties</SelectItem>
                 {MEDICAL_SPECIALTIES.map(spec => (
-                    <SelectItem key={spec} value={spec}>{spec}</SelectItem>
+                    <SelectItem key={spec.id} value={spec.label}>{spec.label}</SelectItem>
                 ))}
             </SelectContent>
         </Select>
@@ -176,11 +177,11 @@ export default function ClinicProfile({ clinicId, onDoctorSelect, language }: Cl
                     {doctor.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
                   </AvatarFallback>
                 </Avatar>
-                
+
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-gray-900 truncate">{doctor.name}</h3>
                   <p className="text-sm text-blue-600 font-medium truncate">
-                    {doctor.specialities.join(', ')}
+                    {(doctor.specialties || doctor.specialities || []).join(', ')}
                   </p>
                   <p className="text-xs text-gray-500 truncate mt-1">
                     {doctor.degrees.join(', ')}
@@ -197,7 +198,7 @@ export default function ClinicProfile({ clinicId, onDoctorSelect, language }: Cl
               </CardContent>
             </Card>
           ))}
-          
+
           {filteredDoctors.length === 0 && (
             <div className="text-center py-10 text-gray-500">
               No doctors found matching your search.

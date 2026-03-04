@@ -209,7 +209,6 @@ export default function PatientDetails({
   const [dietChartModalOpen, setDietChartModalOpen] = useState(false);
   const [selectedPatientForFlow, setSelectedPatientForFlow] = useState<Patient | null>(null);
   const [generatedRxUrl, setGeneratedRxUrl] = useState<string | null>(null);
-  const [generatedDietUrl, setGeneratedDietUrl] = useState<string | null>(null);
   const [isSendingNotification, setIsSendingNotification] = useState(false);
   const [isRegenMode, setIsRegenMode] = useState(false); // Track if RX Regen mode (vs initial Eye flow)
   const [lastRxData, setLastRxData] = useState<{ items: any[], remarks: string, diagnosis: string, vitals: Record<string,string>, pathology: Record<string,string>, suggestedTests: string[] } | null>(null); // Last generated RX data for regen
@@ -221,6 +220,7 @@ export default function PatientDetails({
     degree: string;
     degrees?: string[];
     specialty: string;
+    specialties?: string[];
     specialities?: string[];
     qrNumber?: string;
     clinicName?: string;
@@ -263,6 +263,7 @@ export default function PatientDetails({
     name: '',
     degree: '',
     specialty: '',
+    specialties: [],
     doctorId: '',
   });
 
@@ -364,8 +365,9 @@ export default function PatientDetails({
           name: d.name || 'Doctor',
           degree: d.degree || d.degrees?.[0] || '',
           degrees: d.degrees || (d.degree ? [d.degree] : []),
-          specialty: d.specialty || d.specialities?.[0] || '',
-          specialities: d.specialities || (d.specialty ? [d.specialty] : []),
+          specialty: d.specialty || d.specialties?.[0] || d.specialities?.[0] || '',
+          specialties: d.specialties || d.specialities || (d.specialty ? [d.specialty] : []),
+          specialities: d.specialties || d.specialities || (d.specialty ? [d.specialty] : []),
           qrNumber: d.qrNumber || '',
           clinicName: isClinicChamber ? (clinicInfo?.name || chamberName || '') : (chamberName || d.clinicName || ''),
           doctorId: docId,
@@ -1058,7 +1060,6 @@ export default function PatientDetails({
 
   // Step 4: Diet Chart generated callback
   const handleDietGenerated = async (dietUrl: string) => {
-    setGeneratedDietUrl(dietUrl);
     setDietChartModalOpen(false);
     if (selectedPatientForFlow) {
       await finalizeConsultation(selectedPatientForFlow.id, generatedRxUrl, dietUrl);
@@ -1255,7 +1256,6 @@ export default function PatientDetails({
       setIsSendingNotification(false);
       setSelectedPatientForFlow(null);
       setGeneratedRxUrl(null);
-      setGeneratedDietUrl(null);
       setRxPausedState(null);
     }
   };
@@ -1836,7 +1836,6 @@ export default function PatientDetails({
                       onClick={() => {
                         setSelectedPatientForFlow(patient);
                         setGeneratedRxUrl(null);
-                        setGeneratedDietUrl(null);
                         setRxConfirmModalOpen(true);
                       }}
                       disabled={isDisabled || state.isMarkedSeen || (patient.consultationType === 'video' && !state.vcCompleted)}

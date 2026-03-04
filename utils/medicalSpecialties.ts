@@ -45,6 +45,8 @@ export const MEDICAL_SPECIALTIES: MedicalSpecialty[] = [
   { id: 'unani', label: 'Unani Medicine', searchTerms: ['unani', 'bums'] },
   { id: 'yoga', label: 'Yoga & Naturopathy', searchTerms: ['yoga', 'naturopathy', 'bnys'] },
   { id: 'dietetics', label: 'Dietetics & Nutrition', searchTerms: ['dietician', 'nutritionist', 'diet'] },
+  { id: 'clinic', label: 'Clinic', searchTerms: ['clinic', 'center', 'centre', 'polyclinic'] },
+  { id: 'veterinarian', label: 'Veterinarian', searchTerms: ['vet', 'animal', 'pet', 'dog', 'cat'] },
   { id: 'other', label: 'Other Specialty', searchTerms: ['other', 'specialist'] },
 ];
 
@@ -63,7 +65,7 @@ export const searchSpecialties = (searchTerm: string): MedicalSpecialty[] => {
   const term = searchTerm.toLowerCase().trim();
   if (!term) return MEDICAL_SPECIALTIES;
 
-  return MEDICAL_SPECIALTIES.filter(specialty => 
+  return MEDICAL_SPECIALTIES.filter(specialty =>
     specialty.label.toLowerCase().includes(term) ||
     specialty.searchTerms.some(st => st.includes(term))
   );

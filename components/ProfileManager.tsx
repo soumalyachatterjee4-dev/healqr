@@ -25,7 +25,7 @@ import { useState, useEffect } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import DashboardSidebar from './DashboardSidebar';
-import { MEDICAL_SPECIALTIES } from '../utils/specialties';
+import { MEDICAL_SPECIALTIES, getSpecialtyLabel } from '../utils/medicalSpecialties';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -44,7 +44,7 @@ interface ProfileManagerProps {
     image: string | null;
     name: string;
     degrees: string[];
-    specialities: string[];
+    specialties: string[];
     language?: 'english' | 'hindi' | 'bengali';
     linkedClinicCodes?: string[];
     linkedClinics?: Array<{clinicId: string; clinicCode: string; name: string}>;
@@ -54,7 +54,7 @@ interface ProfileManagerProps {
     image: string | null;
     name: string;
     degrees: string[];
-    specialities: string[];
+    specialties: string[];
     language?: 'english' | 'hindi' | 'bengali' | 'marathi' | 'tamil' | 'telugu' | 'gujarati' | 'kannada' | 'malayalam' | 'punjabi' | 'assamese';
   }) => void;
   activeAddOns?: string[];
@@ -92,7 +92,7 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
       // Don't sync language from props - it's loaded directly from Firestore to avoid race conditions
       // if (profileData.language) setPreferredLanguage(profileData.language);
       if (profileData.degrees) setDegrees(profileData.degrees);
-      if (profileData.specialities) setSpecialities(profileData.specialities);
+      if (profileData.specialties) setSpecialties(profileData.specialties);
     }
   }, [profileData]);
 
@@ -131,7 +131,8 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
         if (data.watermarkLogo) setWatermarkLogo(data.watermarkLogo);
         if (data.preferredLanguage) setPreferredLanguage(data.preferredLanguage);
         if (data.degrees) setDegrees(data.degrees);
-        if (data.specialities) setSpecialities(data.specialities);
+        if (data.specialties) setSpecialties(data.specialties);
+        if (data.specialities) setSpecialties(data.specialities);
         if (data.useDrPrefix !== undefined) setUseDrPrefix(data.useDrPrefix);
         if (data.practisingPincodes) setPractisingPincodes(data.practisingPincodes);
         if (data.experience) setExperience(data.experience);
@@ -166,7 +167,7 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
   const [isUploadingWatermark, setIsUploadingWatermark] = useState(false);
   const [preferredLanguage, setPreferredLanguage] = useState<'english' | 'hindi' | 'bengali' | 'marathi' | 'tamil' | 'telugu' | 'gujarati' | 'kannada' | 'malayalam' | 'punjabi' | 'assamese'>(profileData?.language || 'english');
   const [degrees, setDegrees] = useState<string[]>(profileData?.degrees || []);
-  const [specialities, setSpecialities] = useState<string[]>(profileData?.specialities || []);
+  const [specialties, setSpecialties] = useState<string[]>(profileData?.specialties || []);
   const [useDrPrefix, setUseDrPrefix] = useState(true);
   const [practisingPincodes, setPractisingPincodes] = useState<string[]>([]);
   const [experience, setExperience] = useState('');
@@ -333,13 +334,13 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
 
   const addSpeciality = () => {
     if (newSpeciality.trim()) {
-      setSpecialities([...specialities, newSpeciality.trim()]);
+      setSpecialties([...specialties, newSpeciality.trim()]);
       setNewSpeciality('');
     }
   };
 
-  const removeSpeciality = (index: number) => {
-    setSpecialities(specialities.filter((_, i) => i !== index));
+  const removeSpecialty = (index: number) => {
+    setSpecialties(specialties.filter((_, i) => i !== index));
   };
 
   const addPincode = () => {
@@ -401,8 +402,8 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
           watermarkLogo,
           preferredLanguage,
           degrees,
-          specialties: specialities, // Normalized to 'specialties' (US)
-          specialities: specialities, // Keep legacy field for backward compatibility
+          specialties: specialties, // Normalized to 'specialties' (US)
+          specialities: specialties, // Keep legacy field for backward compatibility
           practisingPincodes,
           experience,
           bio,
@@ -425,7 +426,7 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
           image: profileImage,
           name,
           degrees,
-          specialities,
+          specialties,
           language: preferredLanguage,
         });
       }
@@ -646,7 +647,7 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
                     <Stethoscope className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-500/50" />
                     <Input
                       type="text"
-                      value={specialities[0] || ''}
+                      value={getSpecialtyLabel(specialties[0]) || ''}
                       disabled
                       className="pl-12 bg-zinc-950 border-zinc-800 text-emerald-500/70 font-medium h-12 rounded-lg cursor-not-allowed"
                     />
@@ -979,14 +980,14 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
 
                   {/* Display existing specialities (Skipping the first one which is primary) */}
                   <div className="flex flex-wrap gap-2 mb-3">
-                    {specialities.slice(1).map((speciality, index) => (
+                    {specialties.slice(1).map((speciality, index) => (
                       <div
                         key={index}
                         className="bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 px-4 py-2 rounded-lg flex items-center gap-2"
                       >
-                        <span>{speciality}</span>
+                        <span>{getSpecialtyLabel(speciality)}</span>
                         <button
-                          onClick={() => removeSpeciality(index + 1)} // Adjusted index to account for primary
+                          onClick={() => removeSpecialty(index + 1)} // Adjusted index to account for primary
                           className="hover:text-emerald-300"
                         >
                           <X className="w-4 h-4" />
@@ -997,24 +998,22 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
 
                   {/* Add new speciality */}
                   <div className="flex gap-2">
-                    <Select
-                      value={newSpeciality}
-                      onValueChange={(val) => setNewSpeciality(val)}
-                    >
-                      <SelectTrigger className="bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-emerald-500 w-full">
-                        <SelectValue placeholder="Add another specialty" />
+                    <Select value={newSpeciality} onValueChange={setNewSpeciality}>
+                      <SelectTrigger className="bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-emerald-500">
+                        <SelectValue placeholder="Select specialty to add" />
                       </SelectTrigger>
                       <SelectContent className="bg-zinc-900 border-zinc-800 text-white max-h-[300px]">
-                        {MEDICAL_SPECIALTIES.filter(s => !specialities.includes(s)).map((spec) => (
-                          <SelectItem key={spec} value={spec}>{spec}</SelectItem>
+                        {MEDICAL_SPECIALTIES.map(spec => (
+                          <SelectItem key={spec.id} value={spec.id}>{spec.label}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                     <Button
                       onClick={addSpeciality}
-                      className="bg-emerald-500 hover:bg-emerald-600 h-12 px-4"
+                      className="bg-emerald-500 hover:bg-emerald-600 h-12 px-4 whitespace-nowrap"
                     >
-                      <Plus className="w-5 h-5" />
+                      <Plus className="w-5 h-5 mr-2" />
+                      Add
                     </Button>
                   </div>
                 </div>

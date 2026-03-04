@@ -6,32 +6,10 @@ import { Loader2, ArrowLeft, Shield, Building2, CheckCircle2, Mail, ChevronDown,
 import healqrLogo from '../assets/healqr-logo.png';
 import { toast } from 'sonner';
 import { getAllStates, getStateFromPincode } from '../utils/pincodeMapping';
+import { MEDICAL_SPECIALTIES } from '../utils/medicalSpecialties';
 
-const ALL_SPECIALTIES = [
-  "Clinic",
-  "General Physician",
-  "Cardiologist",
-  "Dermatologist",
-  "Gynecologist",
-  "Pediatrician",
-  "Orthopedist",
-  "Neurologist",
-  "Psychiatrist",
-  "Dentist",
-  "ENT Specialist",
-  "Ophthalmologist",
-  "Urologist",
-  "Gastroenterologist",
-  "Pulmonologist",
-  "Endocrinologist",
-  "Rheumatologist",
-  "Nephrologist",
-  "Oncologist",
-  "Surgeon",
-  "Physiotherapist",
-  "Ayurveda",
-  "Homeopathy",
-];
+const ALL_SPECIALTIES = MEDICAL_SPECIALTIES;
+
 
 const INDIAN_STATES = getAllStates();
 
@@ -68,7 +46,7 @@ export default function PharmaSignUp({ onBack, onLogin }: PharmaSignUpProps) {
   };
 
   const toggleSelectAll = () => {
-    setSelectedSpecialties(allSelected ? [] : [...ALL_SPECIALTIES]);
+    setSelectedSpecialties(allSelected ? [] : ALL_SPECIALTIES.map(s => s.id));
   };
 
   const removeSpecialty = (specialty: string) => {
@@ -347,14 +325,17 @@ export default function PharmaSignUp({ onBack, onLogin }: PharmaSignUpProps) {
               <label className="text-sm font-medium text-gray-300 mb-2 block">Specialty *</label>
               {selectedSpecialties.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mb-2">
-                  {selectedSpecialties.map(s => (
-                    <span key={s} className="inline-flex items-center gap-1 bg-emerald-500/20 text-emerald-400 text-xs px-2 py-1 rounded-full border border-emerald-500/30">
-                      {s}
-                      <button type="button" onClick={() => removeSpecialty(s)} className="hover:text-white transition-colors">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  ))}
+                  {selectedSpecialties.map(sid => {
+                    const specialty = ALL_SPECIALTIES.find(s => s.id === sid);
+                    return (
+                      <span key={sid} className="inline-flex items-center gap-1 bg-emerald-500/20 text-emerald-400 text-xs px-2 py-1 rounded-full border border-emerald-500/30">
+                        {specialty?.label || sid}
+                        <button type="button" onClick={() => removeSpecialty(sid)} className="hover:text-white transition-colors">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    );
+                  })}
                 </div>
               )}
               <button type="button" onClick={() => setShowSpecialtyDropdown(!showSpecialtyDropdown)}
@@ -375,12 +356,12 @@ export default function PharmaSignUp({ onBack, onLogin }: PharmaSignUpProps) {
                     <span className="font-medium text-emerald-400">Select All</span>
                   </button>
                   {ALL_SPECIALTIES.map(specialty => (
-                    <button type="button" key={specialty} onClick={() => toggleSpecialty(specialty)}
+                    <button type="button" key={specialty.id} onClick={() => toggleSpecialty(specialty.id)}
                       className="w-full px-4 py-2.5 text-left text-sm hover:bg-zinc-700 transition-colors flex items-center gap-3">
-                      <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${selectedSpecialties.includes(specialty) ? 'bg-emerald-500 border-emerald-500' : 'border-zinc-500'}`}>
-                        {selectedSpecialties.includes(specialty) && <span className="text-white text-xs">✓</span>}
+                      <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${selectedSpecialties.includes(specialty.id) ? 'bg-emerald-500 border-emerald-500' : 'border-zinc-500'}`}>
+                        {selectedSpecialties.includes(specialty.id) && <span className="text-white text-xs">✓</span>}
                       </div>
-                      <span className={specialty === 'Clinic' ? 'text-blue-400 font-medium' : 'text-gray-300'}>{specialty}</span>
+                      <span className={specialty.id === 'clinic' ? 'text-blue-400 font-medium' : 'text-gray-300'}>{specialty.label}</span>
                     </button>
                   ))}
                 </div>

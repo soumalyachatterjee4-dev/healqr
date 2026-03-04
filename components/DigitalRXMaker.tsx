@@ -32,8 +32,9 @@ interface DigitalRXMakerProps {
     name: string;
     degree: string;
     degrees?: string[];
-    specialty: string;
+    specialty?: string;
     specialities?: string[];
+    specialties?: string[];
     qrNumber?: string;
     clinicName?: string;
     doctorId: string;
@@ -328,7 +329,8 @@ export default function DigitalRXMaker({
         doc.setTextColor(100);
         const degreesText = doctorInfo.degrees?.length ? doctorInfo.degrees.join(', ') : doctorInfo.degree;
         if (degreesText) { doc.text(degreesText, margin, currentY); currentY += 4; }
-        const specialtiesText = doctorInfo.specialities?.length ? doctorInfo.specialities.join(', ') : doctorInfo.specialty;
+        const specialtiesList = doctorInfo.specialties || doctorInfo.specialities;
+        const specialtiesText = (specialtiesList && specialtiesList.length > 0) ? specialtiesList.join(', ') : doctorInfo.specialty;
         if (specialtiesText) { doc.text(specialtiesText, margin, currentY); currentY += 4; }
         if (doctorInfo.showRegistrationOnRX && doctorInfo.registrationNumber) {
           doc.text(`REG NO: ${doctorInfo.registrationNumber}`, margin, currentY);
@@ -351,7 +353,8 @@ export default function DigitalRXMaker({
 
         const degreesText = doctorInfo.degrees?.length ? doctorInfo.degrees.join(', ') : doctorInfo.degree;
         if (degreesText) { doc.text(degreesText, margin, currentY); currentY += 6; }
-        const specialtiesText = doctorInfo.specialities?.length ? doctorInfo.specialities.join(', ') : doctorInfo.specialty;
+        const specialtiesList = doctorInfo.specialties || doctorInfo.specialities;
+        const specialtiesText = (specialtiesList && specialtiesList.length > 0) ? specialtiesList.join(', ') : doctorInfo.specialty;
         if (specialtiesText) { doc.text(specialtiesText, margin, currentY); currentY += 6; }
         if (doctorInfo.showRegistrationOnRX && doctorInfo.registrationNumber) {
           doc.text(`REG NO: ${doctorInfo.registrationNumber}`, margin, currentY);
@@ -767,7 +770,7 @@ export default function DigitalRXMaker({
               doctorId: doctorInfo.doctorId
             } as any,
             {
-              doctorName: displayName,
+              doctorName: doctorInfo.name,
               chamberName: doctorInfo.clinicName || 'Clinic',
               doctorId: doctorInfo.doctorId
             },

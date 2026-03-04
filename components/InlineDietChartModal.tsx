@@ -23,6 +23,7 @@ interface InlineDietChartModalProps {
     degree: string;
     degrees?: string[];
     specialty: string;
+    specialties?: string[];
     specialities?: string[];
     qrNumber?: string;
     clinicName?: string;
@@ -379,7 +380,7 @@ export default function InlineDietChartModal({ patient, doctorInfo, onClose, onG
         if (degreesStr) { doc.text(degreesStr, margin, headerY); headerY += 4; }
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(37, 99, 235);
-        const specStr = (doctorInfo.specialities?.join(' • ') || doctorInfo.specialty || '').toUpperCase();
+        const specStr = (doctorInfo.specialties?.join(' • ') || doctorInfo.specialities?.join(' • ') || doctorInfo.specialty || '').toUpperCase();
         if (specStr) { doc.text(specStr, margin, headerY); headerY += 4; }
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(100);
@@ -404,7 +405,7 @@ export default function InlineDietChartModal({ patient, doctorInfo, onClose, onG
         if (degreesStr) { doc.text(degreesStr, margin, headerY); headerY += 5; }
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(37, 99, 235);
-        const specStr = (doctorInfo.specialities?.join(' • ') || doctorInfo.specialty || 'General Physician').toUpperCase();
+        const specStr = (doctorInfo.specialties?.join(' • ') || doctorInfo.specialities?.join(' • ') || doctorInfo.specialty || 'General Physician').toUpperCase();
         doc.text(specStr, margin, headerY);
         headerY += 5;
         doc.setFont('helvetica', 'normal');

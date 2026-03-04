@@ -4,6 +4,7 @@ import { Button } from './ui/button';
 import { type Language } from '../utils/translations';
 import BookingFlowLayout from './BookingFlowLayout';
 import TemplateDisplay from './TemplateDisplay';
+import { getSpecialtyLabel } from '../utils/medicalSpecialties';
 
 interface Doctor {
   uid: string;
@@ -23,7 +24,7 @@ interface ClinicDoctorSearchProps {
   language?: Language;
 }
 
-export default function ClinicDoctorSearch({ 
+export default function ClinicDoctorSearch({
   onSelectDoctor,
   onBack,
 }: ClinicDoctorSearchProps) {
@@ -51,7 +52,7 @@ export default function ClinicDoctorSearch({
 
       const { db } = await import('../lib/firebase/config');
       if (!db) return;
-      
+
       const { doc, getDoc, collection, query, where, getDocs } = await import('firebase/firestore');
 
       // Load clinic profile
@@ -61,23 +62,23 @@ export default function ClinicDoctorSearch({
       if (clinicSnap.exists()) {
         const clinicData = clinicSnap.data();
         setClinicProfile({ id: clinicSnap.id, ...clinicData });
-        
+
         // Get ALL doctors associated with this clinic (both onboarded and non-onboarded)
         const allDoctorsData: Doctor[] = [];
-        
+
         // Method 1: Get linkedDoctorsDetails (onboarded doctors with full details)
         const linkedDoctors = clinicData.linkedDoctorsDetails || [];
         allDoctorsData.push(...linkedDoctors);
-        
+
         // Method 2: Get non-onboarded doctors from the doctors collection
         // Check if clinic has a doctors array with email/UIDs
         if (clinicData.doctors && clinicData.doctors.length > 0) {
           // These are non-onboarded doctors (just basic info)
           const nonOnboardedDoctors = clinicData.doctors || [];
-          
+
           // Add non-onboarded doctors that aren't already in linkedDoctorsDetails
           const linkedEmails = new Set(linkedDoctors.map((d: Doctor) => d.email));
-          
+
           nonOnboardedDoctors.forEach((doctor: any) => {
             if (!linkedEmails.has(doctor.email)) {
               allDoctorsData.push({
@@ -103,7 +104,10 @@ export default function ClinicDoctorSearch({
         allDoctorsData.forEach((doctor: Doctor) => {
           doctor.specialties?.forEach((spec: string) => specialtiesSet.add(spec));
         });
-        setAvailableSpecialties(Array.from(specialtiesSet).sort());
+        setAvailableSpecialties(Array.from(specialtiesSet).sort((a, b) =>
+          getSpecialtyLabel(a).localeCompare(getSpecialtyLabel(b))
+        ));
+
       }
     } catch (error) {
       console.error('Error loading clinic doctors:', error);
@@ -117,10 +121,13 @@ export default function ClinicDoctorSearch({
 
     if (searchMode === 'specialty' && selectedSpecialty) {
       filtered = filtered.filter(doctor =>
-        doctor.specialties?.some(spec => 
-          spec.toLowerCase().includes(selectedSpecialty.toLowerCase())
-        )
+        doctor.specialties?.some(spec => {
+          const label = getSpecialtyLabel(spec).toLowerCase();
+          const search = selectedSpecialty.toLowerCase();
+          return spec.toLowerCase().includes(search) || label.includes(search);
+        })
       );
+
     } else if (searchMode === 'name' && searchQuery) {
       filtered = filtered.filter(doctor =>
         doctor.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -353,7 +360,7 @@ export default function ClinicDoctorSearch({
                     {/* Doctor Info */}
                     <div className="flex-1 min-w-0">
                       <h3 className="text-lg font-bold text-white mb-1">Dr. {doctor.name}</h3>
-                      
+
                       {/* Degrees */}
                       {doctor.degrees && doctor.degrees.length > 0 && (
                         <div className="flex items-center gap-2 mb-2">

@@ -31,6 +31,11 @@ export default function VerifyWalkin({ bookingId }: VerifyWalkinProps) {
       }
 
       try {
+        if (!db) {
+          setError('Database connection error');
+          setLoading(false);
+          return;
+        }
         const bookingRef = doc(db, 'bookings', bookingId);
         const bookingSnap = await getDoc(bookingRef);
 
@@ -47,6 +52,7 @@ export default function VerifyWalkin({ bookingId }: VerifyWalkinProps) {
           if (data.doctorId) {
             try {
               // Try fetching from doctors collection first
+              if (!db) return;
               const doctorRef = doc(db, 'doctors', data.doctorId);
               const doctorSnap = await getDoc(doctorRef);
 
@@ -54,6 +60,7 @@ export default function VerifyWalkin({ bookingId }: VerifyWalkinProps) {
                 setDoctorData(doctorSnap.data());
               } else {
                 // Fallback to adminProfiles if not found in doctors (for super admin cases)
+                if (!db) return;
                 const adminRef = doc(db, 'adminProfiles', data.doctorId);
                 const adminSnap = await getDoc(adminRef);
                 if (adminSnap.exists()) {
@@ -98,6 +105,7 @@ export default function VerifyWalkin({ bookingId }: VerifyWalkinProps) {
       }
 
       // 2. Update Firestore
+      if (!db) throw new Error('Database connection error');
       const bookingRef = doc(db, 'bookings', bookingId);
       await updateDoc(bookingRef, {
         verifiedByPatient: true,
@@ -136,7 +144,7 @@ export default function VerifyWalkin({ bookingId }: VerifyWalkinProps) {
         // Schedule "Star" Notification (24 hours delay)
         // Check for Clinic Restrictions
         let isReviewRestricted = false;
-        if (bookingData.doctorId) {
+        if (bookingData.doctorId && db) {
           const doctorSnap = await getDoc(doc(db, 'doctors', bookingData.doctorId));
           if (doctorSnap.exists()) {
             const clinicId = doctorSnap.data().clinicId;
@@ -173,7 +181,7 @@ export default function VerifyWalkin({ bookingId }: VerifyWalkinProps) {
     doctorName: doctorData?.name || bookingData?.doctorName,
     doctorPhoto: doctorData?.image,
     doctorDegrees: doctorData?.degrees || (doctorData?.qualification ? [doctorData.qualification] : []),
-    doctorSpecialty: doctorData?.specialities?.[0] || (doctorData?.role === 'super_admin' ? 'Business Associate' : doctorData?.role),
+    doctorSpecialty: doctorData?.specialties?.[0] || doctorData?.specialities?.[0] || (doctorData?.role === 'super_admin' ? 'Business Associate' : doctorData?.role),
     showHeader: true
   };
 

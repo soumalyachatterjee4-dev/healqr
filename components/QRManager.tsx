@@ -5,16 +5,12 @@ import {
   Menu,
   Download,
   Palette,
-  User,
-  GraduationCap,
-  Stethoscope,
   Image as ImageIcon,
-  Zap,
-  QrCode
+  Zap
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { Slider } from './ui/slider';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Tabs, TabsContent } from './ui/tabs';
 import DashboardSidebar from './DashboardSidebar';
 import QRCode from 'qrcode';
 import { toast } from 'sonner';
@@ -26,8 +22,9 @@ interface QRManagerProps {
   profileData?: {
     image: string | null;
     name: string;
-    degrees: string[];
-    specialities: string[];
+    degrees?: string[];
+    specialties?: string[];
+    specialities?: string[];
   };
   activeAddOns?: string[];
   initialTab?: string;
@@ -43,16 +40,15 @@ type DownloadSize = {
 export default function QRManager({ onMenuChange, onLogout, onTestBooking, profileData, activeAddOns = [], initialTab = 'qr-generator' }: QRManagerProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Subscription status state
-  const [subscriptionData, setSubscriptionData] = useState<any>(null);
-  const [loadingSubscription, setLoadingSubscription] = useState(true);
   const [assignedQrCode, setAssignedQrCode] = useState<string>('');
 
   // Doctor Information
   const doctorImage = profileData?.image || null;
   const doctorName = profileData?.name || 'Doctor Name';
   const degree = (profileData?.degrees && profileData.degrees.length > 0) ? profileData.degrees.join(', ') : 'MBBS';
-  const speciality = (profileData?.specialities && profileData.specialities.length > 0) ? profileData.specialities.join(', ') : 'General Physician';
+  const speciality = (profileData?.specialties || profileData?.specialities) && (profileData.specialties || profileData.specialities)!.length > 0
+    ? (profileData.specialties || profileData.specialities)!.join(', ')
+    : 'General Physician';
 
   console.log('🩺 QR Manager Profile Data:', {
     hasImage: !!doctorImage,
@@ -65,7 +61,7 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
   // QR Customization
   const [qrSize, setQrSize] = useState(300);
   const [qrColor, setQrColor] = useState('#000000');
-  const [qrBackgroundColor, setQrBackgroundColor] = useState('#ffffff');
+  const [qrBackgroundColor] = useState('#ffffff');
   const [qrUrl, setQrUrl] = useState('https://teamhealqr.web.app');
 
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
@@ -97,7 +93,6 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
 
       if (!userId) {
         console.log('⚠️ No userId found in localStorage');
-        setLoadingSubscription(false);
         return;
       }
 
@@ -108,7 +103,6 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
 
       const { db } = await import('../lib/firebase/config');
       if (!db) {
-        setLoadingSubscription(false);
         return;
       }
 
@@ -118,19 +112,14 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
 
       if (doctorDoc.exists()) {
         const data = doctorDoc.data();
-        setSubscriptionData(data);
 
         // Set assigned activation QR code
         if (data.activationQrCode) {
           setAssignedQrCode(data.activationQrCode);
         }
 
-        // Calculate days remaining
         if (data.trialEndDate) {
-          const today = new Date();
-          const endDate = data.trialEndDate.toDate();
-          const daysLeft = Math.max(0, Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
-          setSubscriptionData({...data, calculatedDaysRemaining: daysLeft});
+          // daysLeft calculation can be removed if not used elsewhere
         }
 
         console.log('✅ Loaded subscription data:', data);
@@ -138,8 +127,6 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
       }
     } catch (error) {
       console.error('❌ Error loading subscription data:', error);
-    } finally {
-      setLoadingSubscription(false);
     }
   };
 

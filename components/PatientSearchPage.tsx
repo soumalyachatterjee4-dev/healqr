@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Search, MapPin, User, Stethoscope, ChevronDown, Star, ChevronRight, Loader } from 'lucide-react';
 import type { Language } from '../utils/translations';
-import { translations } from '../utils/translations';
-import { MEDICAL_SPECIALTIES } from '../utils/specialties';
+import { MEDICAL_SPECIALTIES } from '../utils/medicalSpecialties';
 import DashboardPromoDisplay from './DashboardPromoDisplay';
+import { db } from '../lib/firebase/config';
 
 interface PatientSearchPageProps {
   language?: Language;
@@ -13,7 +13,8 @@ interface PatientSearchPageProps {
 interface Doctor {
   id: string;
   name: string;
-  specialities: string[];
+  specialties?: string[];
+  specialities?: string[];
   degrees: string[];
   profileImage?: string;
   experience?: number;
@@ -22,7 +23,7 @@ interface Doctor {
   clinicName?: string;
 }
 
-const PatientSearchPage: React.FC<PatientSearchPageProps> = ({ language = 'english', isDashboard = false }) => {
+const PatientSearchPage: React.FC<PatientSearchPageProps> = ({ isDashboard = false }) => {
   const [searchArea, setSearchArea] = useState('');
   const [pinCode, setPinCode] = useState('');
   const [doctorName, setDoctorName] = useState('');
@@ -44,36 +45,37 @@ const PatientSearchPage: React.FC<PatientSearchPageProps> = ({ language = 'engli
   const handleSearch = async () => {
     setLoading(true);
     setSearched(true);
-    
+
     try {
-      const { db } = await import('../lib/firebase/config');
+      if (!db) return;
       const { collection, query, where, getDocs } = await import('firebase/firestore');
-      
+
       const doctorsRef = collection(db, 'doctors');
       let q = query(doctorsRef);
-      
+
       // Query by pinCode if provided
       if (pinCode) {
         q = query(doctorsRef, where('pinCode', '==', pinCode));
       }
-      
+
       const snapshot = await getDocs(q);
       let doctors = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Doctor[];
-      
+
       // Filter by specialty if provided
       if (specialty) {
-        doctors = doctors.filter(doc => 
-          doc.specialities?.some(s => s.toLowerCase().includes(specialty.toLowerCase()))
-        );
+        doctors = doctors.filter(doc => {
+          const doctorSpecs = doc.specialties || doc.specialities || [];
+          return doctorSpecs.some(s => s.toLowerCase().includes(specialty.toLowerCase()));
+        });
       }
-      
+
       // Filter by doctor name if provided
       if (doctorName) {
-        doctors = doctors.filter(doc => 
+        doctors = doctors.filter(doc =>
           doc.name?.toLowerCase().includes(doctorName.toLowerCase())
         );
       }
-      
+
       setResults(doctors);
     } catch (error) {
       console.error("Search error:", error);
@@ -169,8 +171,8 @@ const PatientSearchPage: React.FC<PatientSearchPageProps> = ({ language = 'engli
               >
                 <option value="">All Specialties</option>
                 {MEDICAL_SPECIALTIES.map((spec) => (
-                  <option key={spec} value={spec}>
-                    {spec}
+                  <option key={spec.id} value={spec.id}>
+                    {spec.label}
                   </option>
                 ))}
               </select>
@@ -205,11 +207,11 @@ const PatientSearchPage: React.FC<PatientSearchPageProps> = ({ language = 'engli
           <h2 className="text-2xl font-bold text-white mb-4">
             {loading ? 'Searching...' : `${results.length} Doctor${results.length !== 1 ? 's' : ''} Found`}
           </h2>
-          
+
           {results.length > 0 ? (
             <div className="space-y-4">
               {results.map((doctor) => (
-                <div 
+                <div
                   key={doctor.id}
                   onClick={() => window.location.href = `/?doctorId=${doctor.id}`}
                   className="bg-gray-800 border border-orange-500/20 hover:border-orange-500 rounded-xl p-6 cursor-pointer transition-all"
@@ -224,12 +226,12 @@ const PatientSearchPage: React.FC<PatientSearchPageProps> = ({ language = 'engli
                         </span>
                       )}
                     </div>
-                    
+
                     <div className="flex-1">
                       <div className="flex justify-between items-start mb-2">
                         <div>
                           <h3 className="text-xl font-bold text-white">{doctor.name}</h3>
-                          <p className="text-orange-500 font-medium">{doctor.specialities?.join(', ')}</p>
+                          <p className="text-orange-500 font-medium">{(doctor.specialties || doctor.specialities)?.join(', ')}</p>
                           <p className="text-sm text-gray-400 mt-1">{doctor.degrees?.join(', ')}</p>
                         </div>
                         {doctor.rating && (
@@ -239,7 +241,7 @@ const PatientSearchPage: React.FC<PatientSearchPageProps> = ({ language = 'engli
                           </div>
                         )}
                       </div>
-                      
+
                       <div className="flex items-center justify-between mt-4">
                         <div className="flex items-center gap-1 text-gray-400 text-sm">
                           <MapPin className="h-4 w-4" />

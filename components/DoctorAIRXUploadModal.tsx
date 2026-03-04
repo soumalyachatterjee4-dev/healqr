@@ -20,13 +20,15 @@ interface CropRegion {
   height: number;
 }
 
+import { Language } from '../utils/translations';
+
 interface DoctorAIRXUploadModalProps {
   isOpen: boolean;
   onClose: () => void;
   patientName: string;
   patientId: string;
   patientPhone: string;
-  patientLanguage: 'english' | 'hindi' | 'bengali';
+  patientLanguage: Language;
   onUploadSuccess?: () => void;
 }
 
@@ -342,9 +344,21 @@ export const DoctorAIRXUploadModal: React.FC<DoctorAIRXUploadModalProps> = ({
   const analyzeWithGemini = async (files: File[]): Promise<any> => {
     const imageParts = await Promise.all(files.map(fileToBase64Part));
 
-    const lang = patientLanguage === 'hindi' ? 'Hindi (हिंदी)'
-      : patientLanguage === 'bengali' ? 'Bengali (বাংলা)'
-      : 'English';
+    const languageMap: Record<Language, string> = {
+      'english': 'English',
+      'hindi': 'Hindi (हिंदी)',
+      'bengali': 'Bengali (বাংলা)',
+      'marathi': 'Marathi (मराठी)',
+      'tamil': 'Tamil (தமிழ்)',
+      'telugu': 'Telugu (తెలుగు)',
+      'gujarati': 'Gujarati (ગુજરાતી)',
+      'kannada': 'Kannada (ಕನ್ನಡ)',
+      'malayalam': 'Malayalam (മലയാളం)',
+      'punjabi': 'Punjabi (ਪੰਜਾਬੀ)',
+      'assamese': 'Assamese (অসমीয়া)'
+    };
+
+    const lang = languageMap[patientLanguage] || 'English';
 
     const prompt = `You are an expert Pharmacist. You are given prescription image(s). The user has highlighted a specific area containing medicines.
 
@@ -537,6 +551,7 @@ RULES:
   // Upload images to Firebase Storage
   const uploadImagesToStorage = async (): Promise<string[]> => {
     const urls: string[] = [];
+    if (!storage) throw new Error('Storage not initialized');
     for (let i = 0; i < selectedFiles.length; i++) {
       const compressed = await compressImage(selectedFiles[i]);
       const storageRef = ref(storage, `prescriptions/${patientId}/${Date.now()}_${i}.jpg`);
@@ -548,9 +563,9 @@ RULES:
 
   // Send FCM push notification via Cloud Function
   const sendFCMNotification = async (notificationId: string) => {
-    if (!patientPhone) return;
+    if (!patientPhone || !db) return;
     const phone10 = patientPhone.replace(/\D/g, '').replace(/^91/, '').slice(-10);
-    const tokenDoc = await getDoc(doc(db!, 'fcmTokens', `patient_${phone10}`));
+    const tokenDoc = await getDoc(doc(db, 'fcmTokens', `patient_${phone10}`));
     const fcmToken = tokenDoc.exists() ? tokenDoc.data().token : null;
 
     if (!fcmToken) {

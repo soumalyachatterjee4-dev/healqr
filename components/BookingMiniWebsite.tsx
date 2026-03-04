@@ -329,7 +329,7 @@ export default function BookingMiniWebsite({
       doctorName={doctorProfile?.name}
       doctorPhoto={doctorProfile?.profileImage}
       doctorDegrees={doctorProfile?.degrees}
-      doctorSpecialty={doctorProfile?.specialities?.[0]}
+      doctorSpecialty={doctorProfile?.specialties?.[0] || doctorProfile?.specialities?.[0]}
       useDrPrefix={doctorProfile?.useDrPrefix !== false}
     >
       <div className="bg-[#1a1f2e] rounded-2xl shadow-xl overflow-hidden max-w-full">
@@ -454,8 +454,9 @@ export default function BookingMiniWebsite({
                     </div>
                   </div>
 
-                  {/* Line 2: Degrees & Specialities */}
+                  {/* Line 2: Degrees & Specialties */}
                   {((doctorProfile?.degrees && doctorProfile.degrees.length > 0) ||
+                    (doctorProfile?.specialties && doctorProfile.specialties.length > 0) ||
                     (doctorProfile?.specialities && doctorProfile.specialities.length > 0)) && (
                     <div className="flex flex-wrap gap-2">
                       {/* Degree Badges */}
@@ -472,15 +473,15 @@ export default function BookingMiniWebsite({
                         </>
                       )}
 
-                      {/* Speciality Badges */}
-                      {doctorProfile?.specialities && doctorProfile.specialities.length > 0 && (
+                      {/* Specialty Badges */}
+                      {(doctorProfile?.specialties || doctorProfile?.specialities) && (
                         <>
-                          {doctorProfile.specialities.map((speciality: string, index: number) => (
+                          {(doctorProfile.specialties || doctorProfile.specialities).map((specialty: string, index: number) => (
                             <div
-                              key={`speciality-${index}`}
+                              key={`specialty-${index}`}
                               className="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-lg"
                             >
-                              {speciality}
+                              {specialty}
                             </div>
                           ))}
                         </>

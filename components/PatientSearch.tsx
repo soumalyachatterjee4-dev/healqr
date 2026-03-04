@@ -12,13 +12,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
-import { MEDICAL_SPECIALTIES } from '../utils/specialties';
+import { MEDICAL_SPECIALTIES } from '../utils/medicalSpecialties';
 import DashboardPromoDisplay from './DashboardPromoDisplay';
 
 interface Doctor {
   id: string;
   name: string;
-  specialities: string[];
+  specialties: string[];
   degrees: string[];
   profileImage?: string;
   experience?: number;
@@ -165,9 +165,13 @@ export default function PatientSearch() {
 
       // Filter by specialty if provided
       if (specialty) {
-        doctors = doctors.filter(doc =>
-          doc.specialities?.some(s => s.toLowerCase().includes(specialty.toLowerCase()))
-        );
+        doctors = doctors.filter(doc => {
+          // Check for matching ID or label to handle fallback/transitional state
+          return doc.specialties?.some(s =>
+            s.toLowerCase() === specialty.toLowerCase() ||
+            MEDICAL_SPECIALTIES.find(ms => ms.id === s)?.label.toLowerCase() === specialty.toLowerCase()
+          );
+        });
       }
 
       // Filter by doctor name if provided
@@ -318,8 +322,8 @@ export default function PatientSearch() {
                   </SelectTrigger>
                   <SelectContent className="bg-zinc-800 border-zinc-700">
                     {MEDICAL_SPECIALTIES.map((spec) => (
-                      <SelectItem key={spec} value={spec} className="text-white hover:bg-zinc-700">
-                        {spec}
+                      <SelectItem key={spec.id} value={spec.id} className="text-white hover:bg-zinc-700">
+                        {spec.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -372,7 +376,9 @@ export default function PatientSearch() {
                     <div className="flex justify-between items-start">
                       <div>
                         <h3 className="text-lg font-bold text-white">{doctor.name}</h3>
-                        <p className="text-orange-500 font-medium">{doctor.specialities?.join(', ')}</p>
+                        <p className="text-orange-500 font-medium">
+                          {doctor.specialties?.map(s => MEDICAL_SPECIALTIES.find(ms => ms.id === s)?.label || s).join(', ')}
+                        </p>
                         <p className="text-sm text-gray-400 mt-1">{doctor.degrees?.join(', ')}</p>
                       </div>
                       <Badge variant="secondary" className="flex items-center gap-1 bg-zinc-800 text-white border-zinc-700">
