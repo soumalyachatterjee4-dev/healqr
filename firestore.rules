@@ -26,17 +26,19 @@ service cloud.firestore {
       allow read: if true;
 
       // Allow update for:
-      // 1. Admin (full access)
+      // 1. Admin (full access via custom claim OR admins collection)
       // 2. During clinic/doctor signup for setting pending status (unauthenticated)
       // 3. During email verification for activating QR (authenticated)
       allow update: if (isAuthenticated() && request.auth.token.admin == true) ||
+                      (isAuthenticated() && exists(/databases/$(database)/documents/admins/$(request.auth.token.email))) ||
                       (request.resource.data.status == 'pending' && request.resource.data.linkedEmail != null) ||
                       (isAuthenticated() && request.resource.data.status == 'active' && request.resource.data.linkedEmail != null);
 
       // Allow create for:
-      // 1. Admin (full access)
+      // 1. Admin (full access via custom claim OR admins collection)
       // 2. Unauthenticated virtual QR generation during clinic/doctor signup
       allow create: if (isAuthenticated() && request.auth.token.admin == true) ||
+                      (isAuthenticated() && exists(/databases/$(database)/documents/admins/$(request.auth.token.email))) ||
                       (request.resource.data.qrType == 'virtual' && request.resource.data.generatedBy in ['clinic-signup', 'doctor-signup', 'self-signup']);
 
       // No deletes allowed

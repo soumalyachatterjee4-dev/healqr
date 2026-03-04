@@ -4,10 +4,10 @@ import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
-import { 
-  QrCode, 
+import {
+  QrCode,
   Package,
-  Download, 
+  Download,
   MapPin,
   User,
   Calendar,
@@ -24,12 +24,13 @@ import {
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { db } from '../lib/firebase/config';
-import { 
-  collection, 
-  addDoc, 
-  getDocs, 
-  query, 
-  where, 
+import {
+  collection,
+  addDoc,
+  getDocs,
+  getDoc,
+  query,
+  where,
   orderBy,
   serverTimestamp,
   doc,
@@ -60,19 +61,21 @@ interface AdminQRGenerationProps {
 
 export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
   const [activeTab, setActiveTab] = useState<'create' | 'inventory' | 'display'>('create');
-  
+
   // QR Display Panel states
   const [displayQRNumber, setDisplayQRNumber] = useState('');
   const [displayQRData, setDisplayQRData] = useState<any>(null);
   const [displayQRImage, setDisplayQRImage] = useState<string | null>(null);
   const [searchingQR, setSearchingQR] = useState(false);
-  
+  const [linkedDoctorData, setLinkedDoctorData] = useState<any>(null);
+  const [linkedClinicData, setLinkedClinicData] = useState<any>(null);
+
   // Print Movement Panel states
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<QRBatch | null>(null);
   const [printSize, setPrintSize] = useState<'a4' | 'letter' | 'small' | 'large'>('a4');
   const [printProgress, setPrintProgress] = useState<'idle' | 'downloading' | 'ready'>('idle');
-  
+
   // Form states
   const [startNumber, setStartNumber] = useState(1);
   const [endNumber, setEndNumber] = useState(100);
@@ -84,7 +87,7 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
   const [generating, setGenerating] = useState(false);
   const [nextAvailable, setNextAvailable] = useState<number | null>(null);
   const [checkingNext, setCheckingNext] = useState(false);
-  
+
   // Inventory states
   const [batches, setBatches] = useState<QRBatch[]>([]);
   const [filterStatus, setFilterStatus] = useState<'all' | 'generated' | 'dispatched' | 'deployed'>('all');
@@ -108,12 +111,12 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
     try {
       const qrPoolCollection = collection(db, 'qrPool');
       const qrCodesCollection = collection(db, 'qrCodes'); // Old collection
-      
+
       const [poolQrs, codesQrs] = await Promise.all([
         getDocs(qrPoolCollection),
         getDocs(qrCodesCollection)
       ]);
-      
+
       // Find highest HQR number across BOTH collections (qrPool + old qrCodes)
       let maxNumber = 0;
       // Check qrPool collection
@@ -132,7 +135,7 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
           if (!isNaN(num) && num > maxNumber) maxNumber = num;
         }
       });
-      
+
       console.log('📊 Admin QR Check - Max from both collections:', maxNumber);
 
       const nextNum = maxNumber + 1;
@@ -153,14 +156,14 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
       const batchCollection = collection(db, 'qrBatches');
       const batchQuery = query(batchCollection, orderBy('createdAt', 'desc'));
       const snapshot = await getDocs(batchQuery);
-      
+
       const loadedBatches: QRBatch[] = [];
       let generated = 0, dispatched = 0, deployed = 0;
-      
+
       snapshot.forEach(doc => {
         const data = { id: doc.id, ...doc.data() } as QRBatch;
         loadedBatches.push(data);
-        
+
         if (data.status === 'generated') generated++;
         if (data.status === 'dispatched') dispatched++;
         if (data.status === 'deployed') deployed++;
@@ -200,18 +203,18 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
     try {
       const qrCollection = collection(db, 'qrPool');
       const batchCollection = collection(db, 'qrBatches');
-      
+
       const batchNumber = `BATCH-${Date.now()}`;
-      
+
       // Create QR codes in Firestore
       const qrsCreated = [];
       for (let i = startNumber; i <= endNumber; i++) {
         const qrNumber = `HQR${String(i).padStart(5, '0')}`;
-        
+
         // Check if exists
         const existingQuery = query(qrCollection, where('qrNumber', '==', qrNumber));
         const existingSnapshot = await getDocs(existingQuery);
-        
+
         if (!existingSnapshot.empty) {
           console.log(`${qrNumber} already exists, skipping...`);
           continue;
@@ -259,7 +262,7 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
       toast.success(`✅ Batch ${batchNumber} created successfully! ${qrsCreated.length} QR codes generated and ready for printing.`, {
         duration: 5000
       });
-      
+
       // Reset form
       setStartNumber(endNumber + 1);
       setEndNumber(endNumber + 100);
@@ -268,13 +271,13 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
       setDispatchDate('');
       setDeadline('');
       setRemarks('');
-      
+
       // Reload batches
       await loadBatches();
-      
+
       // Switch to inventory tab to show new batch
       setActiveTab('inventory');
-      
+
       // Show additional prompt to download
       setTimeout(() => {
         toast.info('📥 Go to "Batch Inventory" tab to download printable QRs', {
@@ -295,7 +298,7 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
   const downloadBatchQRs = async (batch: QRBatch, size: string = 'a4') => {
     try {
       setPrintProgress('downloading');
-      
+
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
@@ -307,7 +310,7 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
         small: { width: 2480, height: 3508, qrSize: 150, cols: 5, rows: 8 },
         large: { width: 2480, height: 3508, qrSize: 250, cols: 3, rows: 4 }
       };
-      
+
       const config = sizeConfigs[size as keyof typeof sizeConfigs] || sizeConfigs.a4;
       const pageWidth = config.width;
       const pageHeight = config.height;
@@ -321,11 +324,11 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
 
       const totalQRs = batch.endQR - batch.startQR + 1;
       const pages = Math.ceil(totalQRs / (cols * rows));
-      
+
       for (let page = 0; page < pages; page++) {
         canvas.width = pageWidth;
         canvas.height = pageHeight;
-        
+
         // White background
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, pageWidth, pageHeight);
@@ -335,7 +338,7 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
         ctx.font = 'bold 48px Arial';
         ctx.textAlign = 'center';
         ctx.fillText('HealQR - QR Batch', pageWidth / 2, 80);
-        
+
         // Batch info
         ctx.font = '24px Arial';
         ctx.fillText(`${batch.batchNumber} | ${batch.region} | MR: ${batch.mrName}`, pageWidth / 2, 130);
@@ -374,7 +377,7 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
           ctx.textAlign = 'center';
           ctx.fillStyle = '#000000';
           ctx.fillText(qrNumber, x + qrSize / 2, y + qrSize + 35);
-          
+
           // Batch info
           ctx.font = '16px Arial';
           ctx.fillStyle = '#666666';
@@ -417,11 +420,11 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
 
   const filteredBatches = batches.filter(batch => {
     const matchesStatus = filterStatus === 'all' || batch.status === filterStatus;
-    const matchesSearch = !searchTerm || 
+    const matchesSearch = !searchTerm ||
       batch.batchNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       batch.region.toLowerCase().includes(searchTerm.toLowerCase()) ||
       batch.mrName.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     return matchesStatus && matchesSearch;
   });
 
@@ -444,11 +447,11 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0f1a] text-white p-6">
+    <div className="min-h-screen bg-[#0a0f1a] text-white p-3 sm:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 sm:mb-8 gap-3">
+          <div className="flex items-center gap-3 sm:gap-4">
             <Button
               variant="outline"
               onClick={onBack}
@@ -458,14 +461,14 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
               Back
             </Button>
             <div>
-              <h1 className="text-3xl font-bold">QR Generation & Inventory</h1>
-              <p className="text-gray-400">Production to deployment tracking</p>
+              <h1 className="text-xl sm:text-3xl font-bold">QR Generation & Inventory</h1>
+              <p className="text-gray-400 text-xs sm:text-base">Production to deployment tracking</p>
             </div>
           </div>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
           <Card className="bg-zinc-900 border-zinc-800 p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -508,38 +511,38 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6 border-b border-zinc-800">
+        <div className="flex overflow-x-auto gap-1 sm:gap-2 mb-4 sm:mb-6 border-b border-zinc-800 -mx-3 px-3 sm:mx-0 sm:px-0">
           <button
             onClick={() => setActiveTab('create')}
-            className={`px-6 py-3 font-medium transition-all border-b-2 ${
+            className={`px-3 sm:px-6 py-2.5 sm:py-3 font-medium transition-all border-b-2 whitespace-nowrap text-sm sm:text-base ${
               activeTab === 'create'
                 ? 'border-emerald-500 text-emerald-400'
                 : 'border-transparent text-gray-400 hover:text-gray-300'
             }`}
           >
-            <QrCode className="w-4 h-4 inline-block mr-2" />
+            <QrCode className="w-4 h-4 inline-block mr-1 sm:mr-2" />
             Create Batch
           </button>
           <button
             onClick={() => setActiveTab('inventory')}
-            className={`px-6 py-3 font-medium transition-all border-b-2 ${
+            className={`px-3 sm:px-6 py-2.5 sm:py-3 font-medium transition-all border-b-2 whitespace-nowrap text-sm sm:text-base ${
               activeTab === 'inventory'
                 ? 'border-emerald-500 text-emerald-400'
                 : 'border-transparent text-gray-400 hover:text-gray-300'
             }`}
           >
-            <Package className="w-4 h-4 inline-block mr-2" />
+            <Package className="w-4 h-4 inline-block mr-1 sm:mr-2" />
             Batch Inventory
           </button>
           <button
             onClick={() => setActiveTab('display')}
-            className={`px-6 py-3 font-medium transition-all border-b-2 ${
+            className={`px-3 sm:px-6 py-2.5 sm:py-3 font-medium transition-all border-b-2 whitespace-nowrap text-sm sm:text-base ${
               activeTab === 'display'
                 ? 'border-emerald-500 text-emerald-400'
                 : 'border-transparent text-gray-400 hover:text-gray-300'
             }`}
           >
-            <Eye className="w-4 h-4 inline-block mr-2" />
+            <Eye className="w-4 h-4 inline-block mr-1 sm:mr-2" />
             QR Display Panel
           </button>
         </div>
@@ -685,7 +688,7 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
             {/* Summary */}
             <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-6">
               <p className="text-blue-400">
-                <strong>Batch Summary:</strong> {endNumber - startNumber + 1} QR codes will be created 
+                <strong>Batch Summary:</strong> {endNumber - startNumber + 1} QR codes will be created
                 ({`HQR${String(startNumber).padStart(5, '0')}`} to {`HQR${String(endNumber).padStart(5, '0')}`})
               </p>
             </div>
@@ -702,12 +705,12 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
 
         {/* Inventory Tab */}
         {activeTab === 'inventory' && (
-          <Card className="bg-zinc-900 border-zinc-800 p-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold">Batch Inventory</h2>
-              
+          <Card className="bg-zinc-900 border-zinc-800 p-4 sm:p-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 gap-3">
+              <h2 className="text-xl sm:text-2xl font-bold">Batch Inventory</h2>
+
               {/* Filters */}
-              <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <Input
@@ -715,14 +718,14 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder="Search batches..."
-                    className="pl-10 bg-zinc-950 border-zinc-800 text-white w-64"
+                    className="pl-10 bg-zinc-950 border-zinc-800 text-white w-full sm:w-64"
                   />
                 </div>
-                
+
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value as any)}
-                  className="bg-zinc-950 border border-zinc-800 text-white rounded-lg px-4 py-2"
+                  className="bg-zinc-950 border border-zinc-800 text-white rounded-lg px-4 py-2 w-full sm:w-auto"
                 >
                   <option value="all">All Status</option>
                   <option value="generated">Generated</option>
@@ -741,69 +744,66 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
                 </div>
               ) : (
                 filteredBatches.map((batch) => (
-                  <Card key={batch.id} className="bg-zinc-800 border-zinc-700 p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-lg font-bold">{batch.batchNumber}</h3>
-                          <Badge className={getStatusColor(batch.status)}>
-                            {getStatusIcon(batch.status)}
-                            <span className="ml-1 capitalize">{batch.status}</span>
-                          </Badge>
+                  <Card key={batch.id} className="bg-zinc-800 border-zinc-700 p-4 sm:p-6">
+                    <div className="space-y-3">
+                      {/* Top row: batch name + badge + actions */}
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                        <h3 className="text-base sm:text-lg font-bold break-all">{batch.batchNumber}</h3>
+                        <Badge className={getStatusColor(batch.status)}>
+                          {getStatusIcon(batch.status)}
+                          <span className="ml-1 capitalize">{batch.status}</span>
+                        </Badge>
+                        <div className="flex gap-2 ml-auto">
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setSelectedBatch(batch);
+                              setShowPrintModal(true);
+                              setPrintProgress('idle');
+                            }}
+                            className="bg-blue-500 hover:bg-blue-600"
+                          >
+                            <Download className="w-4 h-4 mr-1" />
+                            Print
+                          </Button>
+                          <select
+                            value={batch.status}
+                            onChange={(e) => updateBatchStatus(batch.id, e.target.value as any)}
+                            className="bg-zinc-950 border border-zinc-700 text-white rounded px-2 sm:px-3 py-1 text-sm"
+                          >
+                            <option value="generated">Generated</option>
+                            <option value="dispatched">Dispatched</option>
+                            <option value="deployed">Deployed</option>
+                          </select>
                         </div>
-                        
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                          <div className="flex items-center gap-2 text-gray-400">
-                            <QrCode className="w-4 h-4" />
-                            <span>{batch.totalQRs} QRs (#{batch.startQR}-#{batch.endQR})</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-gray-400">
-                            <MapPin className="w-4 h-4" />
-                            <span>{batch.region}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-gray-400">
-                            <User className="w-4 h-4" />
-                            <span>{batch.mrName}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-gray-400">
-                            <Calendar className="w-4 h-4" />
-                            <span>Dispatch: {batch.dispatchDate}</span>
-                          </div>
-                        </div>
-
-                        {batch.remarks && (
-                          <p className="text-gray-500 text-sm mt-2">
-                            <FileText className="w-3 h-3 inline mr-1" />
-                            {batch.remarks}
-                          </p>
-                        )}
                       </div>
 
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            setSelectedBatch(batch);
-                            setShowPrintModal(true);
-                            setPrintProgress('idle');
-                          }}
-                          className="bg-blue-500 hover:bg-blue-600"
-                        >
-                          <Download className="w-4 h-4 mr-1" />
-                          Print
-                        </Button>
-                        
-                        {/* Status Update Dropdown */}
-                        <select
-                          value={batch.status}
-                          onChange={(e) => updateBatchStatus(batch.id, e.target.value as any)}
-                          className="bg-zinc-950 border border-zinc-700 text-white rounded px-3 py-1 text-sm"
-                        >
-                          <option value="generated">Generated</option>
-                          <option value="dispatched">Dispatched</option>
-                          <option value="deployed">Deployed</option>
-                        </select>
+                      {/* Batch details grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 text-sm">
+                        <div className="flex items-center gap-2 text-gray-400">
+                          <QrCode className="w-4 h-4 shrink-0" />
+                          <span>{batch.totalQRs} QRs (#{batch.startQR}-#{batch.endQR})</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-gray-400">
+                          <MapPin className="w-4 h-4 shrink-0" />
+                          <span>{batch.region}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-gray-400">
+                          <User className="w-4 h-4 shrink-0" />
+                          <span>{batch.mrName}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-gray-400">
+                          <Calendar className="w-4 h-4 shrink-0" />
+                          <span>Dispatch: {batch.dispatchDate}</span>
+                        </div>
                       </div>
+
+                      {batch.remarks && (
+                        <p className="text-gray-500 text-sm">
+                          <FileText className="w-3 h-3 inline mr-1" />
+                          {batch.remarks}
+                        </p>
+                      )}
                     </div>
                   </Card>
                 ))
@@ -853,8 +853,8 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
                 <div className="text-center mb-6">
                   <h3 className="text-3xl font-bold text-white mb-2">{displayQRData.qrNumber}</h3>
                   <Badge className={
-                    displayQRData.linkedEmail 
-                      ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' 
+                    displayQRData.linkedEmail
+                      ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
                       : 'bg-blue-500/20 text-blue-400 border-blue-500/30'
                   }>
                     {displayQRData.linkedEmail ? 'ACTIVE - In Use' : 'AVAILABLE - Not Assigned'}
@@ -863,8 +863,8 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
 
                 {/* QR Code Display */}
                 <div className="bg-white p-8 rounded-lg mb-6 flex justify-center">
-                  <img 
-                    src={displayQRImage} 
+                  <img
+                    src={displayQRImage}
                     alt={displayQRData.qrNumber}
                     className="w-64 h-64"
                   />
@@ -872,27 +872,41 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
 
                 {/* QR Details */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  {/* QR Type */}
+                  <div className="bg-zinc-900 p-4 rounded-lg">
+                    <p className="text-gray-400 mb-1">QR Type</p>
+                    <Badge className={displayQRData.qrType === 'virtual' ? 'bg-purple-500/20 text-purple-400 border-purple-500/30' : 'bg-blue-500/20 text-blue-400 border-blue-500/30'}>
+                      {displayQRData.qrType === 'virtual' ? '🌐 Virtual QR' : '📦 Physical QR'}
+                    </Badge>
+                  </div>
+
+                  {/* Status */}
+                  <div className="bg-zinc-900 p-4 rounded-lg">
+                    <p className="text-gray-400 mb-1">Status</p>
+                    <p className="text-white font-medium capitalize">{displayQRData.status || 'available'}</p>
+                  </div>
+
                   {displayQRData.region && (
                     <div className="bg-zinc-900 p-4 rounded-lg">
                       <p className="text-gray-400 mb-1">Region</p>
                       <p className="text-white font-medium">{displayQRData.region}</p>
                     </div>
                   )}
-                  
+
                   {displayQRData.mrName && (
                     <div className="bg-zinc-900 p-4 rounded-lg">
                       <p className="text-gray-400 mb-1">MR Name</p>
                       <p className="text-white font-medium">{displayQRData.mrName}</p>
                     </div>
                   )}
-                  
+
                   {displayQRData.batchNumber && (
                     <div className="bg-zinc-900 p-4 rounded-lg">
                       <p className="text-gray-400 mb-1">Batch Number</p>
                       <p className="text-white font-medium">{displayQRData.batchNumber}</p>
                     </div>
                   )}
-                  
+
                   {displayQRData.dispatchDate && (
                     <div className="bg-zinc-900 p-4 rounded-lg">
                       <p className="text-gray-400 mb-1">Dispatch Date</p>
@@ -902,11 +916,84 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
 
                   {displayQRData.linkedEmail && (
                     <div className="bg-zinc-900 p-4 rounded-lg md:col-span-2">
-                      <p className="text-gray-400 mb-1">Linked Doctor Email</p>
+                      <p className="text-gray-400 mb-1">Linked Email</p>
                       <p className="text-emerald-400 font-medium">{displayQRData.linkedEmail}</p>
                     </div>
                   )}
                 </div>
+
+                {/* Linked Doctor/Clinic Details */}
+                {(linkedDoctorData || linkedClinicData) && (
+                  <Card className="bg-gradient-to-br from-emerald-500/10 to-blue-500/10 border-emerald-500/30 p-5 mt-4">
+                    <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                      <User className="w-5 h-5 text-emerald-400" />
+                      Linked Doctor/Clinic Details
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                      {linkedDoctorData && (
+                        <>
+                          <div className="bg-zinc-900/60 p-3 rounded-lg">
+                            <p className="text-gray-400 text-xs mb-1">Doctor Name</p>
+                            <p className="text-white font-semibold">{linkedDoctorData.name || linkedDoctorData.displayName || 'N/A'}</p>
+                          </div>
+                          <div className="bg-zinc-900/60 p-3 rounded-lg">
+                            <p className="text-gray-400 text-xs mb-1">Doctor Email</p>
+                            <p className="text-emerald-400 font-medium">{linkedDoctorData.email || 'N/A'}</p>
+                          </div>
+                          {linkedDoctorData.phone && (
+                            <div className="bg-zinc-900/60 p-3 rounded-lg">
+                              <p className="text-gray-400 text-xs mb-1">Phone</p>
+                              <p className="text-white font-medium">{linkedDoctorData.phone}</p>
+                            </div>
+                          )}
+                          {linkedDoctorData.specialization && (
+                            <div className="bg-zinc-900/60 p-3 rounded-lg">
+                              <p className="text-gray-400 text-xs mb-1">Specialization</p>
+                              <p className="text-white font-medium">{linkedDoctorData.specialization}</p>
+                            </div>
+                          )}
+                          {linkedDoctorData.clinicName && (
+                            <div className="bg-zinc-900/60 p-3 rounded-lg">
+                              <p className="text-gray-400 text-xs mb-1">Clinic Name</p>
+                              <p className="text-white font-medium">{linkedDoctorData.clinicName}</p>
+                            </div>
+                          )}
+                          {linkedDoctorData.address && (
+                            <div className="bg-zinc-900/60 p-3 rounded-lg">
+                              <p className="text-gray-400 text-xs mb-1">Address</p>
+                              <p className="text-white font-medium">{linkedDoctorData.address}</p>
+                            </div>
+                          )}
+                        </>
+                      )}
+                      {linkedClinicData && !linkedDoctorData && (
+                        <>
+                          <div className="bg-zinc-900/60 p-3 rounded-lg">
+                            <p className="text-gray-400 text-xs mb-1">Clinic Name</p>
+                            <p className="text-white font-semibold">{linkedClinicData.clinicName || linkedClinicData.name || 'N/A'}</p>
+                          </div>
+                          <div className="bg-zinc-900/60 p-3 rounded-lg">
+                            <p className="text-gray-400 text-xs mb-1">Clinic Email</p>
+                            <p className="text-emerald-400 font-medium">{linkedClinicData.email || 'N/A'}</p>
+                          </div>
+                          {linkedClinicData.phone && (
+                            <div className="bg-zinc-900/60 p-3 rounded-lg">
+                              <p className="text-gray-400 text-xs mb-1">Phone</p>
+                              <p className="text-white font-medium">{linkedClinicData.phone}</p>
+                            </div>
+                          )}
+                          {linkedClinicData.address && (
+                            <div className="bg-zinc-900/60 p-3 rounded-lg">
+                              <p className="text-gray-400 text-xs mb-1">Address</p>
+                              <p className="text-white font-medium">{linkedClinicData.address}</p>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-3 italic">This information can be used to send a physical print copy of this QR to the concerned doctor/clinic.</p>
+                  </Card>
+                )}
 
                 {/* Download Button */}
                 <Button
@@ -958,18 +1045,18 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
                   </div>
                   <p className="text-sm text-emerald-400 font-medium">Created</p>
                 </div>
-                
+
                 <div className="flex-1 h-1 bg-emerald-500 mx-4"></div>
-                
+
                 <div className="flex flex-col items-center">
                   <div className="w-12 h-12 rounded-full bg-emerald-500 flex items-center justify-center text-white font-bold mb-2">
                     ✓
                   </div>
                   <p className="text-sm text-emerald-400 font-medium">Generated</p>
                 </div>
-                
+
                 <div className={`flex-1 h-1 mx-4 ${printProgress === 'idle' ? 'bg-zinc-700' : 'bg-emerald-500'}`}></div>
-                
+
                 <div className="flex flex-col items-center">
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold mb-2 ${
                     printProgress === 'idle' ? 'bg-zinc-700' : printProgress === 'downloading' ? 'bg-blue-500 animate-pulse' : 'bg-emerald-500'
@@ -980,9 +1067,9 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
                     Download
                   </p>
                 </div>
-                
+
                 <div className={`flex-1 h-1 mx-4 ${printProgress === 'ready' ? 'bg-emerald-500' : 'bg-zinc-700'}`}></div>
-                
+
                 <div className="flex flex-col items-center">
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold mb-2 ${
                     printProgress === 'ready' ? 'bg-emerald-500' : 'bg-zinc-700'
@@ -1132,7 +1219,7 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
               {printProgress === 'ready' && (
                 <div className="mt-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4">
                   <p className="text-emerald-400 text-sm">
-                    ✅ Files downloaded successfully! Click "Print Now" to send to your printer, 
+                    ✅ Files downloaded successfully! Click "Print Now" to send to your printer,
                     or use your browser's print function (Ctrl+P / Cmd+P).
                   </p>
                 </div>
@@ -1146,10 +1233,12 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
 
   async function searchAndDisplayQR() {
     if (!db || !displayQRNumber.trim()) return;
-    
+
     setSearchingQR(true);
     setDisplayQRData(null);
     setDisplayQRImage(null);
+    setLinkedDoctorData(null);
+    setLinkedClinicData(null);
 
     try {
       const qrCollection = collection(db, 'qrPool');
@@ -1175,8 +1264,32 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
           light: '#FFFFFF'
         }
       });
-      
+
       setDisplayQRImage(qrImage);
+
+      // Fetch linked doctor/clinic data if a linkedEmail exists
+      if (qrData.linkedEmail) {
+        try {
+          // Try to find a doctor with this email
+          const doctorsQuery = query(collection(db, 'doctors'), where('email', '==', qrData.linkedEmail));
+          const doctorSnapshot = await getDocs(doctorsQuery);
+          if (!doctorSnapshot.empty) {
+            const docData = doctorSnapshot.docs[0].data();
+            setLinkedDoctorData({ id: doctorSnapshot.docs[0].id, ...docData });
+          } else {
+            // Try to find a clinic with this email
+            const clinicsQuery = query(collection(db, 'clinics'), where('email', '==', qrData.linkedEmail));
+            const clinicSnapshot = await getDocs(clinicsQuery);
+            if (!clinicSnapshot.empty) {
+              const clinicData = clinicSnapshot.docs[0].data();
+              setLinkedClinicData({ id: clinicSnapshot.docs[0].id, ...clinicData });
+            }
+          }
+        } catch (lookupError) {
+          console.warn('Could not fetch linked doctor/clinic data:', lookupError);
+        }
+      }
+
       toast.success(`QR ${displayQRNumber} loaded successfully`);
 
     } catch (error) {

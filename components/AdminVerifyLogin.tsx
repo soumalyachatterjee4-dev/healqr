@@ -36,11 +36,11 @@ export default function AdminVerifyLogin({ onSuccess, onError }: AdminVerifyLogi
 
       // Get email from localStorage
       let email = localStorage.getItem('healqr_admin_email_for_signin');
-      
+
       if (!email) {
         // Ask user to enter their email
         email = window.prompt('Please enter the admin email address:');
-        
+
         if (!email || !email.includes('@')) {
           throw new Error('Valid email address is required');
         }
@@ -53,12 +53,12 @@ export default function AdminVerifyLogin({ onSuccess, onError }: AdminVerifyLogi
 
       const adminsCollectionRef = doc(db, 'admins', email.toLowerCase());
       const adminDocSnapshot = await getDoc(adminsCollectionRef);
-      
+
       if (!adminDocSnapshot.exists() || adminDocSnapshot.data()?.isAuthorized !== true) {
         // Check legacy adminProfiles collection as fallback
         const adminProfileRef = doc(db, 'adminProfiles', 'super_admin');
         const adminProfileDoc = await getDoc(adminProfileRef);
-        
+
         let isAuthorized = false;
         if (adminProfileDoc.exists()) {
           const adminData = adminProfileDoc.data();
@@ -81,6 +81,14 @@ export default function AdminVerifyLogin({ onSuccess, onError }: AdminVerifyLogi
       // Sign in with email link
       const result = await signInWithEmailLink(auth, email, window.location.href);
       const user = result.user;
+
+      // Force identity token refresh to ensure admin custom claims are recognized immediately
+      try {
+        await user.getIdToken(true);
+        console.log('✅ Admin token refreshed with custom claims');
+      } catch (tokenError) {
+        console.error('❌ Error refreshing admin token:', tokenError);
+      }
 
       // Wait for auth state to propagate
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -107,13 +115,13 @@ export default function AdminVerifyLogin({ onSuccess, onError }: AdminVerifyLogi
     } catch (error: any) {
       console.error('❌ Admin login error:', error);
       setStatus('error');
-      
+
       if (error.code === 'auth/invalid-action-code') {
         setMessage('Login link expired or already used. Redirecting...');
       } else {
         setMessage(error.message || 'Admin login failed');
       }
-      
+
       setTimeout(() => {
         if (onError) {
           onError();

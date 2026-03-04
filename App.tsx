@@ -1145,6 +1145,26 @@ export default function App() {
       }
 
       if (user) {
+        // --- ADMIN CHECK ---
+        try {
+          const idTokenResult = await user.getIdTokenResult();
+          if (idTokenResult.claims.admin) {
+            console.log('✅ Admin user confirmed via custom claims');
+            localStorage.setItem('healqr_admin_email', user.email || '');
+            localStorage.setItem('healqr_admin_authenticated', 'true');
+            setAdminEmail(user.email || '');
+
+            // Redirect admin to panel if on landing or login
+            if (currentPage === 'landing' || currentPage === 'admin-login' || currentPage === 'login') {
+              setCurrentPage('admin-panel');
+            }
+            setIsAuthInitialized(true);
+            return; // CRITICAL: Skip doctor profile loading
+          }
+        } catch (adminError) {
+          console.error("Error checking admin claims", adminError);
+        }
+
         // Check localStorage first for quick routing (set by VerifyLogin)
         const isClinicFromStorage = localStorage.getItem('healqr_is_clinic') === 'true';
         const isAssistantFromStorage = localStorage.getItem('healqr_is_assistant') === 'true';
