@@ -8,7 +8,7 @@ import PharmaDashboardTemplates from './PharmaDashboardTemplates';
 import PharmaProfileManager from './PharmaProfileManager';
 import VideoLibrary from './VideoLibrary';
 import { db } from '../lib/firebase/config';
-import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, updateDoc, getDoc } from 'firebase/firestore';
 
 interface PharmaPortalProps {
   onLogout: () => void;
@@ -41,6 +41,7 @@ export default function PharmaPortal({ onLogout }: PharmaPortalProps) {
   const companyId = localStorage.getItem('healqr_pharma_company_id') || '';
   const companyName = localStorage.getItem('healqr_pharma_company_name') || '';
   const companyEmail = localStorage.getItem('healqr_pharma_email') || '';
+  const [companyLogoUrl, setCompanyLogoUrl] = useState<string | null>(null);
 
   const pageTitles: Record<string, string> = {    profile: 'Profile',    dashboard: 'Dashboard',
     'my-doctors': 'My Doctors',
@@ -56,6 +57,26 @@ export default function PharmaPortal({ onLogout }: PharmaPortalProps) {
       window.location.href = '/?page=pharma-login';
     }
   }, []);
+
+  // Fetch company logo for navbar profile icon
+  useEffect(() => {
+    if (!companyId || !db) return;
+    const fetchLogo = async () => {
+      try {
+        const docRef = doc(db, 'pharmaCompanies', companyId);
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.logoUrl) {
+            setCompanyLogoUrl(data.logoUrl);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch company logo:', err);
+      }
+    };
+    fetchLogo();
+  }, [companyId]);
 
   // Listen to support messages for floating chat + unread count
   useEffect(() => {
@@ -175,9 +196,9 @@ export default function PharmaPortal({ onLogout }: PharmaPortalProps) {
     }
   };
 
-  // Navbar icon button component  
-  const NavIconBtn = ({ icon: Icon, label, onClick, badge, active }: {
-    icon: any; label: string; onClick: () => void; badge?: number; active?: boolean;
+  // Navbar icon button component
+  const NavIconBtn = ({ icon: Icon, label, onClick, badge, active, imageUrl }: {
+    icon: any; label: string; onClick: () => void; badge?: number; active?: boolean; imageUrl?: string | null;
   }) => (
     <button
       onClick={onClick}
@@ -188,7 +209,11 @@ export default function PharmaPortal({ onLogout }: PharmaPortalProps) {
           : 'bg-zinc-900 border-zinc-800 text-gray-400 hover:bg-zinc-800 hover:text-white hover:border-zinc-700'
       }`}
     >
-      <Icon className="w-5 h-5" />
+      {imageUrl ? (
+        <img src={imageUrl} alt={label} className="w-5 h-5 rounded-full object-cover" />
+      ) : (
+        <Icon className="w-5 h-5" />
+      )}
       {badge && badge > 0 ? (
         <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
           {badge > 9 ? '9+' : badge}
@@ -222,18 +247,30 @@ export default function PharmaPortal({ onLogout }: PharmaPortalProps) {
           <NavIconBtn icon={Share2} label="Share" onClick={handleShare} />
           <NavIconBtn icon={Video} label="Video Library" onClick={() => setCurrentPage('video-library')} active={currentPage === 'video-library'} />
           <NavIconBtn icon={Bell} label="Notifications" onClick={() => setShowNotifications(!showNotifications)} badge={unreadCount} active={showNotifications} />
-          <NavIconBtn icon={User} label="Profile" onClick={() => setShowProfileMenu(!showProfileMenu)} active={showProfileMenu} />
+          <NavIconBtn icon={User} label="Profile" onClick={() => setShowProfileMenu(!showProfileMenu)} active={showProfileMenu} imageUrl={companyLogoUrl} />
         </div>
       </div>
 
-      {/* Desktop Header */}
-      <div className="hidden lg:flex fixed top-0 right-0 left-64 h-16 bg-black border-b border-zinc-900 items-center justify-between px-6 z-30">
+      {/* Desktop Header - using inline style to guarantee visibility on large screens */}
+      <div
+        className="fixed top-0 right-0 h-16 bg-black border-b border-zinc-900 items-center justify-between px-6"
+        style={{ display: 'none', left: '16rem', zIndex: 40 }}
+        ref={(el) => {
+          if (el) {
+            // Force display flex on lg screens using matchMedia
+            const mq = window.matchMedia('(min-width: 1024px)');
+            const update = () => { el.style.display = mq.matches ? 'flex' : 'none'; };
+            update();
+            mq.addEventListener('change', update);
+          }
+        }}
+      >
         <h1 className="text-lg font-semibold">{pageTitles[currentPage]}</h1>
         <div className="flex items-center gap-3">
           <NavIconBtn icon={Share2} label="Share" onClick={handleShare} />
           <NavIconBtn icon={Video} label="Video Library" onClick={() => setCurrentPage('video-library')} active={currentPage === 'video-library'} />
           <NavIconBtn icon={Bell} label="Notifications" onClick={() => setShowNotifications(!showNotifications)} badge={unreadCount} active={showNotifications} />
-          <NavIconBtn icon={User} label="Profile" onClick={() => setShowProfileMenu(!showProfileMenu)} active={showProfileMenu} />
+          <NavIconBtn icon={User} label="Profile" onClick={() => setShowProfileMenu(!showProfileMenu)} active={showProfileMenu} imageUrl={companyLogoUrl} />
         </div>
       </div>
 
@@ -270,8 +307,12 @@ export default function PharmaPortal({ onLogout }: PharmaPortalProps) {
           <div className="fixed top-16 right-4 lg:right-6 w-72 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl z-50 overflow-hidden">
             <div className="p-4 border-b border-zinc-800">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-blue-500/20 border border-blue-500/40 flex items-center justify-center">
-                  <User className="w-5 h-5 text-blue-400" />
+                <div className="w-10 h-10 rounded-full bg-blue-500/20 border border-blue-500/40 flex items-center justify-center overflow-hidden">
+                  {companyLogoUrl ? (
+                    <img src={companyLogoUrl} alt={companyName} className="w-full h-full object-cover" />
+                  ) : (
+                    <User className="w-5 h-5 text-blue-400" />
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold truncate">{companyName}</p>
