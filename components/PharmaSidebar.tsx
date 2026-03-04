@@ -19,6 +19,7 @@ export default function PharmaSidebar({ currentPage, onNavigate, onLogout, isOpe
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(true);
 
   const mainItems = [
+    { id: 'profile', label: 'Profile', icon: Users },
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'my-doctors', label: 'My Doctors', icon: Users },
   ];

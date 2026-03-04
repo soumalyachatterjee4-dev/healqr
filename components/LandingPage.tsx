@@ -61,6 +61,7 @@ export default function LandingPage({
   const [showClinicOptions, setShowClinicOptions] = useState(false);
   const [showAdvertiserOptions, setShowAdvertiserOptions] = useState(false);
   const [showPatientOptions, setShowPatientOptions] = useState(false);
+  const [showPharmaOptions, setShowPharmaOptions] = useState(false);
 
   // Real-time stats
   const [stats, setStats] = useState({
@@ -716,7 +717,7 @@ export default function LandingPage({
                 </li>
                 <li>
                   <button
-                    onClick={onPharmaLogin}
+                    onClick={() => setShowPharmaOptions(true)}
                     className="text-gray-400 hover:text-emerald-500 transition-colors text-sm text-left"
                   >
                     healQR Distributors
@@ -981,6 +982,50 @@ export default function LandingPage({
                 className="w-full border-zinc-700 text-gray-300 hover:bg-zinc-800 hover:text-white py-6 text-lg"
               >
                 Medical Locker
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pharma/Distributor Options Modal */}
+      {showPharmaOptions && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 max-w-md w-full relative">
+            <button
+              onClick={() => setShowPharmaOptions(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white"
+            >
+              ✕
+            </button>
+
+            <div className="text-center mb-6">
+              <div className="h-16 w-16 bg-blue-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <ShoppingBag className="w-8 h-8 text-blue-500" />
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-2">For Distributors</h2>
+              <p className="text-gray-400">Manage doctors in your territory and scale your business</p>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <Button
+                onClick={() => {
+                  setShowPharmaOptions(false);
+                  window.location.href = '/?page=pharma-signup';
+                }}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-6 text-lg"
+              >
+                Sign Up
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowPharmaOptions(false);
+                  onPharmaLogin?.();
+                }}
+                variant="outline"
+                className="w-full border-zinc-700 text-gray-300 hover:bg-zinc-800 hover:text-white py-6 text-lg"
+              >
+                Log In
               </Button>
             </div>
           </div>

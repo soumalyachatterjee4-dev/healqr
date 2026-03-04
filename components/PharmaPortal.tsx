@@ -5,6 +5,7 @@ import PharmaDashboard from './PharmaDashboard';
 import PharmaMyDoctors from './PharmaMyDoctors';
 import PharmaAnalytics from './PharmaAnalytics';
 import PharmaDashboardTemplates from './PharmaDashboardTemplates';
+import PharmaProfileManager from './PharmaProfileManager';
 import VideoLibrary from './VideoLibrary';
 import { db } from '../lib/firebase/config';
 import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, updateDoc } from 'firebase/firestore';
@@ -24,7 +25,7 @@ interface SupportMessage {
 
 export default function PharmaPortal({ onLogout }: PharmaPortalProps) {
   const [currentPage, setCurrentPage] = useState<
-    'dashboard' | 'my-doctors' | 'analytics' | 'templates' | 'video-library'
+    'profile' | 'dashboard' | 'my-doctors' | 'analytics' | 'templates' | 'video-library'
   >('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -41,8 +42,7 @@ export default function PharmaPortal({ onLogout }: PharmaPortalProps) {
   const companyName = localStorage.getItem('healqr_pharma_company_name') || '';
   const companyEmail = localStorage.getItem('healqr_pharma_email') || '';
 
-  const pageTitles: Record<string, string> = {
-    dashboard: 'Dashboard',
+  const pageTitles: Record<string, string> = {    profile: 'Profile',    dashboard: 'Dashboard',
     'my-doctors': 'My Doctors',
     analytics: 'Analytics',
     templates: 'Dashboard Templates',
@@ -280,6 +280,7 @@ export default function PharmaPortal({ onLogout }: PharmaPortalProps) {
               </div>
             </div>
             <div className="p-2">
+              <button onClick={() => { setShowProfileMenu(false); setCurrentPage('profile'); }} className="w-full text-left px-3 py-2.5 text-sm text-gray-300 hover:bg-zinc-800 rounded-lg transition-colors">Profile</button>
               <button onClick={() => { setShowProfileMenu(false); setCurrentPage('dashboard'); }} className="w-full text-left px-3 py-2.5 text-sm text-gray-300 hover:bg-zinc-800 rounded-lg transition-colors">Dashboard</button>
               <button onClick={() => { setShowProfileMenu(false); setCurrentPage('templates'); }} className="w-full text-left px-3 py-2.5 text-sm text-gray-300 hover:bg-zinc-800 rounded-lg transition-colors">Dashboard Templates</button>
               <div className="border-t border-zinc-800 my-1" />
@@ -291,6 +292,9 @@ export default function PharmaPortal({ onLogout }: PharmaPortalProps) {
 
       {/* Main Content */}
       <div className="flex-1 lg:ml-64 pt-16">
+        {currentPage === 'profile' && (
+          <PharmaProfileManager companyId={companyId} />
+        )}
         {currentPage === 'dashboard' && (
           <PharmaDashboard companyId={companyId} companyName={companyName} />
         )}

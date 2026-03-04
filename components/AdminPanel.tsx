@@ -16,6 +16,7 @@ import AdminPromoManager from './AdminPromoManager';
 import AdminDataStandardization from './AdminDataStandardization';
 import AdminPharmaManagement from './AdminPharmaManagement';
 import AdminAdvertiserManagement from './AdminAdvertiserManagement';
+import AdminDistributorManager from './AdminDistributorManager';
 import AdminPageDistribution from './AdminPageDistribution';
 
 interface DoctorTestimonial {
@@ -52,7 +53,7 @@ interface AdminPanelProps {
 
 export default function AdminPanel({ adminEmail, onLogout, onStartDemo, uploadedTestimonials = [], onUploadTestimonial, supportRequests = [], onNavigateToQRGenerator, onNavigateToQRGeneration, onNavigateToQRManagement }: AdminPanelProps) {
   const [currentPage, setCurrentPage] = useState<
-    'dashboard' | 'profile' | 'revenue' | 'doctors' | 'patients' | 'personal-management' | 'templates' | 'videos' | 'discount-cards' | 'promo-manager' | 'data-cleanup' | 'pharma-management' | 'advertiser-management' | 'page-distribution'
+    'dashboard' | 'profile' | 'revenue' | 'doctors' | 'patients' | 'personal-management' | 'templates' | 'videos' | 'discount-cards' | 'promo-manager' | 'data-cleanup' | 'pharma-management' | 'distribution-requests' | 'advertiser-management' | 'page-distribution'
   >('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
@@ -71,6 +72,7 @@ export default function AdminPanel({ adminEmail, onLogout, onStartDemo, uploaded
     'promo-manager': 'Promo Manager',
     'data-cleanup': 'Data Standardization',
     'pharma-management': 'Pharma Companies',
+    'distribution-requests': 'Distributor Requests',
     'advertiser-management': 'Advertiser Management',
     'page-distribution': 'Page Distribution',
   };
@@ -187,6 +189,7 @@ export default function AdminPanel({ adminEmail, onLogout, onStartDemo, uploaded
         {currentPage === 'promo-manager' && <AdminPromoManager />}
         {currentPage === 'data-cleanup' && <AdminDataStandardization />}
         {currentPage === 'pharma-management' && <AdminPharmaManagement />}
+        {currentPage === 'distribution-requests' && <AdminDistributorManager />}
         {currentPage === 'advertiser-management' && <AdminAdvertiserManagement />}
         {currentPage === 'page-distribution' && <AdminPageDistribution />}
       </div>
