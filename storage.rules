@@ -255,6 +255,18 @@ service firebase.storage {
     }
 
     // ============================================
+    // PHARMA COMPANIES
+    // ============================================
+
+    match /pharmaCompanies/{companyId}/{allPaths=**} {
+      // Allow read by anyone
+      allow read: if true;
+
+      // Allow write by authenticated pharma users for their own company logo
+      allow write: if isAuthenticated() && isImageFile() && isValidImageSize();
+    }
+
+    // ============================================
     // DEFAULT DENY
     // ============================================
 
