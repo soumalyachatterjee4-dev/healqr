@@ -242,9 +242,14 @@ export default function PharmaProfileManager({ companyId }: PharmaProfileManager
             : (profile.territoryStates || []).join(', ')}
         </p>
         {/* Add states */}
+        {profile.territoryType === 'all_india' && (
+          <p className="text-xs text-gray-400 italic">
+            You already have pan India coverage; no additional states can be added.
+          </p>
+        )}
         {availableAddStates.length > 0 && (
           <div className="space-y-2">
-            <p className="text-xs text-gray-400">Add states</p>
+            <p className="text-xs text-gray-400">Add states (click to select then Request addition)</p>
             <div className="flex flex-wrap gap-2">
               {availableAddStates.map((s) => (
                 <button
@@ -299,9 +304,14 @@ export default function PharmaProfileManager({ companyId }: PharmaProfileManager
         <h3 className="font-semibold">Specialties Covered</h3>
         <p className="text-sm text-gray-400">{(profile.specialties || []).join(', ') || 'None'}</p>
         {/* Add specialties */}
+        {availableAddSpecialties.length === 0 && (
+          <p className="text-xs text-gray-400 italic">
+            All available specialties are already covered.
+          </p>
+        )}
         {availableAddSpecialties.length > 0 && (
           <div className="space-y-2">
-            <p className="text-xs text-gray-400">Add specialties</p>
+            <p className="text-xs text-gray-400">Add specialties (click to select then Request addition)</p>
             <div className="flex flex-wrap gap-2">
               {availableAddSpecialties.map((s) => (
                 <button
