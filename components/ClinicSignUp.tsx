@@ -57,12 +57,11 @@ export default function ClinicSignUp({ onBack, onLogin }: ClinicSignUpProps) {
       let finalQrNumber = qrNumber;
       let qrDocRef = null;
       let qrData = null;
+      const qrPoolCollection = collection(db, 'qrPool');
+      const qrCodesCollection = collection(db, 'qrCodes'); // Old collection
 
       if (qrType === 'virtual') {
         // Generate Virtual QR from UNIVERSAL POOL - check BOTH collections for true max
-        const qrPoolCollection = collection(db, 'qrPool');
-        const qrCodesCollection = collection(db, 'qrCodes'); // Old collection
-
         const [poolQrs, codesQrs] = await Promise.all([
           getDocs(qrPoolCollection),
           getDocs(qrCodesCollection)
@@ -103,7 +102,6 @@ export default function ClinicSignUp({ onBack, onLogin }: ClinicSignUpProps) {
         toast.success('Virtual QR Generated: ' + finalQrNumber);
       } else {
         // Pre-printed QR: Validate existing QR Code in BOTH collections
-        const qrCodesCollection = collection(db, 'qrCodes'); // Old collection
         const poolQuery = query(qrPoolCollection, where('qrNumber', '==', qrNumber));
         const codesQuery = query(qrCodesCollection, where('qrNumber', '==', qrNumber));
 
