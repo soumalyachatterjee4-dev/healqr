@@ -1050,8 +1050,8 @@ service cloud.firestore {
     match /pharmaChangeRequests/{reqId} {
       // allow anyone to submit a change request (authentication not required)
       allow create: if true;
-      // only admins can view, modify or delete requests
-      allow read, list, update, delete: if isAuthenticated() && request.auth.token.admin == true;
+      // allow authenticated users to view, modify or delete requests (admin panel)
+      allow read, list, update, delete: if isAuthenticated();
     }
 
     // ============================================
