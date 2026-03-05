@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Apple, Sparkles, Loader2, CheckCircle2, Send, Pencil, Plus, Trash2, Save } from 'lucide-react';
+import { X, Apple, Sparkles, Loader2, CheckCircle2, Send, Pencil, Plus, Trash2, Save, MessageCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -61,7 +61,7 @@ interface InlineDietChartModalProps {
     footerLine2?: string;
   };
   onClose: () => void;
-  onGenerated: (downloadURL: string) => void;
+  onGenerated: (downloadURL: string, shareViaWhatsapp?: boolean) => void;
 }
 
 interface DietPlanDay {
@@ -323,7 +323,7 @@ export default function InlineDietChartModal({ patient, doctorInfo, onClose, onG
   };
 
   // Final submit: Generate PDF + Upload + Return URL
-  const handleFinalSubmit = async () => {
+  const handleFinalSubmit = async (shareViaWhatsapp: boolean = false) => {
     if (!generatedPlan) return;
     setIsSending(true);
 
@@ -756,8 +756,8 @@ export default function InlineDietChartModal({ patient, doctorInfo, onClose, onG
       await uploadBytes(storageRef, pdfBlob);
       const downloadURL = await getDownloadURL(storageRef);
 
-      toast.success('AI Diet Chart downloaded & sent to patient!');
-      onGenerated(downloadURL);
+      toast.success('AI Diet Chart generated successfully!');
+      onGenerated(downloadURL, shareViaWhatsapp);
     } catch (error) {
       console.error('Error generating Diet PDF:', error);
       toast.error('Failed to generate Diet Chart PDF');
@@ -1228,7 +1228,19 @@ export default function InlineDietChartModal({ patient, doctorInfo, onClose, onG
                   Back
                 </Button>
                 <Button
-                  onClick={handleFinalSubmit}
+                  onClick={() => handleFinalSubmit(true)}
+                  disabled={isSending}
+                  size="sm"
+                  className="flex-1 sm:flex-none bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold h-9 px-4 transition-all shadow-lg shadow-[#25D366]/20"
+                >
+                  {isSending ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sending...</>
+                  ) : (
+                    <><MessageCircle className="w-4 h-4 mr-2" /> Submit & Send via WhatsApp</>
+                  )}
+                </Button>
+                <Button
+                  onClick={() => handleFinalSubmit(false)}
                   disabled={isSending}
                   size="sm"
                   className="flex-1 sm:flex-none bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-bold h-9 px-4"
@@ -1236,7 +1248,7 @@ export default function InlineDietChartModal({ patient, doctorInfo, onClose, onG
                   {isSending ? (
                     <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sending...</>
                   ) : (
-                    <><Send className="w-4 h-4 mr-2" /> Submit & Send to Patient</>
+                    <><Send className="w-4 h-4 mr-2" /> Submit & Send to App</>
                   )}
                 </Button>
               </div>

@@ -16,9 +16,9 @@ import {
   X,
   Pencil,
   Trash2,
-  Save,
   Send,
   QrCode as QrIcon,
+  MessageCircle,
 } from "lucide-react";
 import QRCode from "qrcode";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -372,7 +372,7 @@ export default function ClinicAIDietChartManager({
     }
   };
 
-  const handleFinalSubmit = async () => {
+  const handleFinalSubmit = async (shareViaWhatsapp: boolean = false) => {
     if (!selectedChart) return;
     setIsGenerating(true);
     try {
@@ -617,6 +617,15 @@ export default function ClinicAIDietChartManager({
       const downloadURL = await getDownloadURL(storageRef);
 
       toast.success("AI Diet Chart finalized and uploaded!");
+      if (shareViaWhatsapp && selectedChart) {
+        const text = `\uD83D\uDCCB *AI Diet Chart*\nPatient: ${selectedChart.patientName}\n\n\uD83C\uDF4F *Download PDF:*\n${downloadURL}\n\nGuided by ${doctorInfo?.name || clinicName}`;
+        const phoneNumber = selectedChart.phone ? selectedChart.phone.replace(/\D/g, '') : '';
+        const url = phoneNumber
+          ? `https://wa.me/${phoneNumber.startsWith('91') ? phoneNumber : '91' + phoneNumber}?text=${encodeURIComponent(text)}`
+          : `https://wa.me/?text=${encodeURIComponent(text)}`;
+        window.open(url, '_blank');
+      }
+
       if (onComplete) {
         onComplete(downloadURL);
       }
@@ -1769,20 +1778,36 @@ export default function ClinicAIDietChartManager({
 
             <div className="p-6 border-t border-zinc-900 bg-zinc-950 flex flex-col gap-4">
               {localFlowingRX ? (
-                <Button
-                  className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-6 rounded-2xl shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98] text-sm sm:text-base px-2"
-                  onClick={handleFinalSubmit}
-                  disabled={isGenerating}
-                >
-                  {isGenerating ? (
-                    <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <Send className="w-5 h-5" />
-                  )}
-                  {isGenerating
-                    ? "Finalizing Consultation..."
-                    : "FINAL SUBMIT & SEND TO PATIENT"}
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button
+                    className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-6 rounded-2xl shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98] text-sm sm:text-base px-2"
+                    onClick={() => handleFinalSubmit(false)}
+                    disabled={isGenerating}
+                  >
+                    {isGenerating ? (
+                      <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <Send className="w-5 h-5" />
+                    )}
+                    {isGenerating
+                      ? "Finalizing..."
+                      : "SUBMIT & SEND TO APP"}
+                  </Button>
+                  <Button
+                    className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-6 rounded-2xl shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98] text-sm sm:text-base px-2"
+                    onClick={() => handleFinalSubmit(true)}
+                    disabled={isGenerating}
+                  >
+                    {isGenerating ? (
+                      <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <MessageCircle className="w-5 h-5" />
+                    )}
+                    {isGenerating
+                      ? "Finalizing..."
+                      : "SUBMIT & SEND VIA WHATSAPP"}
+                  </Button>
+                </div>
               ) : (
                 <div className="flex gap-4">
                   <Button

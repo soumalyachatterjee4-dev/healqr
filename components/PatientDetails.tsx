@@ -1,4 +1,4 @@
-import { ArrowLeft, Calendar, MapPin, Clock, Bell, Eye, Star, Apple, Phone, X, Check, RotateCcw, CheckCircle2, Video, Send, UserCircle, Sparkles, History, Upload, Lock, QrCode, FileText, Stethoscope, Loader2 } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Clock, Bell, Eye, Star, Apple, Phone, X, Check, RotateCcw, CheckCircle2, Video, Send, UserCircle, Sparkles, History, Upload, Lock, QrCode, FileText, Stethoscope, Loader2, MessageCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import FollowUpModal from './FollowUpModal';
 import CancellationModal from './CancellationModal';
@@ -1037,7 +1037,31 @@ export default function PatientDetails({
         isManualOverrideWalkin
           ? 'Digital RX created — ready for printing!'
           : 'Digital RX regenerated & sent to patient!',
-        { id: 'rx-regen' }
+        {
+          id: 'rx-regen',
+          ...(!isManualOverrideWalkin ? {
+            duration: 8000,
+            action: {
+              label: '📱 Also Send via WhatsApp',
+              onClick: () => {
+                const textParts = [];
+                textParts.push(`📋 *Updated Digital Prescription*`);
+                textParts.push(`Patient: ${selectedPatientForFlow!.name}`);
+                const drName = localStorage.getItem('healqr_user_name') || localStorage.getItem('doctorName') || 'Doctor';
+                textParts.push(`Dr. ${drName}`);
+                if (selectedPatientForFlow!.chamber) textParts.push(`Clinic: ${selectedPatientForFlow!.chamber}`);
+                textParts.push('');
+                textParts.push(`🏥 *Download Prescription:*\n${downloadURL}`);
+                const text = textParts.join('\n');
+                const phoneNumber = selectedPatientForFlow!.phone ? selectedPatientForFlow!.phone.replace(/\D/g, '') : '';
+                const url = phoneNumber
+                  ? `https://wa.me/${phoneNumber.startsWith('91') ? phoneNumber : '91' + phoneNumber}?text=${encodeURIComponent(text)}`
+                  : `https://wa.me/?text=${encodeURIComponent(text)}`;
+                window.open(url, '_blank');
+              },
+            },
+          } : {}),
+        }
       );
     } catch (err) {
       console.error('RX regen update error:', err);
@@ -1051,25 +1075,25 @@ export default function PatientDetails({
     setDietChartModalOpen(true);
   };
 
-  const handleSkipDietAndSend = async () => {
+  const handleSkipDietAndSend = async (shareViaWhatsapp: boolean = false) => {
     setDietConfirmModalOpen(false);
     if (selectedPatientForFlow) {
-      await finalizeConsultation(selectedPatientForFlow.id, generatedRxUrl, null);
+      await finalizeConsultation(selectedPatientForFlow.id, generatedRxUrl, null, shareViaWhatsapp);
     }
   };
 
   // Step 4: Diet Chart generated callback
-  const handleDietGenerated = async (dietUrl: string) => {
+  const handleDietGenerated = async (dietUrl: string, shareViaWhatsapp: boolean = false) => {
     setDietChartModalOpen(false);
     if (selectedPatientForFlow) {
-      await finalizeConsultation(selectedPatientForFlow.id, generatedRxUrl, dietUrl);
+      await finalizeConsultation(selectedPatientForFlow.id, generatedRxUrl, dietUrl, shareViaWhatsapp);
     }
   };
 
   // ============================================
   // 🏁 FINALIZE: Mark as seen + Send notification with RX & Diet URLs
   // ============================================
-  const finalizeConsultation = async (patientId: string, rxUrl: string | null, dietUrl: string | null) => {
+  const finalizeConsultation = async (patientId: string, rxUrl: string | null, dietUrl: string | null, shareViaWhatsapp: boolean = false) => {
     const patient = patients.find(p => p.id === patientId);
     if (!patient) return;
 
@@ -1246,6 +1270,24 @@ export default function PatientDetails({
         id: 'mark-seen',
         description: descText,
       });
+      if (shareViaWhatsapp) {
+        const textParts = [];
+        textParts.push(`📋 *Consultation Documents*`);
+        textParts.push(`Patient: ${patient.name}`);
+        textParts.push(`Dr. ${doctorName}`);
+        if (patient.chamber) textParts.push(`Clinic: ${patient.chamber}`);
+        textParts.push('');
+        if (rxUrl) textParts.push(`🏥 *Digital Prescription:*\n${rxUrl}`);
+        if (dietUrl) textParts.push(`🍏 *AI Diet Chart:*\n${dietUrl}`);
+
+        const text = textParts.join('\n');
+        const phoneNumber = patient.phone ? patient.phone.replace(/\D/g, '') : '';
+        const url = phoneNumber
+          ? `https://wa.me/${phoneNumber.startsWith('91') ? phoneNumber : '91' + phoneNumber}?text=${encodeURIComponent(text)}`
+          : `https://wa.me/?text=${encodeURIComponent(text)}`;
+        window.open(url, '_blank');
+      }
+
     } catch (error) {
       console.error('❌ Error finalizing consultation:', error);
       toast.error('Failed to mark patient as seen', {
@@ -2273,7 +2315,19 @@ export default function PatientDetails({
                   Yes, Add AI Diet Chart
                 </button>
                 <button
-                  onClick={handleSkipDietAndSend}
+                  onClick={() => handleSkipDietAndSend(true)}
+                  disabled={isSendingNotification}
+                  className="w-full py-3 bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors shadow-lg shadow-[#25D366]/20 disabled:opacity-50"
+                >
+                  {isSendingNotification ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <MessageCircle className="w-4 h-4" />
+                  )}
+                  No, Send RX Only via WhatsApp
+                </button>
+                <button
+                  onClick={() => handleSkipDietAndSend(false)}
                   disabled={isSendingNotification}
                   className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 text-gray-300 font-medium rounded-xl flex items-center justify-center gap-2 transition-colors border border-zinc-700 disabled:opacity-50"
                 >
@@ -2282,7 +2336,7 @@ export default function PatientDetails({
                   ) : (
                     <Send className="w-4 h-4" />
                   )}
-                  No, Send RX Only
+                  No, Send RX Only via App Notification
                 </button>
               </div>
             </div>

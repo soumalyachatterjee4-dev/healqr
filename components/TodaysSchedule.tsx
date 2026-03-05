@@ -154,14 +154,39 @@ function PatientDetailsLoader({
 
         const qrBookingsSnap = await getDocs(qrBookingsQuery);
 
-        // Transform firestore documents to patient data
-        // Filter out walk-in patients (they have type: 'walkin_booking')
-        const patients = qrBookingsSnap.docs
-          .filter(doc => {
+        let qrBookingDocs = qrBookingsSnap.docs.filter(doc => {
+          const data = doc.data();
+          // Exclude walk-in bookings - they shouldn't be in chamber view
+          return data.type !== 'walkin_booking';
+        });
+
+        // 🔍 FALLBACK QUERY for clinic bookings with mismatched chamber IDs
+        if (qrBookingDocs.length === 0 && userId) {
+          const fallbackQuery = query(
+            bookingsRef,
+            where('doctorId', '==', userId),
+            where('appointmentDate', '==', todayStr)
+          );
+          const fallbackSnap = await getDocs(fallbackQuery);
+          const fallbackQrBookings = fallbackSnap.docs.filter(doc => {
             const data = doc.data();
-            // Exclude walk-in bookings - they shouldn't be in chamber view
             return data.type !== 'walkin_booking';
-          })
+          });
+
+          qrBookingDocs = fallbackQrBookings.filter(doc => {
+            const data = doc.data();
+            const dataChamberId = typeof data.chamberId === 'string' ? parseInt(data.chamberId, 10) : data.chamberId;
+            if (dataChamberId !== undefined && dataChamberId !== null && !isNaN(dataChamberId)) {
+              return dataChamberId === numericChamberId;
+            }
+            const chamberName = (data.chamberName || data.chamber || '').toString().toLowerCase();
+            const targetName = (chamber.name || '').toString().toLowerCase();
+            return chamberName !== '' && targetName !== '' && chamberName === targetName;
+          });
+        }
+
+        // Transform firestore documents to patient data
+        const patients = qrBookingDocs
           .map(doc => {
             const data = doc.data();
 
@@ -448,6 +473,23 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
           return false;
         });
 
+        // 🔍 Pre-fetch fallback bookings for all chambers (to avoid multiple queries)
+        let fallbackBookings: any[] | null = null;
+        try {
+          const fallbackQuery = query(
+            collection(db!, 'bookings'),
+            where('doctorId', '==', userId),
+            where('appointmentDate', '==', todayStr)
+          );
+          const fallbackSnap = await getDocs(fallbackQuery);
+          fallbackBookings = fallbackSnap.docs.filter(doc => {
+            const data = doc.data();
+            return data.type !== 'walkin_booking';
+          });
+        } catch (e) {
+          console.error('Error fetching fallback bookings:', e);
+        }
+
         // Get booking counts for each chamber (QR bookings only)
         const chambersWithBookings = await Promise.all(
           todaysChambers.map(async (chamber: any) => {
@@ -456,11 +498,16 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
             const todayStr = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
             const bookingsRef = collection(db!, 'bookings');
 
+            let numericChamberId = typeof chamber.id === 'string' ? parseInt(chamber.id, 10) : chamber.id;
+            if (!numericChamberId || isNaN(numericChamberId)) {
+              numericChamberId = -1;
+            }
+
             // Query 1: QR bookings (have chamberId + appointmentDate)
             // Simplified to avoid composite index - filter status in code
             const qrBookingsQuery = query(
               bookingsRef,
-              where('chamberId', '==', chamber.id),
+              where('chamberId', '==', numericChamberId),
               where('appointmentDate', '==', todayStr)
             );
 
@@ -468,7 +515,21 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
 
             // Count ALL bookings (including cancelled) - cancelled slots are still booked slots
             // Only count QR bookings that have appointmentDate for today
-            const qrBookedCount = qrBookingsSnap.size;
+            let qrBookedCount = qrBookingsSnap.size;
+
+            if (qrBookedCount === 0 && fallbackBookings && fallbackBookings.length > 0) {
+              const matchingDocs = fallbackBookings.filter(doc => {
+                const data = doc.data();
+                const dataChamberId = typeof data.chamberId === 'string' ? parseInt(data.chamberId, 10) : data.chamberId;
+                if (dataChamberId !== undefined && dataChamberId !== null && !isNaN(dataChamberId)) {
+                  return dataChamberId === numericChamberId;
+                }
+                const chamberNameStr = (data.chamberName || data.chamber || '').toString().toLowerCase();
+                const targetNameStr = (chamber.name || '').toString().toLowerCase();
+                return chamberNameStr !== '' && targetNameStr !== '' && chamberNameStr === targetNameStr;
+              });
+              qrBookedCount = matchingDocs.length;
+            }
 
             // Only count QR bookings for chamber booking status
             // Walk-in patients are shown separately in "Walk-In Patients" section

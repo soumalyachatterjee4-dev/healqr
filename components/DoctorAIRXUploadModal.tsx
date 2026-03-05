@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Upload, Sparkles, Loader2, Send, Plus, Trash2, Crop, Check, AlertCircle } from 'lucide-react';
+import { X, Upload, Sparkles, Loader2, Send, Plus, Trash2, Crop, Check, AlertCircle, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { db, storage } from '../lib/firebase/config';
 import { collection, addDoc, serverTimestamp, doc, getDoc, setDoc } from 'firebase/firestore';
@@ -861,6 +861,54 @@ RULES:
                     <Send className="w-4 h-4" />
                     Send Original (No AI Analysis)
                   </button>
+
+                  {/* Send Original via WhatsApp Button */}
+                  <button
+                    onClick={async () => {
+                      if (selectedFiles.length === 0 || isSending) return;
+                      setIsSending(true);
+                      setProcessingStep('sending');
+                      try {
+                        const imageUrls = await uploadImagesToStorage();
+                        // Save to Firestore (same as handleSendOriginal)
+                        const notifRef = await addDoc(collection(db!, 'notifications'), {
+                          type: 'ai_rx_prescription', patientId, recipientId: patientId,
+                          patientName, doctorId, doctorName: doctorName || 'Doctor',
+                          decodedText: 'Original prescription (no AI analysis)',
+                          ocrConfidence: 0, prescriptionImages: imageUrls,
+                          totalPages: imageUrls.length, language: patientLanguage,
+                          createdAt: serverTimestamp(), status: 'pending',
+                          deliveryMethod: 'whatsapp', read: false, isOriginal: true,
+                        });
+                        // Also try FCM (best effort)
+                        await sendFCMNotification(notifRef.id);
+                        // Open WhatsApp with image links
+                        const textParts = [`📋 *Prescription Images*`, `Patient: ${patientName}`, `Dr. ${doctorName || 'Doctor'}`, ''];
+                        imageUrls.forEach((url: string, i: number) => {
+                          textParts.push(`📄 *Page ${i + 1}:*\n${url}`);
+                        });
+                        const text = textParts.join('\n');
+                        const cleanPhone = patientPhone ? patientPhone.replace(/\D/g, '') : '';
+                        const waUrl = cleanPhone
+                          ? `https://wa.me/${cleanPhone.startsWith('91') ? cleanPhone : '91' + cleanPhone}?text=${encodeURIComponent(text)}`
+                          : `https://wa.me/?text=${encodeURIComponent(text)}`;
+                        window.open(waUrl, '_blank');
+                        setProcessingStep('done');
+                        toast.success('Prescription ready to send via WhatsApp!');
+                        onUploadSuccess?.();
+                        setTimeout(resetAndClose, 2000);
+                      } catch (error: any) {
+                        toast.error('Failed: ' + error.message);
+                        setProcessingStep('upload');
+                        setIsSending(false);
+                      }
+                    }}
+                    disabled={isSending}
+                    className="w-full py-3.5 bg-[#25D366] hover:bg-[#20bd5a] text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-lg shadow-[#25D366]/20"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    Send Original via WhatsApp
+                  </button>
                 </>
               )}
             </>
@@ -981,21 +1029,84 @@ RULES:
               </div>
 
               {/* Action Buttons */}
-              <div className="flex gap-3">
+              <div className="space-y-3">
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => { setProcessingStep('upload'); setAnalysisResult(null); }}
+                    disabled={isSending}
+                    className="flex-1 py-3 border border-gray-600 text-gray-300 rounded-xl font-medium hover:bg-gray-800 transition-colors disabled:opacity-50"
+                  >
+                    Re-analyze
+                  </button>
+                  <button
+                    onClick={handleSendToPatient}
+                    disabled={isSending}
+                    className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
+                  >
+                    {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    {isSending ? 'Sending...' : 'Send to Patient'}
+                  </button>
+                </div>
+                {/* WhatsApp Send Button (2nd option) */}
                 <button
-                  onClick={() => { setProcessingStep('upload'); setAnalysisResult(null); }}
+                  onClick={async () => {
+                    if (isSending) return;
+                    setIsSending(true);
+                    setProcessingStep('sending');
+                    try {
+                      const imageUrls = await uploadImagesToStorage();
+                      // Save to Firestore (same as handleSendToPatient)
+                      const notifRef = await addDoc(collection(db!, 'notifications'), {
+                        type: 'ai_rx_prescription', patientId, recipientId: patientId,
+                        patientName, doctorId, doctorName: doctorName || 'Doctor',
+                        decodedText, ocrConfidence: confidenceScore,
+                        analysisResult, prescriptionImages: imageUrls,
+                        totalPages: imageUrls.length, language: patientLanguage,
+                        createdAt: serverTimestamp(), status: 'pending',
+                        deliveryMethod: 'whatsapp', read: false,
+                      });
+                      // Also try FCM (best effort)
+                      await sendFCMNotification(notifRef.id);
+                      // Build WhatsApp message with AI analysis
+                      const textParts = [`📋 *AI Decoded Prescription*`, `Patient: ${patientName}`, `Dr. ${doctorName || 'Doctor'}`, ''];
+                      if (analysisResult?.diagnosis) {
+                        textParts.push(`🔍 *Diagnosis:* ${analysisResult.diagnosis}`, '');
+                      }
+                      if (analysisResult?.medicines?.length > 0) {
+                        textParts.push(`💊 *Medicines:*`);
+                        analysisResult.medicines.forEach((med: any, i: number) => {
+                          let line = `${i + 1}. *${med.name}*`;
+                          if (med.dosage) line += ` - ${med.dosage}`;
+                          if (med.frequency) line += ` (${med.frequency})`;
+                          if (med.duration) line += ` for ${med.duration}`;
+                          textParts.push(line);
+                        });
+                        textParts.push('');
+                      }
+                      imageUrls.forEach((url: string, i: number) => {
+                        textParts.push(`📄 *Original Page ${i + 1}:*\n${url}`);
+                      });
+                      const text = textParts.join('\n');
+                      const cleanPhone = patientPhone ? patientPhone.replace(/\D/g, '') : '';
+                      const waUrl = cleanPhone
+                        ? `https://wa.me/${cleanPhone.startsWith('91') ? cleanPhone : '91' + cleanPhone}?text=${encodeURIComponent(text)}`
+                        : `https://wa.me/?text=${encodeURIComponent(text)}`;
+                      window.open(waUrl, '_blank');
+                      setProcessingStep('done');
+                      toast.success('AI prescription ready to send via WhatsApp!');
+                      onUploadSuccess?.();
+                      setTimeout(resetAndClose, 2000);
+                    } catch (error: any) {
+                      toast.error('Failed: ' + error.message);
+                      setProcessingStep('result');
+                      setIsSending(false);
+                    }
+                  }}
                   disabled={isSending}
-                  className="flex-1 py-3 border border-gray-600 text-gray-300 rounded-xl font-medium hover:bg-gray-800 transition-colors disabled:opacity-50"
+                  className="w-full py-3 bg-[#25D366] hover:bg-[#20bd5a] text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 shadow-lg shadow-[#25D366]/20"
                 >
-                  Re-analyze
-                </button>
-                <button
-                  onClick={handleSendToPatient}
-                  disabled={isSending}
-                  className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
-                >
-                  {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                  {isSending ? 'Sending...' : 'Send to Patient'}
+                  {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
+                  {isSending ? 'Sending...' : 'Also Send via WhatsApp'}
                 </button>
               </div>
             </div>
