@@ -1137,11 +1137,14 @@ export default function App() {
       );
 
       const isVerifyVisit = window.location.pathname.includes('/verify-visit/');
+      const isOnVerifyLoginPage = window.location.pathname.includes('/verify-login');
+      const isOnVerifyEmailPage = window.location.pathname.includes('/verify-email');
+      const isOnAssistantLoginPage = window.location.pathname.includes('/assistant-login');
       const isClinicPage = currentPage === 'clinic-login' || currentPage === 'clinic-signup' || pageParam === 'clinic-login' || pageParam === 'clinic-signup';
       const isAdvertiserPage = currentPage === 'advertiser-login' || currentPage === 'advertiser-signup' || pageParam === 'advertiser-login' || pageParam === 'advertiser-signup';
       const isPharmaPage = currentPage === 'pharma-login' || currentPage === 'pharma-verify' || currentPage === 'pharma-portal' || currentPage === 'pharma-signup' || pageParam === 'pharma-login' || pageParam === 'pharma-verify' || pageParam === 'pharma-portal' || pageParam === 'pharma-signup';
 
-      if (isVerificationLink || isBookingMode || hasBookingDoctorId || isNotificationPage || isVerifyVisit || isClinicPage || isAdvertiserPage || isPharmaPage || currentPage === 'verify-email' || currentPage === 'verify-login' || currentPage === 'assistant-login' || currentPage === 'temp-doctor-login' || currentPage === 'temp-doctor-dashboard' || currentPage === 'admin-verify' || currentPage === 'verify-walkin' || currentPage.startsWith('booking-')) {
+      if (isVerificationLink || isBookingMode || hasBookingDoctorId || isNotificationPage || isVerifyVisit || isOnVerifyLoginPage || isOnVerifyEmailPage || isOnAssistantLoginPage || isClinicPage || isAdvertiserPage || isPharmaPage || currentPage === 'verify-email' || currentPage === 'verify-login' || currentPage === 'assistant-login' || currentPage === 'temp-doctor-login' || currentPage === 'temp-doctor-dashboard' || currentPage === 'admin-verify' || currentPage === 'verify-walkin' || currentPage.startsWith('booking-')) {
         setIsAuthInitialized(true);
         return;
       }

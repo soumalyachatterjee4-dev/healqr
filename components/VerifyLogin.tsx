@@ -51,6 +51,15 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
       }
 
       // Sign in with email link
+      // ✅ CRITICAL: Clear stale session flags BEFORE signing in
+      // This prevents onAuthStateChanged from reading leftover flags and routing to wrong dashboard
+      localStorage.removeItem('healqr_is_clinic');
+      localStorage.removeItem('healqr_is_assistant');
+      localStorage.removeItem('healqr_assistant_pages');
+      localStorage.removeItem('healqr_assistant_doctor_id');
+      localStorage.removeItem('healqr_doctor_stats');
+      localStorage.removeItem('healqr_profile_photo');
+
       const result = await signInWithEmailLink(auth, email, window.location.href);
       const user = result.user;
 
