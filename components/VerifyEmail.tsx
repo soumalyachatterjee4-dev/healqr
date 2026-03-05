@@ -180,6 +180,8 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
                 landmark: signupData.landmark || '',
                 qrNumber: signupData.qrNumber,
                 qrType: signupData.qrType || 'preprinted',
+                companyName: signupData.companyName || '',
+                division: signupData.division || '',
                 clinicCode: clinicCode,
                 clinicSlug: clinicSlug,
                 bookingUrl: bookingUrl,
@@ -198,6 +200,7 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
             localStorage.setItem('healqr_qr_id', signupData.qrNumber);
             localStorage.setItem('healqr_booking_url', bookingUrl);
             localStorage.setItem('healqr_authenticated', 'true');
+            localStorage.setItem('healqr_is_clinic', 'true'); // CRITICAL: This was missing
             localStorage.setItem('userId', user.uid);
 
             // Update QR Code in BOTH collections (check which one has it)
@@ -340,6 +343,7 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
           qrNumber: signupData.qrNumber, // Always store the provided QR
           qrType: signupData.qrType || 'preprinted', // QR type (preprinted or virtual)
           companyName: signupData.companyName || '', // Company name for pre-printed QR
+          division: signupData.division || '', // Division for pre-printed QR
           qrDocId: '', // Will be set after QR doc lookup
           doctorCode: doctorCode,
           baCode: signupData.baCode || '',

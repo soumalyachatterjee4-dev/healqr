@@ -67,6 +67,9 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
   const [pinCode, setPinCode] = useState('');
   const [qrNumber, setQrNumber] = useState('');
   const [clinicCode, setClinicCode] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [division, setDivision] = useState('');
+  const [qrType, setQrType] = useState('');
 
   // Editable required field
   const [name, setName] = useState('');
@@ -124,6 +127,9 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
         setLandmark(data.landmark || '');
         setQrNumber(data.qrNumber || '');
         setClinicCode(data.clinicCode || '');
+        setCompanyName(data.companyName || '');
+        setDivision(data.division || '');
+        setQrType(data.qrType || (data.qrNumber ? 'preprinted' : ''));
 
         // Editable required field
         setName(data.name || '');
@@ -498,7 +504,14 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
               {/* QR Used */}
               {qrNumber && (
                 <div>
-                  <Label className="mb-2 block text-gray-300">QR Used (Admin Generated)</Label>
+                  <Label className="mb-2 block text-gray-300 flex items-center gap-2">
+                    QR Used (Admin Generated)
+                    {qrType && (
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 text-xs font-semibold uppercase tracking-wider">
+                        ({qrType})
+                      </span>
+                    )}
+                  </Label>
                   <div className="relative">
                     <QrCode className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
                     <Input
@@ -630,6 +643,38 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
                     <div className="flex items-center gap-2 text-blue-400 text-sm">
                       <Languages className="w-4 h-4" />
                       <span>Selected: {selectedLanguages.length} language{selectedLanguages.length !== 1 ? 's' : ''}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Company Name */}
+                {companyName && (
+                  <div>
+                    <Label className="mb-2 block text-gray-300">Company Name</Label>
+                    <div className="relative">
+                      <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                      <Input
+                        type="text"
+                        value={companyName}
+                        disabled
+                        className="pl-12 bg-zinc-950 border-zinc-800 text-gray-500 h-12 rounded-lg cursor-not-allowed"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Division */}
+                {division && (
+                  <div>
+                    <Label className="mb-2 block text-gray-300">Division</Label>
+                    <div className="relative">
+                      <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                      <Input
+                        type="text"
+                        value={division}
+                        disabled
+                        className="pl-12 bg-zinc-950 border-zinc-800 text-gray-500 h-12 rounded-lg cursor-not-allowed"
+                      />
                     </div>
                   </div>
                 )}

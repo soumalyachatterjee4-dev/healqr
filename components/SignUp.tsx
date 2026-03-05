@@ -111,11 +111,11 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
       let qrDocRef = null;
       let qrData = null;
 
+      const qrPoolCollection = collection(db, 'qrPool');
+      const qrCodesCollection = collection(db, 'qrCodes'); // Old collection
+
       if (qrType === 'virtual') {
         // Generate Virtual QR from UNIVERSAL POOL - check BOTH collections for true max
-        const qrPoolCollection = collection(db, 'qrPool');
-        const qrCodesCollection = collection(db, 'qrCodes'); // Old collection
-
         const [poolQrs, codesQrs] = await Promise.all([
           getDocs(qrPoolCollection),
           getDocs(qrCodesCollection)

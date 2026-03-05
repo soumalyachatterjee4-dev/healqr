@@ -237,6 +237,8 @@ export default function App() {
   const [userQrNumber, setUserQrNumber] = useState("");
   const [userDoctorCode, setUserDoctorCode] = useState("");
   const [userCompanyName, setUserCompanyName] = useState("");
+  const [userDivision, setUserDivision] = useState("");
+  const [userQrType, setUserQrType] = useState<"preprinted" | "virtual" | "">("");
   const [userProfilePhoto, setUserProfilePhoto] = useState("");
   const [userProfileData, setUserProfileData] = useState<{
     profileImage: string;
@@ -1171,22 +1173,29 @@ export default function App() {
 
         if (isClinicFromStorage && !isAssistantFromStorage) {
           // Pure clinic owner - fast route to clinic dashboard (assistants need validation below)
-          console.log('âœ… Clinic user detected from localStorage - routing to clinic dashboard');
+          console.log('✅ Clinic user detected from localStorage - routing to clinic dashboard');
           setCurrentPage('clinic-dashboard');
           setIsAuthInitialized(true);
           return;
         }
 
         // Check if user is a clinic in Firestore (fallback if localStorage not set)
-        if (db) {
+        // BUT: Only check clinics if user is NOT already identified as a doctor
+        // This prevents UID collisions where same UID exists in both doctors + clinics collections
+        if (db && !isAssistantFromStorage) {
           try {
-            const clinicDoc = await getDoc(doc(db, 'clinics', user.uid));
-            if (clinicDoc.exists()) {
-              console.log('âœ… Clinic user detected from Firestore - routing to clinic dashboard');
-              localStorage.setItem('healqr_is_clinic', 'true'); // Cache for next time
-              setCurrentPage('clinic-dashboard');
-              setIsAuthInitialized(true);
-              return; // CRITICAL: Stop here, don't load doctor profile
+            // Check doctors collection FIRST to give doctor identity priority
+            const doctorDocExists = await getDoc(doc(db, 'doctors', user.uid));
+            if (!doctorDocExists.exists()) {
+              // Not a doctor — check if clinic
+              const clinicDoc = await getDoc(doc(db, 'clinics', user.uid));
+              if (clinicDoc.exists()) {
+                console.log('✅ Clinic user detected from Firestore - routing to clinic dashboard');
+                localStorage.setItem('healqr_is_clinic', 'true'); // Cache for next time
+                setCurrentPage('clinic-dashboard');
+                setIsAuthInitialized(true);
+                return; // CRITICAL: Stop here, don't load doctor profile
+              }
             }
           } catch (e) {
             console.error("Error checking clinic status", e);
@@ -1349,6 +1358,14 @@ export default function App() {
               }
               if (data.companyName) {
                 setUserCompanyName(data.companyName);
+              }
+              if (data.division) {
+                setUserDivision(data.division);
+              }
+              if (data.qrType) {
+                setUserQrType(data.qrType);
+              } else if (data.qrNumber) {
+                setUserQrType('preprinted');
               }
 
               // Load profile photo
@@ -2274,11 +2291,22 @@ export default function App() {
       // Note: Purchases will be restored from Firestore on next login
       localStorage.removeItem('healqr_active_addons');
 
-      // ðŸ§¹ Clear session data
+      // 🧹 Clear ALL session data (prevents stale clinic/assistant flags on next login)
       localStorage.removeItem('healqr_authenticated');
       localStorage.removeItem('healqr_qr_code');
       localStorage.removeItem('healqr_user_email');
       localStorage.removeItem('healqr_user_name');
+      localStorage.removeItem('healqr_is_clinic');
+      localStorage.removeItem('healqr_is_assistant');
+      localStorage.removeItem('healqr_assistant_pages');
+      localStorage.removeItem('healqr_assistant_doctor_id');
+      localStorage.removeItem('userId');
+      localStorage.removeItem('healqr_profile_photo');
+      localStorage.removeItem('healqr_doctor_stats');
+      localStorage.removeItem('healqr_qr_id');
+      localStorage.removeItem('healqr_booking_url');
+      localStorage.removeItem('healqr_email_for_signin');
+      localStorage.removeItem('healqr_sidebar_collapsed');
 
       setActiveAddOns([]);
 
@@ -2477,6 +2505,8 @@ export default function App() {
           qrNumber={userQrNumber}
           doctorCode={userDoctorCode}
           companyName={userCompanyName}
+          division={userDivision}
+          qrType={userQrType}
           residentialPinCode={userPinCode}
           profileData={{
             image: userProfileData.profileImage || userProfilePhoto || null,

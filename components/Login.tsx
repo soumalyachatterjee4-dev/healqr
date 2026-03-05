@@ -38,38 +38,47 @@ export default function Login({ onNext, onSignUp, onClose, isDemoMode }: LoginPr
       // Normalize email at the start
       const normalizedEmail = email.toLowerCase().trim();
 
-      // Check if this is an assistant email first
+      // Check if this email belongs to a doctor OR assistant
       const { db } = await import('../lib/firebase/config');
-      let isAssistant = false;
       
       if (db) {
         const { collection, query, where, getDocs } = await import('firebase/firestore');
         
-        // Check assistants collection
-        const assistantsRef = collection(db, 'assistants');
-        const assistantQuery = query(assistantsRef, where('assistantEmail', '==', normalizedEmail), where('isActive', '==', true));
-        const assistantSnap = await getDocs(assistantQuery);
+        // ✅ Check doctors collection FIRST (this is the Doctor Login page)
+        const doctorsRef = collection(db, 'doctors');
+        const q = query(doctorsRef, where('email', '==', normalizedEmail));
+        const existingDocs = await getDocs(q);
         
-        if (!assistantSnap.empty) {
-          // This is an assistant - approved to login
-          isAssistant = true;
-          toast.info('Assistant login detected', {
-            description: 'Sending magic link to assistant email'
-          });
-        } else {
-          // Regular Doctor Login Flow - check if doctor exists
-          const doctorsRef = collection(db, 'doctors');
-          const q = query(doctorsRef, where('email', '==', normalizedEmail));
-          const existingDocs = await getDocs(q);
-          
-          if (existingDocs.empty) {
+        if (existingDocs.empty) {
+          // Not a doctor — check if they're an assistant as fallback
+          try {
+            const assistantsRef = collection(db, 'assistants');
+            const assistantQuery = query(assistantsRef, where('assistantEmail', '==', normalizedEmail), where('isActive', '==', true));
+            const assistantSnap = await getDocs(assistantQuery);
+            
+            if (!assistantSnap.empty) {
+              // This is an assistant - approved to login
+              toast.info('Assistant login detected', {
+                description: 'Sending magic link to assistant email'
+              });
+            } else {
+              toast.error('Account not found', {
+                description: 'This email is not registered as a doctor or assistant. Please sign up.',
+              });
+              setLoading(false);
+              return;
+            }
+          } catch (assistantError) {
+            // If assistant query fails due to permissions, just show account not found
+            console.warn('Could not check assistants collection:', assistantError);
             toast.error('Account not found', {
-              description: 'This email is not registered as a doctor or assistant. Please sign up.',
+              description: 'This email is not registered as a doctor. Please sign up.',
             });
             setLoading(false);
             return;
           }
         }
+        // If doctor exists, proceed directly — no need to check assistants
       }
 
       // Store email for verification (use normalized email)

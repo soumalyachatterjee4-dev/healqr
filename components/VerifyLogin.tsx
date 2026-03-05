@@ -71,6 +71,10 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
         );
         const assistantSnap = await getDocs(assistantQuery);
 
+        // Determine login origin from URL params (Doctor Login vs Clinic Login)
+        const searchParams = new URLSearchParams(window.location.search);
+        const loginType = searchParams.get('type'); // 'clinic' if from Clinic Login, null if from Doctor Login
+
         if (!assistantSnap.empty) {
           // This is an assistant - store minimal data, App.tsx will load full profile
           const assistantData = assistantSnap.docs[0].data();
@@ -84,6 +88,8 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
           // Check if assistant belongs to a clinic
           if (assistantData.isClinic) {
             localStorage.setItem('healqr_is_clinic', 'true');
+          } else {
+            localStorage.removeItem('healqr_is_clinic');
           }
 
           // Pre-fetch doctor/clinic name for instant dashboard display
@@ -106,8 +112,8 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
           }
 
           console.log('✅ Assistant login detected:', email, assistantData.isClinic ? '(clinic)' : '(doctor)');
-        } else {
-          // Check if this is a clinic user (UID-based)
+        } else if (loginType === 'clinic') {
+          // ✅ LOGIN CAME FROM CLINIC LOGIN — check clinics collection first
           const clinicDocRef = doc(db, 'clinics', user.uid);
           const clinicDoc = await getDoc(clinicDocRef);
 
@@ -118,42 +124,68 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
             localStorage.setItem('healqr_user_email', email);
             localStorage.setItem('healqr_authenticated', 'true');
             localStorage.setItem('healqr_is_clinic', 'true');
+            localStorage.removeItem('healqr_is_assistant');
             if (clinicData.name) {
               localStorage.setItem('healqr_user_name', clinicData.name);
             }
 
             console.log('✅ Clinic login detected:', user.uid);
           } else {
+            console.error('❌ User tried to login as clinic but no clinic doc found');
+            await auth.signOut();
+            throw new Error('This email is not registered as a Clinic. Please use the Doctor Login or Register as a Clinic.');
+          }
+        } else {
+          // ✅ LOGIN CAME FROM DOCTOR LOGIN — check doctors collection FIRST
+          const doctorDocRef = doc(db, 'doctors', user.uid);
+          const doctorDoc = await getDoc(doctorDocRef);
+
+          if (doctorDoc.exists()) {
             // Regular doctor - load name + profile from Firestore for instant dashboard display
             localStorage.setItem('userId', user.uid);
             localStorage.setItem('healqr_user_email', email);
             localStorage.setItem('healqr_authenticated', 'true');
+            localStorage.removeItem('healqr_is_clinic'); // Ensure this is removed
+            localStorage.removeItem('healqr_is_assistant');
 
             // Pre-fetch doctor profile so dashboard shows name immediately
-            try {
-              const doctorDocRef = doc(db, 'doctors', user.uid);
-              const doctorDoc = await getDoc(doctorDocRef);
-              if (doctorDoc.exists()) {
-                const doctorData = doctorDoc.data();
-                if (doctorData.name) {
-                  localStorage.setItem('healqr_user_name', doctorData.name);
-                }
-                if (doctorData.profileImage) {
-                  localStorage.setItem('healqr_profile_photo', doctorData.profileImage);
-                }
-                // Pre-cache doctor stats for instant review display
-                if (doctorData.stats) {
-                  localStorage.setItem('healqr_doctor_stats', JSON.stringify({
-                    averageRating: doctorData.stats.averageRating || 0,
-                    totalReviews: doctorData.stats.totalReviews || 0
-                  }));
-                }
-              }
-            } catch (prefetchErr) {
-              console.warn('Could not pre-fetch doctor profile:', prefetchErr);
+            const doctorData = doctorDoc.data();
+            if (doctorData.name) {
+              localStorage.setItem('healqr_user_name', doctorData.name);
+            }
+            if (doctorData.profileImage) {
+              localStorage.setItem('healqr_profile_photo', doctorData.profileImage);
+            }
+            // Pre-cache doctor stats for instant review display
+            if (doctorData.stats) {
+              localStorage.setItem('healqr_doctor_stats', JSON.stringify({
+                averageRating: doctorData.stats.averageRating || 0,
+                totalReviews: doctorData.stats.totalReviews || 0
+              }));
             }
 
             console.log('✅ Doctor login detected:', user.uid);
+          } else {
+            // Doctor doc not found — check if they have a clinic account as fallback
+            const clinicDocRef = doc(db, 'clinics', user.uid);
+            const clinicDoc = await getDoc(clinicDocRef);
+
+            if (clinicDoc.exists()) {
+              const clinicData = clinicDoc.data();
+              localStorage.setItem('userId', user.uid);
+              localStorage.setItem('healqr_user_email', email);
+              localStorage.setItem('healqr_authenticated', 'true');
+              localStorage.setItem('healqr_is_clinic', 'true');
+              if (clinicData.name) {
+                localStorage.setItem('healqr_user_name', clinicData.name);
+              }
+              console.log('✅ Clinic login detected (fallback from doctor login):', user.uid);
+            } else {
+              // No doctor or clinic doc found
+              console.error('❌ No doctor or clinic account found for:', user.uid);
+              await auth.signOut();
+              throw new Error('This email is not registered. Please sign up first.');
+            }
           }
         }
       }

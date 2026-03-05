@@ -63,9 +63,11 @@ interface ProfileManagerProps {
   qrNumber?: string;
   residentialPinCode?: string;
   companyName?: string;
+  division?: string;
+  qrType?: string;
 }
 
-export default function ProfileManager({ onMenuChange, onLogout, profileData, onProfileUpdate, activeAddOns = [], email = '', dob = '', qrNumber = '', residentialPinCode = '', doctorCode = '', companyName = '' }: ProfileManagerProps & { doctorCode?: string; companyName?: string }) {
+export default function ProfileManager({ onMenuChange, onLogout, profileData, onProfileUpdate, activeAddOns = [], email = '', dob = '', qrNumber = '', residentialPinCode = '', doctorCode = '', companyName = '', division = '', qrType = '' }: ProfileManagerProps & { doctorCode?: string; companyName?: string; division?: string; qrType?: string }) {
   // Debug logging
   useEffect(() => {
     console.log('🔥 PROFILE MANAGER RECEIVED PROPS:');
@@ -610,7 +612,14 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
                 {/* QR Number */}
                 {qrNumber && (
                   <div>
-                    <Label className="mb-2 block">QR NUMBER (Linked)</Label>
+                    <Label className="mb-2 block flex items-center gap-2">
+                      QR NUMBER (Linked)
+                      {qrType && (
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 text-xs font-semibold uppercase tracking-wider">
+                          ({qrType})
+                        </span>
+                      )}
+                    </Label>
                     <div className="relative">
                       <QrCode className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
                       <Input
@@ -632,6 +641,22 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
                       <Input
                         type="text"
                         value={companyName}
+                        disabled
+                        className="pl-12 bg-zinc-950 border-zinc-800 text-gray-500 h-12 rounded-lg cursor-not-allowed"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Division */}
+                {division && (
+                  <div>
+                    <Label className="mb-2 block">Division</Label>
+                    <div className="relative">
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                      <Input
+                        type="text"
+                        value={division}
                         disabled
                         className="pl-12 bg-zinc-950 border-zinc-800 text-gray-500 h-12 rounded-lg cursor-not-allowed"
                       />

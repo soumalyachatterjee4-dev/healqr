@@ -46,6 +46,26 @@ service cloud.firestore {
     }
 
     // ============================================
+    // QR CODES COLLECTION (Legacy)
+    // ============================================
+    match /qrCodes/{qrId} {
+      // Allow read for authenticated users (admin, clinic, doctor) and unauthenticated during signup validation
+      allow read: if true;
+
+      // Allow update for:
+      // 1. Admin (full access via custom claim OR admins collection)
+      // 2. During clinic/doctor signup for setting pending status (unauthenticated)
+      // 3. During email verification for activating QR (authenticated)
+      allow update: if (isAuthenticated() && request.auth.token.admin == true) ||
+                      (isAuthenticated() && exists(/databases/$(database)/documents/admins/$(request.auth.token.email))) ||
+                      (request.resource.data.status == 'pending' && request.resource.data.linkedEmail != null) ||
+                      (isAuthenticated() && request.resource.data.status == 'active' && request.resource.data.linkedEmail != null);
+
+      // No deletes allowed
+      allow delete: if false;
+    }
+
+    // ============================================
     // CLINICS COLLECTION
     // ============================================
 
