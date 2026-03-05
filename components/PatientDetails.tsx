@@ -212,6 +212,8 @@ export default function PatientDetails({
   const [isSendingNotification, setIsSendingNotification] = useState(false);
   const [isRegenMode, setIsRegenMode] = useState(false); // Track if RX Regen mode (vs initial Eye flow)
   const [lastRxData, setLastRxData] = useState<{ items: any[], remarks: string, diagnosis: string, vitals: Record<string,string>, pathology: Record<string,string>, suggestedTests: string[] } | null>(null); // Last generated RX data for regen
+  const [regenSuccessModalOpen, setRegenSuccessModalOpen] = useState(false); // Show success modal after RX regen
+  const [regenRxUrl, setRegenRxUrl] = useState<string | null>(null); // Store regen RX URL for WhatsApp
 
   // Get current doctor info from Firebase auth (expanded for DigitalRXMaker)
   const [doctorInfo, setDoctorInfo] = useState<{
@@ -1037,32 +1039,14 @@ export default function PatientDetails({
         isManualOverrideWalkin
           ? 'Digital RX created — ready for printing!'
           : 'Digital RX regenerated & sent to patient!',
-        {
-          id: 'rx-regen',
-          ...(!isManualOverrideWalkin ? {
-            duration: 8000,
-            action: {
-              label: '📱 Also Send via WhatsApp',
-              onClick: () => {
-                const textParts = [];
-                textParts.push(`📋 *Updated Digital Prescription*`);
-                textParts.push(`Patient: ${selectedPatientForFlow!.name}`);
-                const drName = localStorage.getItem('healqr_user_name') || localStorage.getItem('doctorName') || 'Doctor';
-                textParts.push(`Dr. ${drName}`);
-                if (selectedPatientForFlow!.chamber) textParts.push(`Clinic: ${selectedPatientForFlow!.chamber}`);
-                textParts.push('');
-                textParts.push(`🏥 *Download Prescription:*\n${downloadURL}`);
-                const text = textParts.join('\n');
-                const phoneNumber = selectedPatientForFlow!.phone ? selectedPatientForFlow!.phone.replace(/\D/g, '') : '';
-                const url = phoneNumber
-                  ? `https://wa.me/${phoneNumber.startsWith('91') ? phoneNumber : '91' + phoneNumber}?text=${encodeURIComponent(text)}`
-                  : `https://wa.me/?text=${encodeURIComponent(text)}`;
-                window.open(url, '_blank');
-              },
-            },
-          } : {}),
-        }
+        { id: 'rx-regen' }
       );
+
+      // Show regen success modal with WhatsApp option (for non-walkin patients)
+      if (!isManualOverrideWalkin) {
+        setRegenRxUrl(downloadURL);
+        setRegenSuccessModalOpen(true);
+      }
     } catch (err) {
       console.error('RX regen update error:', err);
       toast.error('Failed to update RX', { id: 'rx-regen' });
@@ -1096,6 +1080,12 @@ export default function PatientDetails({
   const finalizeConsultation = async (patientId: string, rxUrl: string | null, dietUrl: string | null, shareViaWhatsapp: boolean = false) => {
     const patient = patients.find(p => p.id === patientId);
     if (!patient) return;
+
+    // Open WhatsApp window IMMEDIATELY (in user-gesture context) to avoid popup blocker
+    let whatsappWindow: Window | null = null;
+    if (shareViaWhatsapp) {
+      whatsappWindow = window.open('about:blank', '_blank');
+    }
 
     setIsSendingNotification(true);
 
@@ -1270,7 +1260,7 @@ export default function PatientDetails({
         id: 'mark-seen',
         description: descText,
       });
-      if (shareViaWhatsapp) {
+      if (shareViaWhatsapp && whatsappWindow) {
         const textParts = [];
         textParts.push(`📋 *Consultation Documents*`);
         textParts.push(`Patient: ${patient.name}`);
@@ -1285,7 +1275,30 @@ export default function PatientDetails({
         const url = phoneNumber
           ? `https://wa.me/${phoneNumber.startsWith('91') ? phoneNumber : '91' + phoneNumber}?text=${encodeURIComponent(text)}`
           : `https://wa.me/?text=${encodeURIComponent(text)}`;
-        window.open(url, '_blank');
+        whatsappWindow.location.href = url;
+      } else if (shareViaWhatsapp && !whatsappWindow) {
+        // Fallback if popup was blocked — show toast with WhatsApp link
+        const textParts = [];
+        textParts.push(`📋 *Consultation Documents*`);
+        textParts.push(`Patient: ${patient.name}`);
+        textParts.push(`Dr. ${doctorName}`);
+        if (patient.chamber) textParts.push(`Clinic: ${patient.chamber}`);
+        textParts.push('');
+        if (rxUrl) textParts.push(`🏥 *Digital Prescription:*\n${rxUrl}`);
+        if (dietUrl) textParts.push(`🍏 *AI Diet Chart:*\n${dietUrl}`);
+
+        const text = textParts.join('\n');
+        const phoneNumber = patient.phone ? patient.phone.replace(/\\D/g, '') : '';
+        const waUrl = phoneNumber
+          ? `https://wa.me/${phoneNumber.startsWith('91') ? phoneNumber : '91' + phoneNumber}?text=${encodeURIComponent(text)}`
+          : `https://wa.me/?text=${encodeURIComponent(text)}`;
+        toast.info('Tap to open WhatsApp', {
+          duration: 15000,
+          action: {
+            label: '📱 Open WhatsApp',
+            onClick: () => window.open(waUrl, '_blank'),
+          },
+        });
       }
 
     } catch (error) {
@@ -2337,6 +2350,81 @@ export default function PatientDetails({
                     <Send className="w-4 h-4" />
                   )}
                   No, Send RX Only via App Notification
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* RX Regen Success Modal — WhatsApp 2nd option */}
+        {regenSuccessModalOpen && selectedPatientForFlow && regenRxUrl && (
+          <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="w-full max-w-md bg-[#0f172a] border border-zinc-700 rounded-2xl shadow-2xl overflow-hidden">
+              {/* Header */}
+              <div className="p-6 border-b border-zinc-800 bg-zinc-900/50">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-emerald-500/20 rounded-xl">
+                    <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">RX Updated Successfully!</h3>
+                    <p className="text-xs text-gray-400">Notification sent to {selectedPatientForFlow.name}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Body */}
+              <div className="p-6 space-y-4">
+                <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center gap-3">
+                  <FileText className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-emerald-300">Updated Digital RX</p>
+                    <p className="text-xs text-emerald-400/70">PDF has been regenerated and stored</p>
+                  </div>
+                </div>
+
+                <p className="text-sm text-gray-400 leading-relaxed">
+                  The updated prescription has been sent via app notification. You can also send it via WhatsApp as a backup.
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="p-6 border-t border-zinc-800 space-y-3">
+                <button
+                  onClick={() => {
+                    const textParts = [];
+                    textParts.push(`📋 *Updated Digital Prescription*`);
+                    textParts.push(`Patient: ${selectedPatientForFlow!.name}`);
+                    const drName = localStorage.getItem('healqr_user_name') || localStorage.getItem('doctorName') || 'Doctor';
+                    textParts.push(`Dr. ${drName}`);
+                    if (selectedPatientForFlow!.chamber) textParts.push(`Clinic: ${selectedPatientForFlow!.chamber}`);
+                    textParts.push('');
+                    textParts.push(`🏥 *Download Prescription:*\n${regenRxUrl}`);
+                    const text = textParts.join('\n');
+                    const phoneNumber = selectedPatientForFlow!.phone ? selectedPatientForFlow!.phone.replace(/\D/g, '') : '';
+                    const url = phoneNumber
+                      ? `https://wa.me/${phoneNumber.startsWith('91') ? phoneNumber : '91' + phoneNumber}?text=${encodeURIComponent(text)}`
+                      : `https://wa.me/?text=${encodeURIComponent(text)}`;
+                    window.open(url, '_blank');
+                    setRegenSuccessModalOpen(false);
+                    setRegenRxUrl(null);
+                    setSelectedPatientForFlow(null);
+                  }}
+                  className="w-full py-3 bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors shadow-lg shadow-[#25D366]/20"
+                >
+                  <MessageCircle className="w-5 h-5" />
+                  Also Send via WhatsApp
+                </button>
+                <button
+                  onClick={() => {
+                    setRegenSuccessModalOpen(false);
+                    setRegenRxUrl(null);
+                    setSelectedPatientForFlow(null);
+                  }}
+                  className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 text-gray-300 font-medium rounded-xl flex items-center justify-center gap-2 transition-colors border border-zinc-700"
+                >
+                  <Check className="w-4 h-4" />
+                  Done
                 </button>
               </div>
             </div>
