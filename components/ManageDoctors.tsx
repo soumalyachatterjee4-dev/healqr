@@ -35,7 +35,8 @@ import {
   Check,
   AlertTriangle,
   Key,
-  ExternalLink
+  ExternalLink,
+  ChevronDown
 } from 'lucide-react';
 import ClinicSidebar from './ClinicSidebar';
 import { toast } from 'sonner';
@@ -118,6 +119,7 @@ const SPECIALTIES = [
 
 const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) => void }> = ({ onNavigate }) => {
   const [linkedDoctors, setLinkedDoctors] = useState<LinkedDoctor[]>([]);
+  const [expandedDoctors, setExpandedDoctors] = useState<Set<string>>(new Set());
   const [allDoctors, setAllDoctors] = useState<any[]>([]); // For searching existing doctors
   // const [doctorCode, setDoctorCode] = useState(''); // Removed duplicate declaration
   const [loading, setLoading] = useState(true);
@@ -1323,38 +1325,52 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
               </div>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="space-y-3">
               {linkedDoctors.map((doctor) => (
                 <Card
                   key={doctor.uid}
-                  className={`bg-gray-800/50 border-gray-700 p-6 ${
+                  className={`bg-gray-800/50 border-gray-700 overflow-hidden ${
                     doctor.status === 'pending_invitation' ? 'opacity-75' : ''
                   }`}
                 >
-                  <div className="flex flex-col sm:flex-row items-start gap-3 mb-4">
-                    <div className="flex items-start gap-3 flex-1 min-w-0">
-                      <div className={`w-12 h-12 flex-shrink-0 rounded-full ${
-                        doctor.status === 'active' ? 'bg-blue-600' : 'bg-orange-600'
-                      } flex items-center justify-center`}>
-                        <User className="w-6 h-6 text-white" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-white font-semibold text-lg break-words">{doctor.name}</h3>
-                        <p className="text-gray-400 text-sm break-words">
-                          {Array.isArray(doctor.specialties)
-                            ? doctor.specialties.join(', ')
-                            : doctor.specialty || 'N/A'}
-                        </p>
-                      </div>
+                  {/* Collapsed Header Row - Always visible */}
+                  <div
+                    className="flex items-center gap-3 p-4 cursor-pointer hover:bg-gray-700/30 transition-colors"
+                    onClick={() => setExpandedDoctors(prev => {
+                      const next = new Set(prev);
+                      if (next.has(doctor.uid)) next.delete(doctor.uid);
+                      else next.add(doctor.uid);
+                      return next;
+                    })}
+                  >
+                    <div className={`w-10 h-10 flex-shrink-0 rounded-full ${
+                      doctor.status === 'active' ? 'bg-blue-600' : 'bg-orange-600'
+                    } flex items-center justify-center`}>
+                      <User className="w-5 h-5 text-white" />
                     </div>
-                    <div className="flex-shrink-0">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-white font-semibold text-base break-words">Dr. {doctor.name}</h3>
+                      <p className="text-gray-400 text-sm break-words">
+                        {Array.isArray(doctor.specialties)
+                          ? doctor.specialties.join(', ')
+                          : doctor.specialty || 'N/A'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 flex-shrink-0">
                       {getStatusBadge(doctor.status, doctor)}
+                      <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${
+                        expandedDoctors.has(doctor.uid) ? 'rotate-180' : ''
+                      }`} />
                     </div>
                   </div>
 
+                  {/* Expanded Details */}
+                  {expandedDoctors.has(doctor.uid) && (
+                  <div className="px-6 pb-6 border-t border-gray-700">
+
                   {/* Activation Note for Pending Doctors */}
                   {doctor.status === 'pending_invitation' && (
-                    <div className="mb-4 p-3 bg-blue-900/20 border border-blue-700/30 rounded-lg">
+                    <div className="mt-4 mb-4 p-3 bg-blue-900/20 border border-blue-700/30 rounded-lg">
                       <p className="text-blue-300 text-xs flex items-start gap-2">
                         <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
                         <span>
@@ -1365,7 +1381,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
                     </div>
                   )}
 
-                  <div className="space-y-3 mb-4">
+                  <div className="space-y-3 mt-4 mb-4">
                     <div className="flex items-start gap-2 text-gray-300">
                       <Mail className="w-4 h-4 text-gray-500 flex-shrink-0 mt-0.5" />
                       <span className="text-sm break-all">{doctor.email}</span>
@@ -1856,6 +1872,9 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
                       Unlink
                     </Button>
                   </div>
+
+                  </div>
+                  )}
                 </Card>
               ))}
             </div>
