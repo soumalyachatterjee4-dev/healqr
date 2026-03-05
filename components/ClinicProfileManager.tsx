@@ -648,36 +648,32 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
                 )}
 
                 {/* Company Name */}
-                {companyName && (
-                  <div>
-                    <Label className="mb-2 block text-gray-300">Company Name</Label>
-                    <div className="relative">
-                      <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                      <Input
-                        type="text"
-                        value={companyName}
-                        disabled
-                        className="pl-12 bg-zinc-950 border-zinc-800 text-gray-500 h-12 rounded-lg cursor-not-allowed"
-                      />
-                    </div>
+                <div>
+                  <Label className="mb-2 block text-gray-300">Company Name</Label>
+                  <div className="relative">
+                    <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                    <Input
+                      type="text"
+                      value={companyName || '—'}
+                      disabled
+                      className="pl-12 bg-zinc-950 border-zinc-800 text-gray-500 h-12 rounded-lg cursor-not-allowed"
+                    />
                   </div>
-                )}
+                </div>
 
                 {/* Division */}
-                {division && (
-                  <div>
-                    <Label className="mb-2 block text-gray-300">Division</Label>
-                    <div className="relative">
-                      <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                      <Input
-                        type="text"
-                        value={division}
-                        disabled
-                        className="pl-12 bg-zinc-950 border-zinc-800 text-gray-500 h-12 rounded-lg cursor-not-allowed"
-                      />
-                    </div>
+                <div>
+                  <Label className="mb-2 block text-gray-300">Division</Label>
+                  <div className="relative">
+                    <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                    <Input
+                      type="text"
+                      value={division || '—'}
+                      disabled
+                      className="pl-12 bg-zinc-950 border-zinc-800 text-gray-500 h-12 rounded-lg cursor-not-allowed"
+                    />
                   </div>
-                )}
+                </div>
               </div>
 
               {/* Bio for Miniwebsite */}

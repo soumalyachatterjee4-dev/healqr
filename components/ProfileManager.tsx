@@ -633,36 +633,32 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
                 )}
 
                 {/* Company Name */}
-                {companyName && (
-                  <div>
-                    <Label className="mb-2 block">Company Name</Label>
-                    <div className="relative">
-                      <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                      <Input
-                        type="text"
-                        value={companyName}
-                        disabled
-                        className="pl-12 bg-zinc-950 border-zinc-800 text-gray-500 h-12 rounded-lg cursor-not-allowed"
-                      />
-                    </div>
+                <div>
+                  <Label className="mb-2 block">Company Name</Label>
+                  <div className="relative">
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                    <Input
+                      type="text"
+                      value={companyName || '—'}
+                      disabled
+                      className="pl-12 bg-zinc-950 border-zinc-800 text-gray-500 h-12 rounded-lg cursor-not-allowed"
+                    />
                   </div>
-                )}
+                </div>
 
                 {/* Division */}
-                {division && (
-                  <div>
-                    <Label className="mb-2 block">Division</Label>
-                    <div className="relative">
-                      <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                      <Input
-                        type="text"
-                        value={division}
-                        disabled
-                        className="pl-12 bg-zinc-950 border-zinc-800 text-gray-500 h-12 rounded-lg cursor-not-allowed"
-                      />
-                    </div>
+                <div>
+                  <Label className="mb-2 block">Division</Label>
+                  <div className="relative">
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                    <Input
+                      type="text"
+                      value={division || '—'}
+                      disabled
+                      className="pl-12 bg-zinc-950 border-zinc-800 text-gray-500 h-12 rounded-lg cursor-not-allowed"
+                    />
                   </div>
-                )}
+                </div>
 
                 {/* Primary Specialty (Read-Only) */}
                 <div>
