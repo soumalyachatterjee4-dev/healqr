@@ -428,6 +428,41 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
           })()
         ]).catch(err => console.error('QR linking error (non-critical):', err));
 
+        // Auto-link doctor to pharma company's distributedDoctors subcollection
+        if (signupData.companyName) {
+          (async () => {
+            try {
+              const { collection, query, where, getDocs, addDoc, serverTimestamp: ts } = await import('firebase/firestore');
+              const pharmaRef = collection(db, 'pharmaCompanies');
+              const pharmaQuery = query(pharmaRef, where('companyName', '==', signupData.companyName.trim()));
+              const pharmaSnap = await getDocs(pharmaQuery);
+
+              if (!pharmaSnap.empty) {
+                const pharmaDoc = pharmaSnap.docs[0];
+                // Add doctor to pharma company's distributedDoctors subcollection
+                await addDoc(collection(db, 'pharmaCompanies', pharmaDoc.id, 'distributedDoctors'), {
+                  doctorId: user.uid,
+                  doctorName: signupData.name || '',
+                  email: email,
+                  specialty: (signupData.specialties || []).join(', '),
+                  pincode: signupData.pinCode || '',
+                  division: signupData.division || '',
+                  qrNumber: signupData.qrNumber || '',
+                  isActive: true,
+                  distributedAt: ts(),
+                  totalBookingCount: 0,
+                  todayBookingCount: 0,
+                });
+                console.log('✅ Doctor auto-linked to pharma company:', signupData.companyName);
+              } else {
+                console.log('ℹ️ No pharma company found for:', signupData.companyName);
+              }
+            } catch (err) {
+              console.error('Pharma auto-link error (non-critical):', err);
+            }
+          })();
+        }
+
         console.log('✅ Doctor profile saved to Firestore with trial subscription');
       }
 

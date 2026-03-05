@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Search, MapPin, Users, Calendar, ChevronDown, ChevronUp, Download, Filter } from 'lucide-react';
 import { db } from '../lib/firebase/config';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, query, where, addDoc, serverTimestamp } from 'firebase/firestore';
 import { getLocationFromPincode } from '../utils/pincodeMapping';
 
 interface PharmaMyDoctorsProps {
@@ -46,23 +46,27 @@ export default function PharmaMyDoctors({ companyId }: PharmaMyDoctorsProps) {
     setLoading(true);
 
     try {
-      const doctorsRef = collection(db, 'pharmaCompanies', companyId, 'distributedDoctors');
-      const snap = await getDocs(doctorsRef);
+      // 1. Load already-distributed doctors from subcollection
+      const distributedRef = collection(db, 'pharmaCompanies', companyId, 'distributedDoctors');
+      const snap = await getDocs(distributedRef);
 
       const allDoctors: DoctorRecord[] = [];
       const stateSet = new Set<string>();
       const zoneSet = new Set<string>();
+      const existingDoctorIds = new Set<string>();
 
       snap.docs.forEach(docSnap => {
         const data = docSnap.data();
         const pincode = data.pincode || '';
         const location = getLocationFromPincode(pincode);
+        const doctorId = data.doctorId || docSnap.id;
 
+        existingDoctorIds.add(doctorId);
         stateSet.add(location.state);
         zoneSet.add(location.zone);
 
         allDoctors.push({
-          doctorId: docSnap.id,
+          doctorId,
           doctorName: data.doctorName || 'Unknown',
           specialty: data.specialty || 'General',
           pincode,
@@ -74,6 +78,61 @@ export default function PharmaMyDoctors({ companyId }: PharmaMyDoctorsProps) {
           isActive: data.isActive !== false,
         });
       });
+
+      // 2. Fetch pharma company name to find matching doctors
+      const companyDoc = await getDoc(doc(db, 'pharmaCompanies', companyId));
+      if (companyDoc.exists()) {
+        const companyName = companyDoc.data().companyName;
+        if (companyName) {
+          // Find doctors in the doctors collection that signed up with this company
+          const doctorsRef = collection(db, 'doctors');
+          const doctorsQuery = query(doctorsRef, where('companyName', '==', companyName));
+          const doctorsSnap = await getDocs(doctorsQuery);
+
+          for (const dDoc of doctorsSnap.docs) {
+            if (existingDoctorIds.has(dDoc.id)) continue; // Already in subcollection
+
+            const dData = dDoc.data();
+            const pincode = dData.pinCode || '';
+            const location = getLocationFromPincode(pincode);
+
+            stateSet.add(location.state);
+            zoneSet.add(location.zone);
+
+            allDoctors.push({
+              doctorId: dDoc.id,
+              doctorName: dData.name || 'Unknown',
+              specialty: Array.isArray(dData.specialties) ? dData.specialties.join(', ') : (dData.specialty || 'General'),
+              pincode,
+              state: location.state,
+              zone: location.zone,
+              todayBookings: 0,
+              totalBookings: dData.bookingsCount || 0,
+              qrDistributedDate: dData.createdAt?.toDate?.()?.toLocaleDateString?.() || '-',
+              isActive: dData.status === 'active',
+            });
+
+            // Auto-sync: add missing doctor to distributedDoctors subcollection
+            try {
+              await addDoc(distributedRef, {
+                doctorId: dDoc.id,
+                doctorName: dData.name || '',
+                email: dData.email || '',
+                specialty: Array.isArray(dData.specialties) ? dData.specialties.join(', ') : (dData.specialty || ''),
+                pincode,
+                division: dData.division || '',
+                qrNumber: dData.qrNumber || '',
+                isActive: dData.status === 'active',
+                distributedAt: dData.createdAt || serverTimestamp(),
+                totalBookingCount: dData.bookingsCount || 0,
+                todayBookingCount: 0,
+              });
+            } catch (syncErr) {
+              console.error('Auto-sync doctor error:', syncErr);
+            }
+          }
+        }
+      }
 
       setDoctors(allDoctors);
       setStates(Array.from(stateSet).sort());
