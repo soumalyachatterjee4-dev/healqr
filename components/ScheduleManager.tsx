@@ -271,6 +271,8 @@ export default function ScheduleManager({
     try {
       let resolvedClinicName = '';
       let resolvedClinicAddress = '';
+      let matchedClinicId = '';
+      let matchedClinicCode = '';
 
       // If clinic code is provided, verify it first
       if (clinicFormCode.trim()) {
@@ -283,9 +285,11 @@ export default function ScheduleManager({
           return;
         }
 
+        matchedClinicId = clinicSnap.docs[0].id;
         const clinicData = clinicSnap.docs[0].data();
         resolvedClinicName = clinicData.name || clinicFormName;
         resolvedClinicAddress = clinicData.address || clinicFormAddress;
+        matchedClinicCode = clinicData.clinicCode || clinicFormCode.trim();
 
         toast.info(`Linked to system clinic: ${resolvedClinicName}`);
       }
@@ -307,9 +311,9 @@ export default function ScheduleManager({
         );
         toast.success('Clinic Updated Successfully');
       } else {
-        // Add new clinic
+        // Add new clinic — use clinic doc ID if matched, otherwise generate
         const newClinic = {
-          id: Date.now().toString(),
+          id: matchedClinicId || Date.now().toString(),
           name: resolvedClinicName || clinicFormName,
           address: resolvedClinicAddress || clinicFormAddress,
           phone: clinicFormPhone,
@@ -327,6 +331,65 @@ export default function ScheduleManager({
         manualClinics: updatedClinics,
         updatedAt: serverTimestamp()
       });
+
+      // Bidirectional link: update clinic's linkedDoctorsDetails & doctor's linkedClinics
+      if (matchedClinicId && !editingClinicId) {
+        try {
+          // Fetch doctor's own profile to get required fields
+          const doctorDoc = await getDoc(doc(db, 'doctors', doctorId));
+          const doctorData = doctorDoc.exists() ? doctorDoc.data() : null;
+
+          if (doctorData) {
+            // 1. Add doctor to clinic's linkedDoctorsDetails
+            const clinicRef = doc(db, 'clinics', matchedClinicId);
+            const clinicSnap = await getDoc(clinicRef);
+            const existingLinkedDoctors = clinicSnap.exists()
+              ? (clinicSnap.data().linkedDoctorsDetails || [])
+              : [];
+
+            const alreadyLinked = existingLinkedDoctors.some((d: any) => d.uid === doctorId);
+            if (!alreadyLinked) {
+              const newLinkedDoctor = {
+                uid: doctorId,
+                email: doctorData.email || '',
+                name: doctorData.name || '',
+                dateOfBirth: doctorData.dateOfBirth || '',
+                specialties: doctorData.specialties || (doctorData.specialty ? [doctorData.specialty] : []),
+                pinCode: doctorData.pinCode || '',
+                doctorCode: doctorData.doctorCode || '',
+                qrNumber: doctorData.qrNumber || '',
+                status: doctorData.status || 'active'
+              };
+
+              if (clinicSnap.exists()) {
+                await updateDoc(clinicRef, {
+                  linkedDoctorsDetails: [...existingLinkedDoctors, newLinkedDoctor]
+                });
+              } else {
+                await setDoc(clinicRef, {
+                  linkedDoctorsDetails: [newLinkedDoctor]
+                }, { merge: true });
+              }
+            }
+
+            // 2. Add clinic to doctor's linkedClinics
+            const existingLinkedClinics = doctorData.linkedClinics || [];
+            const alreadyInLinkedClinics = existingLinkedClinics.some((c: any) => c.clinicId === matchedClinicId);
+            if (!alreadyInLinkedClinics) {
+              await updateDoc(doc(db, 'doctors', doctorId), {
+                linkedClinics: [...existingLinkedClinics, {
+                  clinicId: matchedClinicId,
+                  clinicName: resolvedClinicName,
+                  clinicCode: matchedClinicCode
+                }]
+              });
+            }
+          }
+        } catch (linkError) {
+          console.error('Error creating bidirectional link:', linkError);
+          // Non-fatal: clinic was still saved to doctor's manualClinics
+        }
+      }
 
       handleResetClinicForm();
     } catch (error) {
@@ -373,6 +436,9 @@ export default function ScheduleManager({
     if (!clinicToDelete || !doctorId || !db) return;
 
     try {
+      // Find the clinic being deleted to check if it has a system link
+      const deletedClinic = manualClinics.find(c => c.id === clinicToDelete);
+
       const updatedClinics = manualClinics.filter(c => c.id !== clinicToDelete);
       setManualClinics(updatedClinics);
 
@@ -380,6 +446,37 @@ export default function ScheduleManager({
         manualClinics: updatedClinics,
         updatedAt: serverTimestamp()
       });
+
+      // Bidirectional unlink: remove doctor from clinic's linkedDoctorsDetails & from doctor's linkedClinics
+      if (deletedClinic?.clinicCode) {
+        try {
+          // Find the clinic doc by code or by ID
+          let clinicDocId = deletedClinic.id;
+
+          // Remove doctor from clinic's linkedDoctorsDetails
+          const clinicRef = doc(db, 'clinics', clinicDocId);
+          const clinicSnap = await getDoc(clinicRef);
+          if (clinicSnap.exists()) {
+            const existingLinkedDoctors = clinicSnap.data().linkedDoctorsDetails || [];
+            const updatedDoctors = existingLinkedDoctors.filter((d: any) => d.uid !== doctorId);
+            if (updatedDoctors.length !== existingLinkedDoctors.length) {
+              await updateDoc(clinicRef, { linkedDoctorsDetails: updatedDoctors });
+            }
+          }
+
+          // Remove clinic from doctor's linkedClinics
+          const doctorDoc = await getDoc(doc(db, 'doctors', doctorId));
+          if (doctorDoc.exists()) {
+            const existingLinkedClinics = doctorDoc.data().linkedClinics || [];
+            const updatedLinkedClinics = existingLinkedClinics.filter((c: any) => c.clinicId !== clinicDocId);
+            if (updatedLinkedClinics.length !== existingLinkedClinics.length) {
+              await updateDoc(doc(db, 'doctors', doctorId), { linkedClinics: updatedLinkedClinics });
+            }
+          }
+        } catch (unlinkError) {
+          console.error('Error removing bidirectional link:', unlinkError);
+        }
+      }
 
       toast.success('Clinic Deleted Successfully');
       setShowClinicDeleteModal(false);
