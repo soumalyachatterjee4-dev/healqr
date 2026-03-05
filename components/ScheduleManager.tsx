@@ -79,6 +79,51 @@ export default function ScheduleManager({
             setManualClinics(data.manualClinics);
           }
 
+          // Auto-populate My Clinics from linkedClinics (added by clinic side)
+          if (data.linkedClinics && Array.isArray(data.linkedClinics)) {
+            const existingManualClinics: typeof manualClinics = data.manualClinics || [];
+            const existingClinicCodes = new Set(existingManualClinics.map((c: any) => c.clinicCode).filter(Boolean));
+            const existingClinicIds = new Set(existingManualClinics.map((c: any) => c.id).filter(Boolean));
+
+            const newClinicsToAdd: typeof manualClinics = [];
+            for (const linked of data.linkedClinics) {
+              // Skip if already in manualClinics (by clinicCode or clinicId)
+              if ((linked.clinicCode && existingClinicCodes.has(linked.clinicCode)) ||
+                  existingClinicIds.has(linked.clinicId)) {
+                continue;
+              }
+
+              // Fetch clinic details from Firestore
+              try {
+                const clinicDoc = await getDoc(doc(db!, 'clinics', linked.clinicId));
+                if (clinicDoc.exists()) {
+                  const clinicData = clinicDoc.data();
+                  newClinicsToAdd.push({
+                    id: linked.clinicId,
+                    name: clinicData.name || linked.clinicName || 'Clinic',
+                    address: clinicData.address || '',
+                    phone: clinicData.phone || '',
+                    clinicCode: linked.clinicCode || clinicData.clinicCode || '',
+                    createdAt: Date.now(),
+                  });
+                }
+              } catch (e) {
+                console.error('Failed to fetch linked clinic details:', e);
+              }
+            }
+
+            if (newClinicsToAdd.length > 0) {
+              const merged = [...existingManualClinics, ...newClinicsToAdd];
+              setManualClinics(merged);
+              // Persist merged clinics back to doctor's manualClinics
+              try {
+                await updateDoc(doc(db!, 'doctors', uid), { manualClinics: merged });
+              } catch (e) {
+                console.error('Failed to persist auto-linked clinics:', e);
+              }
+            }
+          }
+
           // Load Self-Restricted Clinics (doctor-side toggle)
           if (data.selfRestrictedClinics && Array.isArray(data.selfRestrictedClinics)) {
             setSelfRestrictedClinics(data.selfRestrictedClinics);
