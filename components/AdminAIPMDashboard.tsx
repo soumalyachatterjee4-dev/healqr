@@ -195,13 +195,13 @@ export default function AdminAIPMDashboard({ adminEmail }: AdminAIPMDashboardPro
           Language Coverage ({totalLanguages} Languages)
         </h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-          {Object.entries(AI_SUPPORTED_LANGUAGES).map(([code, name]) => (
+          {Object.entries(AI_SUPPORTED_LANGUAGES).map(([code, lang]) => (
             <div
               key={code}
               className="px-3 py-2 bg-zinc-800 rounded-lg text-sm flex items-center gap-2"
             >
-              <span className="text-gray-300">{name}</span>
-              <span className="text-gray-600 text-xs ml-auto">{code.slice(0, 2)}</span>
+              <span className="text-gray-300">{lang.nativeName}</span>
+              <span className="text-gray-600 text-xs ml-auto">{lang.code}</span>
             </div>
           ))}
         </div>

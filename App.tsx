@@ -12,6 +12,8 @@ import { onForegroundMessage, ensureFCMInitialized } from "./services/fcm.servic
 import { getActivityTracker } from "./utils/activityTracker";
 import { getSessionPersistence } from "./utils/sessionPersistence";
 import type { Language } from "./utils/translations";
+import { getLanguageFromCode } from "./utils/translations";
+import type { LanguageCode } from "./utils/translations";
 import type { PatientFormData } from "./components/PatientDetailsForm";
 import AssistantAccessManager from "./components/AssistantAccessManager";
 
@@ -749,9 +751,9 @@ export default function App() {
         dietUrl,
       });
 
-      if (language === 'bengali' || language === 'bn') setBookingLanguage('bengali');
-      else if (language === 'hindi' || language === 'hi') setBookingLanguage('hindi');
-      else setBookingLanguage('english');
+      // Map language code to Language type
+      const mappedLang = getLanguageFromCode(language as LanguageCode);
+      setBookingLanguage(mappedLang || 'english');
 
       setCurrentPage('consultation-completed');
     } else if (pageParam === 'rx-updated') {
@@ -772,9 +774,9 @@ export default function App() {
         rxUrl,
       });
 
-      if (language === 'bengali' || language === 'bn') setBookingLanguage('bengali');
-      else if (language === 'hindi' || language === 'hi') setBookingLanguage('hindi');
-      else setBookingLanguage('english');
+      // Map language code to Language type
+      const mappedLang2 = getLanguageFromCode(language as LanguageCode);
+      setBookingLanguage(mappedLang2 || 'english');
 
       setCurrentPage('rx-updated');
     } else if (pageParam === 'follow-up') {

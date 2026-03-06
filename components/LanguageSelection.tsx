@@ -1,7 +1,7 @@
 import { Button } from './ui/button';
 import { Check, ArrowRight, Sparkles, MessageSquare, Bell, FileText, Globe } from 'lucide-react';
 import { useState } from 'react';
-import { t, type Language, languageDisplayNames, languageCodes } from '../utils/translations';
+import { t, type Language, languageDisplayNames, languageCodes, needsAITranslation, preloadLanguageTranslations } from '../utils/translations';
 import TemplateDisplay from './TemplateDisplay';
 import BookingFlowLayout from './BookingFlowLayout';
 
@@ -18,6 +18,7 @@ interface LanguageSelectionProps {
 
 export default function LanguageSelection({ onContinue, onBack, doctorName = '', doctorSpecialty = '', doctorPhoto = '', doctorDegrees = [], useDrPrefix = true, themeColor = 'emerald' }: LanguageSelectionProps) {
   const [selectedLanguage, setSelectedLanguage] = useState<Language>('english');
+  const [isPreloading, setIsPreloading] = useState(false);
 
   // Theme-aware color variables
   const iconGradient = themeColor === 'blue' ? 'from-blue-400 to-blue-600' : 'from-emerald-400 to-emerald-600';
@@ -268,11 +269,32 @@ export default function LanguageSelection({ onContinue, onBack, doctorName = '',
 
         {/* Continue Button */}
         <Button
-          onClick={() => onContinue(selectedLanguage)}
-          className={`w-full h-14 bg-gradient-to-r ${buttonGradient} text-white rounded-2xl flex items-center justify-center gap-2 shadow-lg`}
+          onClick={async () => {
+            if (needsAITranslation(selectedLanguage)) {
+              setIsPreloading(true);
+              try {
+                await preloadLanguageTranslations(selectedLanguage);
+              } catch (e) {
+                console.warn('Preload failed, continuing anyway:', e);
+              }
+              setIsPreloading(false);
+            }
+            onContinue(selectedLanguage);
+          }}
+          disabled={isPreloading}
+          className={`w-full h-14 bg-gradient-to-r ${buttonGradient} text-white rounded-2xl flex items-center justify-center gap-2 shadow-lg disabled:opacity-60`}
         >
-          <span>{t('continue', selectedLanguage)}</span>
-          <ArrowRight className="w-5 h-5" />
+          {isPreloading ? (
+            <>
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
+              <span>Preparing {languageDisplayNames[selectedLanguage]}...</span>
+            </>
+          ) : (
+            <>
+              <span>{t('continue', selectedLanguage)}</span>
+              <ArrowRight className="w-5 h-5" />
+            </>
+          )}
         </Button>
 
       </div>

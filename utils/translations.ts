@@ -1138,10 +1138,96 @@ export const translations = {
   },
 };
 
+// ======================== AI TRANSLATION PRELOAD CACHE ========================
+
+// Core languages that have hardcoded translations (don't need AI)
+const CORE_LANGUAGES: Language[] = [
+  'english', 'hindi', 'bengali', 'marathi', 'tamil', 'telugu',
+  'gujarati', 'kannada', 'malayalam', 'punjabi', 'assamese'
+];
+
+// Cache for AI-preloaded translations: Map<"language::key", translatedText>
+const preloadedCache = new Map<string, string>();
+
+// Track which languages have been preloaded
+const preloadedLanguages = new Set<string>();
+
+/**
+ * Check if a language needs AI translation (not in core hardcoded set)
+ */
+export function needsAITranslation(language: Language): boolean {
+  return !CORE_LANGUAGES.includes(language);
+}
+
+/**
+ * Preload all UI translation keys for a non-core language using AI batch translation.
+ * Call this before navigating away from language selection.
+ * Results are cached in memory for the session.
+ */
+export async function preloadLanguageTranslations(language: Language): Promise<void> {
+  if (!needsAITranslation(language)) return;
+  if (preloadedLanguages.has(language)) return; // Already preloaded
+
+  const { aiTranslateBatch } = await import('../services/aiTranslationService');
+
+  // Collect all English values and their keys
+  const keys = Object.keys(translations) as (keyof typeof translations)[];
+  const englishTexts: string[] = [];
+  const keyMap: string[] = [];
+
+  for (const key of keys) {
+    const entry = translations[key] as Record<string, string>;
+    const englishText = entry?.['english'];
+    if (englishText) {
+      englishTexts.push(englishText);
+      keyMap.push(key);
+    }
+  }
+
+  // Batch translate in chunks of 40 (to stay within Gemini limits)
+  const CHUNK_SIZE = 40;
+  for (let i = 0; i < englishTexts.length; i += CHUNK_SIZE) {
+    const chunk = englishTexts.slice(i, i + CHUNK_SIZE);
+    const chunkKeys = keyMap.slice(i, i + CHUNK_SIZE);
+
+    try {
+      const results = await aiTranslateBatch(chunk, language as any, 'ui');
+      for (let j = 0; j < results.length; j++) {
+        preloadedCache.set(`${language}::${chunkKeys[j]}`, results[j].translated);
+      }
+    } catch (error) {
+      console.warn(`AI preload chunk ${i} failed for ${language}:`, error);
+    }
+  }
+
+  preloadedLanguages.add(language);
+  console.log(`✅ Preloaded ${englishTexts.length} translations for ${language}`);
+}
+
+/**
+ * Get preload progress for UI feedback
+ */
+export function isLanguagePreloaded(language: Language): boolean {
+  return !needsAITranslation(language) || preloadedLanguages.has(language);
+}
+
 // Translation helper function
 export function t(key: keyof typeof translations, language: Language): string {
   const translationsForKey = translations[key] as Record<string, string>;
-  return translationsForKey?.[language] || translationsForKey?.['english'] || key;
+
+  // First check hardcoded translations
+  if (translationsForKey?.[language]) {
+    return translationsForKey[language];
+  }
+
+  // For non-core languages, check AI preloaded cache
+  if (needsAITranslation(language)) {
+    const cached = preloadedCache.get(`${language}::${key}`);
+    if (cached) return cached;
+  }
+
+  // Fallback to English
+  return translationsForKey?.['english'] || key;
 }
 
 // Language display names in their native scripts
@@ -1888,18 +1974,57 @@ export function transliterateName(name: string, targetLanguage: Language): strin
     return transliterateFromLatin(name, 'bengali');
   }
 
+  // For non-core languages, check if AI transliteration is cached
+  if (needsAITranslation(targetLanguage) && !hasIndicScript) {
+    const cached = preloadedCache.get(`name_translit::${targetLanguage}::${name}`);
+    if (cached) return cached;
+    // Trigger async transliteration in background (will show on refresh)
+    transliterateNameAsync(name, targetLanguage);
+  }
+
   // Otherwise return as-is (same script as target)
   return name;
+}
+
+// Async name transliteration for non-core languages (caches result for next render)
+async function transliterateNameAsync(name: string, targetLanguage: Language): Promise<void> {
+  try {
+    const { aiTranslate } = await import('../services/aiTranslationService');
+    const result = await aiTranslate(name, targetLanguage as any, 'ui');
+    preloadedCache.set(`name_translit::${targetLanguage}::${name}`, result.translated);
+  } catch { /* silent */ }
 }
 
 // Helper function to translate patient data values from patient's language to doctor's language
 export function translateDataValue(value: string, targetLanguage: Language): string {
   // If the value exists in our translation map, translate it
   if (dataValueTranslations[value as keyof typeof dataValueTranslations]) {
-    return (dataValueTranslations[value as keyof typeof dataValueTranslations] as any)[targetLanguage] || value;
+    const translated = (dataValueTranslations[value as keyof typeof dataValueTranslations] as any)[targetLanguage];
+    if (translated) return translated;
+
+    // For non-core languages, check AI cache or try to get English first then translate
+    if (needsAITranslation(targetLanguage)) {
+      const cached = preloadedCache.get(`data::${targetLanguage}::${value}`);
+      if (cached) return cached;
+      // Get English value and trigger async translation
+      const englishValue = (dataValueTranslations[value as keyof typeof dataValueTranslations] as any)['english'] || value;
+      translateDataValueAsync(englishValue, value, targetLanguage);
+      return englishValue; // Return English as temporary fallback
+    }
+
+    return value;
   }
   // Otherwise return the original value (patient name, etc.)
   return value;
+}
+
+// Async data value translation for non-core languages
+async function translateDataValueAsync(englishValue: string, originalValue: string, targetLanguage: Language): Promise<void> {
+  try {
+    const { aiTranslate } = await import('../services/aiTranslationService');
+    const result = await aiTranslate(englishValue, targetLanguage as any, 'medical');
+    preloadedCache.set(`data::${targetLanguage}::${originalValue}`, result.translated);
+  } catch { /* silent */ }
 }
 
 // Normalize Indic numerals to English digits (for age input)
