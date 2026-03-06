@@ -19,15 +19,7 @@ const dynamicCache = new Map<string, string>();
 // Track in-flight translations to avoid duplicate API calls
 const pendingTranslations = new Map<string, Promise<string>>();
 
-// Core languages with hardcoded translations — skip AI for these
-const CORE_LANGUAGES: Language[] = [
-  'english', 'hindi', 'bengali', 'marathi', 'tamil', 'telugu',
-  'gujarati', 'kannada', 'malayalam', 'punjabi', 'assamese'
-];
-
-function needsAI(language: Language): boolean {
-  return !CORE_LANGUAGES.includes(language);
-}
+// All non-English languages use AI translation via dt()
 
 /**
  * Batch translate multiple texts via Gemini and cache results
@@ -98,7 +90,7 @@ export function useAITranslation(language: Language) {
   const [, forceUpdate] = useState(0);
   const batchQueue = useRef<Set<string>>(new Set());
   const batchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isEnglishOrCore = language === 'english' || !needsAI(language);
+  const isEnglish = language === 'english';
 
   // Batch flush: translate all queued texts at once
   const flushBatch = useCallback(async () => {
@@ -137,7 +129,7 @@ export function useAITranslation(language: Language) {
    */
   const dt = useCallback((englishText: string): string => {
     if (!englishText) return englishText;
-    if (isEnglishOrCore) return englishText; // Core languages use t() hardcoded
+    if (isEnglish) return englishText;
     
     const cacheKey = `${language}::${englishText}`;
     const cached = dynamicCache.get(cacheKey);
@@ -146,20 +138,20 @@ export function useAITranslation(language: Language) {
     // Queue for batch translation and return English as placeholder
     queueTranslation(englishText);
     return englishText;
-  }, [language, isEnglishOrCore, queueTranslation]);
+  }, [language, isEnglish, queueTranslation]);
 
   /**
    * Preload an array of texts all at once (call in useEffect)
    */
   const preload = useCallback(async (texts: string[]) => {
-    if (isEnglishOrCore) return;
+    if (isEnglish) return;
     
     const uncached = texts.filter(t => !dynamicCache.has(`${language}::${t}`));
     if (uncached.length === 0) return;
     
     await batchTranslateAndCache(uncached, language);
     forceUpdate(n => n + 1);
-  }, [language, isEnglishOrCore]);
+  }, [language, isEnglish]);
 
   return { dt, preload };
 }
