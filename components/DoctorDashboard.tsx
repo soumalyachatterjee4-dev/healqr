@@ -1300,7 +1300,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
             </Card>
 
             {/* Promotional Templates - Always show (birthday promo or regular promo) */}
-            <DashboardPromoDisplay doctorBirthday={doctorBirthday} hideBirthday={false} />
+            <DashboardPromoDisplay doctorBirthday={doctorBirthday} hideBirthday={false} doctorId={localStorage.getItem('userId') || undefined} />
 
             {/* Today's Schedule */}
             <Card className="bg-zinc-900 border-zinc-800">

@@ -180,8 +180,8 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
                 landmark: signupData.landmark || '',
                 qrNumber: signupData.qrNumber,
                 qrType: signupData.qrType || 'preprinted',
-                companyName: signupData.companyName || '',
-                division: signupData.division || '',
+                companyName: (signupData.companyName || '').trim(),
+                division: (signupData.division || '').trim(),
                 clinicCode: clinicCode,
                 clinicSlug: clinicSlug,
                 bookingUrl: bookingUrl,
@@ -202,6 +202,32 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
             localStorage.setItem('healqr_authenticated', 'true');
             localStorage.setItem('healqr_is_clinic', 'true'); // CRITICAL: This was missing
             localStorage.setItem('userId', user.uid);
+
+            // Auto-link clinic to pharma company's distributedClinics subcollection
+            if (signupData.companyName) {
+              try {
+                const { addDoc } = await import('firebase/firestore');
+                const pharmaRef = collection(db, 'pharmaCompanies');
+                const pharmaQuery = query(pharmaRef, where('companyName', '==', signupData.companyName.trim()));
+                const pharmaSnap = await getDocs(pharmaQuery);
+                if (!pharmaSnap.empty) {
+                  const pharmaDoc = pharmaSnap.docs[0];
+                  await addDoc(collection(db, 'pharmaCompanies', pharmaDoc.id, 'distributedClinics'), {
+                    clinicId: user.uid,
+                    clinicName: signupData.clinicName || '',
+                    email: email,
+                    pincode: signupData.pinCode || '',
+                    division: signupData.division || '',
+                    qrNumber: signupData.qrNumber || '',
+                    isActive: true,
+                    distributedAt: serverTimestamp(),
+                  });
+                  console.log('✅ Clinic auto-linked to pharma company:', pharmaDoc.id);
+                }
+              } catch (linkErr) {
+                console.error('Clinic pharma auto-link error:', linkErr);
+              }
+            }
 
             // Update QR Code in BOTH collections (check which one has it)
             const qrPoolCollection = collection(db, 'qrPool');
@@ -342,8 +368,8 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
           landmark: signupData.landmark || '',
           qrNumber: signupData.qrNumber, // Always store the provided QR
           qrType: signupData.qrType || 'preprinted', // QR type (preprinted or virtual)
-          companyName: signupData.companyName || '', // Company name for pre-printed QR
-          division: signupData.division || '', // Division for pre-printed QR
+          companyName: (signupData.companyName || '').trim(), // Company name for pre-printed QR
+          division: (signupData.division || '').trim(), // Division for pre-printed QR
           qrDocId: '', // Will be set after QR doc lookup
           doctorCode: doctorCode,
           baCode: signupData.baCode || '',

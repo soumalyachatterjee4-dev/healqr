@@ -15,7 +15,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { toast } from 'sonner';
 import { getAllStates } from '../utils/pincodeMapping';
 import { Button } from './ui/button';
-import { Globe, Plus, Trash2, Loader2, Upload, X } from 'lucide-react';
+import { Globe, Plus, Trash2, Loader2, Upload, X, Pencil } from 'lucide-react';
 
 const ALL_SPECIALTIES = [
   "Clinic",
@@ -51,9 +51,10 @@ interface ChangeRequest {
   id: string;
   companyId: string;
   companyName?: string;
-  type: 'territory' | 'specialty';
-  action: 'add' | 'remove';
+  type: 'territory' | 'specialty' | 'profile_edit';
+  action: 'add' | 'remove' | 'update';
   items: string[];
+  changes?: Record<string, { from: string; to: string }>;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: any;
 }
@@ -72,6 +73,19 @@ export default function PharmaProfileManager({ companyId }: PharmaProfileManager
   const [specialtyAdd, setSpecialtyAdd] = useState<string[]>([]);
   const [specialtyRemove, setSpecialtyRemove] = useState<string[]>([]);
   const [postingRequest, setPostingRequest] = useState(false);
+
+  // Registration Details edit state
+  const [editingRegistration, setEditingRegistration] = useState(false);
+  const [editCompanyName, setEditCompanyName] = useState('');
+  const [editGstNumber, setEditGstNumber] = useState('');
+  const [editDivision, setEditDivision] = useState('');
+  const [editAddress, setEditAddress] = useState('');
+  const [editPincode, setEditPincode] = useState('');
+  const [editState, setEditState] = useState('');
+  const [submittingProfileEdit, setSubmittingProfileEdit] = useState(false);
+
+  // Contact Person edit state
+  const [editingContact, setEditingContact] = useState(false);
 
   const allStates = getAllStates();
 
@@ -119,7 +133,7 @@ export default function PharmaProfileManager({ companyId }: PharmaProfileManager
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !db || !storage || !companyId) return;
-    
+
     // Validate file type
     if (!file.type.startsWith('image/')) {
       toast.error('Please upload an image file');
@@ -136,16 +150,16 @@ export default function PharmaProfileManager({ companyId }: PharmaProfileManager
     try {
       // Compress image before upload
       const compressedFile = await compressImage(file);
-      
+
       const imageRef = ref(storage, `pharmaCompanies/${companyId}/logo`);
       const snapshot = await uploadBytes(imageRef, compressedFile);
       const downloadURL = await getDownloadURL(snapshot.ref);
-      
+
       await updateDoc(doc(db, 'pharmaCompanies', companyId), {
         logoUrl: downloadURL,
         updatedAt: serverTimestamp(),
       });
-      
+
       // Update profile with new image
       setProfile((prev: any) => ({ ...prev, logoUrl: downloadURL }));
       toast.success('Company logo updated');
@@ -269,6 +283,82 @@ export default function PharmaProfileManager({ companyId }: PharmaProfileManager
     }
   };
 
+  const startEditingRegistration = () => {
+    setEditCompanyName(profile?.companyName || '');
+    setEditGstNumber(profile?.gstNumber || '');
+    setEditDivision(profile?.division || '');
+    setEditAddress(profile?.address || '');
+    setEditPincode(profile?.registeredOfficePincode || '');
+    setEditState(profile?.registeredOfficeState || '');
+    setEditingRegistration(true);
+  };
+
+  const cancelEditingRegistration = () => {
+    setEditingRegistration(false);
+  };
+
+  const submitRegistrationEdit = async () => {
+    if (!db || !companyId) return;
+
+    // Build changes map - only include fields that actually changed
+    const changes: Record<string, { from: string; to: string }> = {};
+    if (editCompanyName !== (profile?.companyName || '')) {
+      changes.companyName = { from: profile?.companyName || '', to: editCompanyName };
+    }
+    if (editGstNumber !== (profile?.gstNumber || '')) {
+      changes.gstNumber = { from: profile?.gstNumber || '', to: editGstNumber };
+    }
+    if (editDivision !== (profile?.division || '')) {
+      changes.division = { from: profile?.division || '', to: editDivision };
+    }
+    if (editAddress !== (profile?.address || '')) {
+      changes.address = { from: profile?.address || '', to: editAddress };
+    }
+    if (editPincode !== (profile?.registeredOfficePincode || '')) {
+      changes.registeredOfficePincode = { from: profile?.registeredOfficePincode || '', to: editPincode };
+    }
+    if (editState !== (profile?.registeredOfficeState || '')) {
+      changes.registeredOfficeState = { from: profile?.registeredOfficeState || '', to: editState };
+    }
+
+    if (Object.keys(changes).length === 0) {
+      toast.info('No changes detected');
+      setEditingRegistration(false);
+      return;
+    }
+
+    setSubmittingProfileEdit(true);
+    try {
+      await addDoc(collection(db, 'pharmaChangeRequests'), {
+        companyId,
+        companyName: profile?.companyName || '',
+        type: 'profile_edit',
+        action: 'update',
+        items: Object.keys(changes),
+        changes,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+      });
+      toast.success('Profile edit request submitted for admin approval');
+      setEditingRegistration(false);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to submit edit request');
+    } finally {
+      setSubmittingProfileEdit(false);
+    }
+  };
+
+  const startEditingContact = () => {
+    setEditingContact(true);
+  };
+
+  const cancelEditingContact = () => {
+    setContactPerson(profile?.contactPerson || '');
+    setContactPhone(profile?.contactPhone || '');
+    setEditingContact(false);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -308,7 +398,7 @@ export default function PharmaProfileManager({ companyId }: PharmaProfileManager
               <span className="text-gray-500 text-sm text-center px-4">No logo uploaded</span>
             )}
           </div>
-          
+
           {/* Upload Controls */}
           <div className="flex-1 space-y-3">
             <label className="block">
@@ -341,63 +431,139 @@ export default function PharmaProfileManager({ companyId }: PharmaProfileManager
 
       {/* Locked information section */}
       <div className="bg-zinc-900 rounded-xl p-6 space-y-4">
-        <h3 className="font-semibold">Registration Details (locked)</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <p className="text-xs text-gray-400">Company Name</p>
-            <p className="font-medium">{profile.companyName}</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-400">Contact Email</p>
-            <p className="font-medium">{profile.contactEmail}</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-400">GST Number</p>
-            <p className="font-medium">{profile.gstNumber || '—'}</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-400">Division/Branch</p>
-            <p className="font-medium">{profile.division || '—'}</p>
-          </div>
-          <div className="sm:col-span-2">
-            <p className="text-xs text-gray-400">Address</p>
-            <p className="font-medium">{profile.address || '—'}</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-400">Registered Office Pincode</p>
-            <p className="font-medium">{profile.registeredOfficePincode}</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-400">Registered Office State</p>
-            <p className="font-medium">{profile.registeredOfficeState}</p>
-          </div>
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold">Registration Details {!editingRegistration && '(locked)'}</h3>
+          {!editingRegistration ? (
+            <button onClick={startEditingRegistration} className="text-gray-400 hover:text-white transition-colors" title="Edit">
+              <Pencil className="w-4 h-4" />
+            </button>
+          ) : (
+            <button onClick={cancelEditingRegistration} className="text-gray-400 hover:text-white transition-colors" title="Cancel">
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
+        {!editingRegistration ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-gray-400">Company Name</p>
+              <p className="font-medium">{profile.companyName}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400">Contact Email</p>
+              <p className="font-medium">{profile.contactEmail}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400">GST Number</p>
+              <p className="font-medium">{profile.gstNumber || '—'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400">Division/Branch</p>
+              <p className="font-medium">{profile.division || '—'}</p>
+            </div>
+            <div className="sm:col-span-2">
+              <p className="text-xs text-gray-400">Address</p>
+              <p className="font-medium">{profile.address || '—'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400">Registered Office Pincode</p>
+              <p className="font-medium">{profile.registeredOfficePincode}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400">Registered Office State</p>
+              <p className="font-medium">{profile.registeredOfficeState}</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            <p className="text-xs text-amber-400">Changes will require admin approval before taking effect.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-gray-400">Company Name</label>
+                <input value={editCompanyName} onChange={(e) => setEditCompanyName(e.target.value)} className="w-full bg-zinc-800 rounded-lg p-2 text-white" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400">Contact Email</label>
+                <p className="font-medium p-2 text-gray-500">{profile.contactEmail}</p>
+              </div>
+              <div>
+                <label className="text-xs text-gray-400">GST Number</label>
+                <input value={editGstNumber} onChange={(e) => setEditGstNumber(e.target.value)} className="w-full bg-zinc-800 rounded-lg p-2 text-white" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400">Division/Branch</label>
+                <input value={editDivision} onChange={(e) => setEditDivision(e.target.value)} className="w-full bg-zinc-800 rounded-lg p-2 text-white" />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="text-xs text-gray-400">Address</label>
+                <input value={editAddress} onChange={(e) => setEditAddress(e.target.value)} className="w-full bg-zinc-800 rounded-lg p-2 text-white" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400">Registered Office Pincode</label>
+                <input value={editPincode} onChange={(e) => setEditPincode(e.target.value)} className="w-full bg-zinc-800 rounded-lg p-2 text-white" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400">Registered Office State</label>
+                <input value={editState} onChange={(e) => setEditState(e.target.value)} className="w-full bg-zinc-800 rounded-lg p-2 text-white" />
+              </div>
+            </div>
+            <Button disabled={submittingProfileEdit} onClick={submitRegistrationEdit} className="mt-2">
+              {submittingProfileEdit ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : null} Submit for Approval
+            </Button>
+          </>
+        )}
       </div>
 
       {/* Contact editable */}
       <div className="bg-zinc-900 rounded-xl p-6 space-y-4">
-        <h3 className="font-semibold">Contact Person</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="text-xs text-gray-400">Name</label>
-            <input
-              value={contactPerson}
-              onChange={(e) => setContactPerson(e.target.value)}
-              className="w-full bg-zinc-800 rounded-lg p-2 text-white"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-gray-400">Mobile Number</label>
-            <input
-              value={contactPhone}
-              onChange={(e) => setContactPhone(e.target.value)}
-              className="w-full bg-zinc-800 rounded-lg p-2 text-white"
-            />
-          </div>
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold">Contact Person</h3>
+          {!editingContact ? (
+            <button onClick={startEditingContact} className="text-gray-400 hover:text-white transition-colors" title="Edit">
+              <Pencil className="w-4 h-4" />
+            </button>
+          ) : (
+            <button onClick={cancelEditingContact} className="text-gray-400 hover:text-white transition-colors" title="Cancel">
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
-        <Button disabled={savingContact} onClick={handleContactSave} className="mt-2">
-          {savingContact ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : null} Save
-        </Button>
+        {!editingContact ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-gray-400">Name</p>
+              <p className="font-medium">{contactPerson || '—'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400">Mobile Number</p>
+              <p className="font-medium">{contactPhone || '—'}</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-gray-400">Name</label>
+                <input
+                  value={contactPerson}
+                  onChange={(e) => setContactPerson(e.target.value)}
+                  className="w-full bg-zinc-800 rounded-lg p-2 text-white"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400">Mobile Number</label>
+                <input
+                  value={contactPhone}
+                  onChange={(e) => setContactPhone(e.target.value)}
+                  className="w-full bg-zinc-800 rounded-lg p-2 text-white"
+                />
+              </div>
+            </div>
+            <Button disabled={savingContact} onClick={() => { handleContactSave(); setEditingContact(false); }} className="mt-2">
+              {savingContact ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : null} Save
+            </Button>
+          </>
+        )}
       </div>
 
       {/* Territory section */}

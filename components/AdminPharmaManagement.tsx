@@ -137,7 +137,7 @@ export default function AdminPharmaManagement() {
     setActionLoading(id);
     try {
       // Cascade delete subcollections
-      for (const sub of ['distributedDoctors', 'promoTemplates', 'supportMessages']) {
+      for (const sub of ['distributedDoctors', 'distributedClinics', 'promoTemplates', 'supportMessages']) {
         const subSnap = await getDocs(collection(db, 'pharmaCompanies', id, sub));
         for (const d of subSnap.docs) {
           await deleteDoc(doc(db, 'pharmaCompanies', id, sub, d.id));

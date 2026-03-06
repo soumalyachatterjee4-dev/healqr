@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Users, BarChart3, FileText,
   LogOut, X, ChevronDown, ChevronRight, Building2,
-  MessageSquare
+  MessageSquare, Hospital
 } from 'lucide-react';
 import healqrLogo from '../assets/healqr-logo.png';
 import { useState } from 'react';
@@ -22,6 +22,7 @@ export default function PharmaSidebar({ currentPage, onNavigate, onLogout, isOpe
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'profile', label: 'Profile', icon: Users },
     { id: 'my-doctors', label: 'My Doctors', icon: Users },
+    { id: 'my-clinics', label: 'My Clinics', icon: Hospital },
   ];
 
   const analyticsItems = [

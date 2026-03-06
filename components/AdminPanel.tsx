@@ -15,6 +15,7 @@ import AdminNotificationPanel from './AdminNotificationPanel';
 import AdminPromoManager from './AdminPromoManager';
 import AdminDataStandardization from './AdminDataStandardization';
 import AdminPharmaManagement from './AdminPharmaManagement';
+import AdminPharmaTemplateApprovals from './AdminPharmaTemplateApprovals';
 import AdminAdvertiserManagement from './AdminAdvertiserManagement';
 import AdminDistributorManager from './AdminDistributorManager';
 import AdminPageDistribution from './AdminPageDistribution';
@@ -53,7 +54,7 @@ interface AdminPanelProps {
 
 export default function AdminPanel({ adminEmail, onLogout, onStartDemo, uploadedTestimonials = [], onUploadTestimonial, supportRequests = [], onNavigateToQRGenerator, onNavigateToQRGeneration, onNavigateToQRManagement }: AdminPanelProps) {
   const [currentPage, setCurrentPage] = useState<
-    'dashboard' | 'profile' | 'revenue' | 'doctors' | 'patients' | 'personal-management' | 'templates' | 'videos' | 'discount-cards' | 'promo-manager' | 'data-cleanup' | 'pharma-management' | 'distribution-requests' | 'advertiser-management' | 'page-distribution'
+    'dashboard' | 'profile' | 'revenue' | 'doctors' | 'patients' | 'personal-management' | 'templates' | 'videos' | 'discount-cards' | 'promo-manager' | 'data-cleanup' | 'pharma-management' | 'pharma-templates' | 'distribution-requests' | 'advertiser-management' | 'page-distribution'
   >('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
@@ -189,6 +190,7 @@ export default function AdminPanel({ adminEmail, onLogout, onStartDemo, uploaded
         {currentPage === 'promo-manager' && <AdminPromoManager />}
         {currentPage === 'data-cleanup' && <AdminDataStandardization />}
         {currentPage === 'pharma-management' && <AdminPharmaManagement />}
+        {currentPage === 'pharma-templates' && <AdminPharmaTemplateApprovals />}
         {currentPage === 'distribution-requests' && <AdminDistributorManager />}
         {currentPage === 'advertiser-management' && <AdminAdvertiserManagement />}
         {currentPage === 'page-distribution' && <AdminPageDistribution />}

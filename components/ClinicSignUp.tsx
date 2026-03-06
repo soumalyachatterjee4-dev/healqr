@@ -152,8 +152,8 @@ export default function ClinicSignUp({ onBack, onLogin }: ClinicSignUpProps) {
         state: getStateFromPincode(pinCode), // Auto-derived from pincode — locked field
         qrNumber: finalQrNumber,
         qrType: qrType,
-        companyName: qrType === 'preprinted' ? companyName : '',
-        division: qrType === 'preprinted' ? division : '',
+        companyName: qrType === 'preprinted' ? companyName.trim() : '',
+        division: qrType === 'preprinted' ? division.trim() : '',
       };
       localStorage.setItem('healqr_pending_clinic_signup', JSON.stringify(signupData));
       localStorage.setItem('healqr_email_for_signin', email);

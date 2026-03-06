@@ -15,9 +15,10 @@ interface ChangeRequest {
   id: string;
   companyId: string;
   companyName: string;
-  type: 'territory' | 'specialty';
-  action: 'add' | 'remove';
+  type: 'territory' | 'specialty' | 'profile_edit';
+  action: 'add' | 'remove' | 'update';
   items: string[];
+  changes?: Record<string, { from: string; to: string }>;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: any;
 }
@@ -46,6 +47,7 @@ export default function AdminDistributorManager() {
           type: data.type,
           action: data.action,
           items: data.items || [],
+          changes: data.changes || undefined,
           status: data.status || 'pending',
           createdAt: data.createdAt,
         });
@@ -102,6 +104,13 @@ export default function AdminDistributorManager() {
               updatedAt: serverTimestamp(),
             });
           }
+        } else if (req.type === 'profile_edit' && req.changes) {
+          // Apply each changed field to the company doc
+          const updateData: Record<string, any> = { updatedAt: serverTimestamp() };
+          for (const [field, { to }] of Object.entries(req.changes)) {
+            updateData[field] = to;
+          }
+          await updateDoc(compRef, updateData);
         }
       }
 
@@ -136,9 +145,22 @@ export default function AdminDistributorManager() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-semibold">{req.companyName}</p>
-                <p className="text-xs text-gray-400">
-                  {req.type} {req.action} – {req.items.join(', ')}
-                </p>
+                {req.type === 'profile_edit' && req.changes ? (
+                  <div className="text-xs text-gray-400 space-y-1 mt-1">
+                    <p className="text-amber-400 font-medium">Profile Edit Request</p>
+                    {Object.entries(req.changes).map(([field, { from, to }]) => (
+                      <p key={field}>
+                        <span className="text-gray-300">{field}:</span>{' '}
+                        <span className="text-red-400 line-through">{from || '(empty)'}</span>{' → '}
+                        <span className="text-green-400">{to || '(empty)'}</span>
+                      </p>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400">
+                    {req.type} {req.action} – {req.items.join(', ')}
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <span className={`text-xs px-2.5 py-1 rounded-full ${

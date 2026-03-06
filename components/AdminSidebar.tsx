@@ -60,6 +60,7 @@ export default function AdminSidebar({
 
   const partnerTools = [
     { id: 'pharma-management', label: 'Pharma Companies', icon: Building2 },
+    { id: 'pharma-templates', label: 'Pharma Templates', icon: FileText },
     { id: 'distribution-requests', label: 'Distributor Requests', icon: MapPinned },
     { id: 'advertiser-management', label: 'Advertisers', icon: BarChart2 },
     { id: 'page-distribution', label: 'Page Distribution', icon: LayoutGrid },

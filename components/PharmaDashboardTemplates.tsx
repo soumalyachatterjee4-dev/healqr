@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { FileText, Upload, Trash2, Image, Eye, Clock, CheckCircle2, AlertCircle, Plus } from 'lucide-react';
 import { db, storage } from '../lib/firebase/config';
-import { collection, getDocs, addDoc, deleteDoc, doc, serverTimestamp, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, addDoc, deleteDoc, doc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { getLocationFromPincode } from '../utils/pincodeMapping';
 
 interface PharmaDashboardTemplatesProps {
   companyId: string;
@@ -16,7 +17,21 @@ interface PromoTemplate {
   storagePath: string;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: any;
+  targetStates: string[];
   targetSpecialties: string[];
+  targetDoctorIds: string[];
+  targetClinicIds: string[];
+  targetDoctorNames: string[];
+  targetClinicNames: string[];
+}
+
+interface TargetEntity {
+  id: string;
+  name: string;
+  type: 'doctor' | 'clinic';
+  specialty: string;
+  state: string;
+  pincode: string;
 }
 
 export default function PharmaDashboardTemplates({ companyId }: PharmaDashboardTemplatesProps) {
@@ -28,18 +43,148 @@ export default function PharmaDashboardTemplates({ companyId }: PharmaDashboardT
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
   const [viewingImage, setViewingImage] = useState<string | null>(null);
 
-  const specialties = [
-    'General Physician', 'Cardiologist', 'Dermatologist', 'Orthopedic',
-    'Pediatrician', 'Gynecologist', 'ENT', 'Ophthalmologist',
-    'Neurologist', 'Psychiatrist', 'Dentist', 'All Specialties'
-  ];
+  // Cascading filter state
+  const [allEntities, setAllEntities] = useState<TargetEntity[]>([]);
+  const [companyStates, setCompanyStates] = useState<string[]>([]);
+  const [selectedStates, setSelectedStates] = useState<string[]>([]);
+  const [availableSpecialties, setAvailableSpecialties] = useState<string[]>([]);
+  const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
+  const [filteredEntities, setFilteredEntities] = useState<TargetEntity[]>([]);
+  const [selectedEntityIds, setSelectedEntityIds] = useState<string[]>([]);
+  const [selectAll, setSelectAll] = useState(false);
+  const [loadingEntities, setLoadingEntities] = useState(false);
+  const [showDisclaimer, setShowDisclaimer] = useState(false);
 
   useEffect(() => {
     loadTemplates();
+    loadEntities();
   }, [companyId]);
+
+  // Update available specialties when selected states change
+  useEffect(() => {
+    if (selectedStates.length === 0) {
+      setAvailableSpecialties([]);
+      setSelectedSpecialties([]);
+      setFilteredEntities([]);
+      setSelectedEntityIds([]);
+      return;
+    }
+    const specs = new Set<string>();
+    allEntities.filter(e => selectedStates.includes(e.state)).forEach(e => specs.add(e.specialty));
+    setAvailableSpecialties(Array.from(specs).sort());
+    // Reset downstream
+    setSelectedSpecialties([]);
+    setFilteredEntities([]);
+    setSelectedEntityIds([]);
+    setSelectAll(false);
+  }, [selectedStates, allEntities]);
+
+  // Update filtered entities when specialties change
+  useEffect(() => {
+    if (selectedSpecialties.length === 0) {
+      setFilteredEntities([]);
+      setSelectedEntityIds([]);
+      setSelectAll(false);
+      return;
+    }
+    const filtered = allEntities.filter(e =>
+      selectedStates.includes(e.state) && selectedSpecialties.includes(e.specialty)
+    );
+    setFilteredEntities(filtered);
+    setSelectedEntityIds([]);
+    setSelectAll(false);
+  }, [selectedSpecialties, selectedStates, allEntities]);
+
+  const loadEntities = async () => {
+    if (!companyId || !db) return;
+    setLoadingEntities(true);
+    try {
+      const entities: TargetEntity[] = [];
+
+      // Load distributed doctors
+      const doctorsSnap = await getDocs(collection(db, 'pharmaCompanies', companyId, 'distributedDoctors'));
+      doctorsSnap.forEach(d => {
+        const data = d.data();
+        const loc = getLocationFromPincode(data.pincode || '');
+        entities.push({
+          id: data.doctorId || d.id,
+          name: data.doctorName || 'Unknown Doctor',
+          type: 'doctor',
+          specialty: data.specialty || 'General',
+          state: loc.state,
+          pincode: data.pincode || '',
+        });
+      });
+
+      // Load distributed clinics
+      const clinicsSnap = await getDocs(collection(db, 'pharmaCompanies', companyId, 'distributedClinics'));
+      clinicsSnap.forEach(d => {
+        const data = d.data();
+        const loc = getLocationFromPincode(data.pincode || '');
+        entities.push({
+          id: data.clinicId || d.id,
+          name: data.clinicName || 'Unknown Clinic',
+          type: 'clinic',
+          specialty: 'Clinic',
+          state: loc.state,
+          pincode: data.pincode || '',
+        });
+      });
+
+      // Also check doctors & clinics collections by companyName (trimmed, case-insensitive)
+      const companyDoc = await getDoc(doc(db, 'pharmaCompanies', companyId));
+      const companyName = companyDoc.exists() ? companyDoc.data().companyName : '';
+      if (companyName) {
+        const lcName = companyName.toLowerCase().trim();
+        const existingDoctorIds = new Set(entities.filter(e => e.type === 'doctor').map(e => e.id));
+
+        const allDoctorsSnap = await getDocs(collection(db, 'doctors'));
+        allDoctorsSnap.forEach(d => {
+          if (existingDoctorIds.has(d.id)) return;
+          const data = d.data();
+          const cn = data.companyName;
+          if (!cn || cn.toLowerCase().trim() !== lcName) return;
+          const loc = getLocationFromPincode(data.pinCode || '');
+          entities.push({
+            id: d.id,
+            name: data.name || 'Unknown Doctor',
+            type: 'doctor',
+            specialty: Array.isArray(data.specialties) ? data.specialties.join(', ') : (data.specialty || 'General'),
+            state: loc.state,
+            pincode: data.pinCode || '',
+          });
+        });
+
+        const existingClinicIds = new Set(entities.filter(e => e.type === 'clinic').map(e => e.id));
+        const allClinicsSnap = await getDocs(collection(db, 'clinics'));
+        allClinicsSnap.forEach(d => {
+          if (existingClinicIds.has(d.id)) return;
+          const data = d.data();
+          const cn = data.companyName;
+          if (!cn || cn.toLowerCase().trim() !== lcName) return;
+          const loc = getLocationFromPincode(data.pinCode || '');
+          entities.push({
+            id: d.id,
+            name: data.name || 'Unknown Clinic',
+            type: 'clinic',
+            specialty: 'Clinic',
+            state: loc.state,
+            pincode: data.pinCode || '',
+          });
+        });
+      }
+
+      setAllEntities(entities);
+      const stateSet = new Set(entities.map(e => e.state).filter(Boolean));
+      setCompanyStates(Array.from(stateSet).sort());
+    } catch (err) {
+      console.error('Error loading entities:', err);
+    } finally {
+      setLoadingEntities(false);
+    }
+  };
 
   const loadTemplates = async () => {
     if (!companyId || !db) return;
@@ -58,6 +203,11 @@ export default function PharmaDashboardTemplates({ companyId }: PharmaDashboardT
         status: d.data().status || 'pending',
         createdAt: d.data().createdAt,
         targetSpecialties: d.data().targetSpecialties || [],
+        targetStates: d.data().targetStates || [],
+        targetDoctorIds: d.data().targetDoctorIds || [],
+        targetClinicIds: d.data().targetClinicIds || [],
+        targetDoctorNames: d.data().targetDoctorNames || [],
+        targetClinicNames: d.data().targetClinicNames || [],
       }));
 
       items.sort((a, b) => {
@@ -93,17 +243,30 @@ export default function PharmaDashboardTemplates({ companyId }: PharmaDashboardT
     reader.readAsDataURL(file);
   };
 
+  const handleUploadClick = () => {
+    if (!selectedFile || !title.trim() || !companyId || !db || !storage) return;
+    if (selectedEntityIds.length === 0) {
+      alert('Please select at least one doctor or clinic to target');
+      return;
+    }
+    setShowDisclaimer(true);
+  };
+
   const handleUpload = async () => {
     if (!selectedFile || !title.trim() || !companyId || !db || !storage) return;
+    setShowDisclaimer(false);
     setUploading(true);
 
     try {
       // Upload image
       const fileName = `${Date.now()}_${selectedFile.name}`;
-      const storagePath = `pharma/${companyId}/promos/${fileName}`;
+      const storagePath = `pharmaCompanies/${companyId}/promos/${fileName}`;
       const storageRef = ref(storage, storagePath);
       await uploadBytes(storageRef, selectedFile);
       const imageUrl = await getDownloadURL(storageRef);
+
+      const targetDoctors = filteredEntities.filter(e => e.type === 'doctor' && selectedEntityIds.includes(e.id));
+      const targetClinics = filteredEntities.filter(e => e.type === 'clinic' && selectedEntityIds.includes(e.id));
 
       // Save to Firestore
       const templatesRef = collection(db, 'pharmaCompanies', companyId, 'promoTemplates');
@@ -112,9 +275,14 @@ export default function PharmaDashboardTemplates({ companyId }: PharmaDashboardT
         description: description.trim(),
         imageUrl,
         storagePath,
-        status: 'pending',
+        status: 'approved',
         createdAt: serverTimestamp(),
-        targetSpecialties: selectedSpecialties.length > 0 ? selectedSpecialties : ['All Specialties'],
+        targetStates: selectedStates,
+        targetSpecialties: selectedSpecialties,
+        targetDoctorIds: targetDoctors.map(d => d.id),
+        targetClinicIds: targetClinics.map(c => c.id),
+        targetDoctorNames: targetDoctors.map(d => d.name),
+        targetClinicNames: targetClinics.map(c => c.name),
         companyId,
       });
 
@@ -123,7 +291,10 @@ export default function PharmaDashboardTemplates({ companyId }: PharmaDashboardT
       setDescription('');
       setSelectedFile(null);
       setPreviewUrl(null);
+      setSelectedStates([]);
       setSelectedSpecialties([]);
+      setSelectedEntityIds([]);
+      setSelectAll(false);
       setShowUpload(false);
 
       await loadTemplates();
@@ -158,24 +329,10 @@ export default function PharmaDashboardTemplates({ companyId }: PharmaDashboardT
     }
   };
 
-  const toggleSpecialty = (spec: string) => {
-    if (spec === 'All Specialties') {
-      setSelectedSpecialties(['All Specialties']);
-      return;
-    }
-    setSelectedSpecialties(prev => {
-      const filtered = prev.filter(s => s !== 'All Specialties');
-      if (filtered.includes(spec)) {
-        return filtered.filter(s => s !== spec);
-      }
-      return [...filtered, spec];
-    });
-  };
-
   const StatusBadge = ({ status }: { status: string }) => {
     const config = {
       pending: { icon: Clock, label: 'Pending Review', color: 'bg-amber-500/20 text-amber-400' },
-      approved: { icon: CheckCircle2, label: 'Approved', color: 'bg-emerald-500/20 text-emerald-400' },
+      approved: { icon: CheckCircle2, label: 'Live', color: 'bg-emerald-500/20 text-emerald-400' },
       rejected: { icon: AlertCircle, label: 'Rejected', color: 'bg-red-500/20 text-red-400' },
     }[status] || { icon: Clock, label: status, color: 'bg-gray-500/20 text-gray-400' };
 
@@ -246,24 +403,114 @@ export default function PharmaDashboardTemplates({ companyId }: PharmaDashboardT
             />
           </div>
 
-          {/* Target Specialties */}
-          <div>
-            <label className="block text-sm text-gray-400 mb-2">Target Specialties</label>
-            <div className="flex flex-wrap gap-2">
-              {specialties.map(spec => (
-                <button
-                  key={spec}
-                  onClick={() => toggleSpecialty(spec)}
-                  className={`px-3 py-1.5 rounded-full text-xs transition-colors ${
-                    selectedSpecialties.includes(spec)
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-zinc-800 text-gray-400 hover:bg-zinc-700'
-                  }`}
-                >
-                  {spec}
-                </button>
-              ))}
-            </div>
+          {/* Cascading Target Selection: State → Specialty → Doctor/Clinic */}
+          <div className="space-y-4 border border-zinc-700 rounded-lg p-4">
+            <h4 className="text-sm font-medium text-gray-300">Target Selection</h4>
+
+            {loadingEntities ? (
+              <div className="flex items-center gap-2 text-sm text-gray-400">
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent" />
+                Loading doctors & clinics...
+              </div>
+            ) : companyStates.length === 0 ? (
+              <p className="text-sm text-gray-500">No distributed doctors or clinics found. Add them from My Doctors / My Clinics first.</p>
+            ) : (
+              <>
+                {/* Step 1: Select States */}
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">1. Select State(s)</label>
+                  <div className="flex flex-wrap gap-2">
+                    {companyStates.map(state => (
+                      <button
+                        key={state}
+                        onClick={() => setSelectedStates(prev =>
+                          prev.includes(state) ? prev.filter(s => s !== state) : [...prev, state]
+                        )}
+                        className={`px-3 py-1.5 rounded-full text-xs transition-colors ${
+                          selectedStates.includes(state)
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-zinc-800 text-gray-400 hover:bg-zinc-700'
+                        }`}
+                      >
+                        {state}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Step 2: Select Specialties */}
+                {selectedStates.length > 0 && availableSpecialties.length > 0 && (
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">2. Select Specialty</label>
+                    <div className="flex flex-wrap gap-2">
+                      {availableSpecialties.map(spec => (
+                        <button
+                          key={spec}
+                          onClick={() => setSelectedSpecialties(prev =>
+                            prev.includes(spec) ? prev.filter(s => s !== spec) : [...prev, spec]
+                          )}
+                          className={`px-3 py-1.5 rounded-full text-xs transition-colors ${
+                            selectedSpecialties.includes(spec)
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-zinc-800 text-gray-400 hover:bg-zinc-700'
+                          }`}
+                        >
+                          {spec}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 3: Select Doctors / Clinics */}
+                {selectedSpecialties.length > 0 && filteredEntities.length > 0 && (
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-2">3. Select Doctor(s) / Clinic(s)</label>
+                    <label className="flex items-center gap-2 mb-2 cursor-pointer text-sm text-gray-300">
+                      <input
+                        type="checkbox"
+                        checked={selectAll}
+                        onChange={(e) => {
+                          setSelectAll(e.target.checked);
+                          setSelectedEntityIds(e.target.checked ? filteredEntities.map(en => en.id) : []);
+                        }}
+                        className="rounded border-zinc-600 bg-zinc-800"
+                      />
+                      Select All ({filteredEntities.length})
+                    </label>
+                    <div className="max-h-48 overflow-y-auto space-y-1 border border-zinc-700 rounded-lg p-2">
+                      {filteredEntities.map(entity => (
+                        <label key={entity.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-zinc-800 rounded cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedEntityIds.includes(entity.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                const next = [...selectedEntityIds, entity.id];
+                                setSelectedEntityIds(next);
+                                setSelectAll(next.length === filteredEntities.length);
+                              } else {
+                                setSelectedEntityIds(prev => prev.filter(id => id !== entity.id));
+                                setSelectAll(false);
+                              }
+                            }}
+                            className="rounded border-zinc-600 bg-zinc-800"
+                          />
+                          <span className="text-sm text-gray-300">{entity.name}</span>
+                          <span className={`text-xs px-1.5 py-0.5 rounded-full ${entity.type === 'doctor' ? 'bg-blue-500/20 text-blue-400' : 'bg-purple-500/20 text-purple-400'}`}>
+                            {entity.type === 'doctor' ? 'Dr' : 'Clinic'}
+                          </span>
+                          <span className="text-xs text-gray-500 ml-auto">{entity.state}</span>
+                        </label>
+                      ))}
+                    </div>
+                    {selectedEntityIds.length > 0 && (
+                      <p className="text-xs text-emerald-400 mt-1">{selectedEntityIds.length} selected</p>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
           {/* Image Upload */}
@@ -290,14 +537,14 @@ export default function PharmaDashboardTemplates({ companyId }: PharmaDashboardT
 
           <div className="flex justify-end gap-3 pt-2">
             <button
-              onClick={() => { setShowUpload(false); setTitle(''); setDescription(''); setSelectedFile(null); setPreviewUrl(null); setSelectedSpecialties([]); }}
+              onClick={() => { setShowUpload(false); setTitle(''); setDescription(''); setSelectedFile(null); setPreviewUrl(null); setSelectedStates([]); setSelectedSpecialties([]); setSelectedEntityIds([]); setSelectAll(false); }}
               className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm transition-colors"
             >
               Cancel
             </button>
             <button
-              onClick={handleUpload}
-              disabled={uploading || !selectedFile || !title.trim()}
+              onClick={handleUploadClick}
+              disabled={uploading || !selectedFile || !title.trim() || selectedEntityIds.length === 0}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm transition-colors flex items-center gap-2"
             >
               {uploading ? (
@@ -362,14 +609,24 @@ export default function PharmaDashboardTemplates({ companyId }: PharmaDashboardT
                   <p className="text-xs text-gray-500 mb-2 line-clamp-2">{template.description}</p>
                 )}
                 <div className="flex flex-wrap gap-1 mb-3">
-                  {template.targetSpecialties.slice(0, 3).map(spec => (
-                    <span key={spec} className="text-xs px-2 py-0.5 bg-zinc-800 text-gray-400 rounded-full">
-                      {spec}
+                  {(template.targetStates || []).map(state => (
+                    <span key={state} className="text-xs px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded-full">
+                      {state}
                     </span>
                   ))}
-                  {template.targetSpecialties.length > 3 && (
+                  {(template.targetDoctorNames || []).slice(0, 2).map(name => (
+                    <span key={name} className="text-xs px-2 py-0.5 bg-zinc-800 text-gray-400 rounded-full">
+                      {name}
+                    </span>
+                  ))}
+                  {(template.targetClinicNames || []).slice(0, 2).map(name => (
+                    <span key={name} className="text-xs px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded-full">
+                      {name}
+                    </span>
+                  ))}
+                  {((template.targetDoctorNames?.length || 0) + (template.targetClinicNames?.length || 0)) > 4 && (
                     <span className="text-xs px-2 py-0.5 bg-zinc-800 text-gray-400 rounded-full">
-                      +{template.targetSpecialties.length - 3}
+                      +{(template.targetDoctorNames?.length || 0) + (template.targetClinicNames?.length || 0) - 4} more
                     </span>
                   )}
                 </div>
@@ -404,10 +661,47 @@ export default function PharmaDashboardTemplates({ companyId }: PharmaDashboardT
       {/* Info */}
       <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
         <p className="text-sm text-blue-400">
-          <strong>Note:</strong> All templates require admin approval before appearing on doctor dashboards.
-          Approved templates appear as "Dashboard Promo" cards.
+          <strong>Note:</strong> Uploaded templates go live immediately on targeted doctor/clinic dashboards.
+          All legal, social, and content responsibility lies solely on the uploading pharma company.
         </p>
       </div>
+
+      {/* Legal Disclaimer Modal */}
+      {showDisclaimer && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={() => setShowDisclaimer(false)}>
+          <div className="bg-zinc-900 border border-zinc-700 rounded-2xl max-w-md w-full p-6 space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-amber-500/20 rounded-full flex items-center justify-center">
+                <AlertCircle className="w-5 h-5 text-amber-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-white">Acknowledgement Required</h3>
+            </div>
+            <div className="space-y-3 text-sm text-gray-300">
+              <p>By uploading this promotional content, you acknowledge and agree that:</p>
+              <ul className="list-disc pl-5 space-y-2">
+                <li>All <strong className="text-white">legal, social, and content responsibility</strong> for this promotional material lies solely on your pharma company.</li>
+                <li><strong className="text-white">www.healqr.com</strong> is a doctor booking platform only and bears no responsibility for the content, claims, or impact of your promotional material.</li>
+                <li>Your company is fully responsible for ensuring compliance with all applicable regulations, advertising standards, and ethical guidelines.</li>
+              </ul>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setShowDisclaimer(false)}
+                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpload}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm transition-colors flex items-center gap-2"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                I Agree & Upload
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

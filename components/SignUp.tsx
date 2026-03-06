@@ -219,8 +219,8 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
         landmark,
         qrNumber: finalQrNumber,
         qrType: qrType, // NEW: Store QR type
-        companyName: qrType === 'preprinted' ? companyName : '', // NEW: Store company name for pre-printed QR
-        division: qrType === 'preprinted' ? division : '', // NEW: Store division for pre-printed QR
+        companyName: qrType === 'preprinted' ? companyName.trim() : '', // NEW: Store company name for pre-printed QR
+        division: qrType === 'preprinted' ? division.trim() : '', // NEW: Store division for pre-printed QR
         acceptedNotifications
       };
 

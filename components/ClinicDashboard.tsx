@@ -36,6 +36,7 @@ import ClinicScheduleManager from './ClinicScheduleManager';
 import ClinicTodaysSchedule from './ClinicTodaysSchedule';
 import ManageDoctors from './ManageDoctors';
 import BrainDeckManager from './BrainDeckManager';
+import DashboardPromoDisplay from './DashboardPromoDisplay';
 import ClinicAdvanceBooking from './ClinicAdvanceBooking';
 import ClinicAnalytics from './ClinicAnalytics';
 import ClinicReports from './ClinicReports';
@@ -961,6 +962,9 @@ export default function ClinicDashboard() {
               </Card>
 
 
+
+              {/* Promotional Banners - Admin global + Pharma targeted */}
+              <DashboardPromoDisplay doctorId={resolvedClinicId} />
 
               {/* Today's Schedule - Doctor Names Prominently Displayed */}
               <Card className="bg-zinc-900 border-zinc-800">

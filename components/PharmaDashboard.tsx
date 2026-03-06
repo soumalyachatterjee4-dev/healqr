@@ -22,6 +22,7 @@ interface DoctorSummary {
 
 interface CompanyStats {
   totalDoctors: number;
+  totalClinics: number;
   totalBookingsToday: number;
   activeDoctorsToday: number;
   zoneBreakdown: Record<string, number>;
@@ -31,6 +32,7 @@ interface CompanyStats {
 export default function PharmaDashboard({ companyId, companyName }: PharmaDashboardProps) {
   const [stats, setStats] = useState<CompanyStats>({
     totalDoctors: 0,
+    totalClinics: 0,
     totalBookingsToday: 0,
     activeDoctorsToday: 0,
     zoneBreakdown: {},
@@ -42,6 +44,7 @@ export default function PharmaDashboard({ companyId, companyName }: PharmaDashbo
   const [territoryStates, setTerritoryStates] = useState<string[]>([]);
   const [territoryType, setTerritoryType] = useState<string>('');
   const [registeredState, setRegisteredState] = useState<string>('');
+  const [companySpecialties, setCompanySpecialties] = useState<string[]>([]);
 
   useEffect(() => {
     loadDashboardData();
@@ -57,6 +60,7 @@ export default function PharmaDashboard({ companyId, companyName }: PharmaDashbo
         setTerritoryStates(data.territoryStates || []);
         setTerritoryType(data.territoryType || '');
         setRegisteredState(data.registeredOfficeState || '');
+        setCompanySpecialties(data.specialties || []);
       }
     } catch (err) {
       console.error('Error loading company profile:', err);
@@ -116,8 +120,13 @@ export default function PharmaDashboard({ companyId, companyName }: PharmaDashbo
       // Sort by today's bookings desc, then total bookings
       doctors.sort((a, b) => b.todayBookings - a.todayBookings || b.totalBookings - a.totalBookings);
 
+      // Get distributed clinics count
+      const clinicsRef = collection(db, 'pharmaCompanies', companyId, 'distributedClinics');
+      const clinicsSnap = await getDocs(clinicsRef);
+
       setStats({
         totalDoctors: doctorsSnap.size,
+        totalClinics: clinicsSnap.size,
         totalBookingsToday,
         activeDoctorsToday,
         zoneBreakdown,
@@ -191,19 +200,19 @@ export default function PharmaDashboard({ companyId, companyName }: PharmaDashbo
           icon={Users}
           label="Total Doctors"
           value={stats.totalDoctors}
-          subtext="Distributed by your company"
+          subtext={`${stats.totalClinics} clinic${stats.totalClinics !== 1 ? 's' : ''} distributed`}
         />
         <StatCard
           icon={Calendar}
           label="Today's Bookings"
           value={stats.totalBookingsToday}
-          subtext="Across all doctors"
+          subtext={`Across ${stats.totalDoctors} dr${stats.totalDoctors !== 1 ? 's' : ''} + ${stats.totalClinics} clinic${stats.totalClinics !== 1 ? 's' : ''}`}
         />
         <StatCard
           icon={Activity}
           label="Active Today"
           value={stats.activeDoctorsToday}
-          subtext="Doctors with bookings"
+          subtext={`Of ${stats.totalDoctors} dr${stats.totalDoctors !== 1 ? 's' : ''} + ${stats.totalClinics} clinic${stats.totalClinics !== 1 ? 's' : ''}`}
         />
         <StatCard
           icon={MapPin}
@@ -246,7 +255,7 @@ export default function PharmaDashboard({ companyId, companyName }: PharmaDashbo
                 <div>
                   <p className="text-emerald-100 text-sm">Specialties Covered</p>
                   <p className="font-semibold text-lg">
-                    {new Set(recentDoctors.map(d => d.specialty)).size || 0}
+                    {companySpecialties.length}
                   </p>
                 </div>
               </div>

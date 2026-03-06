@@ -3,6 +3,7 @@ import { Menu, Bell, Share2, Video, User, MessageSquare, X, Send, Loader2 } from
 import PharmaSidebar from './PharmaSidebar';
 import PharmaDashboard from './PharmaDashboard';
 import PharmaMyDoctors from './PharmaMyDoctors';
+import PharmaMyClinics from './PharmaMyClinics';
 import PharmaAnalytics from './PharmaAnalytics';
 import PharmaDashboardTemplates from './PharmaDashboardTemplates';
 import PharmaProfileManager from './PharmaProfileManager';
@@ -25,7 +26,7 @@ interface SupportMessage {
 
 export default function PharmaPortal({ onLogout }: PharmaPortalProps) {
   const [currentPage, setCurrentPage] = useState<
-    'profile' | 'dashboard' | 'my-doctors' | 'analytics' | 'templates' | 'video-library'
+    'profile' | 'dashboard' | 'my-doctors' | 'my-clinics' | 'analytics' | 'templates' | 'video-library'
   >('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -45,6 +46,7 @@ export default function PharmaPortal({ onLogout }: PharmaPortalProps) {
 
   const pageTitles: Record<string, string> = {    profile: 'Profile',    dashboard: 'Dashboard',
     'my-doctors': 'My Doctors',
+    'my-clinics': 'My Clinics',
     analytics: 'Analytics',
     templates: 'Dashboard Templates',
     'video-library': 'Video Library',
@@ -341,6 +343,9 @@ export default function PharmaPortal({ onLogout }: PharmaPortalProps) {
         )}
         {currentPage === 'my-doctors' && (
           <PharmaMyDoctors companyId={companyId} />
+        )}
+        {currentPage === 'my-clinics' && (
+          <PharmaMyClinics companyId={companyId} />
         )}
         {currentPage === 'analytics' && (
           <PharmaAnalytics companyId={companyId} />
