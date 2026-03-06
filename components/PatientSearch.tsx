@@ -14,6 +14,8 @@ import {
 } from "./ui/select";
 import { MEDICAL_SPECIALTIES } from '../utils/medicalSpecialties';
 import DashboardPromoDisplay from './DashboardPromoDisplay';
+import { useAITranslation } from '../hooks/useAITranslation';
+import type { Language } from '../utils/translations';
 
 interface Doctor {
   id: string;
@@ -28,7 +30,12 @@ interface Doctor {
   landmark?: string;
 }
 
-export default function PatientSearch() {
+interface PatientSearchProps {
+  language?: Language;
+}
+
+export default function PatientSearch({ language = 'english' }: PatientSearchProps) {
+  const { dt } = useAITranslation(language);
   const [areaInput, setAreaInput] = useState('');
   const [pinCode, setPinCode] = useState('');
   const [isAreaLocked, setIsAreaLocked] = useState(false);
@@ -202,7 +209,7 @@ export default function PatientSearch() {
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-lg font-semibold text-white">Find a Doctor</h1>
+          <h1 className="text-lg font-semibold text-white">{dt('Find a Doctor')}</h1>
         </div>
       </div>
 
@@ -219,7 +226,7 @@ export default function PatientSearch() {
           className="w-full mb-4 h-12 text-base border-orange-600 text-orange-600 hover:bg-orange-600 hover:text-white bg-zinc-900 border-2 flex items-center justify-center gap-2"
         >
           <History className="h-5 w-5" />
-          Patient Login - View History & Status
+          {dt('Patient Login - View History & Status')}
         </Button>
 
         {/* Search Box */}
@@ -230,7 +237,7 @@ export default function PatientSearch() {
               <div className="relative">
                 <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                 <Input
-                  placeholder={isAreaLocked ? pinCode : "Enter area (e.g., 'ent dr near moulali') or pincode"}
+                  placeholder={isAreaLocked ? pinCode : dt("Enter area or pincode")}
                   className="pl-10 pr-20 h-12 text-base bg-zinc-800 border-zinc-700 text-white placeholder:text-gray-400"
                   value={isAreaLocked ? `${areaInput} (${pinCode})` : areaInput}
                   onChange={(e) => !isAreaLocked && handleAreaInputChange(e.target.value)}
@@ -295,7 +302,7 @@ export default function PatientSearch() {
               <div className="relative">
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                 <Input
-                  placeholder="Search by Doctor Name (optional)"
+                  placeholder={dt('Search by Doctor Name (optional)')}
                   className="pl-10 pr-10 h-12 text-base bg-zinc-800 border-zinc-700 text-white placeholder:text-gray-400"
                   value={doctorName}
                   onChange={(e) => setDoctorName(e.target.value)}
@@ -318,7 +325,7 @@ export default function PatientSearch() {
                 <Stethoscope className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5 z-10" />
                 <Select value={specialty} onValueChange={setSpecialty}>
                   <SelectTrigger className="pl-10 pr-10 h-12 text-base w-full bg-zinc-800 border-zinc-700 text-white">
-                    <SelectValue placeholder="Select Specialty (optional)" />
+                    <SelectValue placeholder={dt('Select Specialty (optional)')} />
                   </SelectTrigger>
                   <SelectContent className="bg-zinc-800 border-zinc-700">
                     {MEDICAL_SPECIALTIES.map((spec) => (
@@ -346,7 +353,7 @@ export default function PatientSearch() {
               onClick={handleSearch}
               disabled={loading}
             >
-              {loading ? 'Searching...' : 'Search Doctors'}
+              {loading ? dt('Searching...') : dt('Search Doctors')}
             </Button>
           </CardContent>
         </Card>
@@ -355,7 +362,7 @@ export default function PatientSearch() {
         {searched && (
           <div className="space-y-4">
             <h2 className="text-xl font-semibold text-white mb-4">
-              {results.length} Doctors Found
+              {results.length} {dt('Doctors Found')}
             </h2>
 
             {results.map((doctor) => (
@@ -395,7 +402,7 @@ export default function PatientSearch() {
                         </span>
                       </div>
                       <Button variant="ghost" className="text-orange-500 hover:text-orange-400 hover:bg-orange-500/10 p-0 h-auto font-medium">
-                        Book Appointment <ChevronRight className="h-4 w-4 ml-1" />
+                        {dt('Book Appointment')} <ChevronRight className="h-4 w-4 ml-1" />
                       </Button>
                     </div>
                   </div>
@@ -408,8 +415,8 @@ export default function PatientSearch() {
                 <div className="h-16 w-16 bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Search className="h-8 w-8 text-gray-400" />
                 </div>
-                <h3 className="text-lg font-medium text-white">No doctors found</h3>
-                <p className="text-gray-400 mt-1">Try adjusting your search criteria</p>
+                <h3 className="text-lg font-medium text-white">{dt('No doctors found')}</h3>
+                <p className="text-gray-400 mt-1">{dt('Try adjusting your search criteria')}</p>
               </div>
             )}
           </div>

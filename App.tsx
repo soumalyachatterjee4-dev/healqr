@@ -3189,7 +3189,7 @@ export default function App() {
 
       {currentPage === "patient-search" && (
         <Suspense fallback={<PageLoader />}>
-          <PatientSearch />
+          <PatientSearch language={bookingLanguage} />
         </Suspense>
       )}
 
