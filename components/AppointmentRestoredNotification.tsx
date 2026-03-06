@@ -1,5 +1,7 @@
 import { RotateCcw } from 'lucide-react';
 import TemplateDisplay from './TemplateDisplay';
+import { useAITranslation } from '../hooks/useAITranslation';
+import type { Language } from '../utils/translations';
 
 interface AppointmentRestoredNotificationProps {
   bookingId?: string;
@@ -7,10 +9,10 @@ interface AppointmentRestoredNotificationProps {
   doctorName?: string;
   doctorSpecialty?: string;
   doctorInitials?: string;
-  
+
   // Patient Info
   patientName?: string;
-  
+
   // Appointment Details
   clinicName?: string;
   restoredDate?: string;
@@ -19,10 +21,10 @@ interface AppointmentRestoredNotificationProps {
   location?: string;
   bookingSerialNo?: string;
   uniqueBookingId?: string;
-  
+
   // Multilingual
-  language?: 'en' | 'hi' | 'bn';
-  
+  language?: Language;
+
   // Health Tip
   healthTip?: string;
 }
@@ -40,56 +42,11 @@ export default function AppointmentRestoredNotification({
   location = 'Unknown Location',
   bookingSerialNo = '#0',
   uniqueBookingId = 'HQL-000000',
-  language = 'en',
+  language = 'english',
   healthTip = "Regular health checkups help detect problems before they start.",
 }: AppointmentRestoredNotificationProps) {
-  
-  const content = {
-    en: {
-      title: 'APPOINTMENT RESTORED',
-      greeting: `Hello ${patientName}, 👋`,
-      message: `We are pleased to inform you that your appointment at ${clinicName} for ${restoredDate} has been restored. Your appointment with Dr. ${doctorName} is confirmed.`,
-      chamberLabel: 'Chamber:',
-      dateLabel: 'Date:',
-      scheduleTimeLabel: 'Schedule Time:',
-      locationLabel: 'Location:',
-      bookingSerialLabel: 'Booking Serial No:',
-      uniqueBookingLabel: 'Unique Booking ID:',
-      arrivalMessage: 'Please arrive 15 minutes before your scheduled time.',
-      healthTip: "Today's Health Tip",
-      footer: 'Powered by HealQR.com',
-    },
-    hi: {
-      title: 'अपॉइंटमेंट पुनर्स्थापित',
-      greeting: `नमस्ते ${patientName}, 👋`,
-      message: `हमें आपको सूचित करते हुए खुशी हो रही है कि ${clinicName} में ${restoredDate} के लिए आपकी अपॉइंटमेंट पुनर्स्थापित कर दी गई है। डॉ. ${doctorName} के साथ आपका अपॉइंटमेंट पुष्ट है।`,
-      chamberLabel: 'चैंबर:',
-      dateLabel: 'तिथि:',
-      scheduleTimeLabel: 'समय:',
-      locationLabel: 'स्थान:',
-      bookingSerialLabel: 'बुकिंग क्रमांक:',
-      uniqueBookingLabel: 'अनोखा बुकिंग ID:',
-      arrivalMessage: 'कृपया अपने निर्धारित समय से 15 मिनट पहले पहुंचें।',
-      healthTip: 'आज का स्वास्थ्य टिप',
-      footer: 'HealQR.com द्वारा संचालित',
-    },
-    bn: {
-      title: 'অ্যাপয়েন্টমেন্ট পুনরুদ্ধার',
-      greeting: `হ্যালো ${patientName}, 👋`,
-      message: `আমরা আপনাকে জানাতে পেরে আনন্দিত যে ${clinicName}-এ ${restoredDate}-এর জন্য আপনার অ্যাপয়েন্টমেন্ট পুনরুদ্ধার করা হয়েছে। ডাঃ ${doctorName}-এর সাথে আপনার অ্যাপয়েন্টমেন্ট নিশ্চিত করা হয়েছে।`,
-      chamberLabel: 'চেম্বার:',
-      dateLabel: 'তারিখ:',
-      scheduleTimeLabel: 'সময়সূচী:',
-      locationLabel: 'অবস্থান:',
-      bookingSerialLabel: 'বুকিং সিরিয়াল নম্বর:',
-      uniqueBookingLabel: 'অনন্য বুকিং ID:',
-      arrivalMessage: 'অনুগ্রহ করে আপনার নির্ধারিত সময়ের 15 মিনিট আগে পৌঁছান।',
-      healthTip: 'আজকের স্বাস্থ্য টিপ',
-      footer: 'HealQR.com দ্বারা চালিত',
-    },
-  };
 
-  const t = content[language];
+  const { bt, dt } = useAITranslation(language);
 
   return (
     <div className="flex items-center justify-center py-8">
@@ -106,7 +63,7 @@ export default function AppointmentRestoredNotification({
                   <RotateCcw className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-gray-900">{t.title}</h1>
+                  <h1 className="text-gray-900">{bt('APPOINTMENT RESTORED')}</h1>
                 </div>
               </div>
 
@@ -122,44 +79,44 @@ export default function AppointmentRestoredNotification({
               </div>
 
               {/* Greeting */}
-              <p className="text-gray-700 mb-4">{t.greeting}</p>
+              <p className="text-gray-700 mb-4">{bt(`Hello ${patientName}, 👋`)}</p>
 
               {/* Message */}
               <p className="text-gray-700 mb-6 leading-relaxed">
-                {t.message}
+                {bt(`We are pleased to inform you that your appointment at ${clinicName} for ${restoredDate} has been restored. Your appointment with Dr. ${doctorName} is confirmed.`)}
               </p>
 
               {/* Appointment Details Box */}
               <div className="bg-gray-50 rounded-xl p-4 mb-6 space-y-2 mx-6">
             <div className="flex justify-between">
-              <span className="text-gray-600">{t.chamberLabel}</span>
+              <span className="text-gray-600">{bt('Chamber:')}</span>
               <span className="text-gray-900">{chamberName}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">{t.dateLabel}</span>
+              <span className="text-gray-600">{bt('Date:')}</span>
               <span className="text-gray-900">{restoredDate}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">{t.scheduleTimeLabel}</span>
+              <span className="text-gray-600">{bt('Schedule Time:')}</span>
               <span className="text-gray-900">{scheduleTime}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">{t.locationLabel}</span>
+              <span className="text-gray-600">{bt('Location:')}</span>
               <span className="text-gray-900">{location}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">{t.bookingSerialLabel}</span>
+              <span className="text-gray-600">{bt('Booking Serial No:')}</span>
               <span className="text-gray-900">{bookingSerialNo}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">{t.uniqueBookingLabel}</span>
+              <span className="text-gray-600">{bt('Unique Booking ID:')}</span>
               <span className="text-gray-900">{uniqueBookingId}</span>
             </div>
               </div>
 
               {/* Arrival Message */}
               <p className="text-gray-700 mb-6 px-6">
-                {t.arrivalMessage}
+                {bt('Please arrive 15 minutes before your scheduled time.')}
               </p>
 
               {/* Health Tip Section */}
@@ -169,7 +126,7 @@ export default function AppointmentRestoredNotification({
 
           {/* Footer */}
           <div className="text-center mt-6 pt-4 border-t border-gray-200">
-            <p className="text-gray-400 text-sm">{t.footer}</p>
+            <p className="text-gray-400 text-sm">HealQR.com</p>
           </div>
             </div>
           </div>

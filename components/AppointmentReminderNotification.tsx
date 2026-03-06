@@ -1,9 +1,10 @@
 import { Bell } from 'lucide-react';
-import { translations, getLanguageFromCode, type LanguageCode } from '../utils/translations';
 import TemplateDisplay from './TemplateDisplay';
+import { useAITranslation } from '../hooks/useAITranslation';
+import type { Language } from '../utils/translations';
 
 interface AppointmentReminderNotificationProps {
-  language?: LanguageCode;
+  language?: Language;
   patientName?: string;
   doctorName?: string;
   doctorSpecialty?: string;
@@ -16,7 +17,7 @@ interface AppointmentReminderNotificationProps {
 }
 
 export default function AppointmentReminderNotification({
-  language = 'en',
+  language = 'english',
   patientName = 'Rahul Kumar',
   doctorName = 'Dr. Anika Sharma',
   doctorSpecialty = 'Cardiologist',
@@ -27,17 +28,13 @@ export default function AppointmentReminderNotification({
   location = '123 Medical Plaza, Downtown',
   serialNumber = '#7',
 }: AppointmentReminderNotificationProps) {
-  const lang = getLanguageFromCode(language);
-  
+  const { bt } = useAITranslation(language);
+
   return (
     <div className="flex items-center justify-center py-8">
-      {/* Phone Mockup */}
       <div className="w-full max-w-sm">
-        {/* Phone Frame */}
         <div className="bg-gray-900 rounded-3xl p-4 shadow-2xl border-8 border-gray-800">
-          {/* Notification Card */}
           <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-            {/* Header */}
             <div className="px-6 pt-6 pb-4">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center flex-shrink-0">
@@ -45,12 +42,10 @@ export default function AppointmentReminderNotification({
                 </div>
                 <div>
                   <h2 className="text-gray-900 uppercase tracking-wide text-sm">
-                    {translations.notifReminderTitle[lang]}
+                    {bt('APPOINTMENT REMINDER')}
                   </h2>
                 </div>
               </div>
-
-              {/* Doctor Info */}
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center flex-shrink-0">
                   <span className="text-white">{doctorInitials}</span>
@@ -60,54 +55,40 @@ export default function AppointmentReminderNotification({
                   <p className="text-gray-500 text-sm">{doctorSpecialty}</p>
                 </div>
               </div>
-
-              {/* Greeting */}
               <p className="text-gray-900 mb-4">
-                {translations.notifReminderGreeting[lang]} {patientName}, 👋
+                {bt(`Hello ${patientName}, 👋`)}
               </p>
-
-              {/* Message Body */}
               <p className="text-gray-700 text-sm mb-4 leading-relaxed">
-                {translations.notifReminderMessage[lang]} {doctorName} {translations.notifReminderAt[lang]} {clinicName}.
+                {bt(`This is a gentle reminder about your upcoming appointment with ${doctorName} at ${clinicName}.`)}
               </p>
-
-              {/* Appointment Details */}
               <div className="bg-gray-50 rounded-lg p-4 mb-4 space-y-2">
                 <div>
-                  <span className="text-gray-900">{translations.notifAppointmentDate[lang]}</span>{' '}
+                  <span className="text-gray-900">{bt('Appointment Date:')}</span>{' '}
                   <span className="text-gray-600">{appointmentDate}</span>
                 </div>
                 <div>
-                  <span className="text-gray-900">{translations.notifAppointmentTime[lang]}</span>{' '}
+                  <span className="text-gray-900">{bt('Appointment Time:')}</span>{' '}
                   <span className="text-gray-600">{appointmentTime}</span>
                 </div>
                 <div>
-                  <span className="text-gray-900">{translations.location[lang]}</span>{' '}
+                  <span className="text-gray-900">{bt('Location:')}</span>{' '}
                   <span className="text-gray-600">{location}</span>
                 </div>
                 <div>
-                  <span className="text-gray-900">{translations.notifSerialNumber[lang]}</span>{' '}
+                  <span className="text-gray-900">{bt('Serial Number:')}</span>{' '}
                   <span className="text-gray-600">{serialNumber}</span>
                 </div>
               </div>
-
-              {/* Remember to Bring */}
               <div className="mb-4">
-                <p className="text-gray-900 text-sm mb-2">{translations.notifRememberToBring[lang]}</p>
+                <p className="text-gray-900 text-sm mb-2">{bt('Remember to bring:')}</p>
                 <div className="text-gray-600 text-sm space-y-1 ml-2">
-                  <p>{translations.notifPreviousReports[lang]}</p>
-                  <p>{translations.notifCurrentMedications[lang]}</p>
-                  <p>{translations.notifAnyQuestions[lang]}</p>
+                  <p>{bt('• Previous medical reports')}</p>
+                  <p>{bt('• Current medications list')}</p>
+                  <p>{bt('• Any questions or concerns')}</p>
                 </div>
               </div>
-
-              {/* Health Tip Section */}
               <TemplateDisplay placement="notif-appointment-reminder" className="mb-4" />
-
-              {/* Footer */}
-              <p className="text-gray-400 text-xs text-center">
-                {translations.poweredBy[lang]}
-              </p>
+              <p className="text-gray-400 text-xs text-center">HealQR.com</p>
             </div>
           </div>
         </div>

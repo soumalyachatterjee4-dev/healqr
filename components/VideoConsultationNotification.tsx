@@ -1,5 +1,7 @@
 import { Video, Calendar, Clock, ExternalLink, AlertCircle, CheckCircle, User } from 'lucide-react';
 import TemplateDisplay from './TemplateDisplay';
+import { useAITranslation } from '../hooks/useAITranslation';
+import type { Language } from '../utils/translations';
 
 interface VideoConsultationNotificationProps {
   doctorName?: string;
@@ -9,69 +11,8 @@ interface VideoConsultationNotificationProps {
   consultationTime?: string;
   meetingLink?: string;
   bookingId?: string;
-  language?: 'en' | 'hi' | 'bn';
+  language?: Language;
 }
-
-const translations = {
-  en: {
-    title: 'VIDEO CONSULTATION READY',
-    greeting: 'Hello',
-    message1: 'Your video consultation with',
-    message2: 'is scheduled.',
-    consultationDate: 'Date:',
-    consultationTime: 'Time:',
-    bookingId: 'Booking ID:',
-    joinButton: 'Join Video Consultation',
-    beforeJoining: 'Before Joining:',
-    checkCamera: '• Check camera and microphone',
-    stableInternet: '• Ensure stable internet',
-    quietSpace: '• Find a quiet space',
-    note: 'Note:',
-    noteMessage: 'Please join 5 minutes before the scheduled time. The link will be active 10 minutes before your appointment.',
-    healthTip: 'Today\'s Health Tip',
-    healthTipMessage: 'Keep your medical reports ready for better consultation.',
-    poweredBy: 'Powered by HealQR.com'
-  },
-  hi: {
-    title: 'वीडियो परामर्श तैयार',
-    greeting: 'नमस्ते',
-    message1: 'के साथ आपका वीडियो परामर्श',
-    message2: 'निर्धारित है।',
-    consultationDate: 'तारीख:',
-    consultationTime: 'समय:',
-    bookingId: 'बुकिंग आईडी:',
-    joinButton: 'वीडियो परामर्श में शामिल हों',
-    beforeJoining: 'शामिल होने से पहले:',
-    checkCamera: '• कैमरा और माइक्रोफोन जांचें',
-    stableInternet: '• स्थिर इंटरनेट सुनिश्चित करें',
-    quietSpace: '• शांत जगह खोजें',
-    note: 'नोट:',
-    noteMessage: 'कृपया निर्धारित समय से 5 मिनट पहले शामिल हों। लिंक आपकी अपॉइंटमेंट से 10 मिनट पहले सक्रिय होगा।',
-    healthTip: 'आज का स्वास्थ्य टिप',
-    healthTipMessage: 'बेहतर परामर्श के लिए अपनी मेडिकल रिपोर्ट तैयार रखें।',
-    poweredBy: 'HealQR.com द्वारा संचालित'
-  },
-  bn: {
-    title: 'ভিডিও পরামর্শ প্রস্তুত',
-    greeting: 'হ্যালো',
-    message1: 'এর সাথে আপনার ভিডিও পরামর্শ',
-    message2: 'নির্ধারিত আছে।',
-    consultationDate: 'তারিখ:',
-    consultationTime: 'সময়:',
-    bookingId: 'বুকিং আইডি:',
-    joinButton: 'ভিডিও পরামর্শে যোগ দিন',
-    beforeJoining: 'যোগদানের আগে:',
-    checkCamera: '• ক্যামেরা এবং মাইক্রোফোন চেক করুন',
-    stableInternet: '• স্থিতিশীল ইন্টারনেট নিশ্চিত করুন',
-    quietSpace: '• শান্ত জায়গা খুঁজুন',
-    note: 'নোট:',
-    noteMessage: 'অনুগ্রহ করে নির্ধারিত সময়ের 5 মিনিট আগে যোগ দিন। লিঙ্ক আপনার অ্যাপয়েন্টমেন্টের 10 মিনিট আগে সক্রিয় হবে।',
-    healthTip: 'আজকের স্বাস্থ্য টিপ',
-    healthTipMessage: 'ভাল পরামর্শের জন্য আপনার মেডিকেল রিপোর্ট প্রস্তুত রাখুন।',
-    poweredBy: 'HealQR.com দ্বারা চালিত'
-  }
-};
-
 export default function VideoConsultationNotification({
   doctorName = 'Dr. Ankita Sharma',
   doctorSpecialization = 'Cardiologist',
@@ -80,9 +21,9 @@ export default function VideoConsultationNotification({
   consultationTime = '10:00 AM',
   meetingLink = 'https://meet.healqr.com/abc-xyz-123',
   bookingId = 'V7-001',
-  language = 'en'
+  language = 'english'
 }: VideoConsultationNotificationProps) {
-  const t = translations[language];
+  const { bt } = useAITranslation(language);
 
   return (
     <div className="min-h-screen bg-[#1a1f2e] text-white p-4 sm:p-6 flex items-center justify-center">
@@ -97,7 +38,7 @@ export default function VideoConsultationNotification({
                   <Video className="w-6 h-6 text-red-500" />
                 </div>
                 <div>
-                  <h2 className="text-white font-semibold">{t.title}</h2>
+                  <h2 className="text-white font-semibold">{bt('VIDEO CONSULTATION READY')}</h2>
                   <p className="text-white/80 text-xs">Online Video Call</p>
                 </div>
               </div>
@@ -109,14 +50,14 @@ export default function VideoConsultationNotification({
             {/* Greeting */}
             <div className="text-gray-800">
               <p className="text-base">
-                {t.greeting} <span className="font-semibold text-red-600">{patientName}</span>, 👋
+                {bt('Hello')} <span className="font-semibold text-red-600">{patientName}</span>, 👋
               </p>
             </div>
 
             {/* Message */}
             <div className="bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200 rounded-xl p-4">
               <p className="text-gray-700 text-sm leading-relaxed">
-                {t.message1} <span className="font-semibold text-red-600">{doctorName}</span> {t.message2}
+                {bt('Your video consultation with')} <span className="font-semibold text-red-600">{doctorName}</span> {bt('is scheduled.')}
               </p>
             </div>
 
@@ -142,21 +83,21 @@ export default function VideoConsultationNotification({
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600 flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-blue-600" />
-                  {t.consultationDate}
+                  {bt('Date:')}
                 </span>
                 <span className="text-gray-900 font-semibold">{consultationDate}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600 flex items-center gap-2">
                   <Clock className="w-4 h-4 text-blue-600" />
-                  {t.consultationTime}
+                  {bt('Time:')}
                 </span>
                 <span className="text-gray-900 font-semibold">{consultationTime}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600 flex items-center gap-2">
                   <User className="w-4 h-4 text-blue-600" />
-                  {t.bookingId}
+                  {bt('Booking ID:')}
                 </span>
                 <span className="text-gray-900 font-semibold font-mono">{bookingId}</span>
               </div>
@@ -164,11 +105,11 @@ export default function VideoConsultationNotification({
 
             {/* Before Joining Checklist */}
             <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
-              <h4 className="text-purple-900 font-semibold text-sm mb-3">{t.beforeJoining}</h4>
+              <h4 className="text-purple-900 font-semibold text-sm mb-3">{bt('Before Joining:')}</h4>
               <div className="space-y-2 text-sm text-purple-800">
-                <p>{t.checkCamera}</p>
-                <p>{t.stableInternet}</p>
-                <p>{t.quietSpace}</p>
+                <p>{bt('• Check camera and microphone')}</p>
+                <p>{bt('• Ensure stable internet')}</p>
+                <p>{bt('• Find a quiet space')}</p>
               </div>
             </div>
 
@@ -181,7 +122,7 @@ export default function VideoConsultationNotification({
             >
               <button className="w-full bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white py-4 rounded-xl font-semibold text-base shadow-lg hover:shadow-xl transition-all transform hover:scale-[1.02] flex items-center justify-center gap-2">
                 <Video className="w-5 h-5" />
-                {t.joinButton}
+                {bt('Join Video Consultation')}
                 <ExternalLink className="w-4 h-4" />
               </button>
             </a>
@@ -191,7 +132,7 @@ export default function VideoConsultationNotification({
               <div className="flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 text-orange-600 flex-shrink-0 mt-0.5" />
                 <div className="text-xs text-orange-900">
-                  <span className="font-semibold">{t.note}</span> {t.noteMessage}
+                  <span className="font-semibold">{bt('Note:')}</span> {bt('Please join 5 minutes before the scheduled time. The link will be active 10 minutes before your appointment.')}
                 </div>
               </div>
             </div>
@@ -208,7 +149,7 @@ export default function VideoConsultationNotification({
 
           {/* Footer */}
           <div className="bg-gray-50 px-6 py-3 border-t border-gray-100">
-            <p className="text-gray-400 text-xs text-center">{t.poweredBy}</p>
+            <p className="text-gray-400 text-xs text-center">HealQR.com</p>
           </div>
         </div>
       </div>

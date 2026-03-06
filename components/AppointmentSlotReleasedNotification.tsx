@@ -1,9 +1,10 @@
 import { Clock } from 'lucide-react';
-import { translations, getLanguageFromCode, type LanguageCode } from '../utils/translations';
+import { useAITranslation } from '../hooks/useAITranslation';
+import type { Language } from '../utils/translations';
 import TemplateDisplay from './TemplateDisplay';
 
 interface AppointmentSlotReleasedNotificationProps {
-  language?: LanguageCode;
+  language?: Language;
   patientName?: string;
   doctorName?: string;
   doctorSpecialty?: string;
@@ -14,7 +15,7 @@ interface AppointmentSlotReleasedNotificationProps {
 }
 
 export default function AppointmentSlotReleasedNotification({
-  language = 'en',
+  language = 'english',
   patientName = 'Rahul Kumar',
   doctorName = 'Dr. Anika Sharma',
   doctorSpecialty = 'Cardiologist',
@@ -23,7 +24,7 @@ export default function AppointmentSlotReleasedNotification({
   missedAppointmentDate = 'October 10, 2025',
   missedAppointmentTime = '09:30 AM',
 }: AppointmentSlotReleasedNotificationProps) {
-  const lang = getLanguageFromCode(language);
+  const { bt } = useAITranslation(language);
   
   return (
     <div className="flex items-center justify-center py-8">
@@ -41,7 +42,7 @@ export default function AppointmentSlotReleasedNotification({
                 </div>
                 <div>
                   <h2 className="text-gray-900 uppercase tracking-wide text-sm">
-                    {translations.notifSlotReleasedTitle[lang]}
+                    {bt('APPOINTMENT SLOT RELEASED')}
                   </h2>
                 </div>
               </div>
@@ -59,34 +60,34 @@ export default function AppointmentSlotReleasedNotification({
 
               {/* Greeting */}
               <p className="text-gray-900 mb-4">
-                {translations.notifReminderGreeting[lang]} {patientName}, 👋
+                {bt('Hello')} {patientName}, 👋
               </p>
 
               {/* Message Body */}
               <p className="text-gray-700 text-sm mb-4 leading-relaxed">
-                {translations.notifSlotReleasedMessage[lang]} {doctorName} {translations.notifSlotReleasedMessage2[lang]} {clinicName} {translations.notifSlotReleasedMessage3[lang]}
+                {bt('Your appointment slot with')} {doctorName} {bt('at')} {clinicName} {bt('has been automatically released due to no-show.')}
               </p>
 
               {/* Appointment Details */}
               <div className="bg-gray-50 rounded-lg p-4 mb-4 space-y-2">
                 <div>
-                  <span className="text-gray-900">{translations.notifMissedAppointment[lang]}</span>{' '}
+                  <span className="text-gray-900">{bt('Missed Appointment:')}</span>{' '}
                   <span className="text-gray-600">{missedAppointmentTime}, {missedAppointmentDate}</span>
                 </div>
               </div>
 
               {/* Rebook Instructions */}
               <div className="mb-4">
-                <p className="text-gray-900 text-sm mb-2">{translations.notifRebookInstructions[lang]}</p>
+                <p className="text-gray-900 text-sm mb-2">{bt('To rebook:')}</p>
                 <div className="text-gray-600 text-sm space-y-1 ml-2">
-                  <p>• {translations.notifScanQRCode[lang]}</p>
-                  <p>• {translations.notifSelectNewDate[lang]}</p>
+                  <p>• {bt('Scan the doctor\'s unique QR code')}</p>
+                  <p>• {bt('Select a new date and time')}</p>
                 </div>
               </div>
 
               {/* Apology Message */}
               <p className="text-gray-700 text-sm mb-4 text-center italic">
-                {translations.notifWeApologize[lang]}
+                {bt('We understand emergencies happen. Please reschedule at your earliest convenience.')}
               </p>
 
               {/* Health Tip Section */}
@@ -94,7 +95,7 @@ export default function AppointmentSlotReleasedNotification({
 
               {/* Footer */}
               <p className="text-gray-400 text-xs text-center">
-                {translations.poweredBy[lang]}
+                HealQR.com
               </p>
             </div>
           </div>

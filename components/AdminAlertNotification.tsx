@@ -1,9 +1,10 @@
 import { AlertTriangle } from 'lucide-react';
-import { translations, getLanguageFromCode, type LanguageCode } from '../utils/translations';
+import { useAITranslation } from '../hooks/useAITranslation';
+import type { Language } from '../utils/translations';
 import TemplateDisplay from './TemplateDisplay';
 
 interface AdminAlertNotificationProps {
-  language?: LanguageCode;
+  language?: Language;
   doctorName?: string;
   doctorInitials?: string;
   eventType?: string;
@@ -12,14 +13,14 @@ interface AdminAlertNotificationProps {
 }
 
 export default function AdminAlertNotification({
-  language = 'en',
+  language = 'english',
   doctorName = 'Dr. Anika Sharma',
   doctorInitials = 'AS',
   eventType = 'System Alert',
   timestamp = 'October 10, 2025, 09:45 AM',
   severity = 'High',
 }: AdminAlertNotificationProps) {
-  const lang = getLanguageFromCode(language);
+  const { bt } = useAITranslation(language);
   
   return (
     <div className="flex items-center justify-center py-8">
@@ -37,7 +38,7 @@ export default function AdminAlertNotification({
                 </div>
                 <div>
                   <h2 className="text-gray-900 uppercase tracking-wide text-sm">
-                    {translations.notifAdminAlertTitle[lang]}
+                    {bt('URGENT ADMIN ALERT')}
                   </h2>
                 </div>
               </div>
@@ -54,35 +55,35 @@ export default function AdminAlertNotification({
 
               {/* Greeting */}
               <p className="text-gray-900 mb-4">
-                {translations.notifAdminDear[lang]} {doctorName}, 👋
+                {bt('Dear')} {doctorName}, 👋
               </p>
 
               {/* Message Body */}
               <p className="text-gray-700 text-sm mb-4 leading-relaxed">
-                {translations.notifAdminAttentionRequired[lang]}
+                {bt('Immediate attention required! A critical system event needs your review.')}
               </p>
 
               {/* Alert Details */}
               <div className="bg-orange-50 border-l-4 border-orange-500 rounded-r-lg p-4 mb-4 space-y-2">
-                <h3 className="text-gray-900">{translations.notifAlertDetails[lang]}</h3>
+                <h3 className="text-gray-900">{bt('Alert Details:')}</h3>
                 <div>
-                  <span className="text-gray-900">{translations.notifEventType[lang]}</span>{' '}
-                  <span className="text-gray-600">{translations.notifSystemAlert[lang]}</span>
+                  <span className="text-gray-900">{bt('Event Type:')}</span>{' '}
+                  <span className="text-gray-600">{bt('System Alert')}</span>
                 </div>
                 <div>
-                  <span className="text-gray-900">{translations.notifTimestamp[lang]}</span>{' '}
+                  <span className="text-gray-900">{bt('Timestamp:')}</span>{' '}
                   <span className="text-gray-600">{timestamp}</span>
                 </div>
                 <div>
-                  <span className="text-gray-900">{translations.notifSeverity[lang]}</span>{' '}
-                  <span className="text-red-600">{translations.notifHigh[lang]}</span>
+                  <span className="text-gray-900">{bt('Severity:')}</span>{' '}
+                  <span className="text-red-600">{bt('High')}</span>
                 </div>
               </div>
 
               {/* Action Required */}
               <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                <p className="text-gray-900 mb-2">{translations.notifActionRequired[lang]}</p>
-                <p className="text-gray-600 text-sm">{translations.notifReviewAndRespond[lang]}</p>
+                <p className="text-gray-900 mb-2">{bt('Action Required:')}</p>
+                <p className="text-gray-600 text-sm">{bt('Please review and respond immediately')}</p>
               </div>
 
               {/* Health Tip Section */}
@@ -90,7 +91,7 @@ export default function AdminAlertNotification({
 
               {/* Footer */}
               <p className="text-gray-400 text-xs text-center">
-                {translations.poweredBy[lang]}
+                HealQR.com
               </p>
             </div>
           </div>

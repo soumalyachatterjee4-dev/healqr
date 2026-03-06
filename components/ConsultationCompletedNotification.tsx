@@ -1,10 +1,11 @@
 import { CheckCircle, Download } from 'lucide-react';
-import { translations, getLanguageFromCode, type LanguageCode } from '../utils/translations';
 import TemplateDisplay from './TemplateDisplay';
+import { useAITranslation } from '../hooks/useAITranslation';
+import type { Language } from '../utils/translations';
 
 interface ConsultationCompletedNotificationProps {
   bookingId?: string;
-  language?: LanguageCode;
+  language?: Language;
   patientName?: string;
   doctorName?: string;
   doctorSpecialty?: string;
@@ -13,12 +14,12 @@ interface ConsultationCompletedNotificationProps {
   clinicName?: string;
   consultationDate?: string;
   consultationTime?: string;
-  rxUrl?: string; // Prescription download link
-  dietUrl?: string; // AI Diet Chart download link
+  rxUrl?: string;
+  dietUrl?: string;
 }
 
 export default function ConsultationCompletedNotification({
-  language = 'en',
+  language = 'english',
   patientName = 'Rahul Kumar',
   doctorName = 'Dr. Anika Sharma',
   doctorSpecialty = 'Cardiologist',
@@ -30,7 +31,7 @@ export default function ConsultationCompletedNotification({
   rxUrl,
   dietUrl,
 }: ConsultationCompletedNotificationProps) {
-  const lang = getLanguageFromCode(language) as any;
+  const { bt } = useAITranslation(language);
 
   return (
     <div className="flex items-center justify-center py-8">
@@ -48,7 +49,7 @@ export default function ConsultationCompletedNotification({
                 </div>
                 <div>
                   <h2 className="text-gray-900 uppercase tracking-wide text-sm">
-                    {translations.notifCompletedTitle[lang]}
+                    {bt('CONSULTATION COMPLETED')}
                   </h2>
                 </div>
               </div>
@@ -74,25 +75,25 @@ export default function ConsultationCompletedNotification({
 
               {/* Greeting */}
               <p className="text-gray-900 mb-4">
-                {translations.notifReminderGreeting[lang]} {patientName}, 👋
+                {bt(`Hello ${patientName}, 👋`)}
               </p>
 
               {/* Message Body */}
               <p className="text-gray-700 text-sm mb-4 leading-relaxed">
-                {translations.notifCompletedMessage[lang]} {clinicName}. {translations.notifCompletedMessage2[lang]}
+                {bt(`Thank you for visiting ${clinicName}. Your consultation has been successfully completed.`)}
               </p>
 
               {/* Consultation Details */}
               <div className="bg-gray-50 rounded-lg p-4 mb-4 space-y-2">
                 {consultationDate && (
                   <div>
-                    <span className="text-gray-900">{translations.notifConsultationDate[lang]}</span>{' '}
+                    <span className="text-gray-900">{bt('Consultation Date:')}</span>{' '}
                     <span className="text-gray-600">{consultationDate}</span>
                   </div>
                 )}
                 {consultationTime && (
                   <div>
-                    <span className="text-gray-900">{translations.time[lang]}</span>{' '}
+                    <span className="text-gray-900">{bt('Time:')}</span>{' '}
                     <span className="text-gray-600">{consultationTime}</span>
                   </div>
                 )}
@@ -100,17 +101,17 @@ export default function ConsultationCompletedNotification({
 
               {/* Next Steps */}
               <div className="mb-4">
-                <p className="text-gray-900 text-sm mb-2">{translations.notifNextSteps[lang]}</p>
+                <p className="text-gray-900 text-sm mb-2">{bt('Next Steps:')}</p>
                 <div className="text-gray-600 text-sm space-y-1 ml-2">
-                  <p>{translations.notifFollowPrescription[lang]}</p>
-                  <p>{translations.notifScheduleTests[lang]}</p>
-                  <p>{translations.notifBookFollowup[lang]}</p>
+                  <p>{bt('• Follow the prescribed medication')}</p>
+                  <p>{bt('• Schedule recommended tests')}</p>
+                  <p>{bt('• Book follow-up if advised')}</p>
                 </div>
               </div>
 
               {/* Thank You Message */}
               <p className="text-gray-700 text-sm mb-4 text-center">
-                {translations.notifThankYouTrust[lang]}
+                {bt('Thank you for trusting us with your health!')}
               </p>
 
               {/* Health Tip Section */}
@@ -126,7 +127,7 @@ export default function ConsultationCompletedNotification({
                     className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-[0.98] transition-all"
                   >
                     <Download className="w-5 h-5" />
-                    {translations.downloadPrescription?.[lang] || 'Download Digital Prescription'}
+                    {bt('Download Digital Prescription')}
                   </a>
                 </div>
               )}
@@ -141,7 +142,7 @@ export default function ConsultationCompletedNotification({
                     className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 active:scale-[0.98] transition-all"
                   >
                     <Download className="w-5 h-5" />
-                    {translations.downloadDietChart?.[lang] || 'Download AI Diet Chart'}
+                    {bt('Download AI Diet Chart')}
                   </a>
                 </div>
               )}
@@ -149,7 +150,7 @@ export default function ConsultationCompletedNotification({
               {/* Secure link note */}
               {(rxUrl || dietUrl) && (
                 <p className="text-[10px] text-gray-400 text-center mb-4 italic">
-                  {translations.rxSecureLink?.[lang] || 'Securely generated digital prescription'}
+                  {bt('Securely generated digital prescription')}
                 </p>
               )}
 
@@ -164,9 +165,7 @@ export default function ConsultationCompletedNotification({
               )}
 
               {/* Footer */}
-              <p className="text-gray-400 text-xs text-center">
-                {translations.poweredBy[lang]}
-              </p>
+              <p className="text-gray-400 text-xs text-center">HealQR.com</p>
             </div>
           </div>
         </div>

@@ -1,8 +1,11 @@
 import { Video, Clock, Calendar, User } from 'lucide-react';
 import { Button } from './ui/button';
 import TemplateDisplay from './TemplateDisplay';
+import { useAITranslation } from '../hooks/useAITranslation';
+import type { Language } from '../utils/translations';
 
 interface VideoConsultationLinkNotificationProps {
+  language?: Language;
   patientName?: string;
   doctorName?: string;
   appointmentTime?: string;
@@ -12,6 +15,7 @@ interface VideoConsultationLinkNotificationProps {
 }
 
 export default function VideoConsultationLinkNotification({
+  language = 'english',
   patientName = 'Rajesh Kumar',
   doctorName = 'Dr. Priya Sharma',
   appointmentTime = '10:30 AM',
@@ -19,6 +23,8 @@ export default function VideoConsultationLinkNotification({
   consultationLink = 'https://healqr.com/vc/abc123xyz',
   isPreview = false,
 }: VideoConsultationLinkNotificationProps) {
+  const { bt } = useAITranslation(language);
+
   const handleJoinConsultation = () => {
     if (!isPreview && consultationLink) {
       window.open(consultationLink, '_blank');
@@ -36,10 +42,10 @@ export default function VideoConsultationLinkNotification({
 
       {/* Title */}
       <h2 className="text-center text-white mb-2">
-        Video Consultation Starting Soon! 🎥
+        {bt('Video Consultation Starting Soon!')} 🎥
       </h2>
       <p className="text-center text-gray-200 text-sm mb-6">
-        Your video consultation is scheduled in 30 minutes
+        {bt('Your video consultation is scheduled in 30 minutes')}
       </p>
 
       {/* Appointment Details Card */}
@@ -49,7 +55,7 @@ export default function VideoConsultationLinkNotification({
             <User className="w-5 h-5 text-blue-300" />
           </div>
           <div>
-            <p className="text-gray-300 text-xs">Patient</p>
+            <p className="text-gray-300 text-xs">{bt('Patient')}</p>
             <p className="text-white font-medium">{patientName}</p>
           </div>
         </div>
@@ -59,7 +65,7 @@ export default function VideoConsultationLinkNotification({
             <User className="w-5 h-5 text-emerald-300" />
           </div>
           <div>
-            <p className="text-gray-300 text-xs">Doctor</p>
+            <p className="text-gray-300 text-xs">{bt('Doctor')}</p>
             <p className="text-white font-medium">{doctorName}</p>
           </div>
         </div>
@@ -69,7 +75,7 @@ export default function VideoConsultationLinkNotification({
             <Calendar className="w-5 h-5 text-purple-300" />
           </div>
           <div>
-            <p className="text-gray-300 text-xs">Date</p>
+            <p className="text-gray-300 text-xs">{bt('Date')}</p>
             <p className="text-white font-medium">{appointmentDate}</p>
           </div>
         </div>
@@ -79,7 +85,7 @@ export default function VideoConsultationLinkNotification({
             <Clock className="w-5 h-5 text-orange-300" />
           </div>
           <div>
-            <p className="text-gray-300 text-xs">Time</p>
+            <p className="text-gray-300 text-xs">{bt('Time')}</p>
             <p className="text-white font-medium">{appointmentTime}</p>
           </div>
         </div>
@@ -92,12 +98,12 @@ export default function VideoConsultationLinkNotification({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <div>
-            <p className="text-yellow-300 text-sm font-medium mb-1">Before You Join:</p>
+            <p className="text-yellow-300 text-sm font-medium mb-1">{bt('Before You Join:')}</p>
             <ul className="text-yellow-200 text-xs space-y-1">
-              <li>• Ensure stable internet connection</li>
-              <li>• Allow camera & microphone access</li>
-              <li>• Keep your medical reports ready</li>
-              <li>• Join 2-3 minutes early</li>
+              <li>{bt('• Ensure stable internet connection')}</li>
+              <li>{bt('• Allow camera & microphone access')}</li>
+              <li>{bt('• Keep your medical reports ready')}</li>
+              <li>{bt('• Join 2-3 minutes early')}</li>
             </ul>
           </div>
         </div>
@@ -112,7 +118,7 @@ export default function VideoConsultationLinkNotification({
         className="w-full h-14 bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white shadow-lg shadow-red-500/30 rounded-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
       >
         <Video className="w-5 h-5 mr-2" />
-        <span className="text-lg">Join Video Consultation</span>
+        <span className="text-lg">{bt('Join Video Consultation')}</span>
       </Button>
 
       {/* Preview Mode Indicator */}

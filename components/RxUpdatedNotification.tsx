@@ -1,9 +1,10 @@
 import { AlertTriangle, Download, RefreshCw } from 'lucide-react';
-import { translations, getLanguageFromCode, type LanguageCode } from '../utils/translations';
 import TemplateDisplay from './TemplateDisplay';
+import { useAITranslation } from '../hooks/useAITranslation';
+import type { Language } from '../utils/translations';
 
 interface RxUpdatedNotificationProps {
-  language?: LanguageCode;
+  language?: Language;
   patientName?: string;
   doctorName?: string;
   doctorSpecialty?: string;
@@ -16,7 +17,7 @@ interface RxUpdatedNotificationProps {
 }
 
 export default function RxUpdatedNotification({
-  language = 'en',
+  language = 'english',
   patientName = 'Patient',
   doctorName = 'Doctor',
   doctorSpecialty = '',
@@ -27,7 +28,7 @@ export default function RxUpdatedNotification({
   consultationTime = '',
   rxUrl,
 }: RxUpdatedNotificationProps) {
-  const lang = getLanguageFromCode(language) as any;
+  const { bt } = useAITranslation(language);
 
   return (
     <div className="flex items-center justify-center py-8">
@@ -45,7 +46,7 @@ export default function RxUpdatedNotification({
                 </div>
                 <div>
                   <h2 className="text-gray-900 uppercase tracking-wide text-sm font-bold">
-                    {(translations as any).notifRxUpdatedTitle?.[lang] || 'UPDATED PRESCRIPTION'}
+                    {bt('UPDATED PRESCRIPTION')}
                   </h2>
                 </div>
               </div>
@@ -71,7 +72,7 @@ export default function RxUpdatedNotification({
 
               {/* Greeting */}
               <p className="text-gray-900 mb-2 font-medium">
-                Dear {patientName}, {(translations as any).notifRxUpdatedGreeting?.[lang] || 'Important Update!'} 🔄
+                Dear {patientName}, {bt('Important Update!')} 🔄
               </p>
 
               {/* Warning Banner - Ignore Previous */}
@@ -79,33 +80,33 @@ export default function RxUpdatedNotification({
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                   <p className="text-amber-800 text-sm font-medium">
-                    {(translations as any).notifRxUpdatedIgnorePrevious?.[lang] || '⚠️ Please IGNORE the previous prescription notification'}
+                    {bt('⚠️ Please IGNORE the previous prescription notification')}
                   </p>
                 </div>
               </div>
 
               {/* Main Message */}
               <p className="text-gray-700 text-sm mb-4 leading-relaxed">
-                {(translations as any).notifRxUpdatedMessage?.[lang] || 'Your doctor has sent an UPDATED prescription. Please ignore the previous prescription and use this latest version.'}
+                {bt('Your doctor has sent an UPDATED prescription. Please ignore the previous prescription and use this latest version.')}
               </p>
 
               {/* Consultation Details */}
               <div className="bg-gray-50 rounded-lg p-4 mb-4 space-y-2">
                 {consultationDate && (
                   <div>
-                    <span className="text-gray-900 font-medium">{(translations as any).notifConsultationDate?.[lang] || 'Date:'}</span>{' '}
+                    <span className="text-gray-900 font-medium">{bt('Date:')}</span>{' '}
                     <span className="text-gray-600">{consultationDate}</span>
                   </div>
                 )}
                 {consultationTime && (
                   <div>
-                    <span className="text-gray-900 font-medium">{(translations as any).time?.[lang] || 'Time:'}</span>{' '}
+                    <span className="text-gray-900 font-medium">{bt('Time:')}</span>{' '}
                     <span className="text-gray-600">{consultationTime}</span>
                   </div>
                 )}
                 {clinicName && (
                   <div>
-                    <span className="text-gray-900 font-medium">Clinic:</span>{' '}
+                    <span className="text-gray-900 font-medium">{bt('Clinic:')}</span>{' '}
                     <span className="text-gray-600">{clinicName}</span>
                   </div>
                 )}
@@ -121,10 +122,10 @@ export default function RxUpdatedNotification({
                     className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 active:scale-[0.98] transition-all"
                   >
                     <Download className="w-5 h-5" />
-                    {(translations as any).notifRxUpdatedDownload?.[lang] || 'Download Updated Prescription'}
+                    {bt('Download Updated Prescription')}
                   </a>
                   <p className="text-[10px] text-gray-400 text-center mt-2 italic">
-                    This is the latest version of your prescription
+                    {bt('This is the latest version of your prescription')}
                   </p>
                 </div>
               )}
@@ -134,7 +135,7 @@ export default function RxUpdatedNotification({
 
               {/* Footer */}
               <p className="text-gray-400 text-xs text-center">
-                {(translations as any).poweredBy?.[lang] || 'Powered by HealQR.com'}
+                {bt('HealQR.com')}
               </p>
             </div>
           </div>

@@ -1,9 +1,11 @@
 import { Calendar } from 'lucide-react';
 import TemplateDisplay from './TemplateDisplay';
+import { useAITranslation } from '../hooks/useAITranslation';
+import type { Language } from '../utils/translations';
 
 interface AppointmentCancelledNotificationProps {
   bookingId?: string;
-  language?: 'en' | 'hi' | 'bn';
+  language?: Language;
   patientName?: string;
   doctorName?: string;
   specialization?: string;
@@ -15,7 +17,7 @@ interface AppointmentCancelledNotificationProps {
 
 export default function AppointmentCancelledNotification({
   bookingId,
-  language = 'en',
+  language = 'english',
   patientName = 'Rahul Kumar',
   doctorName = 'Dr. Anika Sharma',
   specialization = 'Cardiologist',
@@ -24,50 +26,8 @@ export default function AppointmentCancelledNotification({
   cancellationTime = '10:00 AM',
   cancellationReason = 'Unavoidable circumstances',
 }: AppointmentCancelledNotificationProps) {
-  
-  const content = {
-    en: {
-      title: 'APPOINTMENT CANCELLED',
-      greeting: `Hello ${patientName},`,
-      message: `Due to unavoidable circumstances, your appointment at ${clinicName} scheduled for ${cancelledDate} has been cancelled.`,
-      cancelledDateLabel: 'Cancelled Date:',
-      timeLabel: 'Time:',
-      chamberLabel: 'Chamber:',
-      reasonLabel: 'Reason:',
-      reschedulingLabel: 'Rescheduling:',
-      reschedulingText: "Scan Dr's unique QR code for new appointment",
-      healthTip: "Today's Health Tip",
-      footer: 'Powered by HealQR.com',
-    },
-    hi: {
-      title: 'अपॉइंटमेंट रद्द',
-      greeting: `नमस्ते ${patientName},`,
-      message: `अपरिहार्य परिस्थितियों के कारण, ${clinicName} में ${cancelledDate} के लिए निर्धारित आपकी अपॉइंटमेंट रद्द कर दी गई है।`,
-      cancelledDateLabel: 'रद्द तिथि:',
-      timeLabel: 'समय:',
-      chamberLabel: 'चैंबर:',
-      reasonLabel: 'कारण:',
-      reschedulingLabel: 'पुनर्निर्धारण:',
-      reschedulingText: 'नई अपॉइंटमेंट के लिए डॉक्टर का अनोखा QR कोड स्कैन करें',
-      healthTip: 'आज का स्वास्थ्य टिप',
-      footer: 'HealQR.com द्वारा संचालित',
-    },
-    bn: {
-      title: 'অ্যাপয়েন্টমেন্ট বাতিল',
-      greeting: `হ্যালো ${patientName},`,
-      message: `অনিবার্য পরিস্থিতির কারণে, ${clinicName}-এ ${cancelledDate}-এর জন্য নির্ধারিত আপনার অ্যাপয়েন্টমেন্ট বাতিল করা হয়েছে।`,
-      cancelledDateLabel: 'বাতিল তারিখ:',
-      timeLabel: 'সময়:',
-      chamberLabel: 'চেম্বার:',
-      reasonLabel: 'কারণ:',
-      reschedulingLabel: 'পুনঃনির্ধারণ:',
-      reschedulingText: 'নতুন অ্যাপয়েন্টমেন্টের জন্য ডাক্তারের অনন্য QR কোড স্কান করুন',
-      healthTip: 'আজকের স্বাস্থ্য টিপ',
-      footer: 'HealQR.com দ্বারা চালিত',
-    },
-  };
 
-  const t = content[language];
+  const { bt } = useAITranslation(language);
 
   return (
     <div className="flex items-center justify-center py-8">
@@ -84,7 +44,7 @@ export default function AppointmentCancelledNotification({
                   <Calendar className="w-5 h-5 text-white" />
                 </div>
                 <div className="flex-1">
-                  <h2 className="text-gray-900 leading-tight">{t.title}</h2>
+                  <h2 className="text-gray-900 leading-tight">{bt('APPOINTMENT CANCELLED')}</h2>
                 </div>
               </div>
             </div>
@@ -105,14 +65,14 @@ export default function AppointmentCancelledNotification({
       {/* Greeting */}
       <div className="px-6 pb-3">
         <p className="text-gray-700">
-          {t.greeting} <span className="inline-block">👋</span>
+          {bt(`Hello ${patientName},`)} <span className="inline-block">👋</span>
         </p>
       </div>
 
       {/* Main Message */}
       <div className="px-6 pb-4">
         <p className="text-gray-600 text-sm leading-relaxed">
-          {t.message}
+          {bt(`Due to unavoidable circumstances, your appointment at ${clinicName} scheduled for ${cancelledDate} has been cancelled.`)}
         </p>
       </div>
 
@@ -120,24 +80,24 @@ export default function AppointmentCancelledNotification({
       <div className="px-6 pb-4 bg-gray-50 mx-6 rounded-lg p-4">
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
-            <span className="text-gray-700">{t.chamberLabel}</span>
+            <span className="text-gray-700">{bt('Chamber:')}</span>
             <span className="text-gray-900 font-medium">{clinicName}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-700">{t.cancelledDateLabel}</span>
+            <span className="text-gray-700">{bt('Cancelled Date:')}</span>
             <span className="text-gray-900 font-medium">{cancelledDate}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-700">{t.timeLabel}</span>
+            <span className="text-gray-700">{bt('Time:')}</span>
             <span className="text-gray-900 font-medium">{cancellationTime}</span>
           </div>
           <div className="pt-2 border-t">
-            <span className="text-gray-700">{t.reasonLabel}</span>{' '}
+            <span className="text-gray-700">{bt('Reason:')}</span>{' '}
             <span className="text-gray-900 font-medium">{cancellationReason}</span>
           </div>
           <div className="pt-2 border-t">
-            <span className="text-gray-700">{t.reschedulingLabel}</span>{' '}
-            <span className="text-gray-900">{t.reschedulingText}</span>
+            <span className="text-gray-700">{bt('Rescheduling:')}</span>{' '}
+            <span className="text-gray-900">{bt("Scan Dr's unique QR code for new appointment")}</span>
           </div>
         </div>
       </div>
@@ -149,7 +109,7 @@ export default function AppointmentCancelledNotification({
 
       {/* Footer */}
       <div className="px-6 pb-6 text-center">
-        <p className="text-gray-400 text-xs">{t.footer}</p>
+        <p className="text-gray-400 text-xs">HealQR.com</p>
       </div>
           </div>
         </div>

@@ -734,7 +734,7 @@ export default function App() {
       const clinicName = urlParams.get('clinicName') || '';
       const consultationDate = urlParams.get('consultationDate') || '';
       const consultationTime = urlParams.get('consultationTime') || '';
-      const language = urlParams.get('language') || 'en';
+      const language = urlParams.get('language') || 'english';
       const rxUrl = urlParams.get('rxUrl') || '';
       const dietUrl = urlParams.get('dietUrl') || '';
 
@@ -749,11 +749,8 @@ export default function App() {
         time: consultationTime,
         rxUrl,
         dietUrl,
+        language,
       });
-
-      // Map language code to Language type
-      const mappedLang = getLanguageFromCode(language as LanguageCode);
-      setBookingLanguage(mappedLang || 'english');
 
       setCurrentPage('consultation-completed');
     } else if (pageParam === 'rx-updated') {
@@ -762,7 +759,7 @@ export default function App() {
       const clinicName = urlParams.get('clinicName') || '';
       const consultationDate = urlParams.get('consultationDate') || '';
       const consultationTime = urlParams.get('consultationTime') || '';
-      const language = urlParams.get('language') || 'en';
+      const language = urlParams.get('language') || 'english';
       const rxUrl = urlParams.get('rxUrl') || '';
 
       setNotifData({
@@ -772,11 +769,8 @@ export default function App() {
         date: consultationDate,
         time: consultationTime,
         rxUrl,
+        language,
       });
-
-      // Map language code to Language type
-      const mappedLang2 = getLanguageFromCode(language as LanguageCode);
-      setBookingLanguage(mappedLang2 || 'english');
 
       setCurrentPage('rx-updated');
     } else if (pageParam === 'follow-up') {
@@ -784,13 +778,15 @@ export default function App() {
       const doctorName = urlParams.get('doctorName') || '';
       const date = urlParams.get('date') || '';
       const message = urlParams.get('message') || '';
+      const language = urlParams.get('language') || 'english';
 
       setNotifData({
         patientName,
         doctorName,
         date,
         time: '', // Not needed for follow-up
-        message
+        message,
+        language
       });
       setCurrentPage('follow-up');
     } else if (pageParam === 'review-request') {
@@ -798,6 +794,7 @@ export default function App() {
       const doctorName = urlParams.get('doctorName') || '';
       const date = urlParams.get('date') || '';
       const doctorId = urlParams.get('doctorId');
+      const language = urlParams.get('language') || 'english';
 
       if (doctorId) {
         sessionStorage.setItem('booking_doctor_id', doctorId);
@@ -807,7 +804,8 @@ export default function App() {
         patientName,
         doctorName,
         date,
-        time: ''
+        time: '',
+        language
       });
       setCurrentPage('review-request');
     } else if (pageParam === 'reminder' || pageParam === 'appointment-reminder') {
@@ -818,6 +816,7 @@ export default function App() {
       const location = urlParams.get('location') || '';
       const serialNumber = urlParams.get('serialNumber') || '';
       const clinicName = urlParams.get('clinicName') || '';
+      const language = urlParams.get('language') || 'english';
 
       setNotifData({
         patientName,
@@ -826,7 +825,8 @@ export default function App() {
         time,
         message: location, // Storing location in message field
         serialNumber,
-        clinicName
+        clinicName,
+        language
       });
       setCurrentPage('appointment-reminder');
     }
@@ -2905,7 +2905,7 @@ export default function App() {
       {currentPage === "consultation-completed" && (
         <ConsultationCompletedNotification
           bookingId={notifData?.bookingId}
-          language={bookingLanguage === 'hindi' ? 'hi' : bookingLanguage === 'bengali' ? 'bn' : 'en'}
+          language={(notifData?.language || 'english') as Language}
           patientName={notifData?.patientName}
           doctorName={notifData?.doctorName}
           doctorSpecialty={notifData?.specialization}
@@ -2921,7 +2921,7 @@ export default function App() {
 
       {currentPage === "rx-updated" && (
         <RxUpdatedNotification
-          language={bookingLanguage === 'hindi' ? 'hi' : bookingLanguage === 'bengali' ? 'bn' : 'en'}
+          language={(notifData?.language || 'english') as Language}
           patientName={notifData?.patientName}
           doctorName={notifData?.doctorName}
           clinicName={notifData?.message}
@@ -2933,7 +2933,7 @@ export default function App() {
 
       {currentPage === "follow-up" && (
         <FollowUpNotification
-          language={bookingLanguage === 'hindi' ? 'hi' : bookingLanguage === 'bengali' ? 'bn' : 'en'}
+          language={(notifData?.language || 'english') as Language}
           patientName={notifData?.patientName}
           doctorName={notifData?.doctorName}
           doctorMessage={notifData?.message}
@@ -2943,7 +2943,7 @@ export default function App() {
 
       {currentPage === "review-request" && (
         <ReviewRequestNotification
-          language={bookingLanguage === 'hindi' ? 'hi' : bookingLanguage === 'bengali' ? 'bn' : 'en'}
+          language={(notifData?.language || 'english') as Language}
           patientName={notifData?.patientName}
           doctorName={notifData?.doctorName}
           consultationDate={notifData?.date}
@@ -2954,7 +2954,7 @@ export default function App() {
 
       {currentPage === "appointment-reminder" && (
         <AppointmentReminderNotification
-          language={bookingLanguage === 'hindi' ? 'hi' : bookingLanguage === 'bengali' ? 'bn' : 'en'}
+          language={(notifData?.language || 'english') as Language}
           patientName={notifData?.patientName}
           doctorName={notifData?.doctorName}
           appointmentDate={notifData?.date}
@@ -2967,7 +2967,7 @@ export default function App() {
 
       {currentPage === "appointment-cancelled" && (
         <AppointmentCancelledNotification
-          language={notifData?.language === 'hindi' ? 'hi' : notifData?.language === 'bengali' ? 'bn' : 'en'}
+          language={(notifData?.language || 'english') as Language}
           bookingId={notifData?.bookingId}
           patientName={notifData?.patientName || 'Patient'}
           doctorName={notifData?.doctorName || 'Doctor'}
@@ -2980,7 +2980,7 @@ export default function App() {
 
       {currentPage === "appointment-restored" && (
         <AppointmentRestoredNotification
-          language={notifData?.language === 'hindi' ? 'hi' : notifData?.language === 'bengali' ? 'bn' : 'en'}
+          language={(notifData?.language || 'english') as Language}
           doctorName={notifData?.doctorName || 'Doctor'}
           doctorSpecialty=""
           doctorInitials=""
