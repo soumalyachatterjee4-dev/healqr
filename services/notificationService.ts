@@ -3,6 +3,7 @@ import { Timestamp } from 'firebase/firestore';
 import { app } from '../lib/firebase/config';
 import { saveNotificationHistory } from './notificationHistoryService';
 import { storeNotification as storePatientNotification } from './patientNotificationStorage';
+import { translateNotification } from './googleTranslateService';
 
 const functions = getFunctions(app!);
 
@@ -20,6 +21,15 @@ const normalizePatientTarget = (phoneOrId: string) => {
 
 const sendFCM = async (payload: { userId: string; title: string; body: string; data?: Record<string, any> }) => {
   try {
+    // Auto-translate notification if patient language is not English
+    const lang = payload.data?.language;
+    if (lang && lang !== 'english') {
+      try {
+        const translated = await translateNotification(payload.title, payload.body, lang);
+        payload = { ...payload, title: translated.title, body: translated.body };
+      } catch (e) { /* fallback to English */ }
+    }
+
     console.log('ðŸ“¤ Sending FCM notification:', {
       userId: payload.userId,
       title: payload.title,
@@ -48,6 +58,15 @@ const sendFCM = async (payload: { userId: string; title: string; body: string; d
 
 const scheduleFCM = async (payload: { userId: string; title: string; body: string; data?: Record<string, any>; sendAt: Date }) => {
   try {
+    // Auto-translate scheduled notification
+    const lang = payload.data?.language;
+    if (lang && lang !== 'english') {
+      try {
+        const translated = await translateNotification(payload.title, payload.body, lang);
+        payload = { ...payload, title: translated.title, body: translated.body };
+      } catch (e) { /* fallback to English */ }
+    }
+
     const schedule = httpsCallable(functions, 'scheduleFCMNotification');
     const result = await schedule({ ...payload, sendAt: payload.sendAt.toISOString() });
     const res: any = result.data;
@@ -78,14 +97,22 @@ export const scheduleConsultationConfirmation = async (data: any) => {
     language: data.language || 'english'
   });
 
+  const lang = data.language || 'english';
+  const { title: tTitle, body: tBody } = await translateNotification(
+    'Visit Verified',
+    `Your visit with ${data.doctorName} has been verified. Thank you!`,
+    lang
+  );
+
   // Schedule FCM notification
   const fcmResult = await scheduleFCM({
     userId,
     sendAt: scheduledAt,
-    title: 'âœ… Visit Verified',
-    body: `Your visit with ${data.doctorName} has been verified. Thank you!`,
+    title: `âœ… ${tTitle}`,
+    body: tBody,
     data: {
       type: 'consultation_completed',
+      language: data.language || 'english',
       patientName: data.patientName,
       doctorName: data.doctorName,
       consultationDate: data.consultationDate,
@@ -134,12 +161,20 @@ export const sendConsultationCompleted = async (data: any) => {
     language: data.language || 'english'
   });
 
+  const lang = data.language || 'english';
+  const { title: tTitle, body: tBody } = await translateNotification(
+    'Consultation Completed',
+    `Your consultation with ${data.doctorName} is complete. Thank you for visiting!`,
+    lang
+  );
+
   const result = await sendFCM({
     userId,
-    title: 'âœ… Consultation Completed',
-    body: `Your consultation with ${data.doctorName} is complete. Thank you for visiting!`,
+    title: `âœ… ${tTitle}`,
+    body: tBody,
     data: {
       type: 'consultation_completed',
+      language: data.language || 'english',
       patientName: data.patientName,
       doctorName: data.doctorName,
       consultationDate: data.consultationDate,
@@ -160,8 +195,8 @@ export const sendConsultationCompleted = async (data: any) => {
       patientAge: data.age,
       patientGender: data.sex,
       type: 'consultation_completed',
-      title: 'âœ… Consultation Completed',
-      message: `Your consultation with ${data.doctorName} is complete. Thank you for visiting!`,
+      title: `âœ… ${tTitle}`,
+      message: tBody,
       bookingId: data.bookingId || '',
       doctorId: data.doctorId,
       doctorName: data.doctorName || 'Doctor',
@@ -276,6 +311,7 @@ export const sendRxUpdatedNotification = async (data: any) => {
     body: `Dr. ${data.doctorName} has sent an UPDATED prescription. Ignore the previous one & download the latest version.`,
     data: {
       type: 'rx_updated',
+      language: data.language || 'english',
       patientName: data.patientName,
       doctorName: data.doctorName,
       phone: phone10,
@@ -385,6 +421,7 @@ export const scheduleReviewRequest = async (data: any, seenAt: Date) => {
     body: `How was your visit with ${data.doctorName}?`,
     data: {
       type: 'review_request',
+      language: data.language || 'english',
       bookingId: data.bookingId,
       phone: phone10,
       // Deep link to review request template with language
@@ -458,6 +495,7 @@ export const sendFollowUp = async (data: any) => {
     body: data.customMessage || 'Your doctor has scheduled a follow-up. Please check your appointment.',
     data: {
       type: 'follow_up',
+      language: data.language || 'english',
       followUpDate: data.followUpDate || '',
       phone: phone10,
       isPermanentCommitment: 'true', // Flag to bypass subscription checks in cloud function
@@ -580,6 +618,7 @@ export const sendAppointmentCancelled = async (data: any) => {
     body: data.message || 'Your appointment has been cancelled. Please contact the clinic for details.',
     data: {
       type: 'cancellation',
+      language: data.language || 'english',
       scope: data.scope || 'patient',
       phone: phone10,
       url: `https://healqr-27726.web.app/?${params.toString()}`,
@@ -699,6 +738,7 @@ export const sendAppointmentRestored = async (data: any) => {
     body: data.message || 'Your appointment has been restored and confirmed again.',
     data: {
       type: 'restoration',
+      language: data.language || 'english',
       scope: data.scope || 'patient',
       phone: phone10,
       url: `https://healqr-27726.web.app/?${params.toString()}`,
@@ -881,6 +921,7 @@ export const sendAppointmentReminder = async (data: any, bookingCreatedAt: Date)
     body: `Reminder: Your appointment with ${data.doctorName} is coming up. Please arrive on time.`,
     data: {
       type: 'appointment_reminder',
+      language: data.language || 'english',
       appointmentTime: data.appointmentTime || '',
       phone: phone10,
       url: `https://healqr-27726.web.app/?${params.toString()}`,
@@ -937,6 +978,7 @@ export const scheduleBookingReminder = async (data: any) => {
     body: data.body || 'Reminder: your appointment is coming up. Please arrive on time.',
     data: {
       type: 'booking_reminder',
+      language: data.language || 'english',
       appointmentTime: data.appointmentTime || '',
       phone: phone10,
       // Deep link to reminder template
@@ -962,6 +1004,7 @@ export const sendVideoCallLink = async (data: any) => {
     body: `Dr. ${data.doctorName} is ready for your video consultation. Click to join now!`,
     data: {
       type: 'video_call_link',
+      language: data.language || 'english',
       bookingId: data.bookingId,
       phone: phone10,
       url: `https://healqr-27726.web.app/?${params.toString()}`,
@@ -1048,6 +1091,7 @@ export const scheduleVideoCallLink = async (data: any, appointmentTime: Date) =>
     body: `Dr. ${data.doctorName} will be ready for your video consultation soon. Click inside to get ready!`,
     data: {
       type: 'video_call_link',
+      language: data.language || 'english',
       bookingId: data.bookingId,
       phone: phone10,
       url: `https://healqr-27726.web.app/?${params.toString()}`,

@@ -10,6 +10,7 @@ import {
   DialogFooter,
 } from './ui/dialog';
 import { t, type Language } from '../utils/translations';
+import { useAITranslation } from '../hooks/useAITranslation';
 import ReviewCard from './ReviewCard';
 import { useState, useEffect } from 'react';
 import TemplateDisplay from './TemplateDisplay';
@@ -52,6 +53,8 @@ export default function BookingMiniWebsite({
   language = 'english',
   uploadedReviews = [],
 }: BookingMiniWebsiteProps) {
+  const { bt } = useAITranslation(language);
+
   // Doctor profile state (loaded from Firestore)
   const [doctorProfile, setDoctorProfile] = useState<any>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
@@ -341,9 +344,7 @@ export default function BookingMiniWebsite({
                 <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
                 <div>
                   <h4 className="text-red-400 font-semibold mb-1">
-                    {language === 'english' && 'Booking Unavailable'}
-                    {language === 'hindi' && 'बुकिंग अनुपलब्ध'}
-                    {language === 'bengali' && 'বুকিং অনুপলব্ধ'}
+                    {bt('Booking Unavailable')}
                   </h4>
                   <p className="text-sm text-gray-300">{blockReason}</p>
                   {doctorProfile?.phone && (
@@ -352,9 +353,7 @@ export default function BookingMiniWebsite({
                       className="inline-flex items-center gap-2 mt-3 text-emerald-400 hover:text-emerald-300 text-sm"
                     >
                       <Phone className="w-4 h-4" />
-                      {language === 'english' && 'Call Clinic'}
-                      {language === 'hindi' && 'क्लिनिक पर कॉल करें'}
-                      {language === 'bengali' && 'ক্লিনিকে কল করুন'}
+                      {bt('Call Clinic')}
                     </a>
                   )}
                 </div>
@@ -383,9 +382,7 @@ export default function BookingMiniWebsite({
                   className="w-full h-12 mt-3 border-emerald-600 text-emerald-600 hover:bg-emerald-50 rounded-lg flex items-center justify-center gap-2"
                 >
                   <HistoryIcon className="w-5 h-5" />
-                  {language === 'english' && 'View My Visit History'}
-                  {language === 'hindi' && 'अपना विज़िट इतिहास देखें'}
-                  {language === 'bengali' && 'আমার ভিজিট ইতিহাস দেখুন'}
+                  {bt('View My Visit History')}
                 </Button>
               )}
             </div>
@@ -397,9 +394,7 @@ export default function BookingMiniWebsite({
               className="w-full h-12 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center justify-center gap-2 mt-3 animate-pulse"
             >
               <AlertCircle className="w-5 h-5" />
-              {language === 'english' && 'Emergency Consultation'}
-              {language === 'hindi' && 'आपातकालीन परामर्श'}
-              {language === 'bengali' && 'জরুরী পরামর্শ'}
+              {bt('Emergency Consultation')}
             </Button>
           )}
         </div>
@@ -580,9 +575,7 @@ export default function BookingMiniWebsite({
             <div className="flex items-center gap-2 mb-3">
               <Lightbulb className="w-5 h-5 text-purple-400" />
               <h3 className="text-white text-base sm:text-lg">
-                {language === 'english' && "Today's Health Tip"}
-                {language === 'hindi' && 'आज की स्वास्थ्य सलाह'}
-                {language === 'bengali' && 'আজকের স্বাস্থ্য পরামর্শ'}
+                {bt("Today's Health Tip")}
               </h3>
             </div>
             <TemplateDisplay
@@ -598,9 +591,7 @@ export default function BookingMiniWebsite({
             <div className="flex items-center gap-2 mb-4">
               <Sparkles className="w-5 h-5 text-emerald-400" />
               <h3 className="text-white text-base sm:text-lg">
-                {language === 'english' && 'Messages from Doctor'}
-                {language === 'hindi' && 'डॉक्टर से संदेश'}
-                {language === 'bengali' && 'ডাক্তারের বার্তা'}
+                {bt('Messages from Doctor')}
               </h3>
             </div>
 
@@ -678,17 +669,10 @@ export default function BookingMiniWebsite({
           <DialogHeader>
             <DialogTitle className="text-xl text-white flex items-center gap-2">
               <AlertCircle className="w-6 h-6 text-red-500" />
-              {language === 'english' && 'Emergency Consultation'}
-              {language === 'hindi' && 'आपातकालीन परामर्श'}
-              {language === 'bengali' && 'জরুরী পরামর্শ'}
+              {bt('Emergency Consultation')}
             </DialogTitle>
             <DialogDescription className="text-gray-400">
-              {language === 'english' &&
-                'You are about to call the doctor directly for an emergency consultation.'}
-              {language === 'hindi' &&
-                'आप आपातकालीन परामर्श के लिए डॉक्टर को सीधे कॉल करने वाले हैं।'}
-              {language === 'bengali' &&
-                'আপনি জরুরী পরামর্শের জন্য সরাসরি ডাক্তারকে কল করতে যাচ্ছেন।'}
+              {bt('You are about to call the doctor directly for an emergency consultation.')}
             </DialogDescription>
           </DialogHeader>
 
@@ -697,18 +681,11 @@ export default function BookingMiniWebsite({
               <Phone className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
               <div>
                 <h4 className="text-red-500 mb-2">
-                  {language === 'english' && 'Emergency Contact'}
-                  {language === 'hindi' && 'आपातकालीन संपर्क'}
-                  {language === 'bengali' && 'জরুরি যোগাযোগ'}
+                  {bt('Emergency Contact')}
                 </h4>
                 <p className="text-white text-xl mb-2">{emergencyPhone}</p>
                 <p className="text-sm text-gray-300">
-                  {language === 'english' &&
-                    'Please explain your emergency clearly when the doctor answers.'}
-                  {language === 'hindi' &&
-                    'जब डॉक्टर उत्तर दें तो कृपया अपनी आपातस्थिति स्पष्ट रूप से समझाएं।'}
-                  {language === 'bengali' &&
-                    'ডাক্তার উত্তর দিলে আপনার জরুরী অবস্থা স্পষ্টভাবে ব্যাখ্যা করুন।'}
+                  {bt('Please explain your emergency clearly when the doctor answers.')}
                 </p>
               </div>
             </div>
@@ -720,18 +697,14 @@ export default function BookingMiniWebsite({
               onClick={() => setShowEmergencyDialog(false)}
               className="bg-transparent border-zinc-700 text-white hover:bg-zinc-800"
             >
-              {language === 'english' && 'Cancel'}
-              {language === 'hindi' && 'रद्द करें'}
-              {language === 'bengali' && 'বাতিল'}
+              {bt('Cancel')}
             </Button>
             <Button
               onClick={confirmEmergencyCall}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
               <Phone className="w-4 h-4 mr-2" />
-              {language === 'english' && 'Call Now'}
-              {language === 'hindi' && 'अभी कॉल करें'}
-              {language === 'bengali' && 'এখনই কল করুন'}
+              {bt('Call Now')}
             </Button>
           </DialogFooter>
         </DialogContent>

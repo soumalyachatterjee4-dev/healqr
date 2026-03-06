@@ -1,16 +1,17 @@
 /**
  * useAITranslation Hook — Dynamic real-time translation for any text
- * 
+ *
  * Instead of hardcoding translation dictionaries, this hook uses
  * Gemini AI to translate any English text to the selected language.
  * Results are cached in-memory and IndexedDB for performance.
- * 
+ *
  * Usage:
  *   const { dt } = useAITranslation(language);
  *   return <h1>{dt('Find Your Doctor')}</h1>;
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, createElement, Fragment } from 'react';
+import type { ReactNode } from 'react';
 import type { Language } from '../utils/translations';
 
 // Session-wide cache shared across all hook instances
@@ -29,20 +30,28 @@ async function batchTranslateAndCache(
   language: Language
 ): Promise<void> {
   if (texts.length === 0) return;
-  
+
   try {
     const { aiTranslateBatch } = await import('../services/aiTranslationService');
     const results = await aiTranslateBatch(texts, language as any, 'ui');
-    
+
     for (let i = 0; i < results.length; i++) {
       const cacheKey = `${language}::${texts[i]}`;
       dynamicCache.set(cacheKey, results[i].translated);
     }
   } catch (error) {
-    console.warn('Dynamic batch translation failed:', error);
-    // Cache originals on failure to prevent re-attempts
-    for (const text of texts) {
-      dynamicCache.set(`${language}::${text}`, text);
+    console.warn('Gemini batch translation failed, trying Google Translate:', error);
+    try {
+      const { googleTranslateBatch } = await import('../services/googleTranslateService');
+      const translations = await googleTranslateBatch(texts, language);
+      for (let i = 0; i < translations.length; i++) {
+        dynamicCache.set(`${language}::${texts[i]}`, translations[i]);
+      }
+    } catch (fallbackError) {
+      console.warn('Google Translate fallback also failed:', fallbackError);
+      for (const text of texts) {
+        dynamicCache.set(`${language}::${text}`, text);
+      }
     }
   }
 }
@@ -50,17 +59,17 @@ async function batchTranslateAndCache(
 /**
  * Translate a single text dynamically (with deduplication)
  */
-async function translateSingle(text: string, language: Language): Promise<string> {
+export async function translateSingle(text: string, language: Language): Promise<string> {
   const cacheKey = `${language}::${text}`;
-  
+
   // Already cached
   const cached = dynamicCache.get(cacheKey);
   if (cached) return cached;
-  
+
   // Already in flight
   const pending = pendingTranslations.get(cacheKey);
   if (pending) return pending;
-  
+
   // Start new translation
   const promise = (async () => {
     try {
@@ -69,20 +78,27 @@ async function translateSingle(text: string, language: Language): Promise<string
       dynamicCache.set(cacheKey, result.translated);
       return result.translated;
     } catch {
-      dynamicCache.set(cacheKey, text);
-      return text;
+      try {
+        const { googleTranslate } = await import('../services/googleTranslateService');
+        const translated = await googleTranslate(text, language);
+        dynamicCache.set(cacheKey, translated);
+        return translated;
+      } catch {
+        dynamicCache.set(cacheKey, text);
+        return text;
+      }
     } finally {
       pendingTranslations.delete(cacheKey);
     }
   })();
-  
+
   pendingTranslations.set(cacheKey, promise);
   return promise;
 }
 
 /**
  * React hook for dynamic AI translation
- * 
+ *
  * @param language - Target language
  * @returns { dt } - Dynamic translate function (returns cached or English while loading)
  */
@@ -95,10 +111,10 @@ export function useAITranslation(language: Language) {
   // Batch flush: translate all queued texts at once
   const flushBatch = useCallback(async () => {
     if (batchQueue.current.size === 0) return;
-    
+
     const textsToTranslate = Array.from(batchQueue.current);
     batchQueue.current.clear();
-    
+
     await batchTranslateAndCache(textsToTranslate, language);
     forceUpdate(n => n + 1); // Re-render with translated values
   }, [language]);
@@ -107,9 +123,9 @@ export function useAITranslation(language: Language) {
   const queueTranslation = useCallback((text: string) => {
     const cacheKey = `${language}::${text}`;
     if (dynamicCache.has(cacheKey)) return;
-    
+
     batchQueue.current.add(text);
-    
+
     // Debounce: collect all texts from this render cycle, then batch translate
     if (batchTimer.current) clearTimeout(batchTimer.current);
     batchTimer.current = setTimeout(flushBatch, 50);
@@ -130,12 +146,37 @@ export function useAITranslation(language: Language) {
   const dt = useCallback((englishText: string): string => {
     if (!englishText) return englishText;
     if (isEnglish) return englishText;
-    
+
     const cacheKey = `${language}::${englishText}`;
     const cached = dynamicCache.get(cacheKey);
     if (cached) return cached;
-    
+
     // Queue for batch translation and return English as placeholder
+    queueTranslation(englishText);
+    return englishText;
+  }, [language, isEnglish, queueTranslation]);
+
+  /**
+   * Bilingual translate function
+   * Returns English text + translated text below (smaller, dimmer)
+   * For visible labels, headers, buttons — NOT for placeholders/attributes
+   */
+  const bt = useCallback((englishText: string): ReactNode => {
+    if (!englishText) return englishText;
+    if (isEnglish) return englishText;
+
+    const cached = dynamicCache.get(`${language}::${englishText}`);
+    if (cached && cached !== englishText) {
+      return createElement(Fragment, null,
+        englishText,
+        createElement('span', {
+          className: 'block text-xs opacity-70',
+          style: { lineHeight: '1.3' },
+        }, cached)
+      );
+    }
+
+    // Queue for translation, return English only until loaded
     queueTranslation(englishText);
     return englishText;
   }, [language, isEnglish, queueTranslation]);
@@ -145,15 +186,15 @@ export function useAITranslation(language: Language) {
    */
   const preload = useCallback(async (texts: string[]) => {
     if (isEnglish) return;
-    
+
     const uncached = texts.filter(t => !dynamicCache.has(`${language}::${t}`));
     if (uncached.length === 0) return;
-    
+
     await batchTranslateAndCache(uncached, language);
     forceUpdate(n => n + 1);
   }, [language, isEnglish]);
 
-  return { dt, preload };
+  return { dt, bt, preload };
 }
 
 export default useAITranslation;

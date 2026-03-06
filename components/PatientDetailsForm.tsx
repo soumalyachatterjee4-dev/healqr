@@ -13,6 +13,7 @@ import {
 import { ArrowLeft, CreditCard, Clock, FileText, CheckCircle2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { t, type Language, normalizeIndicNumerals, normalizePatientName } from '../utils/translations';
+import { useAITranslation } from '../hooks/useAITranslation';
 import { PatientRxUploadModal } from './PatientRxUploadModal';
 import TemplateDisplay from './TemplateDisplay';
 import { db } from '../lib/firebase/config';
@@ -86,6 +87,7 @@ export default function PatientDetailsForm({
   themeColor = 'emerald',
   isClinicBooking = false
 }: PatientDetailsFormProps) {
+  const { bt, dt } = useAITranslation(language);
   const [formData, setFormData] = useState<PatientFormData>({
     patientName: '',
     whatsappNumber: '',
@@ -136,7 +138,7 @@ export default function PatientDetailsForm({
     }
 
     if (!doctorId) {
-      toast.error('Doctor information missing');
+      toast.error(dt('Doctor information missing'));
       return;
     }
 
@@ -153,7 +155,7 @@ export default function PatientDetailsForm({
       const demoBookingId = `DEMO-${Date.now().toString().slice(-6)}`;
       const demoTokenNumber = `#DEMO`;
 
-      toast.success('Demo booking preview!');
+      toast.success(dt('Demo booking preview!'));
 
       // Show confirmation page with demo data
       onSubmit({
@@ -175,7 +177,7 @@ export default function PatientDetailsForm({
     try {
       // Generate serial token number based on existing bookings for this chamber slot
       if (!db) {
-        toast.error('Database connection error');
+        toast.error(dt('Database connection error'));
         setIsSubmitting(false);
         return;
       }
@@ -183,7 +185,7 @@ export default function PatientDetailsForm({
       // Get doctor's code from Firestore
       const doctorDoc = await getDoc(doc(db, 'doctors', doctorId));
       if (!doctorDoc.exists()) {
-        toast.error('Doctor not found');
+        toast.error(dt('Doctor not found'));
         setIsSubmitting(false);
         return;
       }
@@ -192,7 +194,7 @@ export default function PatientDetailsForm({
       const doctorCode = doctorData.doctorCode;
 
       if (!doctorCode) {
-        toast.error('Doctor code not found. Please contact support.');
+        toast.error(dt('Doctor code not found. Please contact support.'));
         setIsSubmitting(false);
         return;
       }
@@ -379,7 +381,7 @@ export default function PatientDetailsForm({
             });
 
             if (bookingDate >= startDate && bookingDate <= endDate) {
-              toast.error('This date is unavailable due to planned off period. Please select another date.');
+              toast.error(dt('This date is unavailable due to planned off period. Please select another date.'));
               setIsSubmitting(false);
               return;
             }
@@ -390,7 +392,7 @@ export default function PatientDetailsForm({
         if (doctorData.chambers && Array.isArray(doctorData.chambers) && chamberId !== -1) {
           const foundChamber = doctorData.chambers.find((c: any) => c.id === chamberId);
           if (foundChamber && foundChamber.isActive === false) {
-            toast.error('This chamber is currently unavailable for bookings. Please try again later.');
+            toast.error(dt('This chamber is currently unavailable for bookings. Please try again later.'));
             setIsSubmitting(false);
             return;
           }
@@ -553,18 +555,18 @@ export default function PatientDetailsForm({
           const token = await requestNotificationPermission(userId, 'patient');
           if (token) {
 
-            toast.success('🔔 Notifications enabled! You will receive appointment updates.', {
+            toast.success(dt('Notifications enabled! You will receive appointment updates.'), {
               duration: 4000
             });
           } else {
             console.warn('⚠️ FCM token not obtained, but booking continues');
-            toast.warning('⚠️ Notifications may not work. Enable browser notifications in settings.', {
+            toast.warning(dt('Notifications may not work. Enable browser notifications in settings.'), {
               duration: 5000
             });
           }
         } catch (error) {
           console.error('❌ [FCM] Token registration failed:', error);
-          toast.error('⚠️ Could not enable notifications. You can enable them later in settings.', {
+          toast.error(dt('Could not enable notifications. You can enable them later in settings.'), {
             duration: 5000
           });
           // Don't block booking flow if FCM fails
@@ -637,7 +639,7 @@ export default function PatientDetailsForm({
       // ✅ NOW SHOW CONFIRMATION AND NAVIGATE
       // FCM registration completed above
       // ============================================
-      toast.success('Booking confirmed successfully!');
+      toast.success(dt('Booking confirmed successfully!'));
 
       // Show confirmation page
       onSubmit({
@@ -652,7 +654,7 @@ export default function PatientDetailsForm({
       setShowConfetti(true);
     } catch (error) {
       console.error('Error adding document: ', error);
-      toast.error('Failed to book appointment. Please try again.');
+      toast.error(dt('Failed to book appointment. Please try again.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -888,7 +890,7 @@ export default function PatientDetailsForm({
             />
             <div className="flex-1">
               <label htmlFor="consent1" className="text-gray-300 text-sm leading-6 cursor-pointer block">
-                I accept receiving push notifications from <span className="text-emerald-400">www.healqr.com</span> and understand that it is only a digital booking platform without any medical treatment role.
+                {dt('I accept receiving push notifications from')} <span className="text-emerald-400">www.healqr.com</span> {dt('and understand that it is only a digital booking platform without any medical treatment role.')}
               </label>
             </div>
           </div>
@@ -897,10 +899,10 @@ export default function PatientDetailsForm({
         {/* Payment Section */}
         {requiresPrepayment && (
           <div className="bg-[#1a1f2e] rounded-xl p-6 mb-6">
-            <h3 className="text-white mb-4">💰 Consultation Fee</h3>
+            <h3 className="text-white mb-4">{bt('Consultation Fee')} 💰</h3>
 
             <div className="flex justify-between items-center mb-4 pb-4 border-b border-gray-700">
-              <span className="text-gray-400">Consultation Charge:</span>
+              <span className="text-gray-400">{dt('Consultation Charge')}:</span>
               <span className="text-2xl text-emerald-500">₹{consultationFee}</span>
             </div>
 
@@ -912,14 +914,14 @@ export default function PatientDetailsForm({
                   className="h-12 bg-transparent border-gray-600 text-white hover:bg-gray-800 hover:text-white rounded-lg"
                 >
                   <Clock className="w-4 h-4 mr-2" />
-                  Pay at Clinic
+                  {bt('Pay at Clinic')}
                 </Button>
                 <Button
                   onClick={handlePayNow}
                   className="h-12 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg"
                 >
                   <CreditCard className="w-4 h-4 mr-2" />
-                  Pay Now ₹{consultationFee}
+                  {dt('Pay Now')} ₹{consultationFee}
                 </Button>
               </div>
             )}
@@ -932,13 +934,13 @@ export default function PatientDetailsForm({
                       <path d="M5 13l4 4L19 7"></path>
                     </svg>
                   </div>
-                  <span className="text-emerald-400">Payment Submitted Successfully! ✓</span>
+                  <span className="text-emerald-400">{bt('Payment Submitted Successfully!')} ✓</span>
                 </div>
                 <p className="text-sm text-gray-400 ml-9">
                   UTR: {formData.utrNumber}
                 </p>
                 <p className="text-xs text-yellow-400 ml-9 mt-2">
-                  ⏳ Payment verification pending. Doctor will confirm before consultation.
+                  ⏳ {dt('Payment verification pending. Doctor will confirm before consultation.')}
                 </p>
               </div>
             )}
@@ -948,9 +950,9 @@ export default function PatientDetailsForm({
                 <div className="flex items-center gap-3">
                   <Clock className="w-5 h-5 text-yellow-400" />
                   <div>
-                    <p className="text-yellow-400">Pay at Clinic</p>
+                    <p className="text-yellow-400">{bt('Pay at Clinic')}</p>
                     <p className="text-sm text-gray-400">
-                      Please pay ₹{consultationFee} at the clinic before consultation
+                      {dt('Please pay')} ₹{consultationFee} {dt('at the clinic before consultation')}
                     </p>
                   </div>
                 </div>
@@ -981,7 +983,7 @@ export default function PatientDetailsForm({
                   : 'bg-gray-700 text-gray-500 cursor-not-allowed'
               }`}
             >
-              {isSubmitting ? 'Submitting...' : t('submit', language)}
+              {isSubmitting ? dt('Submitting...') : t('submit', language)}
             </Button>
           )}
         </div>

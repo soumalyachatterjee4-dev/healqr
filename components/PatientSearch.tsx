@@ -35,7 +35,7 @@ interface PatientSearchProps {
 }
 
 export default function PatientSearch({ language = 'english' }: PatientSearchProps) {
-  const { dt } = useAITranslation(language);
+  const { dt, bt } = useAITranslation(language);
   const [areaInput, setAreaInput] = useState('');
   const [pinCode, setPinCode] = useState('');
   const [isAreaLocked, setIsAreaLocked] = useState(false);
@@ -209,7 +209,7 @@ export default function PatientSearch({ language = 'english' }: PatientSearchPro
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-lg font-semibold text-white">{dt('Find a Doctor')}</h1>
+          <h1 className="text-lg font-semibold text-white">{bt('Find a Doctor')}</h1>
         </div>
       </div>
 
@@ -226,7 +226,7 @@ export default function PatientSearch({ language = 'english' }: PatientSearchPro
           className="w-full mb-4 h-12 text-base border-orange-600 text-orange-600 hover:bg-orange-600 hover:text-white bg-zinc-900 border-2 flex items-center justify-center gap-2"
         >
           <History className="h-5 w-5" />
-          {dt('Patient Login - View History & Status')}
+          {bt('Patient Login - View History & Status')}
         </Button>
 
         {/* Search Box */}
@@ -353,7 +353,7 @@ export default function PatientSearch({ language = 'english' }: PatientSearchPro
               onClick={handleSearch}
               disabled={loading}
             >
-              {loading ? dt('Searching...') : dt('Search Doctors')}
+              {loading ? bt('Searching...') : bt('Search Doctors')}
             </Button>
           </CardContent>
         </Card>
@@ -402,7 +402,7 @@ export default function PatientSearch({ language = 'english' }: PatientSearchPro
                         </span>
                       </div>
                       <Button variant="ghost" className="text-orange-500 hover:text-orange-400 hover:bg-orange-500/10 p-0 h-auto font-medium">
-                        {dt('Book Appointment')} <ChevronRight className="h-4 w-4 ml-1" />
+                        {bt('Book Appointment')} <ChevronRight className="h-4 w-4 ml-1" />
                       </Button>
                     </div>
                   </div>
@@ -415,8 +415,8 @@ export default function PatientSearch({ language = 'english' }: PatientSearchPro
                 <div className="h-16 w-16 bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Search className="h-8 w-8 text-gray-400" />
                 </div>
-                <h3 className="text-lg font-medium text-white">{dt('No doctors found')}</h3>
-                <p className="text-gray-400 mt-1">{dt('Try adjusting your search criteria')}</p>
+                <h3 className="text-lg font-medium text-white">{bt('No doctors found')}</h3>
+                <p className="text-gray-400 mt-1">{bt('Try adjusting your search criteria')}</p>
               </div>
             )}
           </div>

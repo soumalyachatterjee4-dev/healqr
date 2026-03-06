@@ -551,7 +551,7 @@
     <div class="section-header"><span class="icon">🌐</span> API Integrations</div>
     <div class="feature-grid">
       <div class="feature-item"><div class="dot live"></div><div><strong>Geocoding Search</strong> — "ENT doctor near Howrah Maidan" style location-based search</div><span class="tag live">Live</span></div>
-      <div class="feature-item"><div class="dot live"></div><div><strong>AI Translation (Gemini PM)</strong> — Full UI + input/output in patient's language (31 languages) via Gemini AI</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div><strong>Dual-Engine Translation</strong> — Gemini AI (primary) + Google Translate API (fallback) — 31 languages, bilingual display (English + patient language)</div><span class="tag live">Live</span></div>
     </div>
   </div>
 </section>
@@ -594,7 +594,7 @@
     <div class="section-header"><span class="icon">🌐</span> API Integrations</div>
     <div class="feature-grid">
       <div class="feature-item"><div class="dot live"></div><div><strong>Geocoding</strong> — patients discover clinic by location search</div><span class="tag live">Live</span></div>
-      <div class="feature-item"><div class="dot live"></div><div><strong>AI Translation (Gemini PM)</strong> — entire booking flow in patient's language (31 languages)</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div><strong>Dual-Engine Translation</strong> — Gemini AI + Google Translate API — bilingual booking flow in 31 languages (English + patient's chosen language displayed together)</div><span class="tag live">Live</span></div>
     </div>
   </div>
 </section>
@@ -637,10 +637,12 @@
       <div class="feature-item"><div class="dot live"></div><div>PWA — installable on mobile (iOS + Android)</div><span class="tag live">Live</span></div>
     </div>
 
-    <div class="section-header"><span class="icon">🌐</span> API Integrations</div>
+    <div class="section-header"><span class="icon">🌐</span> API Integrations & Multilingual</div>
     <div class="feature-grid">
       <div class="feature-item"><div class="dot live"></div><div><strong>Geocoding Search</strong> — "Cardiologist near Park Street" with location-based results</div><span class="tag live">Live</span></div>
-      <div class="feature-item"><div class="dot live"></div><div><strong>AI Translation (Gemini PM)</strong> — entire UI, inputs, outputs, RX in chosen language (31 languages)</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div><strong>Dual-Engine Translation</strong> — Gemini AI (primary) + Google Translate API (fallback) — 31 languages across all booking flow, notifications & PDFs</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div><strong>Bilingual Experience</strong> — English text always visible + patient's chosen language below — "Hinglish"-compatible UX for maximum accessibility</div><span class="tag live">Live</span></div>
+      <div class="feature-item"><div class="dot live"></div><div><strong>Bilingual RX/Diet Chart/Reports</strong> — PDFs show medical terms in English + patient-language labels, diagnosis & instructions translated (Phase 2)</div><span class="tag proposed">Phase 2</span></div>
     </div>
 
     <div class="note-box">
@@ -656,7 +658,7 @@
     <p class="slide-subtitle">Phase-wise infrastructure cost to run HealQR</p>
 
     <div class="assumption-box">
-      <strong>Key Assumptions:</strong> 10 bookings per QR per day &bull; Each booking = ~8 Firestore reads + 3 writes &bull; Geocoding: 1 search request/booking &bull; AI Translation: ~250 tokens per booking (Gemini 2.0 Flash) &bull; Google Cloud $200/month free tier applied &bull; Firebase Blaze (pay-as-you-go) plan
+      <strong>Key Assumptions:</strong> 10 bookings per QR per day &bull; Each booking = ~8 Firestore reads + 3 writes &bull; Geocoding: 1 search request/booking &bull; AI Translation: Gemini AI PM (primary) + Google Translate API (fallback for notifications/PDFs) &bull; ~60% patients choose non-English language &bull; UI labels cached per language (one-time translation) &bull; Google Cloud $200/month free tier applied &bull; Firebase Blaze (pay-as-you-go) plan
     </div>
 
     <!-- Phase 1 -->
@@ -682,14 +684,15 @@
         <tr><td>Gemini AI (Diet + RX)</td><td>~300K requests</td><td>Free tier (2M/month)</td><td>₹0</td></tr>
         <tr><td><strong>Google Geocoding API</strong></td><td>3M requests</td><td>₹420/1K after 40K free</td><td>₹12,43,200</td></tr>
         <tr><td style="padding-left:20px; color:var(--green);">↳ With caching (90% hit)</td><td>300K actual API calls</td><td>₹420/1K</td><td>₹1,24,320</td></tr>
-        <tr><td><strong>Gemini AI Project Manager</strong><br><small style="color:var(--text-muted)">Real-time Translation (31 languages) + Error Detection + Health Monitoring</small></td><td>150K requests</td><td>~₹0.017/req</td><td>₹2,500</td></tr>
+        <tr><td><strong>Gemini AI Project Manager</strong><br><small style="color:var(--text-muted)">Real-time Bilingual Translation (31 languages) + Error Detection + Health Monitoring</small></td><td>200K requests</td><td>~₹0.025/req</td><td>₹5,000</td></tr>
+        <tr><td><strong>Google Translate API</strong><br><small style="color:var(--text-muted)">Fallback engine + Notification templates + PDF translation (Phase 2)</small></td><td>~2M characters</td><td>$20/1M chars</td><td>₹5,000</td></tr>
         <tr class="highlight-row"><td colspan="3"><strong>Subtotal (without caching)</strong></td><td>₹12,96,864</td></tr>
-        <tr class="total-row"><td colspan="3"><strong>PHASE 1 TOTAL (with smart caching)</strong></td><td><strong>₹1,30,484</strong></td></tr>
+        <tr class="total-row"><td colspan="3"><strong>PHASE 1 TOTAL (with smart caching)</strong></td><td><strong>₹1,42,984</strong></td></tr>
       </tbody>
     </table>
 
     <div class="note-box">
-      💡 <strong>Cost Revolution — AI PM vs Translation API:</strong> By using <strong>Gemini 2.0 Flash as an AI Project Manager</strong> instead of Google Translation API, translation costs drop from <strong style="color:var(--red)">₹1,26,000/mo</strong> to <strong style="color:var(--green)">₹2,500/mo</strong> (50× cheaper). The AI PM not only translates 31 languages but also monitors for errors, detects anomalies, and handles context-aware medical translations. Geocoding results are cached by location string (90%+ hit rate). This makes our cost structure dramatically more sustainable.
+      💡 <strong>Dual-Engine Translation Strategy:</strong> <strong>Gemini AI PM</strong> handles all UI/booking flow translation (31 languages, bilingual display) at ~₹5,000/mo. <strong>Google Translate API</strong> serves as fallback + handles notification text and PDF translations for guaranteed reliability (99.9% SLA). Together they cost <strong style="color:var(--green)">₹10,000/mo</strong> vs using Google Translate alone at <strong style="color:var(--red)">₹1,26,000/mo</strong>. Gemini does the heavy lifting; Google Translate ensures zero downtime. UI labels are cached per language (31 one-time translations) so repeat bookings incur zero translation cost for fixed strings. Geocoding results cached by location (90%+ hit rate).
     </div>
   </div>
 </section>
@@ -734,11 +737,18 @@
           <td>₹12,43,200</td>
         </tr>
         <tr>
-          <td>AI Project Manager — Gemini<br><small style="color:var(--text-muted)">Translation + Monitoring</small></td>
-          <td>₹2,500</td>
-          <td>₹7,500</td>
+          <td>AI Project Manager — Gemini<br><small style="color:var(--text-muted)">Bilingual Translation + Monitoring</small></td>
+          <td>₹5,000</td>
           <td>₹15,000</td>
-          <td>₹25,000</td>
+          <td>₹30,000</td>
+          <td>₹50,000</td>
+        </tr>
+        <tr>
+          <td>Google Translate API<br><small style="color:var(--text-muted)">Fallback + Notifications + PDF</small></td>
+          <td>₹5,000</td>
+          <td>₹15,000</td>
+          <td>₹30,000</td>
+          <td>₹50,000</td>
         </tr>
         <tr>
           <td>Server / CDN / Misc</td>
@@ -749,54 +759,56 @@
         </tr>
         <tr class="total-row">
           <td><strong>TOTAL / MONTH</strong></td>
-          <td><strong>₹1,35,484</strong></td>
-          <td><strong>₹4,01,452</strong></td>
-          <td><strong>₹8,02,904</strong></td>
-          <td><strong>₹13,39,840</strong></td>
+          <td><strong>₹1,42,984</strong></td>
+          <td><strong>₹4,23,952</strong></td>
+          <td><strong>₹8,47,904</strong></td>
+          <td><strong>₹14,14,840</strong></td>
         </tr>
         <tr class="highlight-row">
           <td>Cost per Booking</td>
-          <td>₹0.045</td>
-          <td>₹0.045</td>
-          <td>₹0.045</td>
-          <td>₹0.045</td>
+          <td>₹0.048</td>
+          <td>₹0.047</td>
+          <td>₹0.047</td>
+          <td>₹0.047</td>
         </tr>
       </tbody>
     </table>
 
     <div style="text-align: center; margin: 24px 0;">
       <div style="font-size: 14px; color: var(--text-muted);">Cost per Booking (all phases)</div>
-      <div class="big-number">₹0.045</div>
-      <div style="font-size: 14px; color: var(--text-muted);">less than 5 paise per booking</div>
+      <div class="big-number">₹0.047</div>
+      <div style="font-size: 14px; color: var(--text-muted);">less than 5 paise per booking — includes bilingual translation in 31 languages</div>
     </div>
 
     <div class="note-box">
-      📝 <strong>AI PM vs Google Translation API — Cost Savings:</strong><br>
-      With Google Translate: Phase 1 <strong style="color:var(--red)">₹2,58,984/mo</strong> &bull; Phase 4 <strong style="color:var(--red)">₹25,74,840/mo</strong><br>
-      With Gemini AI PM: Phase 1 <strong style="color:var(--green)">₹1,35,484/mo</strong> &bull; Phase 4 <strong style="color:var(--green)">₹13,39,840/mo</strong><br>
-      <strong>Savings: ~48% cost reduction</strong> — Gemini AI PM provides superior multilingual translation (31 languages) at a fraction of the cost, plus intelligent error detection and health monitoring capabilities.
+      📝 <strong>Dual-Engine Translation — Cost Breakdown:</strong><br>
+      <strong>Gemini AI PM (primary):</strong> Phase 1 <strong style="color:var(--green)">₹5,000/mo</strong> → Phase 4 <strong style="color:var(--green)">₹50,000/mo</strong> — handles all UI bilingual translation (31 languages)<br>
+      <strong>Google Translate API (fallback):</strong> Phase 1 <strong style="color:var(--green)">₹5,000/mo</strong> → Phase 4 <strong style="color:var(--green)">₹50,000/mo</strong> — notification text + PDF dynamic content + Gemini failure fallback<br>
+      <strong>Combined:</strong> Phase 1 <strong style="color:var(--green)">₹10,000/mo</strong> → Phase 4 <strong style="color:var(--green)">₹1,00,000/mo</strong><br>
+      <strong>vs Google Translate alone:</strong> Phase 1 <strong style="color:var(--red)">₹1,26,000/mo</strong> → Phase 4 <strong style="color:var(--red)">₹12,60,000/mo</strong><br>
+      <strong>Savings: 92% cost reduction</strong> — Gemini handles bulk translation at near-zero cost, Google Translate provides 99.9% SLA reliability for critical paths.
     </div>
 
     <!-- Phase Timeline -->
     <div class="section-header" style="margin-top: 24px;"><span class="icon">📅</span> Phase Timeline (Infrastructure Only)</div>
     <div class="phase-card p1">
       <div class="phase-label">Phase 1 — May to Jul 2026</div>
-      <div class="phase-title">10K users • ₹1.35L/month (infra)</div>
+      <div class="phase-title">10K users • ₹1.43L/month (infra)</div>
       <div style="font-size: 13px; color: var(--text-muted);">Focus: Onboarding doctors/clinics via QR. Geocoding + AI Translation live from Day 1.</div>
     </div>
     <div class="phase-card p2">
       <div class="phase-label">Phase 2 — Aug to Oct 2026</div>
-      <div class="phase-title">30K users • ₹4.01L/month (infra)</div>
+      <div class="phase-title">30K users • ₹4.24L/month (infra)</div>
       <div style="font-size: 13px; color: var(--text-muted);">Scale APIs. Pharma portal + ad revenue covers costs. Expand to Eastern India.</div>
     </div>
     <div class="phase-card p3">
       <div class="phase-label">Phase 3 — Nov 2026 to Jan 2027</div>
-      <div class="phase-title">60K users • ₹8.03L/month (infra)</div>
+      <div class="phase-title">60K users • ₹8.48L/month (infra)</div>
       <div style="font-size: 13px; color: var(--text-muted);">Scale across India. Premium ad placements. Pharma partnerships.</div>
     </div>
     <div class="phase-card p4">
       <div class="phase-label">Phase 4 — Feb to Mar 2027</div>
-      <div class="phase-title">100K users • ₹13.40L/month (infra)</div>
+      <div class="phase-title">100K users • ₹14.15L/month (infra)</div>
       <div style="font-size: 13px; color: var(--text-muted);">1M+ bookings/day. Full ad network. Self-sustaining revenue.</div>
     </div>
     <div class="note-box">⚠️ These are <strong>infrastructure costs only</strong>. See next slides for full operational expense including team, AI monitoring & professional services.</div>
@@ -880,19 +892,19 @@
 
         <tr><td colspan="5" style="background:rgba(255,152,0,0.08); font-weight:700; color:var(--primary); font-size:12px; text-transform:uppercase; letter-spacing:0.5px;">☁️ Infrastructure (from previous slide)</td></tr>
         <tr>
-          <td>Firebase + APIs + AI PM + CDN + Misc</td>
-          <td>₹1,35,484</td>
-          <td>₹4,01,452</td>
-          <td>₹8,02,904</td>
-          <td>₹13,39,840</td>
+          <td>Firebase + APIs + AI PM + Google Translate + CDN + Misc</td>
+          <td>₹1,42,984</td>
+          <td>₹4,23,952</td>
+          <td>₹8,47,904</td>
+          <td>₹14,14,840</td>
         </tr>
 
         <tr class="total-row">
           <td><strong>TOTAL MONTHLY EXPENSE</strong></td>
-          <td><strong>₹3,85,484</strong></td>
-          <td><strong>₹6,16,452</strong></td>
-          <td><strong>₹10,97,904</strong></td>
-          <td><strong>₹22,09,840</strong></td>
+          <td><strong>₹3,92,984</strong></td>
+          <td><strong>₹7,38,952</strong></td>
+          <td><strong>₹12,42,904</strong></td>
+          <td><strong>₹23,84,840</strong></td>
         </tr>
       </tbody>
     </table>
@@ -916,24 +928,24 @@
         </tr>
         <tr>
           <td>Total Expense / Month</td>
-          <td>₹3.85L</td>
-          <td>₹6.16L</td>
-          <td>₹10.98L</td>
-          <td>₹22.10L</td>
+          <td>₹3.93L</td>
+          <td>₹7.39L</td>
+          <td>₹12.43L</td>
+          <td>₹23.85L</td>
         </tr>
         <tr class="total-row">
           <td><strong>NET PROFIT / MONTH</strong></td>
-          <td><strong style="color:var(--green)">₹15.35L</strong></td>
-          <td><strong style="color:var(--green)">₹65.84L</strong></td>
-          <td><strong style="color:var(--green)">₹1.62Cr</strong></td>
-          <td><strong style="color:var(--green)">₹3.38Cr</strong></td>
+          <td><strong style="color:var(--green)">₹15.27L</strong></td>
+          <td><strong style="color:var(--green)">₹64.61L</strong></td>
+          <td><strong style="color:var(--green)">₹1.61Cr</strong></td>
+          <td><strong style="color:var(--green)">₹3.36Cr</strong></td>
         </tr>
         <tr class="highlight-row">
           <td>Profit Margin</td>
-          <td>79.9%</td>
-          <td>91.4%</td>
-          <td>93.7%</td>
-          <td>93.9%</td>
+          <td>79.5%</td>
+          <td>89.7%</td>
+          <td>92.8%</td>
+          <td>93.4%</td>
         </tr>
       </tbody>
     </table>
@@ -1070,8 +1082,8 @@
         <div class="phase-stats">
           <div class="phase-stat"><span class="num">10K</span><span class="lbl">Users</span></div>
           <div class="phase-stat"><span class="num">100K</span><span class="lbl">Bookings/day</span></div>
-          <div class="phase-stat"><span class="num">₹3.85L</span><span class="lbl">Expense/mo</span></div>
-          <div class="phase-stat"><span class="num" style="color:var(--green)">₹15.35L</span><span class="lbl">Profit/mo</span></div>
+          <div class="phase-stat"><span class="num">₹3.93L</span><span class="lbl">Expense/mo</span></div>
+          <div class="phase-stat"><span class="num" style="color:var(--green)">₹15.27L</span><span class="lbl">Profit/mo</span></div>
         </div>
         <div style="font-size: 13px; color: var(--text-muted); margin-top: 8px; line-height: 1.8;">
           🎯 QR distribution through field agents in West Bengal<br>
@@ -1089,11 +1101,11 @@
         <div class="phase-stats">
           <div class="phase-stat"><span class="num">30K</span><span class="lbl">Users</span></div>
           <div class="phase-stat"><span class="num">300K</span><span class="lbl">Bookings/day</span></div>
-          <div class="phase-stat"><span class="num">₹6.16L</span><span class="lbl">Expense/mo</span></div>
-          <div class="phase-stat"><span class="num" style="color:var(--green)">₹65.84L</span><span class="lbl">Profit/mo</span></div>
+          <div class="phase-stat"><span class="num">₹7.39L</span><span class="lbl">Expense/mo</span></div>
+          <div class="phase-stat"><span class="num" style="color:var(--green)">₹64.61L</span><span class="lbl">Profit/mo</span></div>
         </div>
         <div style="font-size: 13px; color: var(--text-muted); margin-top: 8px; line-height: 1.8;">
-          🤖 Geocoding + AI Translation (Gemini PM) already live from Phase 1<br>
+          🤖 Geocoding + Dual-Engine Translation (Gemini AI + Google Translate) already live from Phase 1<br>
           👨‍💻 Add 3rd developer (Jr.) for scale optimization<br>
           🎯 Expand to Bihar, Jharkhand, Odisha<br>
           📊 Pharma ad partnerships (targeted health ads)
@@ -1108,8 +1120,8 @@
         <div class="phase-stats">
           <div class="phase-stat"><span class="num">60K</span><span class="lbl">Users</span></div>
           <div class="phase-stat"><span class="num">600K</span><span class="lbl">Bookings/day</span></div>
-          <div class="phase-stat"><span class="num">₹10.98L</span><span class="lbl">Expense/mo</span></div>
-          <div class="phase-stat"><span class="num" style="color:var(--green)">₹1.62Cr</span><span class="lbl">Profit/mo</span></div>
+          <div class="phase-stat"><span class="num">₹12.43L</span><span class="lbl">Expense/mo</span></div>
+          <div class="phase-stat"><span class="num" style="color:var(--green)">₹1.61Cr</span><span class="lbl">Profit/mo</span></div>
         </div>
         <div style="font-size: 13px; color: var(--text-muted); margin-top: 8px; line-height: 1.8;">
           📱 Evaluate & potentially launch React Native app (if needed)<br>
@@ -1127,8 +1139,8 @@
         <div class="phase-stats">
           <div class="phase-stat"><span class="num">100K</span><span class="lbl">Users</span></div>
           <div class="phase-stat"><span class="num">1M+</span><span class="lbl">Bookings/day</span></div>
-          <div class="phase-stat"><span class="num">₹22.10L</span><span class="lbl">Expense/mo</span></div>
-          <div class="phase-stat"><span class="num" style="color:var(--green)">₹3.38Cr</span><span class="lbl">Profit/mo</span></div>
+          <div class="phase-stat"><span class="num">₹23.85L</span><span class="lbl">Expense/mo</span></div>
+          <div class="phase-stat"><span class="num" style="color:var(--green)">₹3.36Cr</span><span class="lbl">Profit/mo</span></div>
         </div>
         <div style="font-size: 13px; color: var(--text-muted); margin-top: 8px; line-height: 1.8;">
           🏢 Transition to professional IT house (TCS/Infosys tier) — zero hiring/firing headache<br>
@@ -1142,23 +1154,23 @@
     <div class="divider"></div>
 
     <div class="cta-box">
-      <h3>11-Month Journey to ₹3.38 Cr/month</h3>
+      <h3>11-Month Journey to ₹3.36 Cr/month</h3>
       <p>May 2026 → March 2027 &bull; From 10K to 100K users &bull; <strong style="color:var(--green)">Profitable from Phase 1</strong></p>
       <div style="margin-top: 16px; display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;">
         <div style="background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.3); border-radius:8px; padding: 8px 16px;">
-          <span style="font-size:18px; font-weight:800; color:var(--green);">₹15.35L</span>
+          <span style="font-size:18px; font-weight:800; color:var(--green);">₹15.27L</span>
           <span style="font-size:11px; color:var(--text-muted); display:block;">Phase 1 Profit/mo</span>
         </div>
         <div style="background:rgba(59,130,246,0.12); border:1px solid rgba(59,130,246,0.3); border-radius:8px; padding: 8px 16px;">
-          <span style="font-size:18px; font-weight:800; color:var(--blue);">₹65.84L</span>
+          <span style="font-size:18px; font-weight:800; color:var(--blue);">₹64.61L</span>
           <span style="font-size:11px; color:var(--text-muted); display:block;">Phase 2 Profit/mo</span>
         </div>
         <div style="background:rgba(139,92,246,0.12); border:1px solid rgba(139,92,246,0.3); border-radius:8px; padding: 8px 16px;">
-          <span style="font-size:18px; font-weight:800; color:var(--purple);">₹1.62Cr</span>
+          <span style="font-size:18px; font-weight:800; color:var(--purple);">₹1.61Cr</span>
           <span style="font-size:11px; color:var(--text-muted); display:block;">Phase 3 Profit/mo</span>
         </div>
         <div style="background:rgba(255,152,0,0.12); border:1px solid rgba(255,152,0,0.3); border-radius:8px; padding: 8px 16px;">
-          <span style="font-size:18px; font-weight:800; color:var(--primary);">₹3.38Cr</span>
+          <span style="font-size:18px; font-weight:800; color:var(--primary);">₹3.36Cr</span>
           <span style="font-size:11px; color:var(--text-muted); display:block;">Phase 4 Profit/mo</span>
         </div>
       </div>
@@ -1256,18 +1268,18 @@
           <td><strong>₹3.6Cr</strong></td>
         </tr>
         <tr>
-          <td>Total Monthly Expense<br><small style="color:var(--text-muted)">(Infra + Team + AI PM + Legal + Accounts)</small></td>
-          <td>₹3.85L</td>
-          <td>₹6.16L</td>
-          <td>₹10.98L</td>
-          <td>₹22.10L</td>
+          <td>Total Monthly Expense<br><small style="color:var(--text-muted)">(Infra + Team + AI PM + Google Translate + Legal + Accounts)</small></td>
+          <td>₹3.93L</td>
+          <td>₹7.39L</td>
+          <td>₹12.43L</td>
+          <td>₹23.85L</td>
         </tr>
         <tr class="total-row">
           <td><strong>NET PROFIT / MONTH</strong></td>
-          <td><strong style="color:var(--green)">₹15.35L</strong></td>
-          <td><strong style="color:var(--green)">₹65.84L</strong></td>
-          <td><strong style="color:var(--green)">₹1.62Cr</strong></td>
-          <td><strong style="color:var(--green)">₹3.38Cr</strong></td>
+          <td><strong style="color:var(--green)">₹15.27L</strong></td>
+          <td><strong style="color:var(--green)">₹64.61L</strong></td>
+          <td><strong style="color:var(--green)">₹1.61Cr</strong></td>
+          <td><strong style="color:var(--green)">₹3.36Cr</strong></td>
         </tr>
       </tbody>
     </table>
@@ -1278,7 +1290,7 @@
 
     <div class="cta-box">
       <h3>🚀 Bottom Line</h3>
-      <p>Platform is <strong>profitable from Phase 1</strong>. At Phase 4 (100K users), we project <strong style="color: var(--green); font-size: 18px;">₹3.38 Cr net profit/month</strong> with zero charges to doctors, clinics, or patients.<br><small style="color:var(--text-muted);">Expense includes full team + professional IT house + legal + accounts + AI PM monitoring</small></p>
+      <p>Platform is <strong>profitable from Phase 1</strong>. At Phase 4 (100K users), we project <strong style="color: var(--green); font-size: 18px;">₹3.36 Cr net profit/month</strong> with zero charges to doctors, clinics, or patients.<br><small style="color:var(--text-muted);">Expense includes full team + professional IT house + legal + accounts + AI PM + Google Translate API</small></p>
     </div>
   </div>
 </section>

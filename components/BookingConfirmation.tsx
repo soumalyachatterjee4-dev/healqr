@@ -1,6 +1,7 @@
 import { Button } from './ui/button';
 import { Check, Download, Share2, Bell, BellOff } from 'lucide-react';
 import { t, type Language } from '../utils/translations';
+import { useAITranslation } from '../hooks/useAITranslation';
 import BookingFlowLayout from './BookingFlowLayout';
 import { toast } from 'sonner';
 import TemplateDisplay from './TemplateDisplay';
@@ -51,6 +52,7 @@ export default function BookingConfirmation({
   useDrPrefix = true,
   themeColor = 'emerald',
 }: BookingConfirmationProps) {
+  const { bt, dt } = useAITranslation(language);
   const [notificationStatus, setNotificationStatus] = useState<'checking' | 'enabled' | 'disabled' | 'enabling'>('checking');
   const [hasToken, setHasToken] = useState(false);
   const [arrivalTime, setArrivalTime] = useState<string>('');
@@ -279,7 +281,7 @@ export default function BookingConfirmation({
       if (token) {
         setHasToken(true);
         setNotificationStatus('enabled');
-        toast.success('🔔 Notifications enabled! You will receive appointment updates.', {
+        toast.success(dt('Notifications enabled! You will receive appointment updates.'), {
           duration: 4000
         });
       } else {
@@ -287,11 +289,11 @@ export default function BookingConfirmation({
 
         // Check if permission was denied
         if (!hasNotificationPermission()) {
-          toast.error('❌ Notification permission denied. Please enable notifications in your browser settings.', {
+          toast.error(dt('Notification permission denied. Please enable notifications in your browser settings.'), {
             duration: 6000
           });
         } else {
-          toast.error('⚠️ Could not enable notifications. Please try again later.', {
+          toast.error(dt('Could not enable notifications. Please try again later.'), {
             duration: 4000
           });
         }
@@ -299,7 +301,7 @@ export default function BookingConfirmation({
     } catch (error) {
       console.error('❌ Error enabling notifications:', error);
       setNotificationStatus('disabled');
-      toast.error('⚠️ Failed to enable notifications. Please try again.', {
+      toast.error(dt('Failed to enable notifications. Please try again.'), {
         duration: 4000
       });
     }
@@ -354,12 +356,12 @@ export default function BookingConfirmation({
     link.download = 'appointment-' + appointmentData.bookingId + '.txt';
     link.click();
     URL.revokeObjectURL(url);
-    toast.success('Appointment summary downloaded.');
+    toast.success(dt('Appointment summary downloaded.'));
   };
 
   const handleShare = async () => {
     if (!cardRef.current) {
-      toast.error('Unable to generate card. Try again.');
+      toast.error(dt('Unable to generate card. Try again.'));
       return;
     }
 
@@ -393,7 +395,7 @@ export default function BookingConfirmation({
           text: `Appointment confirmed! Serial #${appointmentData.serialNo} with ${appointmentData.doctorName}`,
           files: [file],
         });
-        toast.success('Shared successfully!');
+        toast.success(dt('Shared successfully!'));
       } else {
         // Fallback: download image + open WhatsApp with text
         const link = document.createElement('a');
@@ -412,12 +414,12 @@ export default function BookingConfirmation({
           `\n_Booked via www.healqr.com_`
         );
         window.open(`https://wa.me/?text=${whatsappText}`, '_blank');
-        toast.success('Card downloaded! Share the image on WhatsApp.');
+        toast.success(dt('Card downloaded! Share the image on WhatsApp.'));
       }
     } catch (error: any) {
       if (error?.name !== 'AbortError') {
         console.error('Share failed:', error);
-        toast.error('Share failed. Try again.');
+        toast.error(dt('Share failed. Try again.'));
       }
     } finally {
       setIsSharing(false);
@@ -457,18 +459,18 @@ export default function BookingConfirmation({
             <p className="text-gray-300">{patientData?.patientName || ''}</p>
             <p className="text-gray-300">+91 {patientData?.whatsappNumber || ''}</p>
             {patientData?.gender && <p className="text-gray-300">{patientData.gender}</p>}
-            {patientData?.age && <p className="text-gray-300">Age: {patientData.age}</p>}
-            {patientData?.purposeOfVisit && <p className="text-gray-300">Purpose: {patientData.purposeOfVisit}</p>}
+            {patientData?.age && <p className="text-gray-300">{bt('Age')}: {patientData.age}</p>}
+            {patientData?.purposeOfVisit && <p className="text-gray-300">{bt('Purpose')}: {patientData.purposeOfVisit}</p>}
           </div>
 
           <div className="bg-[#0f1419] p-4 rounded-2xl mb-4 border border-gray-700">
             <h3 className="text-white mb-3">{t('appointmentDetails', language)}</h3>
-            <p className="text-gray-300">Booking ID: {appointmentData?.bookingId || ''}</p>
-            <p className="text-gray-300">Doctor: {appointmentData?.doctorName || doctorName}</p>
-            <p className="text-gray-300">Date: {appointmentData?.date ? formatDate(appointmentData.date) : ''}</p>
-            <p className="text-gray-300">Time: {appointmentData?.time || ''}</p>
+            <p className="text-gray-300">{dt('Booking ID')}: {appointmentData?.bookingId || ''}</p>
+            <p className="text-gray-300">{dt('Doctor')}: {appointmentData?.doctorName || doctorName}</p>
+            <p className="text-gray-300">{dt('Date')}: {appointmentData?.date ? formatDate(appointmentData.date) : ''}</p>
+            <p className="text-gray-300">{dt('Time')}: {appointmentData?.time || ''}</p>
             {appointmentData?.consultationType !== 'video' && (
-              <p className="text-gray-300">Location: {appointmentData?.location || ''}</p>
+              <p className="text-gray-300">{dt('Location')}: {appointmentData?.location || ''}</p>
             )}
             {/* Mode of Consultation */}
             <div className="mt-2 pt-2 border-t border-gray-600">
@@ -478,14 +480,14 @@ export default function BookingConfirmation({
                     <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
-                    <span className="text-blue-400 font-medium">Mode: Video Consultation</span>
+                    <span className="text-blue-400 font-medium">{bt('Mode: Video Consultation')}</span>
                   </>
                 ) : (
                   <>
                     <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
-                    <span className="text-emerald-400 font-medium">Mode: In-Chamber</span>
+                    <span className="text-emerald-400 font-medium">{bt('Mode: In-Chamber')}</span>
                   </>
                 )}
               </div>
@@ -501,11 +503,11 @@ export default function BookingConfirmation({
                 </svg>
                 <div>
                   <p className={`${arrivalTime === 'IMMEDIATELY' ? 'text-red-400' : 'text-orange-400'} font-medium text-sm`}>
-                    {arrivalTime === 'IMMEDIATELY' ? 'Please come' : 'You must reach by'}
+                    {arrivalTime === 'IMMEDIATELY' ? dt('Please come') : dt('You must reach by')}
                   </p>
                   <p className={`${arrivalTime === 'IMMEDIATELY' ? 'text-red-400' : 'text-orange-400'} text-xl font-bold`}>{arrivalTime}</p>
                   <p className="text-gray-400 text-xs mt-1">
-                    {arrivalTime === 'IMMEDIATELY' ? 'Your appointment time has arrived' : 'Arrive 15 minutes before your slot'}
+                    {arrivalTime === 'IMMEDIATELY' ? dt('Your appointment time has arrived') : dt('Arrive 15 minutes before your slot')}
                   </p>
                 </div>
               </div>
@@ -520,10 +522,10 @@ export default function BookingConfirmation({
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
                 <div>
-                  <p className="text-blue-400 font-medium text-sm">VC link will be sent at</p>
+                  <p className="text-blue-400 font-medium text-sm">{bt('VC link will be sent at')}</p>
                   <p className="text-blue-400 text-xl font-bold">{vcLinkTime}</p>
                   <p className="text-gray-400 text-xs mt-1">
-                    Please tap on the notification link to join.
+                    {dt('Please tap on the notification link to join.')}
                   </p>
                 </div>
               </div>
@@ -535,7 +537,7 @@ export default function BookingConfirmation({
             <div className="bg-blue-500/10 border border-blue-500/30 rounded-2xl p-4 mb-4">
               <div className="flex items-center gap-3">
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-400"></div>
-                <p className="text-blue-300 text-sm">Checking notification status...</p>
+                <p className="text-blue-300 text-sm">{bt('Checking notification status...')}</p>
               </div>
             </div>
           )}
@@ -545,8 +547,8 @@ export default function BookingConfirmation({
               <div className="flex items-center gap-3">
                 <Bell className="w-5 h-5 text-emerald-400 flex-shrink-0" />
                 <div className="flex-1">
-                  <p className="text-emerald-300 text-sm font-medium">Notifications Enabled ✅</p>
-                  <p className="text-gray-400 text-xs mt-1">You'll receive appointment reminders and updates</p>
+                  <p className="text-emerald-300 text-sm font-medium">{bt('Notifications Enabled')} ✅</p>
+                  <p className="text-gray-400 text-xs mt-1">{dt("You'll receive appointment reminders and updates")}</p>
                 </div>
               </div>
             </div>
@@ -557,16 +559,16 @@ export default function BookingConfirmation({
               <div className="flex items-start gap-3">
                 <BellOff className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <p className="text-orange-300 text-sm font-medium mb-2">Enable Notifications</p>
+                  <p className="text-orange-300 text-sm font-medium mb-2">{bt('Enable Notifications')}</p>
                   <p className="text-gray-400 text-xs mb-3">
-                    Get appointment reminders and prescription updates on this device
+                    {dt('Get appointment reminders and prescription updates on this device')}
                   </p>
                   <Button
                     onClick={handleEnableNotifications}
                     className="w-full bg-orange-500 hover:bg-orange-600 text-white text-sm py-2"
                   >
                     <Bell className="w-4 h-4 mr-2" />
-                    Enable Notifications Now
+                    {bt('Enable Notifications Now')}
                   </Button>
                 </div>
               </div>
@@ -577,7 +579,7 @@ export default function BookingConfirmation({
             <div className="bg-blue-500/10 border border-blue-500/30 rounded-2xl p-4 mb-4">
               <div className="flex items-center gap-3">
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-400"></div>
-                <p className="text-blue-300 text-sm">Enabling notifications...</p>
+                <p className="text-blue-300 text-sm">{bt('Enabling notifications...')}</p>
               </div>
             </div>
           )}
@@ -591,10 +593,10 @@ export default function BookingConfirmation({
                 </svg>
                 <div className="flex-1">
                   <p className="text-red-300 text-sm font-medium mb-1">
-                    Video Consultation Booked
+                    {bt('Video Consultation Booked')}
                   </p>
                   <p className="text-gray-300 text-sm">
-                    You will receive an in-app notification 30 minutes before your scheduled time with the video call link. No physical visit required.
+                    {dt('You will receive an in-app notification 30 minutes before your scheduled time with the video call link. No physical visit required.')}
                   </p>
                 </div>
               </div>
@@ -620,8 +622,8 @@ export default function BookingConfirmation({
                 </svg>
               </div>
               <div className="flex-1">
-                <p className="text-orange-300 font-semibold text-sm">Open Patient Portal</p>
-                <p className="text-gray-400 text-xs">View history, prescriptions & install app on your phone</p>
+                <p className="text-orange-300 font-semibold text-sm">{bt('Open Patient Portal')}</p>
+                <p className="text-gray-400 text-xs">{dt('View history, prescriptions & install app on your phone')}</p>
               </div>
               <svg className="w-5 h-5 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -660,7 +662,7 @@ export default function BookingConfirmation({
             <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            View My Consultation History
+            {bt('View My Consultation History')}
           </Button>
 
           <button onClick={onBackToHome} className="w-full text-center text-gray-400 hover:text-white mt-4">

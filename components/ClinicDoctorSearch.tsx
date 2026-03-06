@@ -30,7 +30,7 @@ export default function ClinicDoctorSearch({
   onBack,
   language = 'english',
 }: ClinicDoctorSearchProps) {
-  const { dt } = useAITranslation(language);
+  const { dt, bt } = useAITranslation(language);
   const [searchMode, setSearchMode] = useState<'specialty' | 'name' | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [doctors, setDoctors] = useState<Doctor[]>([]);
@@ -162,7 +162,7 @@ export default function ClinicDoctorSearch({
       <div className="min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-slate-900 flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mb-4"></div>
-          <p className="text-blue-200">{dt('Loading doctors...')}</p>
+          <p className="text-blue-200">{bt('Loading doctors...')}</p>
         </div>
       </div>
     );
@@ -181,8 +181,8 @@ export default function ClinicDoctorSearch({
         <div className="bg-[#1a1f2e] rounded-2xl shadow-xl overflow-hidden max-w-full">
           {/* Header */}
           <div className="px-4 sm:px-6 py-4 sm:py-6 bg-gradient-to-br from-gray-700 to-gray-800">
-            <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">{dt('Find Your Doctor')}</h1>
-            <p className="text-blue-200">{dt("Choose how you'd like to search")}</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">{bt('Find Your Doctor')}</h1>
+            <p className="text-blue-200">{bt("Choose how you'd like to search")}</p>
           </div>
 
           {/* Search Mode Options */}
@@ -194,8 +194,8 @@ export default function ClinicDoctorSearch({
               <div className="w-14 h-14 bg-blue-500/20 rounded-xl flex items-center justify-center mb-4 group-hover:bg-blue-500/30 transition-colors">
                 <Stethoscope className="w-7 h-7 text-blue-400" />
               </div>
-              <h2 className="text-xl font-bold text-white mb-2">{dt('By Specialty')}</h2>
-              <p className="text-gray-300 text-sm">{dt('Browse doctors by their medical specialty')}</p>
+              <h2 className="text-xl font-bold text-white mb-2">{bt('By Specialty')}</h2>
+              <p className="text-gray-300 text-sm">{bt('Browse doctors by their medical specialty')}</p>
               <div className="mt-4 text-blue-400 text-sm font-medium">
                 {availableSpecialties.length} {dt('specialties available')} →
               </div>
@@ -208,8 +208,8 @@ export default function ClinicDoctorSearch({
               <div className="w-14 h-14 bg-blue-500/20 rounded-xl flex items-center justify-center mb-4 group-hover:bg-blue-500/30 transition-colors">
                 <Search className="w-7 h-7 text-blue-400" />
               </div>
-              <h2 className="text-xl font-bold text-white mb-2">{dt('By Name')}</h2>
-              <p className="text-gray-300 text-sm">{dt('Search for a doctor by their name')}</p>
+              <h2 className="text-xl font-bold text-white mb-2">{bt('By Name')}</h2>
+              <p className="text-gray-300 text-sm">{bt('Search for a doctor by their name')}</p>
               <div className="mt-4 text-blue-400 text-sm font-medium">
                 {doctors.length} {dt('doctors available')} →
               </div>
@@ -246,9 +246,9 @@ export default function ClinicDoctorSearch({
         {/* Header */}
         <div className="px-4 sm:px-6 py-4 sm:py-6 bg-gradient-to-br from-gray-700 to-gray-800">
           <h1 className="text-xl md:text-2xl font-bold text-white mb-2">
-            {searchMode === 'specialty' ? dt('Search by Specialty') : dt('Search by Name')}
+            {searchMode === 'specialty' ? bt('Search by Specialty') : bt('Search by Name')}
           </h1>
-          <p className="text-blue-200 text-sm">{dt('Find the right doctor for you')}</p>
+          <p className="text-blue-200 text-sm">{bt('Find the right doctor for you')}</p>
         </div>
 
         {/* Scrollable Content Area */}
@@ -281,7 +281,7 @@ export default function ClinicDoctorSearch({
                       <Stethoscope className="w-5 h-5 text-blue-400" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-white font-semibold text-base truncate">{dt(getSpecialtyLabel(specialty))}</h3>
+                      <h3 className="text-white font-semibold text-base truncate">{bt(getSpecialtyLabel(specialty))}</h3>
                       <p className="text-blue-300 text-xs">
                         {doctors.filter(d => d.specialties?.includes(specialty)).length} {dt('doctors')}
                       </p>
@@ -329,8 +329,8 @@ export default function ClinicDoctorSearch({
           {filteredDoctors.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-6xl mb-4">👨‍⚕️</div>
-              <h3 className="text-xl font-semibold text-white mb-2">{dt('No doctors found')}</h3>
-              <p className="text-gray-300 mb-6">{dt('Try adjusting your search criteria')}</p>
+              <h3 className="text-xl font-semibold text-white mb-2">{bt('No doctors found')}</h3>
+              <p className="text-gray-300 mb-6">{bt('Try adjusting your search criteria')}</p>
               <button
                 onClick={resetSearch}
                 className="text-blue-400 hover:text-blue-300"
@@ -401,7 +401,7 @@ export default function ClinicDoctorSearch({
 
                       <div className="mt-3">
                         <Button className="bg-blue-600 hover:bg-blue-500 text-white h-9 text-sm">
-                          {dt('Select Doctor')}
+                          {bt('Select Doctor')}
                         </Button>
                       </div>
                     </div>

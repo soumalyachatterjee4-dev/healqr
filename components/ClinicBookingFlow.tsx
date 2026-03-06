@@ -7,14 +7,15 @@ import SelectChamber from './SelectChamber';
 import PatientDetailsForm from './PatientDetailsForm';
 import BookingConfirmation from './BookingConfirmation';
 import { type Language } from '../utils/translations';
+import { useAITranslation } from '../hooks/useAITranslation';
 
-type BookingStep = 
-  | 'language' 
-  | 'clinic-website' 
-  | 'doctor-search' 
-  | 'select-date' 
-  | 'select-chamber' 
-  | 'patient-form' 
+type BookingStep =
+  | 'language'
+  | 'clinic-website'
+  | 'doctor-search'
+  | 'select-date'
+  | 'select-chamber'
+  | 'patient-form'
   | 'confirmation';
 
 interface SelectedDoctor {
@@ -43,6 +44,7 @@ interface ClinicData {
 export default function ClinicBookingFlow() {
   const [currentStep, setCurrentStep] = useState<BookingStep>('language');
   const [language, setLanguage] = useState<Language>('english');
+  const { bt } = useAITranslation(language);
   const [selectedDoctor, setSelectedDoctor] = useState<SelectedDoctor | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedChamberId, setSelectedChamberId] = useState<number | null>(null);
@@ -61,7 +63,7 @@ export default function ClinicBookingFlow() {
         // Get clinic ID from URL parameter
         const urlParams = new URLSearchParams(window.location.search);
         const clinicId = urlParams.get('clinicId');
-        
+
         if (!clinicId) {
           console.error('No clinic ID found in URL');
           setLoadingClinic(false);
@@ -75,13 +77,13 @@ export default function ClinicBookingFlow() {
         // Track QR scan immediately (separate from booking)
         const scanSessionId = `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         sessionStorage.setItem('scan_session_id', scanSessionId);
-        
+
         // Load clinic data from Firestore
         const { db } = await import('../lib/firebase/config');
         if (!db) return;
 
         const { collection, addDoc, serverTimestamp, doc, getDoc } = await import('firebase/firestore');
-        
+
         // Track scan
         try {
           await addDoc(collection(db, 'qrScans'), {
@@ -110,7 +112,7 @@ export default function ClinicBookingFlow() {
             clinicName: clinicData.name,
             clinicAddress: clinicData.address
           }));
-          
+
           // Load clinic schedule settings
           const clinicScheduleRef = doc(db, 'clinicSchedules', clinicId);
           const clinicScheduleSnap = await getDoc(clinicScheduleRef);
@@ -171,7 +173,7 @@ export default function ClinicBookingFlow() {
       doctorCode: doctor.doctorCode,
       fullDoctorObject: doctor
     });
-    
+
     // Load doctor's schedule settings AND chambers
     console.log('🔍 Loading doctor data for UID:', doctor.uid);
     try {
@@ -187,15 +189,15 @@ export default function ClinicBookingFlow() {
         setCurrentStep('select-date');
         return;
       }
-      
+
       const { doc, getDoc } = await import('firebase/firestore');
-      
+
       // Load doctor's profile (includes chambers)
       const doctorProfileRef = doc(db, 'doctors', doctor.uid);
       const doctorProfileSnap = await getDoc(doctorProfileRef);
-      
+
       let doctorWithChambers = { ...doctor };
-      
+
       if (doctorProfileSnap.exists()) {
         const profileData = doctorProfileSnap.data();
         doctorWithChambers.chambers = profileData.chambers || [];
@@ -211,9 +213,9 @@ export default function ClinicBookingFlow() {
         console.warn('⚠️ Doctor profile not found for:', doctor.uid);
         doctorWithChambers.chambers = [];
       }
-      
+
       setSelectedDoctor(doctorWithChambers);
-      
+
       // Store doctor info in session
       sessionStorage.setItem('booking_doctor_id', doctor.uid);
       sessionStorage.setItem('booking_doctor_name', doctor.name);
@@ -223,13 +225,13 @@ export default function ClinicBookingFlow() {
       if (doctor.qrNumber) {
         sessionStorage.setItem('booking_doctor_qr', doctor.qrNumber);
       }
-      
+
       // Load doctor's schedule
       const doctorScheduleRef = doc(db, 'schedules', doctor.uid);
       console.log('📄 Firestore path:', `schedules/${doctor.uid}`);
       const doctorScheduleSnap = await getDoc(doctorScheduleRef);
       console.log('📊 Schedule document exists?', doctorScheduleSnap.exists());
-      
+
       if (doctorScheduleSnap.exists()) {
         const scheduleData = doctorScheduleSnap.data();
         const doctorPlannedOff = scheduleData.plannedOffPeriods || [];
@@ -252,13 +254,13 @@ export default function ClinicBookingFlow() {
       } else {
         console.warn('⚠️ NO schedule document found in schedules collection for doctor:', doctor.uid);
         console.log('📋 FALLBACK: Trying to load from doctors collection (legacy location)...');
-        
+
         // FALLBACK: Read from doctors collection if schedules doesn't exist
         if (doctorProfileSnap.exists()) {
           const profileData = doctorProfileSnap.data();
           const legacyPlannedOff = profileData.plannedOffPeriods || [];
           const legacyMaxDays = profileData.maxAdvanceBookingDays || 30;
-          
+
           console.log('✅ Doctor Schedule LOADED from doctors collection (LEGACY):', {
             doctorUid: doctor.uid,
             maxAdvanceDays: legacyMaxDays,
@@ -270,7 +272,7 @@ export default function ClinicBookingFlow() {
               status: p.status
             }))
           });
-          
+
           setDoctorSchedule({
             maxAdvanceDays: legacyMaxDays,
             plannedOffPeriods: legacyPlannedOff,
@@ -295,7 +297,7 @@ export default function ClinicBookingFlow() {
         globalBookingEnabled: true
       });
     }
-    
+
     setCurrentStep('select-date');
   };
 
@@ -315,17 +317,17 @@ export default function ClinicBookingFlow() {
 
   const handleBookingComplete = (data: any) => {
     console.log('✅ Booking completed with data:', data);
-    
+
     // Handle both string (legacy) and object formats
     let bId = '';
-    
+
     if (typeof data === 'string') {
       bId = data;
     } else if (data && data.bookingId) {
       bId = data.bookingId;
       setConfirmationData(data);
     }
-    
+
     setBookingId(bId);
     setCurrentStep('confirmation');
   };
@@ -378,7 +380,7 @@ export default function ClinicBookingFlow() {
       <div className="min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-slate-900 flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mb-4"></div>
-          <p className="text-blue-200">Loading clinic...</p>
+          <p className="text-blue-200">{bt('Loading clinic...')}</p>
         </div>
       </div>
     );
@@ -390,8 +392,8 @@ export default function ClinicBookingFlow() {
       <div className="min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-slate-900 flex items-center justify-center p-4">
         <div className="bg-slate-800/50 border border-blue-500/20 rounded-2xl p-8 max-w-md text-center backdrop-blur-sm">
           <div className="text-6xl mb-4">🏥</div>
-          <h2 className="text-2xl font-bold text-white mb-2">Clinic Not Found</h2>
-          <p className="text-blue-200">Please scan a valid clinic QR code to continue.</p>
+          <h2 className="text-2xl font-bold text-white mb-2">{bt('Clinic Not Found')}</h2>
+          <p className="text-blue-200">{bt('Please scan a valid clinic QR code to continue.')}</p>
         </div>
       </div>
     );
@@ -401,7 +403,7 @@ export default function ClinicBookingFlow() {
   switch (currentStep) {
     case 'language':
       return (
-        <LanguageSelection 
+        <LanguageSelection
           onContinue={handleLanguageSelect}
           doctorName={clinic.name}
           doctorPhoto={clinic.logoUrl}
@@ -434,7 +436,7 @@ export default function ClinicBookingFlow() {
         clinicSchedule?.maxAdvanceDays || 30,
         doctorSchedule?.maxAdvanceDays || 30
       );
-      
+
       // Combine planned off periods from both clinic and doctor
       const mergedPlannedOffPeriods = [
         ...(clinicSchedule?.plannedOffPeriods || []).map((p: any) => ({ ...p, source: 'clinic' })),
@@ -445,7 +447,7 @@ export default function ClinicBookingFlow() {
         ...(clinicSchedule?.plannedOffPeriods || []),
         ...(doctorSchedule?.plannedOffPeriods || []).filter((p: any) => p.clinicId)
       ];
-      
+
       console.log('📅 Merged Schedule Settings:', {
         clinicMaxDays: clinicSchedule?.maxAdvanceDays,
         doctorMaxDays: doctorSchedule?.maxAdvanceDays,
@@ -454,7 +456,7 @@ export default function ClinicBookingFlow() {
         doctorOffPeriods: doctorSchedule?.plannedOffPeriods?.length || 0,
         totalOffPeriods: mergedPlannedOffPeriods.length
       });
-      
+
       return (
         <SelectDate
           onContinue={handleDateSelect}
@@ -505,7 +507,7 @@ export default function ClinicBookingFlow() {
           onBack={handleBack}
           selectedDate={selectedDate}
           // Pass required IDs
-          doctorId={selectedDoctor?.uid} 
+          doctorId={selectedDoctor?.uid}
           selectedChamber={selectedChamberName}
           // Pass display data
           doctorName={selectedDoctor?.name || ''}
