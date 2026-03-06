@@ -1,5 +1,5 @@
 import { Button } from './ui/button';
-import { Check, ArrowRight, Sparkles, MessageSquare, Bell, FileText } from 'lucide-react';
+import { Check, ArrowRight, Sparkles, MessageSquare, Bell, FileText, Globe } from 'lucide-react';
 import { useState } from 'react';
 import { t, type Language, languageDisplayNames, languageCodes } from '../utils/translations';
 import TemplateDisplay from './TemplateDisplay';
@@ -26,13 +26,13 @@ export default function LanguageSelection({ onContinue, onBack, doctorName = '',
   const selectedIconBg = themeColor === 'blue' ? 'bg-blue-500/20' : 'bg-emerald-500/20';
   const selectedIconText = themeColor === 'blue' ? 'text-blue-400' : 'text-emerald-400';
   const benefitIconColor = themeColor === 'blue' ? 'text-blue-400' : 'text-emerald-400';
-  const buttonGradient = themeColor === 'blue' 
-    ? 'from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700' 
+  const buttonGradient = themeColor === 'blue'
+    ? 'from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700'
     : 'from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700';
-  
+
   console.log('🔍 LanguageSelection Props:', { doctorName, doctorSpecialty, doctorPhoto, doctorDegrees });
 
-  const languages: Array<{ id: Language; code: string; name: string; subtitle: string }> = [
+  const coreIndianLanguages: Array<{ id: Language; code: string; name: string; subtitle: string }> = [
     {
       id: 'english' as Language,
       code: languageCodes.english,
@@ -101,6 +101,34 @@ export default function LanguageSelection({ onContinue, onBack, doctorName = '',
     },
   ];
 
+  const moreIndianLanguages: Array<{ id: Language; code: string; name: string; subtitle: string }> = [
+    { id: 'odia', code: languageCodes.odia, name: languageDisplayNames.odia, subtitle: 'Odia' },
+    { id: 'urdu', code: languageCodes.urdu, name: languageDisplayNames.urdu, subtitle: 'Urdu' },
+    { id: 'nepali', code: languageCodes.nepali, name: languageDisplayNames.nepali, subtitle: 'Nepali' },
+    { id: 'konkani', code: languageCodes.konkani, name: languageDisplayNames.konkani, subtitle: 'Konkani' },
+    { id: 'maithili', code: languageCodes.maithili, name: languageDisplayNames.maithili, subtitle: 'Maithili' },
+    { id: 'dogri', code: languageCodes.dogri, name: languageDisplayNames.dogri, subtitle: 'Dogri' },
+    { id: 'sindhi', code: languageCodes.sindhi, name: languageDisplayNames.sindhi, subtitle: 'Sindhi' },
+    { id: 'bodo', code: languageCodes.bodo, name: languageDisplayNames.bodo, subtitle: 'Bodo' },
+    { id: 'santali', code: languageCodes.santali, name: languageDisplayNames.santali, subtitle: 'Santali' },
+    { id: 'kashmiri', code: languageCodes.kashmiri, name: languageDisplayNames.kashmiri, subtitle: 'Kashmiri' },
+    { id: 'manipuri', code: languageCodes.manipuri, name: languageDisplayNames.manipuri, subtitle: 'Manipuri' },
+  ];
+
+  const internationalLanguages: Array<{ id: Language; code: string; name: string; subtitle: string }> = [
+    { id: 'arabic', code: languageCodes.arabic, name: languageDisplayNames.arabic, subtitle: 'Arabic' },
+    { id: 'french', code: languageCodes.french, name: languageDisplayNames.french, subtitle: 'French' },
+    { id: 'spanish', code: languageCodes.spanish, name: languageDisplayNames.spanish, subtitle: 'Spanish' },
+    { id: 'portuguese', code: languageCodes.portuguese, name: languageDisplayNames.portuguese, subtitle: 'Portuguese' },
+    { id: 'russian', code: languageCodes.russian, name: languageDisplayNames.russian, subtitle: 'Russian' },
+    { id: 'chinese', code: languageCodes.chinese, name: languageDisplayNames.chinese, subtitle: 'Chinese' },
+    { id: 'japanese', code: languageCodes.japanese, name: languageDisplayNames.japanese, subtitle: 'Japanese' },
+    { id: 'korean', code: languageCodes.korean, name: languageDisplayNames.korean, subtitle: 'Korean' },
+    { id: 'german', code: languageCodes.german, name: languageDisplayNames.german, subtitle: 'German' },
+  ];
+
+  const [showMore, setShowMore] = useState(false);
+
   return (
     <BookingFlowLayout
       onBack={onBack}
@@ -127,7 +155,7 @@ export default function LanguageSelection({ onContinue, onBack, doctorName = '',
 
         {/* Language Options */}
         <div className="space-y-3 mb-6 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-          {languages.map((language) => (
+          {coreIndianLanguages.map((language) => (
             <button
               key={language.id}
               onClick={() => setSelectedLanguage(language.id)}
@@ -148,6 +176,69 @@ export default function LanguageSelection({ onContinue, onBack, doctorName = '',
               </div>
             </button>
           ))}
+
+          {/* More Languages Toggle */}
+          {!showMore && (
+            <button
+              onClick={() => setShowMore(true)}
+              className="w-full p-3 rounded-2xl border-2 border-dashed border-gray-600 hover:border-gray-500 transition-all flex items-center justify-center gap-2 text-gray-400 hover:text-gray-300"
+            >
+              <Globe className="w-4 h-4" />
+              <span className="text-sm font-medium">+20 More Languages (AI Translated)</span>
+            </button>
+          )}
+
+          {showMore && (
+            <>
+              {/* More Indian Languages */}
+              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-2 pt-2">More Indian Languages</div>
+              {moreIndianLanguages.map((language) => (
+                <button
+                  key={language.id}
+                  onClick={() => setSelectedLanguage(language.id)}
+                  className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center gap-4 ${
+                    selectedLanguage === language.id
+                      ? `${selectedBorder} ${selectedBg}`
+                      : 'border-gray-700 bg-[#0f1419] hover:border-gray-600'
+                  }`}
+                >
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                    selectedLanguage === language.id ? `${selectedIconBg} ${selectedIconText}` : 'bg-gray-800 text-gray-400'
+                  }`}>
+                    <span className="font-semibold text-xs">{language.code}</span>
+                  </div>
+                  <div className="flex-1 text-left">
+                    <div className="text-white">{language.name}</div>
+                    <div className="text-sm text-gray-400">{language.subtitle}</div>
+                  </div>
+                </button>
+              ))}
+
+              {/* International Languages */}
+              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-2 pt-2">International Languages</div>
+              {internationalLanguages.map((language) => (
+                <button
+                  key={language.id}
+                  onClick={() => setSelectedLanguage(language.id)}
+                  className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center gap-4 ${
+                    selectedLanguage === language.id
+                      ? `${selectedBorder} ${selectedBg}`
+                      : 'border-gray-700 bg-[#0f1419] hover:border-gray-600'
+                  }`}
+                >
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                    selectedLanguage === language.id ? `${selectedIconBg} ${selectedIconText}` : 'bg-gray-800 text-gray-400'
+                  }`}>
+                    <span className="font-semibold text-xs">{language.code}</span>
+                  </div>
+                  <div className="flex-1 text-left">
+                    <div className="text-white">{language.name}</div>
+                    <div className="text-sm text-gray-400">{language.subtitle}</div>
+                  </div>
+                </button>
+              ))}
+            </>
+          )}
         </div>
 
         {/* Language Benefits Section */}

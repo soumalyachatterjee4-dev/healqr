@@ -96,6 +96,7 @@ const PharmaLogin = lazy(() => import("./components/PharmaLogin"));
 const PharmaVerifyLogin = lazy(() => import("./components/PharmaVerifyLogin"));
 const PharmaPortal = lazy(() => import("./components/PharmaPortal"));
 const PharmaSignUp = lazy(() => import("./components/PharmaSignUp"));
+const AIChatBot = lazy(() => import("./components/AIChatBot"));
 
 // Loading Component
 const PageLoader = () => (
@@ -3346,6 +3347,11 @@ export default function App() {
         <LocalStorageDebugger
           onClose={() => setShowLocalStorageDebugger(false)}
         />
+      )}
+
+      {/* AI ChatBot - Floating widget on patient-facing pages */}
+      {(currentPage.startsWith('booking-') || currentPage.startsWith('patient-') || currentPage === 'clinic-booking-flow') && (
+        <AIChatBot language={bookingLanguage} />
       )}
 
       <Toaster

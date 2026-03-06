@@ -1,36 +1,38 @@
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { app } from '../lib/firebase/config';
+import { aiTranslate, aiTranslateBatch, aiDetectLanguage, AI_SUPPORTED_LANGUAGES, type AILanguage } from './aiTranslationService';
 
-// Language codes mapping
+// Language codes mapping — now powered by Gemini AI PM (31 languages)
 export const SUPPORTED_LANGUAGES = {
   english: 'en',
   hindi: 'hi',
   bengali: 'bn',
-  spanish: 'es',
-  french: 'fr',
-  german: 'de',
-  portuguese: 'pt',
-  arabic: 'ar',
-  chinese: 'zh',
-  japanese: 'ja',
-  korean: 'ko',
-  russian: 'ru',
-  italian: 'it',
-  turkish: 'tr',
-  dutch: 'nl',
-  polish: 'pl',
-  thai: 'th',
-  vietnamese: 'vi',
-  indonesian: 'id',
-  malay: 'ms',
+  marathi: 'mr',
   tamil: 'ta',
   telugu: 'te',
-  marathi: 'mr',
   gujarati: 'gu',
   kannada: 'kn',
   malayalam: 'ml',
   punjabi: 'pa',
+  assamese: 'as',
+  odia: 'or',
   urdu: 'ur',
+  sindhi: 'sd',
+  nepali: 'ne',
+  konkani: 'kok',
+  maithili: 'mai',
+  dogri: 'doi',
+  bodo: 'brx',
+  santali: 'sat',
+  kashmiri: 'ks',
+  manipuri: 'mni',
+  arabic: 'ar',
+  french: 'fr',
+  spanish: 'es',
+  portuguese: 'pt',
+  russian: 'ru',
+  chinese: 'zh',
+  japanese: 'ja',
+  korean: 'ko',
+  german: 'de',
 } as const;
 
 export type SupportedLanguage = keyof typeof SUPPORTED_LANGUAGES;
@@ -91,7 +93,7 @@ function findLocalTranslation(text: string, targetLanguage: SupportedLanguage): 
 }
 
 /**
- * Translate text using Local Dictionary (Free) or fallback to original
+ * Translate text using Gemini AI PM (with local dictionary fallback)
  */
 export async function translate(
   text: string,
@@ -101,28 +103,33 @@ export async function translate(
   if (!text) return text;
   if (targetLanguage === 'english') return text;
 
-  // Check cache first
+  // Check legacy cache first
   const cacheKey = `${text}_${sourceLanguage || 'auto'}_${targetLanguage}`;
   if (translationCache.has(cacheKey)) {
     return translationCache.get(cacheKey)!;
   }
 
-  // Simulate network delay for realistic feel
-  await new Promise(resolve => setTimeout(resolve, 600));
-
-  // Try local dictionary
+  // Try local dictionary first (free, instant)
   const localTranslation = findLocalTranslation(text, targetLanguage);
   if (localTranslation) {
     translationCache.set(cacheKey, localTranslation);
     return localTranslation;
   }
 
-  console.warn(`Translation not found for: "${text}" to ${targetLanguage}`);
+  // Use Gemini AI Translation
+  if (targetLanguage in AI_SUPPORTED_LANGUAGES) {
+    const result = await aiTranslate(text, targetLanguage as AILanguage, 'chat');
+    if (result.translated !== text) {
+      translationCache.set(cacheKey, result.translated);
+      return result.translated;
+    }
+  }
+
   return text;
 }
 
 /**
- * Translate multiple texts at once
+ * Translate multiple texts at once (uses Gemini batch for efficiency)
  */
 export async function translateBatch(
   texts: string[],
@@ -130,15 +137,20 @@ export async function translateBatch(
   sourceLanguage?: SupportedLanguage
 ): Promise<string[]> {
   if (!texts || texts.length === 0) return texts;
-  
-  // Process sequentially for now as it's local
-  const results = await Promise.all(texts.map(text => translate(text, targetLanguage, sourceLanguage)));
-  return results;
+  if (targetLanguage === 'english') return texts;
+
+  // Use AI batch translation for efficiency
+  if (targetLanguage in AI_SUPPORTED_LANGUAGES) {
+    const results = await aiTranslateBatch(texts, targetLanguage as AILanguage, 'chat');
+    return results.map(r => r.translated);
+  }
+
+  // Fallback to sequential local translation
+  return Promise.all(texts.map(text => translate(text, targetLanguage, sourceLanguage)));
 }
 
 /**
- * Detect the language of text
- * (Mock implementation since we don't have the API)
+ * Detect the language of text using Gemini AI
  */
 export async function detectLanguage(text: string): Promise<{
   language: string;
@@ -146,15 +158,12 @@ export async function detectLanguage(text: string): Promise<{
   isReliable: boolean;
 } | null> {
   if (!text) return null;
-  
-  // Simple heuristic: if it contains non-ascii characters, it might not be English
-  // This is very basic but free.
-  const isEnglish = /^[\x00-\x7F]*$/.test(text);
-  
+
+  const result = await aiDetectLanguage(text);
   return {
-    language: isEnglish ? 'en' : 'und', // 'und' for undetermined
-    confidence: 0.5,
-    isReliable: false
+    language: SUPPORTED_LANGUAGES[result.language as SupportedLanguage] || 'en',
+    confidence: result.confidence,
+    isReliable: result.confidence > 0.7
   };
 }
 

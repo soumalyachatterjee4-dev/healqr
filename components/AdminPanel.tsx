@@ -19,6 +19,7 @@ import AdminPharmaTemplateApprovals from './AdminPharmaTemplateApprovals';
 import AdminAdvertiserManagement from './AdminAdvertiserManagement';
 import AdminDistributorManager from './AdminDistributorManager';
 import AdminPageDistribution from './AdminPageDistribution';
+import AdminAIPMDashboard from './AdminAIPMDashboard';
 
 interface DoctorTestimonial {
   id: number;
@@ -54,7 +55,7 @@ interface AdminPanelProps {
 
 export default function AdminPanel({ adminEmail, onLogout, onStartDemo, uploadedTestimonials = [], onUploadTestimonial, supportRequests = [], onNavigateToQRGenerator, onNavigateToQRGeneration, onNavigateToQRManagement }: AdminPanelProps) {
   const [currentPage, setCurrentPage] = useState<
-    'dashboard' | 'profile' | 'revenue' | 'doctors' | 'patients' | 'personal-management' | 'templates' | 'videos' | 'discount-cards' | 'promo-manager' | 'data-cleanup' | 'pharma-management' | 'pharma-templates' | 'distribution-requests' | 'advertiser-management' | 'page-distribution'
+    'dashboard' | 'profile' | 'revenue' | 'doctors' | 'patients' | 'personal-management' | 'templates' | 'videos' | 'discount-cards' | 'promo-manager' | 'data-cleanup' | 'pharma-management' | 'pharma-templates' | 'distribution-requests' | 'advertiser-management' | 'page-distribution' | 'ai-pm-dashboard'
   >('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
@@ -76,6 +77,7 @@ export default function AdminPanel({ adminEmail, onLogout, onStartDemo, uploaded
     'distribution-requests': 'Distributor Requests',
     'advertiser-management': 'Advertiser Management',
     'page-distribution': 'Page Distribution',
+    'ai-pm-dashboard': 'AI PM Dashboard',
   };
 
   // Load unread notification count
@@ -194,6 +196,7 @@ export default function AdminPanel({ adminEmail, onLogout, onStartDemo, uploaded
         {currentPage === 'distribution-requests' && <AdminDistributorManager />}
         {currentPage === 'advertiser-management' && <AdminAdvertiserManagement />}
         {currentPage === 'page-distribution' && <AdminPageDistribution />}
+        {currentPage === 'ai-pm-dashboard' && <AdminAIPMDashboard adminEmail={adminEmail} />}
       </div>
     </div>
   );

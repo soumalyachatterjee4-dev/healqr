@@ -18,7 +18,8 @@ import {
   Building2,
   MapPinned,
   BarChart2,
-  LayoutGrid
+  LayoutGrid,
+  Brain
 } from 'lucide-react';
 import { useState } from 'react';
 import healqrLogo from '../assets/healqr-logo.png';
@@ -41,6 +42,11 @@ export default function AdminSidebar({
   const [isManagementOpen, setIsManagementOpen] = useState(true);
   const [isContentOpen, setIsContentOpen] = useState(true);
   const [isPartnersOpen, setIsPartnersOpen] = useState(false);
+  const [isAIOpen, setIsAIOpen] = useState(false);
+
+  const aiTools = [
+    { id: 'ai-pm-dashboard', label: 'AI PM Dashboard', icon: Brain },
+  ];
 
   const managementTools = [
     { id: 'profile', label: 'Profile Manager', icon: User },
@@ -208,6 +214,40 @@ export default function AdminSidebar({
             {isPartnersOpen && (
               <div className="mt-1 space-y-0.5">
                 {partnerTools.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => handleMenuClick(item.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+                      currentPage === item.id
+                        ? 'bg-emerald-500 text-white'
+                        : 'text-gray-400 hover:bg-zinc-900 hover:text-white'
+                    }`}
+                  >
+                    <item.icon className="w-4 h-4" />
+                    <span className="text-sm">{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {/* AI & ANALYTICS */}
+          <div className="mb-3">
+            <button
+              onClick={() => setIsAIOpen(!isAIOpen)}
+              className="w-full flex items-center gap-2 px-3 py-2 text-gray-500 hover:text-gray-300 transition-colors"
+            >
+              <span className="text-xs uppercase tracking-wider flex-1 text-left">
+                AI & Analytics
+              </span>
+              {isAIOpen ? (
+                <ChevronDown className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronRight className="w-3.5 h-3.5" />
+              )}
+            </button>
+            {isAIOpen && (
+              <div className="mt-1 space-y-0.5">
+                {aiTools.map((item) => (
                   <button
                     key={item.id}
                     onClick={() => handleMenuClick(item.id)}

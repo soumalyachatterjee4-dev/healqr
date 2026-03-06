@@ -1,8 +1,9 @@
 // Real-time Multilingual Translation Service
-// Supports: English, Hindi (हिंदी), Bengali (বাংলা), Marathi (मराठी), Tamil (தமிழ்), Telugu (తెలుగు), Gujarati (ગુજરાતી), Kannada (ಕನ್ನಡ), Malayalam (മലയാളം), Punjabi (ਪੰਜਾਬੀ), Assamese (অসমীয়া)
+// Supports: 22 Indian + 9 International languages (31 total)
+// Hardcoded translations: 11 core Indian languages | AI Translation (Gemini PM): all 31
 
-export type Language = 'english' | 'hindi' | 'bengali' | 'marathi' | 'tamil' | 'telugu' | 'gujarati' | 'kannada' | 'malayalam' | 'punjabi' | 'assamese';
-export type LanguageCode = 'en' | 'hi' | 'bn' | 'mr' | 'ta' | 'te' | 'gu' | 'kn' | 'ml' | 'pa' | 'as';
+export type Language = 'english' | 'hindi' | 'bengali' | 'marathi' | 'tamil' | 'telugu' | 'gujarati' | 'kannada' | 'malayalam' | 'punjabi' | 'assamese' | 'odia' | 'urdu' | 'sindhi' | 'nepali' | 'konkani' | 'maithili' | 'dogri' | 'bodo' | 'santali' | 'kashmiri' | 'manipuri' | 'arabic' | 'french' | 'spanish' | 'portuguese' | 'russian' | 'chinese' | 'japanese' | 'korean' | 'german';
+export type LanguageCode = 'en' | 'hi' | 'bn' | 'mr' | 'ta' | 'te' | 'gu' | 'kn' | 'ml' | 'pa' | 'as' | 'or' | 'ur' | 'sd' | 'ne' | 'kok' | 'mai' | 'doi' | 'brx' | 'sat' | 'ks' | 'mni' | 'ar' | 'fr' | 'es' | 'pt' | 'ru' | 'zh' | 'ja' | 'ko' | 'de';
 
 // Helper to convert language codes to full names
 export function getLanguageFromCode(code: LanguageCode): Language {
@@ -18,6 +19,26 @@ export function getLanguageFromCode(code: LanguageCode): Language {
     'ml': 'malayalam',
     'pa': 'punjabi',
     'as': 'assamese',
+    'or': 'odia',
+    'ur': 'urdu',
+    'sd': 'sindhi',
+    'ne': 'nepali',
+    'kok': 'konkani',
+    'mai': 'maithili',
+    'doi': 'dogri',
+    'brx': 'bodo',
+    'sat': 'santali',
+    'ks': 'kashmiri',
+    'mni': 'manipuri',
+    'ar': 'arabic',
+    'fr': 'french',
+    'es': 'spanish',
+    'pt': 'portuguese',
+    'ru': 'russian',
+    'zh': 'chinese',
+    'ja': 'japanese',
+    'ko': 'korean',
+    'de': 'german',
   };
   return map[code];
 }
@@ -345,6 +366,12 @@ export const translations = {
     hindi: 'पंजाबी',
     bengali: 'পাঞ্জাবি',
     assamese: 'পাঞ্জাবী',
+  },
+  languageAssamese: {
+    english: 'Assamese',
+    hindi: 'असमिया',
+    bengali: 'অসমীয়া',
+    assamese: 'অসমীয়া',
   },
 
   // Common
@@ -1118,22 +1145,42 @@ export function t(key: keyof typeof translations, language: Language): string {
 }
 
 // Language display names in their native scripts
-export const languageDisplayNames = {
+export const languageDisplayNames: Record<Language, string> = {
   english: 'English',
   hindi: 'हिंदी',
   bengali: 'বাংলা',
   marathi: 'मराठी',
   tamil: 'தமிழ்',
   telugu: 'తెలుగు',
-  gujarati: 'ગુજરાતી',
+  gujarati: 'ગુજરাતી',
   kannada: 'ಕನ್ನಡ',
   malayalam: 'മലയാളം',
   punjabi: 'ਪੰਜਾਬੀ',
   assamese: 'অসমীয়া',
+  odia: 'ଓଡ଼ିଆ',
+  urdu: 'اردو',
+  sindhi: 'سنڌي',
+  nepali: 'नेपाली',
+  konkani: 'कोंकणी',
+  maithili: 'मैथिली',
+  dogri: 'डोगरी',
+  bodo: 'बड़ो',
+  santali: 'ᱥᱟᱱᱛᱟᱲᱤ',
+  kashmiri: 'كٲشُر',
+  manipuri: 'মৈতৈলোন্',
+  arabic: 'العربية',
+  french: 'Français',
+  spanish: 'Español',
+  portuguese: 'Português',
+  russian: 'Русский',
+  chinese: '中文',
+  japanese: '日本語',
+  korean: '한국어',
+  german: 'Deutsch',
 };
 
 // Language codes for flags/icons
-export const languageCodes = {
+export const languageCodes: Record<Language, string> = {
   english: 'GB',
   hindi: 'IN',
   bengali: 'BD',
@@ -1145,6 +1192,26 @@ export const languageCodes = {
   malayalam: 'IN',
   punjabi: 'IN',
   assamese: 'IN',
+  odia: 'IN',
+  urdu: 'PK',
+  sindhi: 'PK',
+  nepali: 'NP',
+  konkani: 'IN',
+  maithili: 'IN',
+  dogri: 'IN',
+  bodo: 'IN',
+  santali: 'IN',
+  kashmiri: 'IN',
+  manipuri: 'IN',
+  arabic: 'SA',
+  french: 'FR',
+  spanish: 'ES',
+  portuguese: 'BR',
+  russian: 'RU',
+  chinese: 'CN',
+  japanese: 'JP',
+  korean: 'KR',
+  german: 'DE',
 };
 
 // Data value translations - for translating patient data from their language to doctor's language
