@@ -43,6 +43,8 @@ export function getLanguageFromCode(code: LanguageCode): Language {
   return map[code];
 }
 
+// In-memory cache for async AI transliterations (name/data value lookups)
+const translationCache = new Map<string, string>();
 
 // Language display names in their native scripts
 export const languageDisplayNames: Record<Language, string> = {
@@ -788,9 +790,9 @@ export function transliterateName(name: string, targetLanguage: Language): strin
     return transliterateFromLatin(name, 'bengali');
   }
 
-  // For non-core languages, check if AI transliteration is cached
-  if (needsAITranslation(targetLanguage) && !hasIndicScript) {
-    const cached = preloadedCache.get(`name_translit::${targetLanguage}::${name}`);
+  // For other non-English languages with Latin script input → try AI transliteration
+  if (targetLanguage !== 'english' && !hasIndicScript) {
+    const cached = translationCache.get(`name_translit::${targetLanguage}::${name}`);
     if (cached) return cached;
     // Trigger async transliteration in background (will show on refresh)
     transliterateNameAsync(name, targetLanguage);
@@ -805,7 +807,7 @@ async function transliterateNameAsync(name: string, targetLanguage: Language): P
   try {
     const { aiTranslate } = await import('../services/aiTranslationService');
     const result = await aiTranslate(name, targetLanguage as any, 'ui');
-    preloadedCache.set(`name_translit::${targetLanguage}::${name}`, result.translated);
+    translationCache.set(`name_translit::${targetLanguage}::${name}`, result.translated);
   } catch { /* silent */ }
 }
 
@@ -816,9 +818,9 @@ export function translateDataValue(value: string, targetLanguage: Language): str
     const translated = (dataValueTranslations[value as keyof typeof dataValueTranslations] as any)[targetLanguage];
     if (translated) return translated;
 
-    // For non-core languages, check AI cache or try to get English first then translate
-    if (needsAITranslation(targetLanguage)) {
-      const cached = preloadedCache.get(`data::${targetLanguage}::${value}`);
+    // For languages without a hardcoded entry, check AI cache or fall back to English
+    if (targetLanguage !== 'english') {
+      const cached = translationCache.get(`data::${targetLanguage}::${value}`);
       if (cached) return cached;
       // Get English value and trigger async translation
       const englishValue = (dataValueTranslations[value as keyof typeof dataValueTranslations] as any)['english'] || value;
@@ -837,7 +839,7 @@ async function translateDataValueAsync(englishValue: string, originalValue: stri
   try {
     const { aiTranslate } = await import('../services/aiTranslationService');
     const result = await aiTranslate(englishValue, targetLanguage as any, 'medical');
-    preloadedCache.set(`data::${targetLanguage}::${originalValue}`, result.translated);
+    translationCache.set(`data::${targetLanguage}::${originalValue}`, result.translated);
   } catch { /* silent */ }
 }
 
