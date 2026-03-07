@@ -113,9 +113,7 @@ export async function googleTranslateBatch(
     });
 
     if (!response.ok) {
-      console.warn('Google Translate batch error:', response.status);
-      uncachedIndices.forEach((idx, j) => { results[idx] = uncachedTexts[j]; });
-      return results;
+      throw new Error(`Google Translate API error: ${response.status}`);
     }
 
     const data = await response.json();

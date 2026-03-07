@@ -20,10 +20,14 @@ const dynamicCache = new Map<string, string>();
 // Track in-flight translations to avoid duplicate API calls
 const pendingTranslations = new Map<string, Promise<string>>();
 
-// All non-English languages use AI translation via dt()
+// Track failed translations to prevent infinite retry loops
+const translationFailed = new Map<string, number>(); // cacheKey → timestamp
+const RETRY_AFTER_MS = 30000; // Allow retry after 30 seconds
 
 /**
- * Batch translate multiple texts via Gemini and cache results
+ * Batch translate multiple texts via Gemini and cache results.
+ * Falls back to Google Translate if Gemini fails or returns source text.
+ * Never caches source text as translation — prevents permanent English display.
  */
 async function batchTranslateAndCache(
   texts: string[],
@@ -31,28 +35,44 @@ async function batchTranslateAndCache(
 ): Promise<void> {
   if (texts.length === 0) return;
 
+  // Track which texts still need translation
+  const untranslated = new Set(texts);
+
+  // Try Gemini first
   try {
     const { aiTranslateBatch } = await import('../services/aiTranslationService');
     const results = await aiTranslateBatch(texts, language as any, 'ui');
 
     for (let i = 0; i < results.length; i++) {
-      const cacheKey = `${language}::${texts[i]}`;
-      dynamicCache.set(cacheKey, results[i].translated);
+      if (results[i].translated && results[i].translated !== texts[i]) {
+        dynamicCache.set(`${language}::${texts[i]}`, results[i].translated);
+        untranslated.delete(texts[i]);
+      }
     }
   } catch (error) {
-    console.warn('Gemini batch translation failed, trying Google Translate:', error);
+    console.warn('Gemini batch translation failed:', error);
+  }
+
+  // If some texts weren't translated by Gemini, try Google Translate
+  if (untranslated.size > 0) {
+    const remainingTexts = Array.from(untranslated);
     try {
       const { googleTranslateBatch } = await import('../services/googleTranslateService');
-      const translations = await googleTranslateBatch(texts, language);
+      const translations = await googleTranslateBatch(remainingTexts, language);
       for (let i = 0; i < translations.length; i++) {
-        dynamicCache.set(`${language}::${texts[i]}`, translations[i]);
+        if (translations[i] && translations[i] !== remainingTexts[i]) {
+          dynamicCache.set(`${language}::${remainingTexts[i]}`, translations[i]);
+          untranslated.delete(remainingTexts[i]);
+        }
       }
     } catch (fallbackError) {
-      console.warn('Google Translate fallback also failed:', fallbackError);
-      for (const text of texts) {
-        dynamicCache.set(`${language}::${text}`, text);
-      }
+      console.warn('All translation APIs failed:', fallbackError);
     }
+  }
+
+  // Mark remaining untranslated texts as temporarily failed (prevents infinite loops)
+  for (const text of untranslated) {
+    translationFailed.set(`${language}::${text}`, Date.now());
   }
 }
 
@@ -123,6 +143,11 @@ export function useAITranslation(language: Language) {
   const queueTranslation = useCallback((text: string) => {
     const cacheKey = `${language}::${text}`;
     if (dynamicCache.has(cacheKey)) return;
+
+    // Don't retry recently failed translations (prevents infinite API call loops)
+    const failedAt = translationFailed.get(cacheKey);
+    if (failedAt && (Date.now() - failedAt) < RETRY_AFTER_MS) return;
+    translationFailed.delete(cacheKey);
 
     batchQueue.current.add(text);
 

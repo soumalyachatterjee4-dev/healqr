@@ -231,7 +231,7 @@ export async function aiTranslateBatch(
     }
     const cacheKey = makeCacheKey(texts[i], targetLanguage, context);
     const cached = await getCachedTranslation(cacheKey);
-    if (cached) {
+    if (cached && cached !== texts[i]) {
       results[i] = { translated: cached, fromCache: true };
     } else {
       uncachedTexts.push({ index: i, text: texts[i] });
@@ -278,11 +278,7 @@ Return format: ["translated1", "translated2", ...]`;
     });
 
     if (!response.ok) {
-      // Fill remaining with originals
-      uncachedTexts.forEach(item => {
-        results[item.index] = { translated: item.text, fromCache: false };
-      });
-      return results as TranslationResult[];
+      throw new Error(`Gemini API error: ${response.status}`);
     }
 
     const data = await response.json();
@@ -295,15 +291,16 @@ Return format: ["translated1", "translated2", ...]`;
     // Map results back and cache them
     for (let i = 0; i < uncachedTexts.length; i++) {
       const translated = translatedArray[i] || uncachedTexts[i].text;
-      const cacheKey = makeCacheKey(uncachedTexts[i].text, targetLanguage, context);
-      await setCachedTranslation(cacheKey, translated);
+      // Only cache actual translations, not source text (prevents IndexedDB poisoning)
+      if (translated !== uncachedTexts[i].text) {
+        const cacheKey = makeCacheKey(uncachedTexts[i].text, targetLanguage, context);
+        await setCachedTranslation(cacheKey, translated);
+      }
       results[uncachedTexts[i].index] = { translated, fromCache: false };
     }
   } catch (error) {
     console.warn('AI Batch Translation failed:', error);
-    uncachedTexts.forEach(item => {
-      results[item.index] = { translated: item.text, fromCache: false };
-    });
+    throw error;
   }
 
   return results as TranslationResult[];
