@@ -1213,6 +1213,7 @@ export default function ScheduleManager({
               patientsToNotify.push({
                 phone: whatsappNumber || booking.phone,
                 name: patientName,
+                language: booking.language || 'english',
               });
             }
 
@@ -1352,6 +1353,7 @@ export default function ScheduleManager({
             patientsToNotify.push({
               phone: whatsappNumber || booking.phone,
               name: patientName,
+              language: booking.language || 'english',
             });
           }
 

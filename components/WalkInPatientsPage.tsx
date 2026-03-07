@@ -341,7 +341,7 @@ export default function WalkInPatientsPage({ patients, onBack, onMenuChange }: W
             followUpDate: followUpDate.toISOString(),
             followUpDays: days,
             customMessage: message,
-            language: 'english', // Walk-in patients default to English
+            language: selectedPatient.language || 'english',
           });
 
           console.log('✅ Follow-up notification scheduled via FCM');

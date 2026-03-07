@@ -1,6 +1,6 @@
 import { Button } from './ui/button';
 import { Check, Download, Share2, Bell, BellOff } from 'lucide-react';
-import { t, type Language } from '../utils/translations';
+import { type Language } from '../utils/translations';
 import { useAITranslation } from '../hooks/useAITranslation';
 import BookingFlowLayout from './BookingFlowLayout';
 import { toast } from 'sonner';
@@ -451,11 +451,11 @@ export default function BookingConfirmation({
             #{appointmentData?.serialNo || '---'}
           </h1>
           <p className="text-center text-emerald-400 mb-4">
-            {t('bookingConfirmed', language)}
+            {bt('Booking Confirmed!')}
           </p>
 
           <div className="bg-[#0f1419] p-4 rounded-2xl mb-4 border border-gray-700">
-            <h3 className="text-white mb-3">{t('patientDetails', language)}</h3>
+            <h3 className="text-white mb-3">{bt('Patient Details')}</h3>
             <p className="text-gray-300">{patientData?.patientName || ''}</p>
             <p className="text-gray-300">+91 {patientData?.whatsappNumber || ''}</p>
             {patientData?.gender && <p className="text-gray-300">{patientData.gender}</p>}
@@ -464,7 +464,7 @@ export default function BookingConfirmation({
           </div>
 
           <div className="bg-[#0f1419] p-4 rounded-2xl mb-4 border border-gray-700">
-            <h3 className="text-white mb-3">{t('appointmentDetails', language)}</h3>
+            <h3 className="text-white mb-3">{bt('Appointment Details')}</h3>
             <p className="text-gray-300">{dt('Booking ID')}: {appointmentData?.bookingId || ''}</p>
             <p className="text-gray-300">{dt('Doctor')}: {appointmentData?.doctorName || doctorName}</p>
             <p className="text-gray-300">{dt('Date')}: {appointmentData?.date ? formatDate(appointmentData.date) : ''}</p>
@@ -666,7 +666,7 @@ export default function BookingConfirmation({
           </Button>
 
           <button onClick={onBackToHome} className="w-full text-center text-gray-400 hover:text-white mt-4">
-            {t('backToHome', language)}
+            {bt('Back to Home')}
           </button>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { Button } from './ui/button';
+﻿import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
@@ -12,7 +12,7 @@ import {
 } from './ui/select';
 import { ArrowLeft, CreditCard, Clock, FileText, CheckCircle2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { t, type Language, normalizeIndicNumerals, normalizePatientName } from '../utils/translations';
+import { type Language, normalizeIndicNumerals, normalizePatientName } from '../utils/translations';
 import { useAITranslation } from '../hooks/useAITranslation';
 import { PatientRxUploadModal } from './PatientRxUploadModal';
 import TemplateDisplay from './TemplateDisplay';
@@ -681,7 +681,7 @@ export default function PatientDetailsForm({
     >
       <div className="pb-24">
         {/* Subtitle */}
-        <p className="text-emerald-400 text-sm mb-6">{t('pleaseFillPatientDetails', language)}</p>
+        <p className="text-emerald-400 text-sm mb-6">{bt('Please fill in the patient details')}</p>
 
         {/* Blocked Alert */}
         {isBlocked && (
@@ -704,17 +704,17 @@ export default function PatientDetailsForm({
         <div className="bg-[#1a1f2e] rounded-xl p-6 mb-6">
           {/* Required Information */}
           <div className="mb-6">
-            <h3 className="text-white mb-4">{t('requiredInformation', language)}</h3>
+            <h3 className="text-white mb-4">{bt('Required Information')}</h3>
 
             {/* Patient Name */}
             <div className="mb-4">
               <Label htmlFor="patientName" className="text-gray-300 mb-2 block">
-                {t('patientName', language)} <span className="text-red-500">*</span>
+                {bt('Patient Name')} <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="patientName"
                 type="text"
-                placeholder={t('enterPatientFullName', language)}
+                placeholder={dt('Enter patient full name')}
                 value={formData.patientName}
                 onChange={(e) => setFormData({ ...formData, patientName: e.target.value })}
                 className="bg-[#0f1419] border-gray-700 text-white placeholder:text-gray-500 focus:border-emerald-500 focus:ring-emerald-500"
@@ -730,7 +730,7 @@ export default function PatientDetailsForm({
             {/* WhatsApp Number */}
             <div className="mb-0">
               <Label htmlFor="whatsappNumber" className="text-gray-300 mb-2 block">
-                {t('whatsappNumber', language)} <span className="text-red-500">*</span>
+                {bt('WhatsApp Number')} <span className="text-red-500">*</span>
               </Label>
               <div className="flex gap-2">
                 <Input
@@ -754,17 +754,17 @@ export default function PatientDetailsForm({
 
           {/* Optional Information */}
           <div>
-            <h3 className="text-white mb-4">{t('optionalInformation', language)}</h3>
+            <h3 className="text-white mb-4">{bt('Optional Information')}</h3>
 
             {/* Age */}
             <div className="mb-4">
               <Label htmlFor="age" className="text-gray-300 mb-2 block">
-                {t('age', language)}
+                {bt('Age')}
               </Label>
               <Input
                 id="age"
                 type="text"
-                placeholder={t('enterAge', language)}
+                placeholder={dt('Enter age')}
                 value={formData.age}
                 onChange={(e) => {
                   // Normalize Indic numerals to English digits in real-time
@@ -783,21 +783,21 @@ export default function PatientDetailsForm({
             {/* Gender */}
             <div className="mb-4">
               <Label htmlFor="gender" className="text-gray-300 mb-2 block">
-                {t('gender', language)}
+                {bt('Gender')}
               </Label>
               <Select value={formData.gender} onValueChange={(value: string) => setFormData({ ...formData, gender: value })}>
                 <SelectTrigger className="bg-[#0f1419] border-gray-700 text-white focus:border-emerald-500 focus:ring-emerald-500">
-                  <SelectValue placeholder={t('selectGender', language)} />
+                  <SelectValue placeholder={dt('Select gender')} />
                 </SelectTrigger>
                 <SelectContent className="bg-[#1a1f2e] border-gray-700">
                   <SelectItem value="male" className="text-white hover:bg-gray-700 focus:bg-gray-700">
-                    {t('male', language)}
+                    {bt('Male')}
                   </SelectItem>
                   <SelectItem value="female" className="text-white hover:bg-gray-700 focus:bg-gray-700">
-                    {t('female', language)}
+                    {bt('Female')}
                   </SelectItem>
                   <SelectItem value="other" className="text-white hover:bg-gray-700 focus:bg-gray-700">
-                    {t('other', language)}
+                    {bt('Other')}
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -806,27 +806,27 @@ export default function PatientDetailsForm({
             {/* Purpose of Visit */}
             <div className="mb-0">
               <Label htmlFor="purposeOfVisit" className="text-gray-300 mb-2 block">
-                {t('purposeOfVisit', language)}
+                {bt('Purpose of Visit')}
               </Label>
               <Select value={formData.purposeOfVisit} onValueChange={(value: string) => setFormData({ ...formData, purposeOfVisit: value })}>
                 <SelectTrigger className="bg-[#0f1419] border-gray-700 text-white focus:border-emerald-500 focus:ring-emerald-500">
-                  <SelectValue placeholder={t('selectPurposeOfVisit', language)} />
+                  <SelectValue placeholder={dt('Select purpose of visit')} />
                 </SelectTrigger>
                 <SelectContent className="bg-[#1a1f2e] border-gray-700">
                   <SelectItem value="new-patient" className="text-white hover:bg-gray-700 focus:bg-gray-700">
-                    {t('newPatientInitialConsultation', language)}
+                    {bt('New Patient - Initial Consultation')}
                   </SelectItem>
                   <SelectItem value="existing-patient" className="text-white hover:bg-gray-700 focus:bg-gray-700">
-                    {t('existingPatientNewTreatment', language)}
+                    {bt('Existing Patient - New Treatment')}
                   </SelectItem>
                   <SelectItem value="report-review" className="text-white hover:bg-gray-700 focus:bg-gray-700">
-                    {t('reportReview', language)}
+                    {bt('Report Review')}
                   </SelectItem>
                   <SelectItem value="follow-up" className="text-white hover:bg-gray-700 focus:bg-gray-700">
-                    {t('followUpConsultation', language)}
+                    {bt('Follow-Up Consultation')}
                   </SelectItem>
                   <SelectItem value="routine-checkup" className="text-white hover:bg-gray-700 focus:bg-gray-700">
-                    {t('routineCheckup', language)}
+                    {bt('Routine Checkup')}
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -841,16 +841,16 @@ export default function PatientDetailsForm({
               <FileText className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <h3 className="text-white mb-2">
-                  {t('havePreviousPrescription', language)}
+                  {bt('Have a previous prescription?')}
                 </h3>
                 <p className="text-sm text-gray-400 mb-4">
-                  {t('uploadPrescriptionHelp', language)}
+                  {bt('Upload your previous prescription to help the doctor')}
                 </p>
                 {uploadedRx ? (
                   <div className="flex items-center gap-2 text-green-400 text-sm">
                     <CheckCircle2 className="w-4 h-4" />
                     <span>
-                      {t('prescriptionUploadedSuccess', language)}
+                      {bt('Prescription uploaded successfully!')}
                       {Array.isArray(formData.prescriptionUrl) && formData.prescriptionUrl.length > 1 && (
                         <span className="ml-2">({formData.prescriptionUrl.length} files)</span>
                       )}
@@ -864,7 +864,7 @@ export default function PatientDetailsForm({
                     className="border-blue-500 text-blue-400 hover:bg-blue-500/10 hover:text-blue-400"
                   >
                     <FileText className="w-4 h-4 mr-2" />
-                    {t('uploadPreviousPrescription', language)}
+                    {bt('Upload Previous Prescription')}
                   </Button>
                 )}
               </div>
@@ -874,7 +874,7 @@ export default function PatientDetailsForm({
 
         {/* Consent & Terms Card */}
         <div className="bg-[#1a1f2e] rounded-xl p-6 mb-6">
-          <h3 className="text-white mb-4">{t('consentAndTerms', language)}</h3>
+          <h3 className="text-white mb-4">{bt('Consent & Terms')}</h3>
 
           {/* Consent Checkbox */}
           <div className="flex items-start gap-3">
@@ -971,7 +971,7 @@ export default function PatientDetailsForm({
             variant="outline"
             className="flex-1 h-12 bg-transparent border-gray-600 text-white hover:bg-gray-800 hover:text-white rounded-lg"
           >
-            {t('back', language)}
+            {bt('Back')}
           </Button>
           {showSubmit && (
             <Button
@@ -983,7 +983,7 @@ export default function PatientDetailsForm({
                   : 'bg-gray-700 text-gray-500 cursor-not-allowed'
               }`}
             >
-              {isSubmitting ? dt('Submitting...') : t('submit', language)}
+              {isSubmitting ? dt('Submitting...') : bt('Submit')}
             </Button>
           )}
         </div>

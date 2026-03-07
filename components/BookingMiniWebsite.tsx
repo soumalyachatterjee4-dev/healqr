@@ -9,7 +9,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from './ui/dialog';
-import { t, type Language } from '../utils/translations';
+import { type Language } from '../utils/translations';
 import { useAITranslation } from '../hooks/useAITranslation';
 import ReviewCard from './ReviewCard';
 import { useState, useEffect } from 'react';
@@ -372,7 +372,7 @@ export default function BookingMiniWebsite({
                 className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Calendar className="w-5 h-5" />
-                {t('bookAppointmentNow', language)}
+                {bt('Book Appointment Now')}
               </Button>
 
               {onViewHistory && (
@@ -402,7 +402,7 @@ export default function BookingMiniWebsite({
         {/* Know Your Doctor Section */}
         <div className="px-4 sm:px-6 py-4 sm:py-6">
           <h3 className="text-white text-base sm:text-lg mb-4">
-            {t('knowYourDoctor', language)}
+            {bt('Know Your Doctor')}
           </h3>
 
           {loadingProfile ? (
@@ -517,7 +517,7 @@ export default function BookingMiniWebsite({
                     {cumulativeStats.averageRating.toFixed(1)}/5
                   </span>
                   <span className="text-sm text-gray-400">
-                    {cumulativeStats.totalReviews} {t('reviews', language)}
+                    {cumulativeStats.totalReviews} {bt('reviews')}
                   </span>
                 </div>
 
@@ -642,7 +642,7 @@ export default function BookingMiniWebsite({
           return reviewsToShow.length > 0 ? (
             <div className="px-4 sm:px-6 pb-6">
               <h3 className="text-white text-base sm:text-lg mb-4">
-                {t('patientReviews', language)}
+                {bt('Patient Reviews')}
               </h3>
               <div className="space-y-4">
                 {reviewsToShow.slice(0, 2).map((review, index) => (

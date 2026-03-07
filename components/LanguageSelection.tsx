@@ -1,7 +1,8 @@
 import { Button } from './ui/button';
 import { Check, ArrowRight, Sparkles, MessageSquare, Bell, FileText, Globe } from 'lucide-react';
 import { useState } from 'react';
-import { t, type Language, languageDisplayNames, languageCodes, needsAITranslation, preloadLanguageTranslations } from '../utils/translations';
+import { type Language, languageDisplayNames, languageCodes } from '../utils/translations';
+import { useAITranslation } from '../hooks/useAITranslation';
 import TemplateDisplay from './TemplateDisplay';
 import BookingFlowLayout from './BookingFlowLayout';
 
@@ -18,7 +19,7 @@ interface LanguageSelectionProps {
 
 export default function LanguageSelection({ onContinue, onBack, doctorName = '', doctorSpecialty = '', doctorPhoto = '', doctorDegrees = [], useDrPrefix = true, themeColor = 'emerald' }: LanguageSelectionProps) {
   const [selectedLanguage, setSelectedLanguage] = useState<Language>('english');
-  const [isPreloading, setIsPreloading] = useState(false);
+  const { bt } = useAITranslation(selectedLanguage);
 
   // Theme-aware color variables
   const iconGradient = themeColor === 'blue' ? 'from-blue-400 to-blue-600' : 'from-emerald-400 to-emerald-600';
@@ -38,67 +39,67 @@ export default function LanguageSelection({ onContinue, onBack, doctorName = '',
       id: 'english' as Language,
       code: languageCodes.english,
       name: languageDisplayNames.english,
-      subtitle: t('defaultLanguage', selectedLanguage),
+      subtitle: 'Default language',
     },
     {
       id: 'bengali' as Language,
       code: languageCodes.bengali,
       name: languageDisplayNames.bengali,
-      subtitle: t('languageBengali', selectedLanguage),
+      subtitle: 'Bengali',
     },
     {
       id: 'hindi' as Language,
       code: languageCodes.hindi,
       name: languageDisplayNames.hindi,
-      subtitle: t('languageHindi', selectedLanguage),
+      subtitle: 'Hindi',
     },
     {
       id: 'marathi' as Language,
       code: languageCodes.marathi,
       name: languageDisplayNames.marathi,
-      subtitle: t('languageMarathi', selectedLanguage),
+      subtitle: 'Marathi',
     },
     {
       id: 'tamil' as Language,
       code: languageCodes.tamil,
       name: languageDisplayNames.tamil,
-      subtitle: t('languageTamil', selectedLanguage),
+      subtitle: 'Tamil',
     },
     {
       id: 'telugu' as Language,
       code: languageCodes.telugu,
       name: languageDisplayNames.telugu,
-      subtitle: t('languageTelugu', selectedLanguage),
+      subtitle: 'Telugu',
     },
     {
       id: 'gujarati' as Language,
       code: languageCodes.gujarati,
       name: languageDisplayNames.gujarati,
-      subtitle: t('languageGujarati', selectedLanguage),
+      subtitle: 'Gujarati',
     },
     {
       id: 'kannada' as Language,
       code: languageCodes.kannada,
       name: languageDisplayNames.kannada,
-      subtitle: t('languageKannada', selectedLanguage),
+      subtitle: 'Kannada',
     },
     {
       id: 'malayalam' as Language,
       code: languageCodes.malayalam,
       name: languageDisplayNames.malayalam,
-      subtitle: t('languageMalayalam', selectedLanguage),
+      subtitle: 'Malayalam',
     },
     {
       id: 'punjabi' as Language,
       code: languageCodes.punjabi,
       name: languageDisplayNames.punjabi,
-      subtitle: t('languagePunjabi', selectedLanguage),
+      subtitle: 'Punjabi',
     },
     {
       id: 'assamese' as Language,
       code: languageCodes.assamese,
       name: languageDisplayNames.assamese,
-      subtitle: t('languageAssamese', selectedLanguage),
+      subtitle: 'Assamese',
     },
   ];
 
@@ -149,9 +150,9 @@ export default function LanguageSelection({ onContinue, onBack, doctorName = '',
         </div>
 
         {/* Heading */}
-        <h1 className="text-white text-center mb-3">{t('chooseLanguage', selectedLanguage)}</h1>
+        <h1 className="text-white text-center mb-3">{bt('Choose Your Language')}</h1>
         <p className="text-gray-400 text-center mb-8">
-          {t('languageSubtitle', selectedLanguage)}
+          {bt('Select your preferred language for all communications')}
         </p>
 
         {/* Language Options */}
@@ -246,20 +247,20 @@ export default function LanguageSelection({ onContinue, onBack, doctorName = '',
         <div className="mb-6 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/30 rounded-xl p-4">
           <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-blue-400" />
-            {t('yourLanguageBenefits', selectedLanguage)}
+            {bt('Your Language Benefits')}
           </h3>
           <ul className="space-y-2 text-sm text-gray-300">
             <li className="flex items-start gap-2">
               <MessageSquare className={`w-4 h-4 ${benefitIconColor} mt-0.5 flex-shrink-0`} />
-              <span>{t('benefitMessages', selectedLanguage)}</span>
+              <span>{bt('All messages in your language')}</span>
             </li>
             <li className="flex items-start gap-2">
               <Bell className={`w-4 h-4 ${benefitIconColor} mt-0.5 flex-shrink-0`} />
-              <span>{t('benefitNotifications', selectedLanguage)}</span>
+              <span>{bt('Notifications translated automatically')}</span>
             </li>
             <li className="flex items-start gap-2">
               <FileText className={`w-4 h-4 ${benefitIconColor} mt-0.5 flex-shrink-0`} />
-              <span>{t('benefitConfirmations', selectedLanguage)}</span>
+              <span>{bt('Booking confirmations in your language')}</span>
             </li>
           </ul>
         </div>
@@ -269,32 +270,11 @@ export default function LanguageSelection({ onContinue, onBack, doctorName = '',
 
         {/* Continue Button */}
         <Button
-          onClick={async () => {
-            if (needsAITranslation(selectedLanguage)) {
-              setIsPreloading(true);
-              try {
-                await preloadLanguageTranslations(selectedLanguage);
-              } catch (e) {
-                console.warn('Preload failed, continuing anyway:', e);
-              }
-              setIsPreloading(false);
-            }
-            onContinue(selectedLanguage);
-          }}
-          disabled={isPreloading}
-          className={`w-full h-14 bg-gradient-to-r ${buttonGradient} text-white rounded-2xl flex items-center justify-center gap-2 shadow-lg disabled:opacity-60`}
+          onClick={() => onContinue(selectedLanguage)}
+          className={`w-full h-14 bg-gradient-to-r ${buttonGradient} text-white rounded-2xl flex items-center justify-center gap-2 shadow-lg`}
         >
-          {isPreloading ? (
-            <>
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
-              <span>Preparing {languageDisplayNames[selectedLanguage]}...</span>
-            </>
-          ) : (
-            <>
-              <span>{t('continue', selectedLanguage)}</span>
-              <ArrowRight className="w-5 h-5" />
-            </>
-          )}
+          <span>{bt('Continue')}</span>
+          <ArrowRight className="w-5 h-5" />
         </Button>
 
       </div>

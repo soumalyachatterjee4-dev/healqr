@@ -1010,6 +1010,7 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
               tokenNumber: booking.tokenNumber || `#${booking.serialNo || 0}`,
               bookingId: booking.bookingId || bookingDoc.id,
               appointmentTime: booking.appointmentTime || selectedChamber.startTime,
+              language: booking.language || 'english',
             });
           }
           bookingsCancelled++;
@@ -1145,6 +1146,7 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
               tokenNumber: booking.tokenNumber || `#${booking.serialNo || 0}`,
               bookingId: booking.bookingId || bookingDoc.id,
               appointmentTime: booking.appointmentTime || selectedChamber.startTime,
+              language: booking.language || 'english',
             });
           }
         }

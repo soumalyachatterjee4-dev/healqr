@@ -2,7 +2,8 @@ import { Button } from './ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { ChevronLeft, ChevronRight, Lightbulb } from 'lucide-react';
 import { useState } from 'react';
-import { t, type Language } from '../utils/translations';
+import { type Language } from '../utils/translations';
+import { useAITranslation } from '../hooks/useAITranslation';
 import TemplateDisplay from './TemplateDisplay';
 import BookingFlowLayout from './BookingFlowLayout';
 
@@ -58,18 +59,19 @@ export default function SelectDate({ onBack, onContinue, language, maxAdvanceDay
   });
   
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const { bt, dt } = useAITranslation(language);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const [currentMonth, setCurrentMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
 
   const daysOfWeek = [
-    t('sun', language),
-    t('mon', language),
-    t('tue', language),
-    t('wed', language),
-    t('thu', language),
-    t('fri', language),
-    t('sat', language),
+    dt('Sun'),
+    dt('Mon'),
+    dt('Tue'),
+    dt('Wed'),
+    dt('Thu'),
+    dt('Fri'),
+    dt('Sat'),
   ];
 
   const getDaysInMonth = (date: Date) => {
@@ -283,7 +285,7 @@ export default function SelectDate({ onBack, onContinue, language, maxAdvanceDay
       <div>
 
         {/* Select Date Section */}
-        <h2 className="text-white mb-4">{t('selectDate', language)}</h2>
+        <h2 className="text-white mb-4">{bt('Select Date')}</h2>
 
         {/* Calendar */}
         <div className="bg-[#1a1f2e] rounded-2xl border border-gray-700 p-6 mb-6">
@@ -355,7 +357,7 @@ export default function SelectDate({ onBack, onContinue, language, maxAdvanceDay
               : 'bg-gray-700 text-gray-500 cursor-not-allowed'
           }`}
         >
-          {t('continueToChamberSelection', language)}
+          {bt('Continue to Chamber Selection')}
         </Button>
       </div>
     </BookingFlowLayout>

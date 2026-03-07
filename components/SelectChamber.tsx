@@ -1,6 +1,7 @@
 import { Button } from './ui/button';
 import { useState, useEffect } from 'react';
-import { t, type Language, languageDisplayNames } from '../utils/translations';
+import { type Language, languageDisplayNames } from '../utils/translations';
+import { useAITranslation } from '../hooks/useAITranslation';
 import BookingFlowLayout from './BookingFlowLayout';
 import { Badge } from './ui/badge';
 import {
@@ -79,6 +80,7 @@ export default function SelectChamber({
   clinicAddress,
   clinicPlannedOffPeriods = [],
 }: SelectChamberProps) {
+  const { bt } = useAITranslation(language);
   const accentColor = themeColor === 'blue' ? 'blue' : 'emerald';
   console.log('🏥 SelectChamber received:', {
     doctorName,
@@ -517,8 +519,8 @@ export default function SelectChamber({
       <div>
         {/* Title */}
         <div className="text-center mb-2">
-          <h1 className="text-white mb-2">{t('selectChamber', language)}</h1>
-          <p className="text-gray-400 text-sm mb-4">{t('choosePreferredLocation', language)}</p>
+          <h1 className="text-white mb-2">{bt('Select Chamber')}</h1>
+          <p className="text-gray-400 text-sm mb-4">{bt('Choose your preferred location')}</p>
 
           {/* Selected Date Badge */}
           <div className={`inline-block bg-${accentColor}-500/20 border border-${accentColor}-500/30 backdrop-blur-sm rounded-full px-4 py-2 mb-6`}>
@@ -590,7 +592,7 @@ export default function SelectChamber({
           {/* Available Chambers - ONLY show if chamber consultation is selected */}
           {consultationType === 'chamber' && (
             <>
-              <h3 className="text-white mb-4">{t('availableChambers', language)}</h3>
+              <h3 className="text-white mb-4">{bt('Available Chambers')}</h3>
 
           {/* Loading state */}
           {loadingCounts && chambers.length > 0 ? (
@@ -728,7 +730,7 @@ export default function SelectChamber({
                   : 'border-gray-700 bg-[#0f1419] hover:border-gray-600'
                 }`}
               >
-                <h4 className="text-white mb-2">{t('mainChamber', language)}</h4>
+                <h4 className="text-white mb-2">{bt('Main Chamber')}</h4>
                 <p className="text-sm text-gray-400 mb-1">123 Medical Plaza, Room 101</p>
                 <p className="text-sm text-gray-400">06:00 - 17:00</p>
               </button>
@@ -740,7 +742,7 @@ export default function SelectChamber({
                   : 'border-gray-700 bg-[#0f1419] hover:border-gray-600'
                 }`}
               >
-                <h4 className="text-white mb-2">{t('secondaryChamber', language)}</h4>
+                <h4 className="text-white mb-2">{bt('Secondary Chamber')}</h4>
                 <p className="text-sm text-gray-400 mb-1">456 Health Center, Suite 205</p>
                 <p className="text-sm text-gray-400">10:00 - 18:00</p>
               </button>
@@ -799,7 +801,7 @@ export default function SelectChamber({
                 : 'bg-gray-700 text-gray-500 cursor-not-allowed'
             }`}
           >
-            {consultationType === 'video' ? 'Continue to Patient Details' : t('continueToPatientDetails', language)}
+            {consultationType === 'video' ? 'Continue to Patient Details' : bt('Continue to Patient Details')}
           </Button>
         </div>
       </div>

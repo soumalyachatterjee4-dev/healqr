@@ -1,6 +1,5 @@
 ﻿import { useState, useEffect } from 'react';
 import { Clock, Activity, AlertCircle } from 'lucide-react';
-import { translations } from '../utils/translations';
 import DashboardPromoDisplay from './DashboardPromoDisplay';
 import { collection, query, where, getDocs, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase/config';

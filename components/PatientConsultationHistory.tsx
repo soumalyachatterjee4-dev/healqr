@@ -20,7 +20,6 @@ import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase/config';
 import DashboardPromoDisplay from './DashboardPromoDisplay';
 import type { Language } from '../utils/translations';
-import { translations } from '../utils/translations';
 
 interface Consultation {
   id: string;

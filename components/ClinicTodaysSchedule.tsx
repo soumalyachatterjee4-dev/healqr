@@ -565,6 +565,7 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
               name: data.patientName || 'Unknown Patient',
               phone: data.whatsappNumber || data.phone || 'N/A',
               appointmentTime: data.appointmentTime || 'N/A',
+              language: data.language || 'english',
             };
           });
 
@@ -621,6 +622,7 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
               name: data.patientName || 'Unknown Patient',
               phone: data.whatsappNumber || data.phone || 'N/A',
               appointmentTime: data.appointmentTime || 'N/A',
+              language: data.language || 'english',
             };
           });
 
@@ -738,7 +740,7 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
             chamber: 'Chamber',
             tokenNumber: 'N/A',
             message: 'Your appointment has been restored and is now active. The doctor is ready to see you.',
-            language: 'english',
+            language: patient.language || 'english',
           }).catch((err: any) => {
             console.warn(`⚠️ Failed to send restoration notification to ${patient.name}:`, err);
           });
@@ -832,7 +834,7 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
             chamber: 'Chamber',
             tokenNumber: 'N/A',
             message: 'Your appointment has been cancelled. The doctor has blocked this time slot. Please contact the clinic for rescheduling.',
-            language: 'english',
+            language: patient.language || 'english',
           }).catch((err: any) => {
             console.warn(`⚠️ Failed to send notification to ${patient.name}:`, err);
           });

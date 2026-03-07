@@ -12,8 +12,6 @@ import { onForegroundMessage, ensureFCMInitialized } from "./services/fcm.servic
 import { getActivityTracker } from "./utils/activityTracker";
 import { getSessionPersistence } from "./utils/sessionPersistence";
 import type { Language } from "./utils/translations";
-import { getLanguageFromCode } from "./utils/translations";
-import type { LanguageCode } from "./utils/translations";
 import type { PatientFormData } from "./components/PatientDetailsForm";
 import AssistantAccessManager from "./components/AssistantAccessManager";
 

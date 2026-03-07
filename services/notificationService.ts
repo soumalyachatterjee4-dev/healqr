@@ -837,7 +837,7 @@ export const sendBatchCancellation = async (
           ? `Your appointment at ${chamberName} has been cancelled by doctor (Chamber Suspended)`
           : `Your appointment has been cancelled by doctor (Global Suspension)`,
         scope: type,
-        language: bookingDetails?.language || 'english'
+        language: p.language || bookingDetails?.language || 'english'
       });
       sent += 1;
     } catch (err) {
@@ -876,7 +876,7 @@ export const sendBatchRestoration = async (
           ? `Your appointment at ${chamberName} has been restored and confirmed`
           : `Your appointment has been restored and confirmed (Chamber Reactivated)`,
         scope: type,
-        language: bookingDetails?.language || 'english'
+        language: p.language || bookingDetails?.language || 'english'
       });
       sent += 1;
     } catch (err) {
