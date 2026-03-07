@@ -1,13 +1,16 @@
 /**
- * AI Translation Service — Powered by Gemini 2.0 Flash
+ * AI Translation Service — Powered by Gemini via Firebase Cloud Function
  *
- * Replaces Google Translation API at ~50x lower cost.
+ * API key is securely stored server-side (never exposed in browser).
  * Handles real-time translation for 31 languages (22 Indian + 9 international).
  * Uses intelligent caching (IndexedDB + in-memory) to minimize API calls.
  */
 
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
-const API_KEY = 'AIzaSyAEXO21T32uegMq4U57OnSDuBdA6CC_OOc';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { app } from '../lib/firebase/config';
+
+const functions = getFunctions(app!);
+const translateBatchFn = httpsCallable(functions, 'translateBatch');
 
 // ======================== LANGUAGE DEFINITIONS ========================
 
@@ -140,7 +143,7 @@ interface TranslationResult {
 }
 
 /**
- * Translate a single text string using Gemini AI
+ * Translate a single text string via Cloud Function
  */
 export async function aiTranslate(
   text: string,
@@ -150,65 +153,12 @@ export async function aiTranslate(
   if (!text || !text.trim()) return { translated: text, fromCache: false };
   if (targetLanguage === 'english') return { translated: text, fromCache: false };
 
-  // Check cache
-  const cacheKey = makeCacheKey(text, targetLanguage, context);
-  const cached = await getCachedTranslation(cacheKey);
-  if (cached) return { translated: cached, fromCache: true };
-
-  // Call Gemini
-  const langInfo = AI_SUPPORTED_LANGUAGES[targetLanguage];
-  const contextInstructions = getContextInstructions(context);
-
-  const prompt = `Translate the following English text to ${langInfo.nativeName} (${targetLanguage}). ${contextInstructions}
-
-RULES:
-- Return ONLY the translated text, nothing else
-- Use ${langInfo.script} script
-- Keep medical terms, drug names, doctor names, and proper nouns in English
-- Keep numbers in standard Arabic numerals (0-9)
-- Maintain the same tone and formality level
-- If the text contains HTML tags, preserve them exactly
-
-Text: "${text}"`;
-
-  try {
-    const response = await fetch(`${GEMINI_API_URL}?key=${API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 500,
-        }
-      })
-    });
-
-    if (!response.ok) {
-      console.warn(`AI Translation API error: ${response.status}`);
-      return { translated: text, fromCache: false };
-    }
-
-    const data = await response.json();
-    const translated = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-
-    if (!translated) return { translated: text, fromCache: false };
-
-    // Clean up: remove quotes Gemini sometimes adds
-    const cleaned = translated.replace(/^["']|["']$/g, '');
-
-    // Cache it
-    await setCachedTranslation(cacheKey, cleaned);
-
-    return { translated: cleaned, fromCache: false };
-  } catch (error) {
-    console.warn('AI Translation failed, returning original:', error);
-    return { translated: text, fromCache: false };
-  }
+  const results = await aiTranslateBatch([text], targetLanguage, context);
+  return results[0];
 }
 
 /**
- * Batch translate multiple texts in a single API call (cheaper + faster)
+ * Batch translate multiple texts via Cloud Function (API key stays server-side)
  */
 export async function aiTranslateBatch(
   texts: string[],
@@ -243,55 +193,19 @@ export async function aiTranslateBatch(
     return results as TranslationResult[];
   }
 
-  // Batch translate uncached texts via Gemini
-  const langInfo = AI_SUPPORTED_LANGUAGES[targetLanguage];
-  const contextInstructions = getContextInstructions(context);
-
-  // Build numbered list for Gemini
-  const numberedTexts = uncachedTexts.map((item, idx) => `${idx + 1}. "${item.text}"`).join('\n');
-
-  const prompt = `Translate the following English texts to ${langInfo.nativeName} (${targetLanguage}). ${contextInstructions}
-
-RULES:
-- Return ONLY a JSON array of translated strings in the same order
-- Use ${langInfo.script} script
-- Keep medical terms, drug names, doctor names, and proper nouns in English
-- Keep numbers in standard Arabic numerals (0-9)
-- Maintain the same tone and formality level
-
-Texts to translate:
-${numberedTexts}
-
-Return format: ["translated1", "translated2", ...]`;
-
+  // Call Cloud Function (API key is server-side, never exposed)
   try {
-    const response = await fetch(`${GEMINI_API_URL}?key=${API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 2000,
-        }
-      })
+    const textsToTranslate = uncachedTexts.map(item => item.text);
+    const response = await translateBatchFn({
+      texts: textsToTranslate,
+      targetLanguage,
+      context
     });
-
-    if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '[]';
-
-    // Parse JSON array from Gemini
-    const cleanJson = rawText.replace(/```json|```/g, '').trim();
-    const translatedArray: string[] = JSON.parse(cleanJson);
+    const { translations } = response.data as { translations: string[] };
 
     // Map results back and cache them
     for (let i = 0; i < uncachedTexts.length; i++) {
-      const translated = translatedArray[i] || uncachedTexts[i].text;
-      // Only cache actual translations, not source text (prevents IndexedDB poisoning)
+      const translated = translations[i] || uncachedTexts[i].text;
       if (translated !== uncachedTexts[i].text) {
         const cacheKey = makeCacheKey(uncachedTexts[i].text, targetLanguage, context);
         await setCachedTranslation(cacheKey, translated);
@@ -299,7 +213,7 @@ Return format: ["translated1", "translated2", ...]`;
       results[uncachedTexts[i].index] = { translated, fromCache: false };
     }
   } catch (error) {
-    console.warn('AI Batch Translation failed:', error);
+    console.warn('Cloud Function translation failed:', error);
     throw error;
   }
 
@@ -350,31 +264,8 @@ export async function aiDetectLanguage(text: string): Promise<{
     return { language: 'urdu', confidence: 0.6, script: 'Arabic' };
   }
 
-  // Fallback: use Gemini for uncertain scripts
-  try {
-    const response = await fetch(`${GEMINI_API_URL}?key=${API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: `Detect the language of this text and return ONLY a JSON object: {"language": "english|hindi|bengali|...", "confidence": 0.0-1.0, "script": "Latin|Devanagari|..."}
-
-Text: "${text.substring(0, 200)}"` }] }],
-        generationConfig: { temperature: 0, maxOutputTokens: 100 }
-      })
-    });
-
-    const data = await response.json();
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
-    const cleaned = rawText.replace(/```json|```/g, '').trim();
-    const result = JSON.parse(cleaned);
-    return {
-      language: result.language as AILanguage || 'english',
-      confidence: result.confidence || 0.5,
-      script: result.script || 'Latin'
-    };
-  } catch {
-    return { language: 'english', confidence: 0.3, script: 'Latin' };
-  }
+  // Fallback for scripts not detected by heuristics
+  return { language: 'english', confidence: 0.3, script: 'Latin' };
 }
 
 // ======================== MEDICAL CONTEXT TRANSLATION ========================
@@ -403,20 +294,6 @@ export async function aiTranslateChat(
 }
 
 // ======================== HELPERS ========================
-
-function getContextInstructions(context: string): string {
-  switch (context) {
-    case 'medical':
-      return 'This is medical/healthcare content. Keep all drug names, disease names, medical procedures, and medical abbreviations (BP, ECG, OPD, etc.) in English. Translate descriptive medical text naturally.';
-    case 'chat':
-      return 'This is a doctor-patient chat message. Translate conversationally and naturally. Keep medicine names and dosages in English.';
-    case 'notification':
-      return 'This is a notification/alert message. Keep it concise and clear. Keep doctor names, medicine names, and appointment times in English.';
-    case 'ui':
-    default:
-      return 'This is a UI label/button text for a healthcare app. Keep it short, clear, and natural.';
-  }
-}
 
 /**
  * Get cache statistics
