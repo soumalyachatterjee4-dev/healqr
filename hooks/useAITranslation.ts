@@ -13,9 +13,11 @@
 import { useState, useEffect, useCallback, useRef, createElement, Fragment } from 'react';
 import type { ReactNode } from 'react';
 import type { Language } from '../utils/translations';
+import bundledTranslations from '../utils/bundledTranslations';
 
 // Session-wide cache shared across all hook instances
-const dynamicCache = new Map<string, string>();
+// Pre-seed with bundled translations for instant display
+const dynamicCache = new Map<string, string>(bundledTranslations);
 
 // Track in-flight translations to avoid duplicate API calls
 const pendingTranslations = new Map<string, Promise<string>>();
