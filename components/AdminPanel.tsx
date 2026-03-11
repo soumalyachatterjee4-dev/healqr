@@ -74,6 +74,7 @@ export default function AdminPanel({ adminEmail, onLogout, onStartDemo, uploaded
     'promo-manager': 'Promo Manager',
     'data-cleanup': 'Data Standardization',
     'pharma-management': 'Pharma Companies',
+    'pharma-templates': 'Pharma Approvals',
     'distribution-requests': 'Distributor Requests',
     'advertiser-management': 'Advertiser Management',
     'page-distribution': 'Page Distribution',

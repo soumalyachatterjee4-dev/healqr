@@ -19,11 +19,11 @@ interface Ad {
 
 interface AdBannerProps {
   language?: Language;
-  placement?: 'language' | 'specialty' | 'doctor_selection' | 'mini_website' | 'chamber' | 'date' | 'patient_form' | 'confirmation';
+  placement?: 'language' | 'specialty' | 'doctor_selection' | 'mini_website' | 'chamber' | 'date' | 'patient_form' | 'confirmation' | 'booking_flow';
   className?: string;
 }
 
-export default function AdBanner({ language = 'en', placement = 'booking_flow', className = '' }: AdBannerProps) {
+export default function AdBanner({ language = 'english', placement = 'booking_flow', className = '' }: AdBannerProps) {
   const [ad, setAd] = useState<Ad | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -34,7 +34,7 @@ export default function AdBanner({ language = 'en', placement = 'booking_flow', 
   const fetchAd = async () => {
     try {
       const adsRef = collection(db, 'advertisements');
-      
+
       // Query for active ads matching language or 'all'
       const q = query(
         adsRef,
@@ -42,12 +42,12 @@ export default function AdBanner({ language = 'en', placement = 'booking_flow', 
       );
 
       const snapshot = await getDocs(q);
-      
+
       if (!snapshot.empty) {
         // Filter ads that match language or are for 'all' languages
         const ads = snapshot.docs
           .map(doc => ({ id: doc.id, ...doc.data() } as Ad))
-          .filter(ad => 
+          .filter(ad =>
             (ad.language === language || ad.language === 'all') &&
             (ad.placement === 'all' || ad.placement === 'booking_flow')
           );
@@ -128,17 +128,17 @@ export default function AdBanner({ language = 'en', placement = 'booking_flow', 
 
   return (
     <div className={`w-full ${className}`}>
-      <Card 
+      <Card
         className="bg-zinc-900 border-zinc-800 overflow-hidden cursor-pointer hover:border-emerald-500/50 transition-all group"
         onClick={handleAdClick}
       >
         <div className="relative">
-          <img 
-            src={ad.imageUrl} 
+          <img
+            src={ad.imageUrl}
             alt={ad.title || "Health Card Advertisement"}
             className="w-full h-auto object-cover"
           />
-          
+
           {ad.link && (
             <div className="absolute top-2 right-2 bg-black/50 backdrop-blur-sm rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity">
               <ExternalLink className="w-4 h-4 text-white" />

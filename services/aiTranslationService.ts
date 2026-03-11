@@ -148,7 +148,7 @@ interface TranslationResult {
 export async function aiTranslate(
   text: string,
   targetLanguage: AILanguage,
-  context: 'ui' | 'medical' | 'chat' | 'notification' = 'ui'
+  context: 'ui' | 'medical' | 'chat' | 'notification' | 'transliterate' = 'ui'
 ): Promise<TranslationResult> {
   if (!text || !text.trim()) return { translated: text, fromCache: false };
   if (targetLanguage === 'english') return { translated: text, fromCache: false };
@@ -163,7 +163,7 @@ export async function aiTranslate(
 export async function aiTranslateBatch(
   texts: string[],
   targetLanguage: AILanguage,
-  context: 'ui' | 'medical' | 'chat' | 'notification' = 'ui'
+  context: 'ui' | 'medical' | 'chat' | 'notification' | 'transliterate' = 'ui'
 ): Promise<TranslationResult[]> {
   if (!texts || texts.length === 0) return [];
   if (targetLanguage === 'english') {

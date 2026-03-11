@@ -3,7 +3,6 @@ import { Button } from './ui/button';
 import { Video, User, AlertCircle, Star, Grid3x3, Smartphone, Clock, FileText, CheckCircle, TrendingUp, Bell, Users, Layout, ShoppingCart, Building2, MessageSquare, MonitorPlay, ShoppingBag, ScanLine, Twitter, Linkedin, Facebook, ArrowLeft, Sparkles } from 'lucide-react';
 import { collection, query, where, getDocs, getCountFromServer, Timestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase/config';
-import FloatingSupportBox from './FloatingSupportBox';
 import LandingSupportModal from './LandingSupportModal';
 import AdvertiserGatewayModal from './AdvertiserGatewayModal';
 import DashboardPromoDisplay from './DashboardPromoDisplay';
@@ -160,8 +159,6 @@ export default function LandingPage({
 
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* Floating Support Box */}
-      <FloatingSupportBox />
       {/* Navbar */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-black border-b border-gray-900">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">

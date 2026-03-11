@@ -1,6 +1,6 @@
 /**
  * Firebase Authentication Service
- * 
+ *
  * Handles all authentication-related operations:
  * - Sign up with email/password
  * - Sign in with email/password
@@ -65,7 +65,7 @@ export class AuthService {
         fullName: doctorData.fullName,
         doctorCode: doctorCode,
         specialty: doctorData.specialty || '',
-        
+
         // Initialize chambers (inactive by default)
         chambers: {
           main: {
@@ -79,7 +79,7 @@ export class AuthService {
             schedule: {},
           },
         },
-        
+
         // Starter plan (100 bookings free)
         subscription: {
           plan: 'starter',
@@ -91,11 +91,11 @@ export class AuthService {
           nextRenewalDate: this.calculateNextRenewalDate(),
           billingCycle: 'monthly',
         },
-        
+
         // No add-ons initially
         activeAddons: [],
         addonExpiry: {},
-        
+
         // Initialize stats
         stats: {
           totalBookings: 0,
@@ -103,7 +103,7 @@ export class AuthService {
           averageRating: 0,
           totalReviews: 0,
         },
-        
+
         // Default settings
         settings: {
           emailNotifications: true,
@@ -111,7 +111,7 @@ export class AuthService {
           pushNotifications: true,
           language: 'english',
         },
-        
+
         // Metadata
         createdAt: serverTimestamp() as any,
         updatedAt: serverTimestamp() as any,
@@ -131,7 +131,7 @@ export class AuthService {
       await sendEmailVerification(user);
 
       return { user, doctorCode };
-      
+
     } catch (error: any) {
       console.error('❌ Sign up error:', error);
       throw this.handleAuthError(error);
@@ -157,7 +157,7 @@ export class AuthService {
 
       // 2. Fetch doctor data from Firestore
       const doctorDoc = await getDoc(doc(db, COLLECTIONS.DOCTORS, user.uid));
-      
+
       if (!doctorDoc.exists()) {
         throw new Error('Doctor profile not found. Please contact support.');
       }
@@ -172,7 +172,7 @@ export class AuthService {
       );
 
       return { user, doctor };
-      
+
     } catch (error: any) {
       console.error('❌ Sign in error:', error);
       throw this.handleAuthError(error);
@@ -194,6 +194,26 @@ export class AuthService {
       console.error('❌ Sign out error:', error);
       throw this.handleAuthError(error);
     }
+  }
+
+  /**
+   * Generic sign in with email and password
+   */
+  static async login(email: string, password: string): Promise<UserCredential> {
+    if (!auth) {
+      throw new Error('Firebase not configured. Using DEMO MODE.');
+    }
+    return await signInWithEmailAndPassword(auth, email, password);
+  }
+
+  /**
+   * Generic sign up with email and password
+   */
+  static async signUp(email: string, password: string): Promise<UserCredential> {
+    if (!auth) {
+      throw new Error('Firebase not configured. Using DEMO MODE.');
+    }
+    return await createUserWithEmailAndPassword(auth, email, password);
   }
 
   /**
@@ -242,19 +262,19 @@ export class AuthService {
    */
   private static async generateUniqueDoctorCode(): Promise<string> {
     const maxAttempts = 10;
-    
+
     for (let i = 0; i < maxAttempts; i++) {
       // Generate random 6-digit number
       const code = Math.floor(100000 + Math.random() * 900000).toString();
-      
+
       // Check if code already exists
       const exists = await this.checkDoctorCodeExists(code);
-      
+
       if (!exists) {
         return code;
       }
     }
-    
+
     throw new Error('Failed to generate unique doctor code. Please try again.');
   }
 
@@ -343,7 +363,7 @@ export class AuthService {
     if (!auth) return null;
     const user = auth.currentUser;
     if (!user) return null;
-    
+
     return await user.getIdToken();
   }
 }

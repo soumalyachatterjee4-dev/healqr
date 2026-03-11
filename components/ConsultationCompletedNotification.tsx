@@ -1,6 +1,6 @@
 import { CheckCircle, Download } from 'lucide-react';
 import TemplateDisplay from './TemplateDisplay';
-import { useAITranslation } from '../hooks/useAITranslation';
+
 import type { Language } from '../utils/translations';
 
 interface ConsultationCompletedNotificationProps {
@@ -31,8 +31,6 @@ export default function ConsultationCompletedNotification({
   rxUrl,
   dietUrl,
 }: ConsultationCompletedNotificationProps) {
-  const { bt } = useAITranslation(language);
-
   return (
     <div className="flex items-center justify-center py-8">
       {/* Phone Mockup */}
@@ -49,7 +47,7 @@ export default function ConsultationCompletedNotification({
                 </div>
                 <div>
                   <h2 className="text-gray-900 uppercase tracking-wide text-sm">
-                    {bt('CONSULTATION COMPLETED')}
+                    CONSULTATION COMPLETED
                   </h2>
                 </div>
               </div>
@@ -75,25 +73,25 @@ export default function ConsultationCompletedNotification({
 
               {/* Greeting */}
               <p className="text-gray-900 mb-4">
-                {bt(`Hello ${patientName}, 👋`)}
+                {`Hello ${patientName}, 👋`}
               </p>
 
               {/* Message Body */}
               <p className="text-gray-700 text-sm mb-4 leading-relaxed">
-                {bt(`Thank you for visiting ${clinicName}. Your consultation has been successfully completed.`)}
+                {`Thank you for visiting ${clinicName}. Your consultation has been successfully completed.`}
               </p>
 
               {/* Consultation Details */}
               <div className="bg-gray-50 rounded-lg p-4 mb-4 space-y-2">
                 {consultationDate && (
                   <div>
-                    <span className="text-gray-900">{bt('Consultation Date:')}</span>{' '}
+                    <span className="text-gray-900">Consultation Date:</span>{' '}
                     <span className="text-gray-600">{consultationDate}</span>
                   </div>
                 )}
                 {consultationTime && (
                   <div>
-                    <span className="text-gray-900">{bt('Time:')}</span>{' '}
+                    <span className="text-gray-900">Time:</span>{' '}
                     <span className="text-gray-600">{consultationTime}</span>
                   </div>
                 )}
@@ -101,17 +99,17 @@ export default function ConsultationCompletedNotification({
 
               {/* Next Steps */}
               <div className="mb-4">
-                <p className="text-gray-900 text-sm mb-2">{bt('Next Steps:')}</p>
+                <p className="text-gray-900 text-sm mb-2">Next Steps:</p>
                 <div className="text-gray-600 text-sm space-y-1 ml-2">
-                  <p>{bt('• Follow the prescribed medication')}</p>
-                  <p>{bt('• Schedule recommended tests')}</p>
-                  <p>{bt('• Book follow-up if advised')}</p>
+                  <p>• Follow the prescribed medication</p>
+                  <p>• Schedule recommended tests</p>
+                  <p>• Book follow-up if advised</p>
                 </div>
               </div>
 
               {/* Thank You Message */}
               <p className="text-gray-700 text-sm mb-4 text-center">
-                {bt('Thank you for trusting us with your health!')}
+                Thank you for trusting us with your health!
               </p>
 
               {/* Health Tip Section */}
@@ -127,7 +125,7 @@ export default function ConsultationCompletedNotification({
                     className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-[0.98] transition-all"
                   >
                     <Download className="w-5 h-5" />
-                    {bt('Download Digital Prescription')}
+                    Download Digital Prescription
                   </a>
                 </div>
               )}
@@ -142,7 +140,7 @@ export default function ConsultationCompletedNotification({
                     className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 active:scale-[0.98] transition-all"
                   >
                     <Download className="w-5 h-5" />
-                    {bt('Download AI Diet Chart')}
+                    Download AI Diet Chart
                   </a>
                 </div>
               )}
@@ -150,7 +148,7 @@ export default function ConsultationCompletedNotification({
               {/* Secure link note */}
               {(rxUrl || dietUrl) && (
                 <p className="text-[10px] text-gray-400 text-center mb-4 italic">
-                  {bt('Securely generated digital prescription')}
+                  Securely generated digital prescription
                 </p>
               )}
 

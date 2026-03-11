@@ -180,8 +180,9 @@ const PWAInstallBanner = () => {
   );
 };
 
-const PatientDashboardNew = () => {
+const PatientDashboardNew = ({ onLanguageDetected }: { onLanguageDetected?: (lang: string) => void }) => {
   const [patientData, setPatientData] = useState<any>(null);
+  const [patientLanguage, setPatientLanguage] = useState<string>(localStorage.getItem('patient_language') || 'english');
   const [currentView, setCurrentView] = useState('dashboard');
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -259,6 +260,14 @@ const PatientDashboardNew = () => {
           gender: latestBooking.patientGender,
           email: latestBooking.patientEmail || ''
         });
+
+        // Detect and store patient's language preference from booking
+        const lang = latestBooking.language || 'english';
+        if (lang && lang !== 'en' && lang !== 'english') {
+          setPatientLanguage(lang);
+          localStorage.setItem('patient_language', lang);
+          onLanguageDetected?.(lang);
+        }
 
         // Calculate stats
         calculateStats(patientPhone);
@@ -647,15 +656,15 @@ const PatientDashboardNew = () => {
       case 'health-card':
         return <PatientHealthCardProfile />;
       case 'history':
-        return <PatientConsultationHistory language={'english'} />;
+        return <PatientConsultationHistory language={patientLanguage} />;
       case 'live-tracker':
-        return <PatientLiveStatus language={'english'} />;
+        return <PatientLiveStatus language={patientLanguage} />;
       case 'notifications':
-        return <PatientNotifications patientPhone={patientData?.phone} language={'english'} />;
+        return <PatientNotifications patientPhone={patientData?.phone} language={patientLanguage} />;
       case 'medico-locker':
-        return <PatientMedicoLocker language={'english'} />;
+        return <PatientMedicoLocker language={patientLanguage} />;
       case 'search':
-        return <PatientSearch language={'english'} isDashboard={true} />;
+        return <PatientSearch language={patientLanguage} isDashboard={true} />;
       default:
         return renderDashboardContent();
     }

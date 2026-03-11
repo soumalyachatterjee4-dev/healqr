@@ -6,8 +6,9 @@ import SelectDate from './SelectDate';
 import SelectChamber from './SelectChamber';
 import PatientDetailsForm from './PatientDetailsForm';
 import BookingConfirmation from './BookingConfirmation';
-import { type Language } from '../utils/translations';
-import { useAITranslation } from '../hooks/useAITranslation';
+import type { Language } from '../utils/translations';
+
+
 
 type BookingStep =
   | 'language'
@@ -44,9 +45,9 @@ interface ClinicData {
 export default function ClinicBookingFlow() {
   const [currentStep, setCurrentStep] = useState<BookingStep>('language');
   const [language, setLanguage] = useState<Language>('english');
-  const { bt } = useAITranslation(language);
+
   const [selectedDoctor, setSelectedDoctor] = useState<SelectedDoctor | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedChamberId, setSelectedChamberId] = useState<number | null>(null);
   const [selectedChamberName, setSelectedChamberName] = useState<string>('');
   const [bookingId, setBookingId] = useState<string>('');
@@ -203,11 +204,11 @@ export default function ClinicBookingFlow() {
         doctorWithChambers.chambers = profileData.chambers || [];
         console.log('✅ Doctor profile LOADED:', {
           doctorUid: doctor.uid,
-          chambersCount: doctorWithChambers.chambers.length,
-          chambers: doctorWithChambers.chambers.map((c: any) => ({
+          chambersCount: doctorWithChambers.chambers?.length || 0,
+          chambers: doctorWithChambers.chambers?.map((c: any) => ({
             name: c.chamberName,
             address: c.chamberAddress
-          }))
+          })) || []
         });
       } else {
         console.warn('⚠️ Doctor profile not found for:', doctor.uid);
@@ -301,9 +302,9 @@ export default function ClinicBookingFlow() {
     setCurrentStep('select-date');
   };
 
-  const handleDateSelect = (date: string) => {
+  const handleDateSelect = (date: Date) => {
     setSelectedDate(date);
-    sessionStorage.setItem('booking_date', date);
+    sessionStorage.setItem('booking_date', date.toISOString());
     setCurrentStep('select-chamber');
   };
 
@@ -342,7 +343,7 @@ export default function ClinicBookingFlow() {
     sessionStorage.removeItem('booking_chamber_id');
     sessionStorage.removeItem('booking_chamber_name');
     setSelectedDoctor(null);
-    setSelectedDate('');
+    setSelectedDate(null);
     setSelectedChamberId(null);
     setSelectedChamberName('');
     setCurrentStep('clinic-website');
@@ -362,7 +363,7 @@ export default function ClinicBookingFlow() {
         break;
       case 'select-chamber':
         setCurrentStep('select-date');
-        setSelectedDate('');
+        setSelectedDate(null);
         break;
       case 'patient-form':
         setCurrentStep('select-chamber');
@@ -380,7 +381,7 @@ export default function ClinicBookingFlow() {
       <div className="min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-slate-900 flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mb-4"></div>
-          <p className="text-blue-200">{bt('Loading clinic...')}</p>
+          <p className="text-blue-200">Loading clinic...</p>
         </div>
       </div>
     );
@@ -392,8 +393,8 @@ export default function ClinicBookingFlow() {
       <div className="min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-slate-900 flex items-center justify-center p-4">
         <div className="bg-slate-800/50 border border-blue-500/20 rounded-2xl p-8 max-w-md text-center backdrop-blur-sm">
           <div className="text-6xl mb-4">🏥</div>
-          <h2 className="text-2xl font-bold text-white mb-2">{bt('Clinic Not Found')}</h2>
-          <p className="text-blue-200">{bt('Please scan a valid clinic QR code to continue.')}</p>
+          <h2 className="text-2xl font-bold text-white mb-2">Clinic Not Found</h2>
+          <p className="text-blue-200">Please scan a valid clinic QR code to continue.</p>
         </div>
       </div>
     );
@@ -485,7 +486,7 @@ export default function ClinicBookingFlow() {
         <SelectChamber
           onChamberSelect={handleChamberSelect}
           onBack={handleBack}
-          selectedDate={selectedDate}
+          selectedDate={selectedDate || new Date()}
           chambers={selectedDoctor?.chambers || []}
           doctorName={selectedDoctor?.name || ''}
           doctorDegrees={selectedDoctor?.degrees}
@@ -505,7 +506,7 @@ export default function ClinicBookingFlow() {
         <PatientDetailsForm
           onSubmit={handleBookingComplete}
           onBack={handleBack}
-          selectedDate={selectedDate}
+          selectedDate={selectedDate || new Date()}
           // Pass required IDs
           doctorId={selectedDoctor?.uid}
           selectedChamber={selectedChamberName}
@@ -525,7 +526,6 @@ export default function ClinicBookingFlow() {
     case 'confirmation':
       return (
         <BookingConfirmation
-          bookingId={bookingId}
           onBackToHome={handleBackToHome}
           doctorName={selectedDoctor?.name || ''}
           language={language}
@@ -542,7 +542,7 @@ export default function ClinicBookingFlow() {
             serialNo: confirmationData?.serialNo?.toString() || confirmationData?.tokenNumber?.toString() || '---',
             bookingId: bookingId,
             doctorName: selectedDoctor?.name || 'Doctor',
-            date: selectedDate ? new Date(selectedDate) : new Date(),
+            date: selectedDate || new Date(),
             time: confirmationData?.selectedTime || '10:00 AM - 02:00 PM', // Fallback or need to capture time
             location: selectedChamberName || clinic?.address || 'Clinic',
             consultationType: 'chamber'

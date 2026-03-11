@@ -2,8 +2,9 @@ import { Lightbulb, Calendar, Phone, Sparkles, MapPin, Users, Star, AlertCircle 
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { useState, useEffect } from 'react';
-import { type Language } from '../utils/translations';
-import { useAITranslation } from '../hooks/useAITranslation';
+import type { Language } from '../utils/translations';
+
+
 import TemplateDisplay from './TemplateDisplay';
 import BookingFlowLayout from './BookingFlowLayout';
 import ReviewCard from './ReviewCard';
@@ -29,7 +30,7 @@ export default function ClinicBookingMiniWebsite({
   onBack,
   language = 'english',
 }: ClinicBookingMiniWebsiteProps) {
-  const { bt } = useAITranslation(language);
+
   const [clinicProfile, setClinicProfile] = useState<any>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -180,7 +181,7 @@ export default function ClinicBookingMiniWebsite({
             className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Calendar className="w-5 h-5" />
-            {bt('Book Appointment Now')}
+            Book Appointment Now
           </Button>
 
           {/* Emergency Button */}

@@ -9,6 +9,8 @@ import { toast } from 'sonner';
 import { jsPDF } from 'jspdf';
 import { searchMedicines, type Medicine } from '../utils/medicines';
 import { getDrugSuggestionsFromGemini } from '../services/aiService';
+import { needsNonLatinRendering, ensureFontLoaded, transliterateTexts, renderNonLatinForPDF } from '../utils/pdfTransliteration';
+import type { AILanguage } from '../services/aiTranslationService';
 
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { app } from '../lib/firebase/config';
@@ -279,6 +281,62 @@ export default function DigitalRXMaker({
   const generatePDF = async () => {
     setGenerating(true);
     try {
+      // ─── Bilingual: Transliterate medicine names + instructions if non-English ───
+      const patientLang = (patient.language || 'english') as AILanguage;
+      const isBilingual = needsNonLatinRendering(patientLang);
+      let scriptFont: string | null = null;
+      let transliteratedMeds: string[] = [];
+      let transliteratedInstructions: string[] = [];
+      const headerTranslit = new Map<string, string>(); // English → transliterated
+
+      if (isBilingual) {
+        const validMeds = items.filter(item => item.medicineName);
+        const medNames = validMeds.map((item: any) => `${item.type} ${item.medicineName} ${item.strength}`);
+        const instrTexts = validMeds.map((item: any) => item.instructions || '').filter(Boolean);
+
+        // Collect header texts for transliteration
+        const headerTexts: string[] = [];
+        const isClinicCtx = doctorInfo.pdfContext === 'clinic' && doctorInfo.clinicInfo;
+        if (isClinicCtx) {
+          if (doctorInfo.clinicInfo!.name) headerTexts.push(doctorInfo.clinicInfo!.name);
+          if (doctorInfo.clinicInfo!.address) headerTexts.push(doctorInfo.clinicInfo!.address);
+        }
+        const drDisplay = (doctorInfo.useDrPrefix ?? true) ? `Dr. ${doctorInfo.name}` : doctorInfo.name;
+        headerTexts.push(drDisplay);
+        const degStr = doctorInfo.degrees?.length ? doctorInfo.degrees.join(', ') : doctorInfo.degree;
+        if (degStr) headerTexts.push(degStr);
+        const specList = doctorInfo.specialties || doctorInfo.specialities;
+        const specStr = (specList && specList.length > 0) ? specList.join(', ') : doctorInfo.specialty;
+        if (specStr) headerTexts.push(specStr);
+        if (doctorInfo.timing) headerTexts.push(doctorInfo.timing);
+        if (!isClinicCtx && doctorInfo.clinicName) headerTexts.push(doctorInfo.clinicName);
+        if (!isClinicCtx && doctorInfo.address) headerTexts.push(doctorInfo.address);
+        // Patient labels + values
+        headerTexts.push('Patient Name:', patient.name, 'Mobile:', 'Age/Sex:', 'Purpose:', 'Booking ID / SRL:');
+        if (patient.purpose) headerTexts.push(patient.purpose);
+
+        // Load font + transliterate all in parallel
+        const [font, medResults, instrResults, headerResults] = await Promise.all([
+          ensureFontLoaded(patientLang),
+          transliterateTexts(medNames, patientLang),
+          instrTexts.length > 0 ? transliterateTexts(instrTexts, patientLang) : Promise.resolve([]),
+          transliterateTexts(headerTexts, patientLang),
+        ]);
+        scriptFont = font;
+        transliteratedMeds = medResults;
+        transliteratedInstructions = instrResults;
+        headerTexts.forEach((text, idx) => headerTranslit.set(text, headerResults[idx]));
+      }
+
+      // Helper: render transliterated text below the current position
+      const addTranslitBelow = (text: string, x: number, y: number, fontSize: number, maxWidth?: number) => {
+        if (!isBilingual || !scriptFont || !headerTranslit.has(text)) return 0;
+        const rendered = renderNonLatinForPDF(headerTranslit.get(text)!, scriptFont, fontSize, '#888');
+        const w = maxWidth ? Math.min(rendered.widthMM, maxWidth) : rendered.widthMM;
+        doc.addImage(rendered.dataUrl, 'PNG', x, y, w, rendered.heightMM);
+        return rendered.heightMM + 0.5;
+      };
+
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
       const margin = 20;
@@ -294,16 +352,21 @@ export default function DigitalRXMaker({
         doc.setFontSize(20);
         doc.setTextColor(30, 41, 59);
         doc.setFont('helvetica', 'bold');
-        doc.text((doctorInfo.clinicInfo!.name || '').toUpperCase(), margin, currentY);
+        const clinicNameText = (doctorInfo.clinicInfo!.name || '');
+        doc.text(clinicNameText.toUpperCase(), margin, currentY);
+        currentY += addTranslitBelow(clinicNameText, margin, currentY, 12, pageWidth / 2 - margin);
         currentY += 7;
 
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
         doc.setTextColor(100);
         if (doctorInfo.clinicInfo!.address) {
-          const splitAddr = doc.splitTextToSize(doctorInfo.clinicInfo!.address, pageWidth / 2 - margin);
+          const addrText = doctorInfo.clinicInfo!.address;
+          const splitAddr = doc.splitTextToSize(addrText, pageWidth / 2 - margin);
           doc.text(splitAddr, margin, currentY);
-          currentY += splitAddr.length * 4 + 2;
+          currentY += splitAddr.length * 4 + 1;
+          currentY += addTranslitBelow(addrText, margin, currentY, 7, pageWidth / 2 - margin);
+          currentY += 1;
         }
         if (doctorInfo.clinicInfo!.phone) {
           doc.text(`Tel: ${doctorInfo.clinicInfo!.phone}`, margin, currentY);
@@ -322,21 +385,31 @@ export default function DigitalRXMaker({
         doc.setTextColor(40);
         const displayName = (doctorInfo.useDrPrefix ?? true) ? `Dr. ${doctorInfo.name}` : doctorInfo.name;
         doc.text(displayName.toUpperCase(), margin, currentY);
+        currentY += addTranslitBelow(displayName, margin, currentY, 9, pageWidth / 2 - margin);
         currentY += 5;
 
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
         doc.setTextColor(100);
         const degreesText = doctorInfo.degrees?.length ? doctorInfo.degrees.join(', ') : doctorInfo.degree;
-        if (degreesText) { doc.text(degreesText, margin, currentY); currentY += 4; }
+        if (degreesText) {
+          doc.text(degreesText, margin, currentY); currentY += 4;
+          currentY += addTranslitBelow(degreesText, margin, currentY - 1, 7);
+        }
         const specialtiesList = doctorInfo.specialties || doctorInfo.specialities;
         const specialtiesText = (specialtiesList && specialtiesList.length > 0) ? specialtiesList.join(', ') : doctorInfo.specialty;
-        if (specialtiesText) { doc.text(specialtiesText, margin, currentY); currentY += 4; }
+        if (specialtiesText) {
+          doc.text(specialtiesText, margin, currentY); currentY += 4;
+          currentY += addTranslitBelow(specialtiesText, margin, currentY - 1, 7);
+        }
         if (doctorInfo.showRegistrationOnRX && doctorInfo.registrationNumber) {
           doc.text(`REG NO: ${doctorInfo.registrationNumber}`, margin, currentY);
           currentY += 4;
         }
-        if (doctorInfo.timing) { doc.text(`Timing: ${doctorInfo.timing}`, margin, currentY); currentY += 4; }
+        if (doctorInfo.timing) {
+          doc.text(`Timing: ${doctorInfo.timing}`, margin, currentY); currentY += 4;
+          currentY += addTranslitBelow(doctorInfo.timing, margin, currentY - 1, 7);
+        }
 
       } else {
         // === DOCTOR HEADER: Doctor Name & Details FIRST, then Chamber ===
@@ -345,6 +418,7 @@ export default function DigitalRXMaker({
         doc.setFont('helvetica', 'bold');
         const displayName = (doctorInfo.useDrPrefix ?? true) ? `Dr. ${doctorInfo.name}` : doctorInfo.name;
         doc.text(displayName.toUpperCase(), margin, currentY);
+        currentY += addTranslitBelow(displayName, margin, currentY, 12, pageWidth / 2 - margin);
         currentY += 8;
 
         doc.setFontSize(10);
@@ -352,10 +426,16 @@ export default function DigitalRXMaker({
         doc.setTextColor(100);
 
         const degreesText = doctorInfo.degrees?.length ? doctorInfo.degrees.join(', ') : doctorInfo.degree;
-        if (degreesText) { doc.text(degreesText, margin, currentY); currentY += 6; }
+        if (degreesText) {
+          doc.text(degreesText, margin, currentY); currentY += 5;
+          currentY += addTranslitBelow(degreesText, margin, currentY - 2, 7);
+        }
         const specialtiesList = doctorInfo.specialties || doctorInfo.specialities;
         const specialtiesText = (specialtiesList && specialtiesList.length > 0) ? specialtiesList.join(', ') : doctorInfo.specialty;
-        if (specialtiesText) { doc.text(specialtiesText, margin, currentY); currentY += 6; }
+        if (specialtiesText) {
+          doc.text(specialtiesText, margin, currentY); currentY += 5;
+          currentY += addTranslitBelow(specialtiesText, margin, currentY - 2, 7);
+        }
         if (doctorInfo.showRegistrationOnRX && doctorInfo.registrationNumber) {
           doc.text(`REG NO: ${doctorInfo.registrationNumber}`, margin, currentY);
           currentY += 6;
@@ -366,17 +446,23 @@ export default function DigitalRXMaker({
           doc.setFont('helvetica', 'bold');
           doc.setTextColor(60);
           doc.text(doctorInfo.clinicName, margin, currentY);
+          currentY += addTranslitBelow(doctorInfo.clinicName, margin, currentY, 8);
           currentY += 5;
         }
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(100);
         doc.setFontSize(9);
         if (doctorInfo.address) {
-          const splitAddress = doc.splitTextToSize(doctorInfo.address, pageWidth / 2 - margin);
+          const addrText = doctorInfo.address;
+          const splitAddress = doc.splitTextToSize(addrText, pageWidth / 2 - margin);
           doc.text(splitAddress, margin, currentY);
           currentY += (splitAddress.length * 5);
+          currentY += addTranslitBelow(addrText, margin, currentY, 7, pageWidth / 2 - margin);
         }
-        if (doctorInfo.timing) { doc.text(doctorInfo.timing, margin, currentY); currentY += 5; }
+        if (doctorInfo.timing) {
+          doc.text(doctorInfo.timing, margin, currentY); currentY += 5;
+          currentY += addTranslitBelow(doctorInfo.timing, margin, currentY - 2, 7);
+        }
       }
 
       // Right Side: QR Code — Context-Aware
@@ -403,17 +489,20 @@ export default function DigitalRXMaker({
 
       doc.setLineWidth(0.5);
       doc.setDrawColor(200);
-      doc.line(margin, 65, pageWidth - margin, 65);
+      const headerEndY = Math.max(currentY + 5, 65);
+      doc.line(margin, headerEndY, pageWidth - margin, headerEndY);
 
       // --- PATIENT INFO SECTION ---
       doc.setFontSize(10);
       doc.setTextColor(60);
       doc.setFont('helvetica', 'bold');
 
-      const patientRowY = 75;
+      const patientRowY = headerEndY + 10;
       doc.text('Patient Name:', margin, patientRowY);
       doc.setFont('helvetica', 'normal');
       doc.text(patient.name, margin + 25, patientRowY);
+      // Transliterated patient name below
+      addTranslitBelow(patient.name, margin + 25, patientRowY + 1, 7);
 
       doc.setFont('helvetica', 'bold');
       doc.text('Mobile:', margin + 80, patientRowY);
@@ -425,12 +514,13 @@ export default function DigitalRXMaker({
       doc.setFont('helvetica', 'normal');
       doc.text(`${patient.age}Y/${patient.gender}`, margin + 155, patientRowY);
 
-      const patientRow2Y = 82;
+      const patientRow2Y = patientRowY + 7;
       if (patient.purpose) {
         doc.setFont('helvetica', 'bold');
         doc.text('Purpose:', margin, patientRow2Y);
         doc.setFont('helvetica', 'normal');
         doc.text(patient.purpose, margin + 20, patientRow2Y);
+        addTranslitBelow(patient.purpose, margin + 20, patientRow2Y + 1, 7);
       }
 
       doc.setFont('helvetica', 'bold');
@@ -439,7 +529,8 @@ export default function DigitalRXMaker({
       const serialDisplay = patient.srlNo ? `SRL-${patient.srlNo}` : patient.bookingId;
       doc.text(serialDisplay, margin + 155, patientRow2Y);
 
-      doc.line(margin, 88, pageWidth - margin, 88);
+      const patientEndY = patientRow2Y + 6;
+      doc.line(margin, patientEndY, pageWidth - margin, patientEndY);
 
       // --- WATERMARK LOGO (if available) ---
       const wmLogo = (isClinic && doctorInfo.clinicInfo?.watermarkLogo) || doctorInfo.watermarkLogo;
@@ -469,7 +560,7 @@ export default function DigitalRXMaker({
       }
 
       // --- MAIN BODY (TWO PANELS) ---
-      const bodyY = 98;
+      const bodyY = patientEndY + 10;
       const leftColWidth = contentWidth * 0.33;
       const dividerX = margin + leftColWidth;
 
@@ -605,17 +696,38 @@ export default function DigitalRXMaker({
         const medLines = doc.splitTextToSize(medLine, rxAreaWidth);
         doc.text(medLines, dividerX + 10, currentMedY);
 
+        // ─── Bilingual: transliterated medicine name below English ───
+        let bilingualOffset = 0;
+        if (isBilingual && scriptFont && transliteratedMeds[i]) {
+          const rendered = renderNonLatinForPDF(transliteratedMeds[i], scriptFont, 10, '#888');
+          doc.addImage(rendered.dataUrl, 'PNG', dividerX + 15, currentMedY + (medLines.length * 5) - 1, rendered.widthMM, rendered.heightMM);
+          bilingualOffset = rendered.heightMM + 1;
+        }
+
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
-        doc.text(`Dosage: ${item.dosage} | Duration: ${item.duration}`, dividerX + 15, currentMedY + (medLines.length * 5) + 1);
+        doc.text(`Dosage: ${item.dosage} | Duration: ${item.duration}`, dividerX + 15, currentMedY + (medLines.length * 5) + 1 + bilingualOffset);
 
         if (item.instructions) {
           doc.setTextColor(100);
-          doc.text(`Note: ${item.instructions}`, dividerX + 15, currentMedY + (medLines.length * 5) + 7);
+          doc.text(`Note: ${item.instructions}`, dividerX + 15, currentMedY + (medLines.length * 5) + 7 + bilingualOffset);
+
+          // Transliterated instruction
+          let instrOffset = 0;
+          if (isBilingual && scriptFont && item.instructions) {
+            // Find the matching transliterated instruction
+            const instrIdx = validItems.slice(0, i + 1).filter((it: any) => it.instructions).length - 1;
+            if (transliteratedInstructions[instrIdx]) {
+              const instrRendered = renderNonLatinForPDF(transliteratedInstructions[instrIdx], scriptFont, 8, '#999');
+              doc.addImage(instrRendered.dataUrl, 'PNG', dividerX + 15, currentMedY + (medLines.length * 5) + 10 + bilingualOffset, instrRendered.widthMM, instrRendered.heightMM);
+              instrOffset = instrRendered.heightMM;
+            }
+          }
+
           doc.setTextColor(60);
-          currentMedY += (medLines.length * 5) + 14;
+          currentMedY += (medLines.length * 5) + 14 + bilingualOffset + instrOffset;
         } else {
-          currentMedY += (medLines.length * 5) + 8;
+          currentMedY += (medLines.length * 5) + 8 + bilingualOffset;
         }
       });
 
@@ -642,6 +754,18 @@ export default function DigitalRXMaker({
         const remarksLines = doc.splitTextToSize(remarks, contentWidth);
         doc.text(remarksLines, margin, bottomY + 7);
         bottomY += 7 + (remarksLines.length * 4) + 2;
+
+        // Bilingual: transliterated special instructions
+        if (isBilingual && scriptFont) {
+          try {
+            const [translitRemarks] = await transliterateTexts([remarks], patientLang);
+            if (translitRemarks) {
+              const rendered = renderNonLatinForPDF(translitRemarks, scriptFont, 8, '#888');
+              doc.addImage(rendered.dataUrl, 'PNG', margin, bottomY, Math.min(rendered.widthMM, contentWidth), rendered.heightMM);
+              bottomY += rendered.heightMM + 2;
+            }
+          } catch { /* skip if fails */ }
+        }
       }
 
       // --- FOOTER BOX (Context-Aware, Compact) ---

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import TemplateDisplay from './TemplateDisplay';
-import { useAITranslation } from '../hooks/useAITranslation';
+
 import type { Language } from '../utils/translations';
 
 interface ReviewRequestNotificationProps {
@@ -40,7 +40,7 @@ export default function ReviewRequestNotification({
   const [showRatingDialog, setShowRatingDialog] = useState(false);
   const [showGooglePrompt, setShowGooglePrompt] = useState(false);
 
-  const { bt, dt } = useAITranslation(language);
+
 
   const handleRateClick = () => {
     setShowRatingDialog(true);
@@ -144,10 +144,10 @@ export default function ReviewRequestNotification({
           <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
             {/* Header */}
             <div className="bg-white border-b border-gray-200 px-6 py-4 text-center relative">
-              <p className="text-gray-500 text-sm uppercase tracking-wide mb-1">{bt('SHARE YOUR FEEDBACK')}</p>
+              <p className="text-gray-500 text-sm uppercase tracking-wide mb-1">SHARE YOUR FEEDBACK</p>
               <div className="flex items-center justify-center gap-2">
                 <Star className="w-5 h-5 text-gray-900" />
-                <h2 className="text-gray-900 font-semibold">{bt('Review & Rating')}</h2>
+                <h2 className="text-gray-900 font-semibold">Review & Rating</h2>
               </div>
             </div>
 
@@ -162,15 +162,15 @@ export default function ReviewRequestNotification({
               <h3 className="text-gray-900 font-semibold">{doctorName}</h3>
               <p className="text-gray-600 text-sm">{doctorSpecialty}</p>
               {consultationDate && (
-                <p className="text-gray-400 text-xs mt-1">{bt('Visited on')} {consultationDate}</p>
+                <p className="text-gray-400 text-xs mt-1">Visited on {consultationDate}</p>
               )}
             </div>
           </div>
 
           {/* Message */}
           <div className="mb-6">
-            <p className="text-gray-900 font-medium mb-3">{bt(`Hello ${patientName}, 👋`)}</p>
-            <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-line">{bt(`We hope you are feeling better after your visit with ${doctorName}.\n\nWould you mind sharing your experience?\nYour feedback helps us improve.`)}</p>
+            <p className="text-gray-900 font-medium mb-3">{`Hello ${patientName}, 👋`}</p>
+            <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-line">{`We hope you are feeling better after your visit with ${doctorName}.\n\nWould you mind sharing your experience?\nYour feedback helps us improve.`}</p>
           </div>
 
           {/* Feedback Textarea */}
@@ -178,7 +178,7 @@ export default function ReviewRequestNotification({
             <Textarea
               value={feedback}
               onChange={(e) => setFeedback(e.target.value)}
-              placeholder={dt('Share your experience... (optional)')}
+              placeholder="Share your experience... (optional)"
               className="min-h-[80px] resize-none text-sm bg-gray-50 text-gray-900 border-gray-200 placeholder:text-gray-500"
             />
           </div>
@@ -191,20 +191,20 @@ export default function ReviewRequestNotification({
               className="flex-1 border-gray-300 hover:bg-gray-50"
             >
               <Star className="w-4 h-4 mr-2" />
-              {bt('Rate')}
+              Rate
             </Button>
             <Button
               onClick={handleIgnore}
               variant="outline"
               className="flex-1 border-gray-300 hover:bg-gray-50"
             >
-              {bt('Ignore')}
+              Ignore
             </Button>
             <Button
               onClick={handleSendReview}
               className="flex-1 bg-blue-900 hover:bg-blue-800 text-white"
             >
-              {bt('SEND')}
+              SEND
             </Button>
           </div>
 
@@ -227,10 +227,10 @@ export default function ReviewRequestNotification({
                     <Star className="w-8 h-8 text-blue-600 fill-blue-600" />
                 </div>
                 <h3 className="text-gray-900 font-bold text-xl mb-2">
-                    {rating === 5 ? bt('🌟 Outstanding!') : bt('✨ Thank You!')}
+                    {rating === 5 ? '🌟 Outstanding!' : '✨ Thank You!'}
                 </h3>
                 <p className="text-gray-600 mb-6">
-                    {bt('Thanks! Would you like to post this 5-star review on Google to help us?')}
+                    Thanks! Would you like to post this 5-star review on Google to help us?
                 </p>
 
                 <div className="space-y-3">
@@ -238,13 +238,13 @@ export default function ReviewRequestNotification({
                         onClick={handleGoogleRedirect}
                         className="w-full bg-blue-600 hover:bg-blue-700 text-white h-12 text-lg font-medium shadow-lg shadow-blue-200"
                     >
-                        {bt('Post on Google')}
+                        Post on Google
                     </Button>
                     <button
                         onClick={() => setShowGooglePrompt(false)}
                         className="text-gray-400 text-sm hover:text-gray-600 font-medium"
                     >
-                        {bt('No thanks, maybe later')}
+                        No thanks, maybe later
                     </button>
                 </div>
             </div>
@@ -256,7 +256,7 @@ export default function ReviewRequestNotification({
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-2xl p-8 max-w-sm w-full shadow-2xl">
               <h3 className="text-gray-900 font-semibold text-center mb-6">
-                {bt('Rate Your Experience')}
+                Rate Your Experience
               </h3>
 
               {/* Star Rating */}
@@ -276,11 +276,11 @@ export default function ReviewRequestNotification({
 
               {rating > 0 && (
                 <p className="text-center text-gray-600 text-sm mb-6">
-                  {rating >= 4.5 ? bt('Excellent!') :
-                   rating >= 3.5 ? bt('Great!') :
-                   rating >= 2.5 ? bt('Good') :
-                   rating >= 1.5 ? bt('Fair') :
-                   bt('Poor')}
+                  {rating >= 4.5 ? 'Excellent!' :
+                   rating >= 3.5 ? 'Great!' :
+                   rating >= 2.5 ? 'Good' :
+                   rating >= 1.5 ? 'Fair' :
+                   'Poor'}
                   {' '}({rating.toFixed(1)} ⭐)
                 </p>
               )}
@@ -291,7 +291,7 @@ export default function ReviewRequestNotification({
                   variant="outline"
                   className="flex-1"
                 >
-                  {bt('Cancel')}
+                  Cancel
                 </Button>
                 <Button
                   onClick={() => {
@@ -301,7 +301,7 @@ export default function ReviewRequestNotification({
                   className="flex-1 bg-blue-900 hover:bg-blue-800"
                   disabled={rating === 0}
                 >
-                  {bt('Continue')}
+                  Continue
                 </Button>
               </div>
             </div>

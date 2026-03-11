@@ -1,0 +1,185 @@
+﻿App.tsx(2610,11): error TS2322: Type '{ onLogout: () => Promise<void>; onMenuChange: (menu: string) => void; onBack: () => void; patientId: string; activeAddOns: string[]; }' is not assignable to type 'IntrinsicAttributes & PatientDetailsProps'.
+  Property 'onLogout' does not exist on type 'IntrinsicAttributes & PatientDetailsProps'.
+App.tsx(2666,13): error TS2322: Type '{ doctorName: string; degree: string; specialty: any; qrUrl: string; profileImage: string; onLogout: () => Promise<void>; onMenuChange: (menu: string) => void; }' is not assignable to type 'IntrinsicAttributes & SocialMediaKitProps'.
+  Property 'specialty' does not exist on type 'IntrinsicAttributes & SocialMediaKitProps'. Did you mean 'speciality'?
+App.tsx(2666,40): error TS2551: Property 'specialties' does not exist on type '{ profileImage: string; name: string; degrees: string[]; specialities: string[]; }'. Did you mean 'specialities'?
+components/AdvertiserLogin.tsx(32,50): error TS2339: Property 'login' does not exist on type 'typeof AuthService'.
+components/AdvertiserSignUp.tsx(60,50): error TS2339: Property 'signUp' does not exist on type 'typeof AuthService'.
+components/Analytics.tsx(333,9): error TS2322: Type '((menu: string) => void) | undefined' is not assignable to type '(menu: string) => void'.
+  Type 'undefined' is not assignable to type '(menu: string) => void'.
+components/BrainDeckManager.tsx(249,68): error TS2339: Property 'description' does not exist on type '{ id: number; title: string; level: DifficultyLevel; bg: string; }'.
+components/ClinicBookingMiniWebsite.tsx(24,14): error TS2304: Cannot find name 'Language'.
+components/ClinicQRManager.tsx(43,36): error TS2339: Property 'profileImage' does not exist on type '{ image: string | null; name: string; }'.
+components/ClinicQRManager.tsx(132,36): error TS2769: No overload matches this call.
+  Overload 1 of 6, '(canvasElement: HTMLCanvasElement, text: string | QRCodeSegment[], options?: QRCodeToDataURLOptions | undefined): Promise<...>', gave the following error.
+    Argument of type 'string' is not assignable to parameter of type 'HTMLCanvasElement'.
+  Overload 2 of 6, '(text: string | QRCodeSegment[], callback: (error: Error | null | undefined, url: string) => void): void', gave the following error.
+    Object literal may only specify known properties, and 'width' does not exist in type '(error: Error | null | undefined, url: string) => void'.
+  Overload 3 of 6, '(text: string | QRCodeSegment[], options?: QRCodeToDataURLOptions | undefined): Promise<string>', gave the following error.
+    Object literal may only specify known properties, and 'rendererOpts' does not exist in type 'QRCodeToDataURLOptionsOther'.
+components/ClinicQRManager.tsx(145,24): error TS2345: Argument of type 'void & Promise<string>' is not assignable to parameter of type 'SetStateAction<string>'.
+components/ClinicQRManager.tsx(469,9): error TS2322: Type '(() => void) | undefined' is not assignable to type '() => void'.
+  Type 'undefined' is not assignable to type '() => void'.
+components/ClinicSignUp.tsx(137,25): error TS2345: Argument of type 'DocumentReference<DocumentData, DocumentData> | null' is not assignable to parameter of type 'DocumentReference<DocumentData, DocumentData>'.
+  Type 'null' is not assignable to type 'DocumentReference<DocumentData, DocumentData>'.
+components/DoctorAIRXUploadModal.tsx(347,11): error TS2740: Type '{ english: string; hindi: string; bengali: string; marathi: string; tamil: string; telugu: string; gujarati: string; kannada: string; malayalam: string; punjabi: string; assamese: string; }' is missing the following properties from type 'Record<Language, string>': odia, urdu, sindhi, nepali, and 16 more.
+components/DoctorPatientChatManager.tsx(416,9): error TS2322: Type '{ children: Element; featureId: string; featureName: string; featureDescription: string; featureIcon: ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>; ... 5 more ...; onLogout: (() => void) | undefined; }' is not assignable to type 'DetailedHTMLProps<HTMLAttributes<HTMLDivElement>, HTMLDivElement>'.
+  Property 'featureId' does not exist on type 'DetailedHTMLProps<HTMLAttributes<HTMLDivElement>, HTMLDivElement>'.
+components/ManageDoctors.tsx(297,16): error TS2304: Cannot find name 'CardTitle'.
+components/ManageDoctors.tsx(297,38): error TS2304: Cannot find name 'CardTitle'.
+components/ManageDoctors.tsx(300,47): error TS2339: Property 'profileType' does not exist on type 'LinkedDoctor'.
+components/ManageDoctors.tsx(303,14): error TS2304: Cannot find name 'CardContent'.
+components/ManageDoctors.tsx(306,70): error TS2339: Property 'profileType' does not exist on type 'LinkedDoctor'.
+components/ManageDoctors.tsx(308,20): error TS2339: Property 'profileType' does not exist on type 'LinkedDoctor'.
+components/ManageDoctors.tsx(309,50): error TS2304: Cannot find name 'handleEnableSolo'.
+components/ManageDoctors.tsx(311,48): error TS2554: Expected 2 arguments, but got 1.
+components/ManageDoctors.tsx(312,15): error TS2304: Cannot find name 'CardContent'.
+components/ManageDoctors.tsx(591,25): error TS2322: Type 'LinkedDoctor | { uid: string; email: string; name: string; dateOfBirth: string; specialties: string[]; pinCode: string; doctorCode: string; qrNumber: string; status: string; }' is not assignable to type 'LinkedDoctor'.
+  Type '{ uid: string; email: string; name: string; dateOfBirth: string; specialties: string[]; pinCode: string; doctorCode: string; qrNumber: string; status: string; }' is not assignable to type 'LinkedDoctor'.
+    Types of property 'status' are incompatible.
+      Type 'string' is not assignable to type '"active" | "inactive" | "pending_invitation" | undefined'.
+components/ManageDoctors.tsx(591,45): error TS2322: Type '{ uid: string; email: string; name: string; dateOfBirth: string; specialties: string[]; pinCode: string; doctorCode: string; qrNumber: string; status: string; }' is not assignable to type 'LinkedDoctor'.
+  Types of property 'status' are incompatible.
+    Type 'string' is not assignable to type '"active" | "inactive" | "pending_invitation" | undefined'.
+components/ManageDoctors.tsx(987,26): error TS2345: Argument of type '(prev: LinkedDoctor[]) => (LinkedDoctor | { status: "active" | "inactive"; toggleOffPeriod: { startDate: string; endDate: string; reason: "medical" | "other" | "vacation"; }; ... 19 more ...; footerLine2?: string | undefined; })[]' is not assignable to parameter of type 'SetStateAction<LinkedDoctor[]>'.
+  Type '(prev: LinkedDoctor[]) => (LinkedDoctor | { status: "active" | "inactive"; toggleOffPeriod: { startDate: string; endDate: string; reason: "medical" | "other" | "vacation"; }; ... 19 more ...; footerLine2?: string | undefined; })[]' is not assignable to type '(prevState: LinkedDoctor[]) => LinkedDoctor[]'.
+    Type '(LinkedDoctor | { status: "active" | "inactive"; toggleOffPeriod: { startDate: string; endDate: string; reason: "medical" | "other" | "vacation"; }; uid: string; email: string; ... 17 more ...; footerLine2?: string | undefined; })[]' is not assignable to type 'LinkedDoctor[]'.
+      Type 'LinkedDoctor | { status: "active" | "inactive"; toggleOffPeriod: { startDate: string; endDate: string; reason: "medical" | "other" | "vacation"; }; uid: string; email: string; ... 17 more ...; footerLine2?: string | undefined; }' is not assignable to type 'LinkedDoctor'.
+        Type '{ status: "active" | "inactive"; toggleOffPeriod: { startDate: string; endDate: string; reason: "medical" | "other" | "vacation"; }; uid: string; email: string; name: string; specialty?: string; ... 15 more ...; footerLine2?: string; }' is not assignable to type 'LinkedDoctor'.
+          Types of property 'toggleOffPeriod' are incompatible.
+            Type '{ startDate: string; endDate: string; reason: "medical" | "other" | "vacation"; }' is missing the following properties from type '{ startDate: string; endDate: string; reason: string; setBy: string; setAt: any; }': setBy, setAt
+components/ManageDoctors.tsx(1677,35): error TS2322: Type 'Date' is not assignable to type 'string | number | undefined'.
+components/ManageDoctors.tsx(1689,35): error TS2322: Type 'string | Date' is not assignable to type 'string | number | undefined'.
+  Type 'Date' is not assignable to type 'string | number | undefined'.
+components/ManageDoctors.tsx(1707,69): error TS2345: Argument of type 'string' is not assignable to parameter of type 'SetStateAction<"medical" | "other" | "vacation">'.
+components/NotificationCenter.tsx(319,38): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+components/PatientHistoryModal.tsx(214,46): error TS2345: Argument of type '{ status: "pending" | "failed" | "sent" | "delivered" | "not_allowed"; timestamp?: Date | undefined; } | undefined' is not assignable to parameter of type '{ status: "pending" | "failed" | "sent"; } | undefined'.
+  Type '{ status: "pending" | "failed" | "sent" | "delivered" | "not_allowed"; timestamp?: Date | undefined; }' is not assignable to type '{ status: "pending" | "failed" | "sent"; }'.
+    Types of property 'status' are incompatible.
+      Type '"pending" | "failed" | "sent" | "delivered" | "not_allowed"' is not assignable to type '"pending" | "failed" | "sent"'.
+        Type '"delivered"' is not assignable to type '"pending" | "failed" | "sent"'.
+components/PatientHistoryModal.tsx(215,46): error TS2345: Argument of type '{ status: "pending" | "failed" | "sent" | "delivered" | "not_allowed"; timestamp?: Date | undefined; } | undefined' is not assignable to parameter of type '{ status: "pending" | "failed" | "sent"; } | undefined'.
+  Type '{ status: "pending" | "failed" | "sent" | "delivered" | "not_allowed"; timestamp?: Date | undefined; }' is not assignable to type '{ status: "pending" | "failed" | "sent"; }'.
+    Types of property 'status' are incompatible.
+      Type '"pending" | "failed" | "sent" | "delivered" | "not_allowed"' is not assignable to type '"pending" | "failed" | "sent"'.
+        Type '"delivered"' is not assignable to type '"pending" | "failed" | "sent"'.
+components/PatientHistoryModal.tsx(216,46): error TS2345: Argument of type '{ status: "pending" | "failed" | "sent" | "delivered" | "not_allowed"; timestamp?: Date | undefined; } | undefined' is not assignable to parameter of type '{ status: "pending" | "failed" | "sent"; } | undefined'.
+  Type '{ status: "pending" | "failed" | "sent" | "delivered" | "not_allowed"; timestamp?: Date | undefined; }' is not assignable to type '{ status: "pending" | "failed" | "sent"; }'.
+    Types of property 'status' are incompatible.
+      Type '"pending" | "failed" | "sent" | "delivered" | "not_allowed"' is not assignable to type '"pending" | "failed" | "sent"'.
+        Type '"delivered"' is not assignable to type '"pending" | "failed" | "sent"'.
+components/PatientHistoryModal.tsx(217,46): error TS2345: Argument of type '{ status: "pending" | "failed" | "sent" | "delivered" | "not_allowed"; timestamp?: Date | undefined; } | undefined' is not assignable to parameter of type '{ status: "pending" | "failed" | "sent"; } | undefined'.
+  Type '{ status: "pending" | "failed" | "sent" | "delivered" | "not_allowed"; timestamp?: Date | undefined; }' is not assignable to type '{ status: "pending" | "failed" | "sent"; }'.
+    Types of property 'status' are incompatible.
+      Type '"pending" | "failed" | "sent" | "delivered" | "not_allowed"' is not assignable to type '"pending" | "failed" | "sent"'.
+        Type '"delivered"' is not assignable to type '"pending" | "failed" | "sent"'.
+components/PatientLiveStatus.tsx(161,11): error TS7034: Variable 'todaysBooking' implicitly has type 'any' in some locations where its type cannot be determined.
+components/PatientLiveStatus.tsx(233,25): error TS7005: Variable 'todaysBooking' implicitly has an 'any' type.
+components/PatientLiveStatus.tsx(247,27): error TS2339: Property 'id' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(248,29): error TS2339: Property 'bookingDate' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(248,58): error TS2339: Property 'consultationDate' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(249,31): error TS2339: Property 'bookingStatus' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(250,33): error TS2339: Property 'serialNumber' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(251,32): error TS2339: Property 'tokenNumber' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(252,37): error TS2339: Property 'serialNumber' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(253,29): error TS2339: Property 'slot' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(255,36): error TS2339: Property 'patientName' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(256,31): error TS2339: Property 'doctorName' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(261,45): error TS2339: Property 'serialNumber' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(262,45): error TS2339: Property 'tokenNumber' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(263,45): error TS2339: Property 'serialNo' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(264,45): error TS2339: Property 'slotNumber' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(265,45): error TS2339: Property 'queueNumber' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(266,45): error TS2339: Property 'position' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(275,23): error TS2339: Property 'chamberCapacity' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(276,23): error TS2339: Property 'totalSlots' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(277,23): error TS2339: Property 'capacity' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(278,23): error TS2339: Property 'maxPatients' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(282,38): error TS2339: Property 'timeSlot' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(282,64): error TS2339: Property 'consultationTime' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(282,98): error TS2339: Property 'slot' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(282,120): error TS2339: Property 'time' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(290,39): error TS2339: Property 'chamberCapacity' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(291,39): error TS2339: Property 'totalSlots' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(292,39): error TS2339: Property 'capacity' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(341,41): error TS2339: Property 'isCancelled' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(341,70): error TS2339: Property 'status' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(346,41): error TS2339: Property 'isCompleted' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(347,48): error TS2339: Property 'consultationStatus' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(350,38): error TS2339: Property 'doctorId' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(350,64): error TS2339: Property 'userId' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(351,41): error TS2339: Property 'chamberName' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(351,70): error TS2339: Property 'clinicName' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(351,98): error TS2339: Property 'location' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(410,40): error TS2339: Property 'bookingDate' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(410,69): error TS2339: Property 'consultationDate' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(411,35): error TS2339: Property 'doctorName' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(411,73): error TS2339: Property 'doctor' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(412,36): error TS2339: Property 'chamberName' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(412,65): error TS2339: Property 'clinicName' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(412,93): error TS2339: Property 'location' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(413,36): error TS2339: Property 'patientName' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(413,65): error TS2339: Property 'name' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(414,35): error TS2339: Property 'patientAge' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(414,63): error TS2339: Property 'age' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(415,38): error TS2339: Property 'patientGender' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(415,69): error TS2339: Property 'gender' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(416,34): error TS2339: Property 'id' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(418,37): error TS2339: Property 'cancelReason' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(419,36): error TS2339: Property 'cancelledBy' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(420,36): error TS2339: Property 'cancelledAt' does not exist on type 'never'.
+components/PatientLiveStatus.tsx(423,36): error TS2339: Property 'isCancelled' does not exist on type 'never'.
+components/PatientNotificationSettings.tsx(11,41): error TS2305: Module '"../services/fcm.service"' has no exported member 'validateFCMToken'.
+components/PatientNotificationSettings.tsx(11,86): error TS2305: Module '"../services/fcm.service"' has no exported member 'refreshFCMToken'.
+components/PharmaProfileManager.tsx(615,43): error TS7006: Parameter 's' implicitly has an 'any' type.
+components/PharmaProfileManager.tsx(676,48): error TS7006: Parameter 's' implicitly has an 'any' type.
+components/PreviewCenter.tsx(55,46): error TS2367: This comparison appears to be unintentional because the types '"mini-website" | "patient-chat-interface" | "patient-video-consultation" | "video-consultation-link" | "rx-download" | "walkin-verification" | "walkin-complete"' and '"ai-rx-analysis"' have no overlap.
+components/PreviewCenter.tsx(241,23): error TS2322: Type '"en"' is not assignable to type 'Language | undefined'.
+components/PreviewCenter.tsx(247,50): error TS2322: Type '"en" | "hi" | "bn"' is not assignable to type 'Language | undefined'.
+  Type '"en"' is not assignable to type 'Language | undefined'.
+components/PreviewCenter.tsx(250,52): error TS2322: Type '"en" | "hi" | "bn"' is not assignable to type 'Language | undefined'.
+  Type '"en"' is not assignable to type 'Language | undefined'.
+components/PreviewCenter.tsx(253,41): error TS2322: Type '"en" | "hi" | "bn"' is not assignable to type 'Language | undefined'.
+  Type '"en"' is not assignable to type 'Language | undefined'.
+components/PreviewCenter.tsx(256,44): error TS2322: Type '"en" | "hi" | "bn"' is not assignable to type 'Language | undefined'.
+  Type '"en"' is not assignable to type 'Language | undefined'.
+components/PreviewCenter.tsx(259,39): error TS2322: Type '"en" | "hi" | "bn"' is not assignable to type 'Language | undefined'.
+  Type '"en"' is not assignable to type 'Language | undefined'.
+components/PreviewCenter.tsx(265,19): error TS2322: Type '"en" | "hi" | "bn"' is not assignable to type 'Language | undefined'.
+  Type '"en"' is not assignable to type 'Language | undefined'.
+components/PreviewCenter.tsx(287,19): error TS2322: Type '"en" | "hi" | "bn"' is not assignable to type 'Language | undefined'.
+  Type '"en"' is not assignable to type 'Language | undefined'.
+components/PreviewCenter.tsx(320,19): error TS2322: Type '"en" | "hi" | "bn"' is not assignable to type 'Language | undefined'.
+  Type '"en"' is not assignable to type 'Language | undefined'.
+components/Report.tsx(344,9): error TS2322: Type '((menu: string) => void) | undefined' is not assignable to type '(menu: string) => void'.
+  Type 'undefined' is not assignable to type '(menu: string) => void'.
+components/ScheduleManager.tsx(1216,17): error TS2353: Object literal may only specify known properties, and 'language' does not exist in type '{ phone: string; name: string; }'.
+components/ScheduleManager.tsx(1356,15): error TS2353: Object literal may only specify known properties, and 'language' does not exist in type '{ phone: string; name: string; }'.
+components/ScheduleManager.tsx(1483,9): error TS2367: This comparison appears to be unintentional because the types 'true | undefined' and 'false' have no overlap.
+components/SelectionModal.tsx(49,18): error TS2322: Type '{ children: string; jsx: true; }' is not assignable to type 'DetailedHTMLProps<StyleHTMLAttributes<HTMLStyleElement>, HTMLStyleElement>'.
+  Property 'jsx' does not exist on type 'DetailedHTMLProps<StyleHTMLAttributes<HTMLStyleElement>, HTMLStyleElement>'.
+components/SignUp.tsx(202,25): error TS2345: Argument of type 'DocumentReference<DocumentData, DocumentData> | null' is not assignable to parameter of type 'DocumentReference<DocumentData, DocumentData>'.
+  Type 'null' is not assignable to type 'DocumentReference<DocumentData, DocumentData>'.
+components/TemplateUploader.tsx(92,9): error TS2322: Type '((menu: string) => void) | undefined' is not assignable to type '(menu: string) => void'.
+  Type 'undefined' is not assignable to type '(menu: string) => void'.
+components/TodaysSchedule.tsx(1013,15): error TS2353: Object literal may only specify known properties, and 'language' does not exist in type '{ phone: string; name: string; tokenNumber?: string | undefined; bookingId?: string | undefined; appointmentTime?: string | undefined; }'.
+components/TodaysSchedule.tsx(1149,15): error TS2353: Object literal may only specify known properties, and 'language' does not exist in type '{ phone: string; name: string; tokenNumber?: string | undefined; bookingId?: string | undefined; appointmentTime?: string | undefined; }'.
+components/ui/calendar.tsx(63,9): error TS2353: Object literal may only specify known properties, and 'IconLeft' does not exist in type 'Partial<CustomComponents>'.
+components/ui/calendar.tsx(63,22): error TS7031: Binding element 'className' implicitly has an 'any' type.
+components/ui/calendar.tsx(66,23): error TS7031: Binding element 'className' implicitly has an 'any' type.
+components/ui/resizable.tsx(12,51): error TS2339: Property 'PanelGroup' does not exist on type 'typeof import("C:/Projects/healqr 3/node_modules/react-resizable-panels/dist/react-resizable-panels")'.
+components/ui/resizable.tsx(14,25): error TS2339: Property 'PanelGroup' does not exist on type 'typeof import("C:/Projects/healqr 3/node_modules/react-resizable-panels/dist/react-resizable-panels")'.
+components/ui/resizable.tsx(35,51): error TS2339: Property 'PanelResizeHandle' does not exist on type 'typeof import("C:/Projects/healqr 3/node_modules/react-resizable-panels/dist/react-resizable-panels")'.
+components/ui/resizable.tsx(39,25): error TS2339: Property 'PanelResizeHandle' does not exist on type 'typeof import("C:/Projects/healqr 3/node_modules/react-resizable-panels/dist/react-resizable-panels")'.
+components/ui/resizable.tsx(52,26): error TS2339: Property 'PanelResizeHandle' does not exist on type 'typeof import("C:/Projects/healqr 3/node_modules/react-resizable-panels/dist/react-resizable-panels")'.
+lib/firebase/db.service.ts(57,45): error TS2339: Property 'CLINICS' does not exist on type '{ readonly DOCTORS: "doctors"; readonly PATIENTS: "patients"; readonly BOOKINGS: "bookings"; readonly TRANSACTIONS: "transactions"; readonly NOTIFICATIONS: "notifications"; readonly NOTIFICATION_QUEUE: "notificationQueue"; ... 15 more ...; readonly SCHEDULED_TASKS: "scheduledTasks"; }'.
+lib/firebase/db.service.ts(86,45): error TS2339: Property 'CLINICS' does not exist on type '{ readonly DOCTORS: "doctors"; readonly PATIENTS: "patients"; readonly BOOKINGS: "bookings"; readonly TRANSACTIONS: "transactions"; readonly NOTIFICATIONS: "notifications"; readonly NOTIFICATION_QUEUE: "notificationQueue"; ... 15 more ...; readonly SCHEDULED_TASKS: "scheduledTasks"; }'.
+lib/firebase/db.service.ts(121,43): error TS2339: Property 'CLINICS' does not exist on type '{ readonly DOCTORS: "doctors"; readonly PATIENTS: "patients"; readonly BOOKINGS: "bookings"; readonly TRANSACTIONS: "transactions"; readonly NOTIFICATIONS: "notifications"; readonly NOTIFICATION_QUEUE: "notificationQueue"; ... 15 more ...; readonly SCHEDULED_TASKS: "scheduledTasks"; }'.
+lib/firebase/db.service.ts(160,48): error TS2339: Property 'soloSchedule' does not exist on type 'Doctor'.
+lib/firebase/db.service.ts(160,71): error TS2339: Property 'soloSchedule' does not exist on type 'Doctor'.
+lib/firebase/db.service.ts(165,50): error TS2339: Property 'clinicSchedules' does not exist on type 'Doctor'.
+lib/firebase/db.service.ts(165,76): error TS2339: Property 'clinicSchedules' does not exist on type 'Doctor'.
+services/notificationService.ts(376,5): error TS2322: Type '"rx_updated"' is not assignable to type '"cancelled" | "consultation_completed" | "follow_up" | "review_request" | "reminder" | "booking_confirmed" | "appointment_confirmed" | "restored" | "prescription_ready" | "video_call_link"'.
+services/notificationService.ts(385,5): error TS2322: Type '"rx_updated"' is not assignable to type '"consultation_completed" | "follow_up" | "review_request" | "prescription_ready" | "appointment_cancelled" | "appointment_reminder" | undefined'.
+services/notificationService.ts(389,7): error TS2561: Object literal may only specify known properties, but 'warningMessage' does not exist in type '{ greeting?: string | undefined; mainMessage?: string | undefined; consultationDetails?: { date?: string | undefined; time?: string | undefined; chamber?: string | undefined; } | undefined; ... 4 more ...; followUpDays?: number | undefined; }'. Did you mean to write 'mainMessage'?

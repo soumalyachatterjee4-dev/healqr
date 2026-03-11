@@ -1,6 +1,6 @@
 import { AlertTriangle, Download, RefreshCw } from 'lucide-react';
 import TemplateDisplay from './TemplateDisplay';
-import { useAITranslation } from '../hooks/useAITranslation';
+
 import type { Language } from '../utils/translations';
 
 interface RxUpdatedNotificationProps {
@@ -28,7 +28,7 @@ export default function RxUpdatedNotification({
   consultationTime = '',
   rxUrl,
 }: RxUpdatedNotificationProps) {
-  const { bt } = useAITranslation(language);
+  
 
   return (
     <div className="flex items-center justify-center py-8">
@@ -46,7 +46,7 @@ export default function RxUpdatedNotification({
                 </div>
                 <div>
                   <h2 className="text-gray-900 uppercase tracking-wide text-sm font-bold">
-                    {bt('UPDATED PRESCRIPTION')}
+                    UPDATED PRESCRIPTION
                   </h2>
                 </div>
               </div>
@@ -72,7 +72,7 @@ export default function RxUpdatedNotification({
 
               {/* Greeting */}
               <p className="text-gray-900 mb-2 font-medium">
-                Dear {patientName}, {bt('Important Update!')} 🔄
+                Dear {patientName}, Important Update! 🔄
               </p>
 
               {/* Warning Banner - Ignore Previous */}
@@ -80,33 +80,33 @@ export default function RxUpdatedNotification({
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                   <p className="text-amber-800 text-sm font-medium">
-                    {bt('⚠️ Please IGNORE the previous prescription notification')}
+                    ⚠️ Please IGNORE the previous prescription notification
                   </p>
                 </div>
               </div>
 
               {/* Main Message */}
               <p className="text-gray-700 text-sm mb-4 leading-relaxed">
-                {bt('Your doctor has sent an UPDATED prescription. Please ignore the previous prescription and use this latest version.')}
+                Your doctor has sent an UPDATED prescription. Please ignore the previous prescription and use this latest version.
               </p>
 
               {/* Consultation Details */}
               <div className="bg-gray-50 rounded-lg p-4 mb-4 space-y-2">
                 {consultationDate && (
                   <div>
-                    <span className="text-gray-900 font-medium">{bt('Date:')}</span>{' '}
+                    <span className="text-gray-900 font-medium">Date:</span>{' '}
                     <span className="text-gray-600">{consultationDate}</span>
                   </div>
                 )}
                 {consultationTime && (
                   <div>
-                    <span className="text-gray-900 font-medium">{bt('Time:')}</span>{' '}
+                    <span className="text-gray-900 font-medium">Time:</span>{' '}
                     <span className="text-gray-600">{consultationTime}</span>
                   </div>
                 )}
                 {clinicName && (
                   <div>
-                    <span className="text-gray-900 font-medium">{bt('Clinic:')}</span>{' '}
+                    <span className="text-gray-900 font-medium">Clinic:</span>{' '}
                     <span className="text-gray-600">{clinicName}</span>
                   </div>
                 )}
@@ -122,10 +122,10 @@ export default function RxUpdatedNotification({
                     className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 active:scale-[0.98] transition-all"
                   >
                     <Download className="w-5 h-5" />
-                    {bt('Download Updated Prescription')}
+                    Download Updated Prescription
                   </a>
                   <p className="text-[10px] text-gray-400 text-center mt-2 italic">
-                    {bt('This is the latest version of your prescription')}
+                    This is the latest version of your prescription
                   </p>
                 </div>
               )}
@@ -135,7 +135,7 @@ export default function RxUpdatedNotification({
 
               {/* Footer */}
               <p className="text-gray-400 text-xs text-center">
-                {bt('HealQR.com')}
+                HealQR.com
               </p>
             </div>
           </div>

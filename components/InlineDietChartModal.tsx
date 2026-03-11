@@ -8,6 +8,8 @@ import { toast } from 'sonner';
 import QRCode from 'qrcode';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { app } from '../lib/firebase/config';
+import { needsNonLatinRendering, ensureFontLoaded, transliterateTexts, renderNonLatinForPDF } from '../utils/pdfTransliteration';
+import type { AILanguage } from '../services/aiTranslationService';
 
 interface InlineDietChartModalProps {
   patient: {
@@ -17,6 +19,7 @@ interface InlineDietChartModalProps {
     gender: string;
     phone: string;
     visitType?: string;
+    language?: string;
   };
   doctorInfo: {
     name: string;
@@ -330,9 +333,57 @@ export default function InlineDietChartModal({ patient, doctorInfo, onClose, onG
     try {
       const { jsPDF } = await import('jspdf');
 
+      // ─── Bilingual: transliterate food names if non-English ───
+      const patientLang = (patient.language || 'english') as AILanguage;
+      const isBilingual = needsNonLatinRendering(patientLang);
+      let scriptFont: string | null = null;
+      const foodNameMap = new Map<string, string>(); // English → transliterated
+      const headerTranslit = new Map<string, string>(); // English → transliterated header text
+
+      if (isBilingual && generatedPlan) {
+        const allFoodNames = [...new Set(generatedPlan.flatMap(day => day.meals.flatMap(meal => meal.items.map(item => item.name))))];
+
+        // Collect header texts for transliteration
+        const headerTexts: string[] = [];
+        const isClinicH = doctorInfo.pdfContext === 'clinic' && doctorInfo.clinicInfo;
+        if (isClinicH) {
+          if (doctorInfo.clinicInfo!.name) headerTexts.push(doctorInfo.clinicInfo!.name);
+          if (doctorInfo.clinicInfo!.address) headerTexts.push(doctorInfo.clinicInfo!.address);
+        }
+        const drNameH = (doctorInfo.useDrPrefix ?? true) ? `DR. ${doctorInfo.name}` : doctorInfo.name.toUpperCase();
+        headerTexts.push(drNameH);
+        const degreesH = doctorInfo.degrees?.join('  •  ') || doctorInfo.degree || '';
+        if (degreesH) headerTexts.push(degreesH);
+        const specH = (doctorInfo.specialties?.join(' • ') || doctorInfo.specialities?.join(' • ') || doctorInfo.specialty || '').toUpperCase();
+        if (specH) headerTexts.push(specH);
+        if (doctorInfo.timing) headerTexts.push(doctorInfo.timing);
+        if (!isClinicH && doctorInfo.clinicName) headerTexts.push(doctorInfo.clinicName);
+        if (!isClinicH && doctorInfo.address) headerTexts.push(doctorInfo.address);
+        headerTexts.push(patient.name);
+
+        const [font, foodResults, headerResults] = await Promise.all([
+          ensureFontLoaded(patientLang),
+          transliterateTexts(allFoodNames, patientLang),
+          transliterateTexts(headerTexts, patientLang),
+        ]);
+        scriptFont = font;
+        allFoodNames.forEach((name, idx) => foodNameMap.set(name, foodResults[idx]));
+        headerTexts.forEach((text, idx) => headerTranslit.set(text, headerResults[idx]));
+      }
+
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
       const margin = 20;
+
+      // Helper: render transliterated text below the current position
+      const addTranslitBelow = (text: string, x: number, y: number, fontSize: number, maxWidth?: number) => {
+        if (!isBilingual || !scriptFont || !headerTranslit.has(text)) return 0;
+        const rendered = renderNonLatinForPDF(headerTranslit.get(text)!, scriptFont, fontSize, '#888');
+        const w = maxWidth ? Math.min(rendered.widthMM, maxWidth) : rendered.widthMM;
+        doc.addImage(rendered.dataUrl, 'PNG', x, y, w, rendered.heightMM);
+        return rendered.heightMM + 0.5;
+      };
+
       const isClinic = doctorInfo.pdfContext === 'clinic' && doctorInfo.clinicInfo;
 
       // --- CONTEXT-AWARE HEADER ---
@@ -340,19 +391,23 @@ export default function InlineDietChartModal({ patient, doctorInfo, onClose, onG
 
       if (isClinic) {
         // === CLINIC HEADER: Clinic first, then Doctor ===
+        const clinicNameText = (doctorInfo.clinicInfo!.name || '').toUpperCase();
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(20);
         doc.setTextColor(30, 41, 59);
-        doc.text((doctorInfo.clinicInfo!.name || '').toUpperCase(), margin, headerY);
+        doc.text(clinicNameText, margin, headerY);
         headerY += 7;
+        if (doctorInfo.clinicInfo!.name) headerY += addTranslitBelow(doctorInfo.clinicInfo!.name, margin, headerY, 12, pageWidth / 2 - margin);
 
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
         doc.setTextColor(100);
         if (doctorInfo.clinicInfo!.address) {
-          const splitAddr = doc.splitTextToSize(doctorInfo.clinicInfo!.address, pageWidth / 2 - margin);
+          const addrText = doctorInfo.clinicInfo!.address;
+          const splitAddr = doc.splitTextToSize(addrText, pageWidth / 2 - margin);
           doc.text(splitAddr, margin, headerY);
           headerY += splitAddr.length * 4 + 2;
+          headerY += addTranslitBelow(addrText, margin, headerY, 7, pageWidth / 2 - margin);
         }
         if (doctorInfo.clinicInfo!.phone) {
           doc.text(`Tel: ${doctorInfo.clinicInfo!.phone}`, margin, headerY);
@@ -372,23 +427,33 @@ export default function InlineDietChartModal({ patient, doctorInfo, onClose, onG
         const drName = (doctorInfo.useDrPrefix ?? true) ? `DR. ${doctorInfo.name}` : doctorInfo.name.toUpperCase();
         doc.text(drName, margin, headerY);
         headerY += 5;
+        headerY += addTranslitBelow(drName, margin, headerY, 9, pageWidth / 2 - margin);
 
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
         doc.setTextColor(71, 85, 105);
         const degreesStr = doctorInfo.degrees?.join('  •  ') || doctorInfo.degree || '';
-        if (degreesStr) { doc.text(degreesStr, margin, headerY); headerY += 4; }
+        if (degreesStr) {
+          doc.text(degreesStr, margin, headerY); headerY += 4;
+          headerY += addTranslitBelow(degreesStr, margin, headerY - 1, 7);
+        }
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(37, 99, 235);
         const specStr = (doctorInfo.specialties?.join(' • ') || doctorInfo.specialities?.join(' • ') || doctorInfo.specialty || '').toUpperCase();
-        if (specStr) { doc.text(specStr, margin, headerY); headerY += 4; }
+        if (specStr) {
+          doc.text(specStr, margin, headerY); headerY += 4;
+          headerY += addTranslitBelow(specStr, margin, headerY - 1, 7);
+        }
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(100);
         if (doctorInfo.showRegistrationOnRX && doctorInfo.registrationNumber) {
           doc.text(`REG NO: ${doctorInfo.registrationNumber}`, margin, headerY);
           headerY += 4;
         }
-        if (doctorInfo.timing) { doc.text(`Timing: ${doctorInfo.timing}`, margin, headerY); headerY += 4; }
+        if (doctorInfo.timing) {
+          doc.text(`Timing: ${doctorInfo.timing}`, margin, headerY); headerY += 4;
+          headerY += addTranslitBelow(doctorInfo.timing, margin, headerY - 1, 7);
+        }
 
       } else {
         // === DOCTOR HEADER: Doctor first, then Chamber ===
@@ -398,16 +463,22 @@ export default function InlineDietChartModal({ patient, doctorInfo, onClose, onG
         const drName = (doctorInfo.useDrPrefix ?? true) ? `DR. ${doctorInfo.name}` : doctorInfo.name.toUpperCase();
         doc.text(drName, margin, headerY);
         headerY += 8;
+        headerY += addTranslitBelow(drName, margin, headerY, 12, pageWidth / 2 - margin);
 
         doc.setFontSize(10);
         doc.setTextColor(71, 85, 105);
         const degreesStr = doctorInfo.degrees?.join('  •  ') || doctorInfo.degree || '';
-        if (degreesStr) { doc.text(degreesStr, margin, headerY); headerY += 5; }
+        if (degreesStr) {
+          doc.text(degreesStr, margin, headerY); headerY += 5;
+          headerY += addTranslitBelow(degreesStr, margin, headerY - 2, 7);
+        }
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(37, 99, 235);
         const specStr = (doctorInfo.specialties?.join(' • ') || doctorInfo.specialities?.join(' • ') || doctorInfo.specialty || 'General Physician').toUpperCase();
         doc.text(specStr, margin, headerY);
         headerY += 5;
+        headerY += addTranslitBelow(specStr, margin, headerY - 2, 7);
+
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
         doc.setTextColor(100);
@@ -423,20 +494,24 @@ export default function InlineDietChartModal({ patient, doctorInfo, onClose, onG
           doc.setTextColor(51, 65, 85);
           doc.text(doctorInfo.clinicName.toUpperCase(), margin, headerY);
           headerY += 5;
+          headerY += addTranslitBelow(doctorInfo.clinicName, margin, headerY, 8);
         }
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
         doc.setTextColor(100);
         if (doctorInfo.address) {
-          const addressLines = doc.splitTextToSize(doctorInfo.address, 70);
+          const addrText = doctorInfo.address;
+          const addressLines = doc.splitTextToSize(addrText, 70);
           doc.text(addressLines, margin, headerY);
           headerY += addressLines.length * 4;
+          headerY += addTranslitBelow(addrText, margin, headerY, 7, pageWidth / 2 - margin);
         }
         if (doctorInfo.timing) {
           doc.setFont('helvetica', 'italic');
           doc.text(doctorInfo.timing, margin, headerY);
           doc.setFont('helvetica', 'normal');
           headerY += 4;
+          headerY += addTranslitBelow(doctorInfo.timing, margin, headerY - 2, 7);
         }
       }
 
@@ -459,30 +534,32 @@ export default function InlineDietChartModal({ patient, doctorInfo, onClose, onG
       }
 
       // --- PATIENT STRIPE ---
+      const stripeY = Math.max(headerY + 5, 85); // ensure minimum spacing
       doc.setFillColor(248, 250, 252);
-      doc.rect(20, 85, pageWidth - 40, 15, 'F');
+      doc.rect(20, stripeY, pageWidth - 40, 15, 'F');
       doc.setDrawColor(226, 232, 240);
-      doc.line(20, 85, pageWidth - 20, 85);
-      doc.line(20, 100, pageWidth - 20, 100);
+      doc.line(20, stripeY, pageWidth - 20, stripeY);
+      doc.line(20, stripeY + 15, pageWidth - 20, stripeY + 15);
 
       doc.setFontSize(8);
       doc.setTextColor(148, 163, 184);
-      doc.text('PATIENT', 25, 91);
-      doc.text('PHONE', 75, 91);
-      doc.text('AGE/SEX', 125, 91);
-      doc.text('DATE', pageWidth - 45, 91);
+      doc.text('PATIENT', 25, stripeY + 6);
+      doc.text('PHONE', 75, stripeY + 6);
+      doc.text('AGE/SEX', 125, stripeY + 6);
+      doc.text('DATE', pageWidth - 45, stripeY + 6);
 
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
       doc.setTextColor(30, 41, 59);
-      doc.text(patient.name.toUpperCase(), 25, 96);
-      doc.text(patient.phone || 'NA', 75, 96);
-      doc.text(`${patient.age}Y/${patient.gender.substring(0, 1).toUpperCase()}`, 125, 96);
+      doc.text(patient.name.toUpperCase(), 25, stripeY + 11);
+      addTranslitBelow(patient.name, 25, stripeY + 12, 7);
+      doc.text(patient.phone || 'NA', 75, stripeY + 11);
+      doc.text(`${patient.age}Y/${patient.gender.substring(0, 1).toUpperCase()}`, 125, stripeY + 11);
       doc.setTextColor(37, 99, 235);
-      doc.text(new Date().toLocaleDateString('en-GB'), pageWidth - 45, 96);
+      doc.text(new Date().toLocaleDateString('en-GB'), pageWidth - 45, stripeY + 11);
 
       // --- AI DIET CHART HEADING ---
-      let currentY = 115;
+      let currentY = stripeY + 30;
       doc.setFontSize(18);
       doc.setTextColor(30, 41, 59);
       doc.text('AI DIET CHART', pageWidth / 2, currentY, { align: 'center', charSpace: 2 });
@@ -574,6 +651,13 @@ export default function InlineDietChartModal({ patient, doctorInfo, onClose, onG
             doc.text(item.kcal, xPos + colWidth - 10, mealY, { align: 'right' });
             doc.setTextColor(71, 85, 105);
             mealY += wrappedItem.length * 4;
+
+            // Bilingual: transliterated food name
+            if (isBilingual && scriptFont && foodNameMap.has(item.name)) {
+              const rendered = renderNonLatinForPDF(foodNameMap.get(item.name)!, scriptFont, 7, '#999');
+              doc.addImage(rendered.dataUrl, 'PNG', xPos + 4, mealY - 2, Math.min(rendered.widthMM, colWidth - 20), rendered.heightMM);
+              mealY += rendered.heightMM;
+            }
           });
 
           if (mIdx % 2 !== 0 || mIdx === day.meals.length - 1) {
@@ -1194,7 +1278,7 @@ export default function InlineDietChartModal({ patient, doctorInfo, onClose, onG
                 <Sparkles className="w-4 h-4 text-orange-400" />
                 <span>AI-powered nutrition plan based on patient assessment</span>
               </div>
-              <div className="flex gap-2 w-full sm:w-auto">
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                 <Button onClick={onClose} variant="ghost" size="sm" className="flex-1 sm:flex-none text-gray-400 hover:text-white h-9 px-3">
                   Cancel
                 </Button>
@@ -1218,7 +1302,7 @@ export default function InlineDietChartModal({ patient, doctorInfo, onClose, onG
                 <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                 <span>Review the plan, edit if needed, then submit</span>
               </div>
-              <div className="flex gap-2 w-full sm:w-auto">
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                 <Button
                   onClick={() => setStep('form')}
                   variant="ghost"

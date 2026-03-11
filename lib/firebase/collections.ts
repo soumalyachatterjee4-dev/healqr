@@ -1,6 +1,6 @@
 /**
  * Firestore Collections Schema
- * 
+ *
  * This file defines all Firestore collections and their TypeScript interfaces
  * for type-safe database operations.
  */
@@ -34,6 +34,7 @@ export const COLLECTIONS = {
   ADMIN_LOGS: 'adminLogs',
   PLATFORM_ANALYTICS: 'platformAnalytics',
   SCHEDULED_TASKS: 'scheduledTasks',
+  CLINICS: 'clinics',
 } as const;
 
 // ============================================
@@ -49,12 +50,12 @@ export interface Doctor {
   specialty?: string;
   qualification?: string;
   experience?: string;
-  
+
   // Profile
   profilePhoto?: string; // Storage URL
   about?: string;
   languages?: string[];
-  
+
   // Chambers
   chambers: {
     main: {
@@ -92,7 +93,7 @@ export interface Doctor {
       qrCode?: string;
     };
   };
-  
+
   // Subscription
   subscription: {
     plan: 'starter' | 'growth' | 'scale' | 'pro' | 'summit';
@@ -105,36 +106,36 @@ export interface Doctor {
     billingCycle: 'monthly' | 'yearly';
     razorpaySubscriptionId?: string;
   };
-  
+
   // Active Premium Add-ons
   activeAddons: string[]; // ['ecommerce-activation', 'doctor-patient-chat', ...]
   addonExpiry: {
     [addonId: string]: Timestamp;
   };
-  
+
   // Emergency Button
   emergencyButton?: {
     active: boolean;
     phoneNumber: string;
     activatedAt: Timestamp;
   };
-  
+
   // E-commerce (if addon active)
   ecommerce?: {
     active: boolean;
     razorpayAccountId?: string;
     productsCount: number;
   };
-  
+
   // Video Consultation (if addon active)
   videoConsultation?: {
     active: boolean;
     meetingRoomId?: string;
   };
-  
+
   // Assistant Access (if addon active)
   assistants?: string[]; // Array of assistant user IDs
-  
+
   // Stats
   stats: {
     totalBookings: number;
@@ -142,7 +143,7 @@ export interface Doctor {
     averageRating: number;
     totalReviews: number;
   };
-  
+
   // Settings
   settings: {
     emailNotifications: boolean;
@@ -151,7 +152,7 @@ export interface Doctor {
     language: 'english' | 'hindi' | 'bengali';
     fcmToken?: string; // For push notifications
   };
-  
+
   // Metadata
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -171,23 +172,23 @@ export interface Patient {
   age: number;
   gender: 'male' | 'female' | 'other';
   email?: string;
-  
+
   // Medical History
   medicalHistory?: {
     bloodGroup?: string;
     allergies?: string[];
     chronicConditions?: string[];
   };
-  
+
   // Bookings
   bookingHistory: string[]; // Array of booking IDs
-  
+
   // Stats
   stats: {
     totalBookings: number;
     totalSpent: number;
   };
-  
+
   // Metadata
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -201,45 +202,45 @@ export interface Patient {
 export interface Booking {
   id: string;
   bookingNumber: string; // Unique booking number
-  
+
   // References
   doctorId: string;
   patientId: string;
   doctorCode: string;
-  
+
   // Patient Details (denormalized for quick access)
   patientName: string;
   patientPhone: string;
   patientAge: number;
   patientGender: 'male' | 'female' | 'other';
-  
+
   // Booking Details
   chamber: 'main' | 'secondary';
   bookingDate: Timestamp;
   timeSlot: string; // '09:00 AM'
   consultationFee: number;
-  
+
   // Payment
   paymentStatus: 'pending' | 'paid' | 'verification_pending' | 'failed';
   paymentMethod?: 'upi' | 'card' | 'netbanking' | 'wallet' | 'pay_later';
   paymentId?: string; // Razorpay payment ID
   utrNumber?: string; // For UPI payments
-  
+
   // Status
   status: 'confirmed' | 'cancelled' | 'completed' | 'no_show' | 'rescheduled';
   cancelledAt?: Timestamp;
   cancelledBy?: 'doctor' | 'patient';
   cancellationReason?: string;
-  
+
   // Consultation
   consultationCompleted: boolean;
   consultationNotes?: string;
   prescriptionId?: string; // Reference to prescription document
-  
+
   // Follow-up
   followUpDate?: Timestamp;
   followUpBookingId?: string;
-  
+
   // Metadata
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -252,24 +253,24 @@ export interface Booking {
 
 export interface Transaction {
   id: string;
-  
+
   // References
   doctorId: string;
   bookingId?: string; // For consultation payments
-  
+
   // Transaction Details
   type: 'subscription' | 'addon' | 'topup' | 'consultation' | 'ecommerce' | 'refund';
   amount: number;
   currency: 'INR';
-  
+
   // Payment Gateway
   razorpayPaymentId?: string;
   razorpayOrderId?: string;
   razorpaySignature?: string;
-  
+
   // Status
   status: 'pending' | 'completed' | 'failed' | 'refunded';
-  
+
   // Details
   description: string;
   metadata?: {
@@ -278,7 +279,7 @@ export interface Transaction {
     billingCycle?: 'monthly' | 'yearly';
     [key: string]: any;
   };
-  
+
   // Metadata
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -290,32 +291,32 @@ export interface Transaction {
 
 export interface Notification {
   id: string;
-  
+
   // Recipients
   recipientId: string; // Doctor or Patient ID
   recipientType: 'doctor' | 'patient';
-  
+
   // Notification Details
   type: string; // 'booking_reminder', 'consultation_completed', etc.
   title: string;
   message: string;
   language: 'english' | 'hindi' | 'bengali';
-  
+
   // Status
   read: boolean;
   readAt?: Timestamp;
-  
+
   // Actions
   actionUrl?: string;
   actionData?: any;
-  
+
   // Delivery
   channels: {
     push: boolean;
     email: boolean;
     sms: boolean;
   };
-  
+
   // Metadata
   createdAt: Timestamp;
   expiresAt?: Timestamp;
@@ -327,40 +328,40 @@ export interface Notification {
 
 export interface NotificationQueue {
   id: string;
-  
+
   // Recipient
   recipientPhone: string; // Patient phone number
   recipientType: 'patient' | 'doctor';
-  
+
   // Notification Details
-  type: 'booking_reminder' | 'consultation_completed' | 'follow_up' | 'review_request' | 
+  type: 'booking_reminder' | 'consultation_completed' | 'follow_up' | 'review_request' |
         'cancellation' | 'restoration' | 'admin_alert' | 'subscription_expiry' | 'booking_limit';
   title: string;
   message: string;
   language: 'english' | 'hindi' | 'bengali';
-  
+
   // Related Data
   bookingId?: string;
   doctorId?: string;
   chamberId?: string;
-  
+
   // Rich Notification Data
   richTemplate?: any; // Rich notification template data
   deliveryMethod?: string; // 'rich_notification' | 'simple'
-  
+
   // Scheduling
   scheduledFor: Timestamp; // When to send
-  
+
   // Delivery Status
   status: 'pending' | 'sent' | 'failed' | 'cancelled';
   sentAt?: Timestamp;
   failureReason?: string;
   retryCount: number;
-  
+
   // Tracking
   impressionRecorded: boolean;
   clickRecorded: boolean;
-  
+
   // Metadata
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -387,26 +388,26 @@ export interface PatientFCMToken {
 
 export interface ScheduledNotification {
   id: string;
-  
+
   // Recipient
   recipientPhone: string;
   recipientType: 'patient' | 'doctor';
-  
+
   // Notification Type
   type: 'follow_up' | 'review_request' | 'subscription_expiry';
-  
+
   // Trigger Details
   triggerTime: Timestamp;
   relatedBookingId?: string;
   relatedDoctorId?: string;
-  
+
   // Status
   status: 'scheduled' | 'sent' | 'cancelled';
-  
+
   // Follow-up specific (permanent commitment)
   isPermanentCommitment?: boolean; // Deliver even if subscription expired
   customMessage?: string;
-  
+
   // Metadata
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -418,28 +419,28 @@ export interface ScheduledNotification {
 
 export interface ChatRoom {
   id: string;
-  
+
   // Participants
   doctorId: string;
   patientId: string;
-  
+
   // Details
   doctorName: string;
   patientName: string;
-  
+
   // Status
   status: 'active' | 'closed';
-  
+
   // Last Message
   lastMessage?: string;
   lastMessageAt?: Timestamp;
-  
+
   // Unread Count
   unreadCount: {
     doctor: number;
     patient: number;
   };
-  
+
   // Metadata
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -451,24 +452,24 @@ export interface ChatRoom {
 
 export interface ChatMessage {
   id: string;
-  
+
   // References
   chatRoomId: string;
   senderId: string;
   senderType: 'doctor' | 'patient';
-  
+
   // Message
   message: string;
   type: 'text' | 'image' | 'file' | 'prescription';
-  
+
   // Attachments
   attachmentUrl?: string;
   attachmentName?: string;
-  
+
   // Status
   read: boolean;
   readAt?: Timestamp;
-  
+
   // Metadata
   createdAt: Timestamp;
 }
@@ -479,25 +480,25 @@ export interface ChatMessage {
 
 export interface Review {
   id: string;
-  
+
   // References
   doctorId: string;
   patientId: string;
   bookingId: string;
-  
+
   // Review Details
   patientName: string;
   rating: number; // 1-5
   comment: string;
-  
+
   // Status
   verified: boolean;
   published: boolean;
-  
+
   // Doctor Response
   doctorResponse?: string;
   respondedAt?: Timestamp;
-  
+
   // Metadata
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -509,10 +510,10 @@ export interface Review {
 
 export interface Product {
   id: string;
-  
+
   // References
   doctorId: string;
-  
+
   // Product Details
   name: string;
   description: string;
@@ -520,22 +521,22 @@ export interface Product {
   price: number;
   mrp: number;
   discount: number; // Percentage
-  
+
   // Images
   images: string[]; // Array of storage URLs
-  
+
   // Stock
   inStock: boolean;
   stockQuantity?: number;
-  
+
   // Status
   active: boolean;
   featured: boolean;
-  
+
   // Stats
   views: number;
   orders: number;
-  
+
   // Metadata
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -547,15 +548,15 @@ export interface Product {
 
 export interface Prescription {
   id: string;
-  
+
   // References
   doctorId: string;
   patientId: string;
   bookingId: string;
-  
+
   // Prescription Details
   type: 'old' | 'new'; // OLD = patient uploaded, NEW = doctor uploaded
-  
+
   // Files
   files: {
     url: string; // Storage URL
@@ -563,7 +564,7 @@ export interface Prescription {
     fileType: string;
     uploadedAt: Timestamp;
   }[];
-  
+
   // AI Analysis (for NEW prescriptions)
   aiAnalysis?: {
     extractedText: string;
@@ -575,10 +576,10 @@ export interface Prescription {
     confidence: number;
     analyzedAt: Timestamp;
   };
-  
+
   // Status
   status: 'uploaded' | 'analyzed' | 'sent_to_patient';
-  
+
   // Metadata
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -590,20 +591,20 @@ export interface Prescription {
 
 export interface AdminLog {
   id: string;
-  
+
   // Admin Details
   adminEmail: string;
   adminName: string;
-  
+
   // Action
   action: string; // 'doctor_approved', 'payment_refunded', etc.
   targetType: 'doctor' | 'patient' | 'booking' | 'transaction' | 'system';
   targetId?: string;
-  
+
   // Details
   description: string;
   metadata?: any;
-  
+
   // Metadata
   createdAt: Timestamp;
   ipAddress?: string;

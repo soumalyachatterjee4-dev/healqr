@@ -8,7 +8,7 @@ import DashboardSidebar from './DashboardSidebar';
 
 interface AnalyticsProps {
   onMenuChange?: (menu: string) => void;
-  onLogout?: () => void;
+  onLogout?: () => void | Promise<void>;
   activeAddOns?: string[];
 }
 
@@ -26,7 +26,7 @@ interface AnalyticsData {
   purposeData: Record<string, number>;
 }
 
-export default function Analytics({ onMenuChange, onLogout, activeAddOns = [] }: AnalyticsProps) {
+export default function Analytics({ onMenuChange = () => {}, onLogout, activeAddOns = [] }: AnalyticsProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [timeFrame, setTimeFrame] = useState('last-7-days');
   const [selectedChamber, setSelectedChamber] = useState('all');
@@ -64,7 +64,7 @@ export default function Analytics({ onMenuChange, onLogout, activeAddOns = [] }:
         if (doctorSnap.exists()) {
           const doctorData = doctorSnap.data();
           const chambersList = doctorData.chambers || [];
-          
+
           const chamberOptions = [
             { id: 'all', name: 'All Chambers' },
             ...chambersList.map((chamber: any) => ({
@@ -72,7 +72,7 @@ export default function Analytics({ onMenuChange, onLogout, activeAddOns = [] }:
               name: chamber.chamberName
             }))
           ];
-          
+
           setChambers(chamberOptions);
         }
       } catch (error) {
@@ -101,7 +101,7 @@ export default function Analytics({ onMenuChange, onLogout, activeAddOns = [] }:
         if (!doctorSnap.exists()) return;
 
         const doctorData = doctorSnap.data();
-        
+
         // Calculate date range based on timeFrame
         let startDate: Date;
         let endDate: Date = new Date();
@@ -130,7 +130,7 @@ export default function Analytics({ onMenuChange, onLogout, activeAddOns = [] }:
         let q = query(bookingsRef, where('doctorId', '==', userId));
 
         const bookingsSnap = await getDocs(q);
-        
+
         let totalScan = 0;
         let totalBooking = 0;
         let qrBooking = 0;
@@ -139,7 +139,7 @@ export default function Analytics({ onMenuChange, onLogout, activeAddOns = [] }:
         let globalToggleCancellation = 0;
         let chamberCancellation = 0;
         let patientCancellation = 0;
-        
+
         const ageGroups: Record<string, number> = {
           '0-18': 0,
           '19-30': 0,
@@ -148,14 +148,14 @@ export default function Analytics({ onMenuChange, onLogout, activeAddOns = [] }:
           '60+': 0,
           'NA': 0
         };
-        
+
         const genderCounts: Record<string, number> = {
           'Male': 0,
           'Female': 0,
           'Other': 0,
           'NA': 0
         };
-        
+
         const purposeCounts: Record<string, number> = {
           'New Patient - Initial Consultation': 0,
           'Existing Patient - New Treatment (First Visit)': 0,
@@ -168,7 +168,7 @@ export default function Analytics({ onMenuChange, onLogout, activeAddOns = [] }:
 
         bookingsSnap.docs.forEach(doc => {
           const data = doc.data();
-          
+
           // Handle different date field formats
           let bookingDate: Date | null = null;
           if (data.createdAt?.toDate) {
@@ -181,7 +181,7 @@ export default function Analytics({ onMenuChange, onLogout, activeAddOns = [] }:
             // For advance bookings, use appointmentDate string
             bookingDate = new Date(data.appointmentDate);
           }
-          
+
           if (!bookingDate || isNaN(bookingDate.getTime())) return; // Skip if no valid date
 
           // Filter by date range
@@ -201,7 +201,7 @@ export default function Analytics({ onMenuChange, onLogout, activeAddOns = [] }:
           // Count total bookings (non-cancelled)
           if (!isCancelled) {
             totalBooking++;
-            
+
             if (isQRBooking) {
               qrBooking++;
             } else {
@@ -244,7 +244,7 @@ export default function Analytics({ onMenuChange, onLogout, activeAddOns = [] }:
           // Count cancellations by type
           if (isCancelled) {
             const cancelReason = data.cancellationReason || '';
-            
+
             if (cancelReason.includes('global toggle') || cancelReason.includes('Global booking disabled')) {
               globalToggleCancellation++;
             } else if (cancelReason.includes('chamber') || cancelReason.includes('Chamber deactivated')) {
@@ -311,7 +311,7 @@ export default function Analytics({ onMenuChange, onLogout, activeAddOns = [] }:
       'Emergency Consultation': 'Emergency',
       'NA': 'NA'
     };
-    
+
     return Object.entries(analyticsData.purposeData).map(([purpose, count]) => ({
       purpose: labelMap[purpose] || purpose,
       count
@@ -556,9 +556,9 @@ export default function Analytics({ onMenuChange, onLogout, activeAddOns = [] }:
                     <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                     <XAxis dataKey="age" stroke="#9ca3af" />
                     <YAxis stroke="#9ca3af" />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: '#1f2937', 
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#1f2937',
                         border: '1px solid #374151',
                         borderRadius: '8px',
                         color: '#fff'
@@ -595,9 +595,9 @@ export default function Analytics({ onMenuChange, onLogout, activeAddOns = [] }:
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: '#1f2937', 
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#1f2937',
                         border: '1px solid #374151',
                         borderRadius: '8px',
                         color: '#fff'
@@ -627,16 +627,16 @@ export default function Analytics({ onMenuChange, onLogout, activeAddOns = [] }:
                   <BarChart data={purposeData} layout="vertical" margin={{ left: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                     <XAxis type="number" stroke="#9ca3af" />
-                    <YAxis 
-                      type="category" 
-                      dataKey="purpose" 
-                      stroke="#9ca3af" 
+                    <YAxis
+                      type="category"
+                      dataKey="purpose"
+                      stroke="#9ca3af"
                       width={140}
                       tick={{ fontSize: 12 }}
                     />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: '#1f2937', 
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#1f2937',
                         border: '1px solid #374151',
                         borderRadius: '8px',
                         color: '#fff'
@@ -673,9 +673,9 @@ export default function Analytics({ onMenuChange, onLogout, activeAddOns = [] }:
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: '#1f2937', 
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#1f2937',
                         border: '1px solid #374151',
                         borderRadius: '8px',
                         color: '#fff'

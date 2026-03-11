@@ -9,13 +9,18 @@ import {
   DialogDescription,
   DialogFooter,
 } from './ui/dialog';
-import { type Language } from '../utils/translations';
-import { useAITranslation } from '../hooks/useAITranslation';
+
+// Convert slug like "general_medicine" to "General Medicine"
+function formatSpecialty(slug: string): string {
+  return slug
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase());
+}
 import ReviewCard from './ReviewCard';
 import { useState, useEffect } from 'react';
 import TemplateDisplay from './TemplateDisplay';
 import BookingFlowLayout from './BookingFlowLayout';
-
+import type { Language } from '../utils/translations';
 interface Review {
   id: number;
   patientName: string;
@@ -53,7 +58,6 @@ export default function BookingMiniWebsite({
   language = 'english',
   uploadedReviews = [],
 }: BookingMiniWebsiteProps) {
-  const { bt } = useAITranslation(language);
 
   // Doctor profile state (loaded from Firestore)
   const [doctorProfile, setDoctorProfile] = useState<any>(null);
@@ -332,7 +336,7 @@ export default function BookingMiniWebsite({
       doctorName={doctorProfile?.name}
       doctorPhoto={doctorProfile?.profileImage}
       doctorDegrees={doctorProfile?.degrees}
-      doctorSpecialty={doctorProfile?.specialties?.[0] || doctorProfile?.specialities?.[0]}
+      doctorSpecialty={formatSpecialty(doctorProfile?.specialties?.[0] || doctorProfile?.specialities?.[0] || '')}
       useDrPrefix={doctorProfile?.useDrPrefix !== false}
     >
       <div className="bg-[#1a1f2e] rounded-2xl shadow-xl overflow-hidden max-w-full">
@@ -344,7 +348,7 @@ export default function BookingMiniWebsite({
                 <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
                 <div>
                   <h4 className="text-red-400 font-semibold mb-1">
-                    {bt('Booking Unavailable')}
+                    Booking Unavailable
                   </h4>
                   <p className="text-sm text-gray-300">{blockReason}</p>
                   {doctorProfile?.phone && (
@@ -353,7 +357,7 @@ export default function BookingMiniWebsite({
                       className="inline-flex items-center gap-2 mt-3 text-emerald-400 hover:text-emerald-300 text-sm"
                     >
                       <Phone className="w-4 h-4" />
-                      {bt('Call Clinic')}
+                      Call Clinic
                     </a>
                   )}
                 </div>
@@ -372,7 +376,7 @@ export default function BookingMiniWebsite({
                 className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Calendar className="w-5 h-5" />
-                {bt('Book Appointment Now')}
+                Book Appointment Now
               </Button>
 
               {onViewHistory && (
@@ -382,7 +386,7 @@ export default function BookingMiniWebsite({
                   className="w-full h-12 mt-3 border-emerald-600 text-emerald-600 hover:bg-emerald-50 rounded-lg flex items-center justify-center gap-2"
                 >
                   <HistoryIcon className="w-5 h-5" />
-                  {bt('View My Visit History')}
+                  View My Visit History
                 </Button>
               )}
             </div>
@@ -394,7 +398,7 @@ export default function BookingMiniWebsite({
               className="w-full h-12 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center justify-center gap-2 mt-3 animate-pulse"
             >
               <AlertCircle className="w-5 h-5" />
-              {bt('Emergency Consultation')}
+              Emergency Consultation
             </Button>
           )}
         </div>
@@ -402,7 +406,7 @@ export default function BookingMiniWebsite({
         {/* Know Your Doctor Section */}
         <div className="px-4 sm:px-6 py-4 sm:py-6">
           <h3 className="text-white text-base sm:text-lg mb-4">
-            {bt('Know Your Doctor')}
+            Know Your Doctor
           </h3>
 
           {loadingProfile ? (
@@ -476,7 +480,7 @@ export default function BookingMiniWebsite({
                               key={`specialty-${index}`}
                               className="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-lg"
                             >
-                              {specialty}
+                              {formatSpecialty(specialty)}
                             </div>
                           ))}
                         </>
@@ -517,7 +521,7 @@ export default function BookingMiniWebsite({
                     {cumulativeStats.averageRating.toFixed(1)}/5
                   </span>
                   <span className="text-sm text-gray-400">
-                    {cumulativeStats.totalReviews} {bt('reviews')}
+                    {cumulativeStats.totalReviews} reviews
                   </span>
                 </div>
 
@@ -527,8 +531,7 @@ export default function BookingMiniWebsite({
                   </p>
                 ) : doctorProfile?.experience ? (
                   <p className="text-sm text-gray-300 leading-relaxed">
-                    {doctorProfile.experience} of experience in medical
-                    practice.
+                    {`${doctorProfile.experience} of experience in medical practice.`}
                   </p>
                 ) : (
                   <p className="text-sm text-gray-300 leading-relaxed">
@@ -575,7 +578,7 @@ export default function BookingMiniWebsite({
             <div className="flex items-center gap-2 mb-3">
               <Lightbulb className="w-5 h-5 text-purple-400" />
               <h3 className="text-white text-base sm:text-lg">
-                {bt("Today's Health Tip")}
+                Today's Health Tip
               </h3>
             </div>
             <TemplateDisplay
@@ -591,7 +594,7 @@ export default function BookingMiniWebsite({
             <div className="flex items-center gap-2 mb-4">
               <Sparkles className="w-5 h-5 text-emerald-400" />
               <h3 className="text-white text-base sm:text-lg">
-                {bt('Messages from Doctor')}
+                Messages from Doctor
               </h3>
             </div>
 
@@ -642,7 +645,7 @@ export default function BookingMiniWebsite({
           return reviewsToShow.length > 0 ? (
             <div className="px-4 sm:px-6 pb-6">
               <h3 className="text-white text-base sm:text-lg mb-4">
-                {bt('Patient Reviews')}
+                Patient Reviews
               </h3>
               <div className="space-y-4">
                 {reviewsToShow.slice(0, 2).map((review, index) => (
@@ -669,10 +672,10 @@ export default function BookingMiniWebsite({
           <DialogHeader>
             <DialogTitle className="text-xl text-white flex items-center gap-2">
               <AlertCircle className="w-6 h-6 text-red-500" />
-              {bt('Emergency Consultation')}
+              Emergency Consultation
             </DialogTitle>
             <DialogDescription className="text-gray-400">
-              {bt('You are about to call the doctor directly for an emergency consultation.')}
+              You are about to call the doctor directly for an emergency consultation.
             </DialogDescription>
           </DialogHeader>
 
@@ -681,11 +684,11 @@ export default function BookingMiniWebsite({
               <Phone className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
               <div>
                 <h4 className="text-red-500 mb-2">
-                  {bt('Emergency Contact')}
+                  Emergency Contact
                 </h4>
                 <p className="text-white text-xl mb-2">{emergencyPhone}</p>
                 <p className="text-sm text-gray-300">
-                  {bt('Please explain your emergency clearly when the doctor answers.')}
+                  Please explain your emergency clearly when the doctor answers.
                 </p>
               </div>
             </div>
@@ -697,14 +700,14 @@ export default function BookingMiniWebsite({
               onClick={() => setShowEmergencyDialog(false)}
               className="bg-transparent border-zinc-700 text-white hover:bg-zinc-800"
             >
-              {bt('Cancel')}
+              Cancel
             </Button>
             <Button
               onClick={confirmEmergencyCall}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
               <Phone className="w-4 h-4 mr-2" />
-              {bt('Call Now')}
+              Call Now
             </Button>
           </DialogFooter>
         </DialogContent>

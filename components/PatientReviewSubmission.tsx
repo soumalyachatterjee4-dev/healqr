@@ -8,11 +8,11 @@ import type { Language } from '../utils/translations';
 
 interface PatientReviewSubmissionProps {
   language?: Language;
-  onSubmit?: (review: { 
+  onSubmit?: (review: {
     id: number;
     patientName: string;
-    rating: number; 
-    comment: string; 
+    rating: number;
+    comment: string;
     date: string;
     verified: boolean;
   }) => void;
@@ -31,12 +31,12 @@ export default function PatientReviewSubmission({
 
   const handleSubmit = () => {
     if (rating === 0) {
-      alert(language === 'hindi' ? 'कृपया रेटिंग चुनें' : language === 'bengali' ? 'দয়া করে রেটিং নির্বাচন করুন' : 'Please select a rating');
+      alert('Please select a rating');
       return;
     }
 
     if (!patientName.trim()) {
-      alert(language === 'hindi' ? 'कृपया अपना नाम दर्ज करें' : language === 'bengali' ? 'দয়া করে আপনার নাম লিখুন' : 'Please enter your name');
+      alert('Please enter your name');
       return;
     }
 
@@ -52,44 +52,9 @@ export default function PatientReviewSubmission({
     if (onSubmit) {
       onSubmit(reviewData);
     }
-    
+
     // Don't call onClose - let the parent (App.tsx) handle navigation after submit
   };
-
-  const translations = {
-    english: {
-      title: 'Rate Your Experience',
-      subtitle: 'How was your consultation?',
-      nameLabel: 'Your Name',
-      namePlaceholder: 'Enter your name',
-      commentLabel: 'Add a comment (optional)',
-      commentPlaceholder: 'Share your experience...',
-      submit: 'Submit Review',
-      cancel: 'Cancel',
-    },
-    hindi: {
-      title: 'अपना अनुभव साझा करें',
-      subtitle: 'आपका परामर्श कैसा रहा?',
-      nameLabel: 'आपका नाम',
-      namePlaceholder: 'अपना नाम दर्ज करें',
-      commentLabel: 'टिप्पणी जोड़ें (वैकल्पिक)',
-      commentPlaceholder: 'अपना अनुभव साझा करें...',
-      submit: 'समीक्षा जमा करें',
-      cancel: 'रद्द करें',
-    },
-    bengali: {
-      title: 'আপনার অভিজ্ঞতা শেয়ার করুন',
-      subtitle: 'আপনার পরামর্শ কেমন ছিল?',
-      nameLabel: 'আপনার নাম',
-      namePlaceholder: 'আপনার নাম লিখুন',
-      commentLabel: 'মন্তব্য যোগ করুন (ঐচ্ছিক)',
-      commentPlaceholder: 'আপনার অভিজ্ঞতা শেয়ার করুন...',
-      submit: 'রিভিউ জমা দিন',
-      cancel: 'বাতিল',
-    },
-  };
-
-  const t = translations[language];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-600 via-blue-500 to-cyan-400 flex items-center justify-center p-4">
@@ -98,8 +63,8 @@ export default function PatientReviewSubmission({
           <div className="w-16 h-16 bg-gradient-to-r from-purple-600 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
             <Star className="w-8 h-8 text-white" />
           </div>
-          <h2 className="text-gray-900 mb-2">{t.title}</h2>
-          <p className="text-gray-600">{t.subtitle}</p>
+          <h2 className="text-gray-900 mb-2">Rate Your Experience</h2>
+          <p className="text-gray-600">How was your consultation?</p>
         </div>
 
         {/* Star Rating */}
@@ -125,11 +90,11 @@ export default function PatientReviewSubmission({
           </div>
           {rating > 0 && (
             <p className="text-center text-gray-600 text-sm">
-              {rating === 5 ? (language === 'hindi' ? 'उत्कृष्ट!' : language === 'bengali' ? 'চমৎকার!' : 'Excellent!') :
-               rating === 4 ? (language === 'hindi' ? 'बहुत अच्छा!' : language === 'bengali' ? 'খুব ভাল!' : 'Great!') :
-               rating === 3 ? (language === 'hindi' ? 'अच्छा' : language === 'bengali' ? 'ভাল' : 'Good') :
-               rating === 2 ? (language === 'hindi' ? 'औसत' : language === 'bengali' ? 'গড়' : 'Fair') :
-               (language === 'hindi' ? 'खराब' : language === 'bengali' ? 'খারাপ' : 'Poor')}
+              {rating === 5 ? 'Excellent!' :
+               rating === 4 ? 'Great!' :
+               rating === 3 ? 'Good' :
+               rating === 2 ? 'Fair' :
+               'Poor'}
             </p>
           )}
         </div>
@@ -137,13 +102,13 @@ export default function PatientReviewSubmission({
         {/* Name Input */}
         <div className="mb-6">
           <Label htmlFor="name" className="text-gray-900 mb-2">
-            {t.nameLabel}
+            Your Name
           </Label>
           <Input
             id="name"
             value={patientName}
             onChange={(e) => setPatientName(e.target.value)}
-            placeholder={t.namePlaceholder}
+            placeholder="Enter your name"
             className="bg-white text-gray-900 border-gray-300 placeholder:text-gray-400"
           />
         </div>
@@ -151,13 +116,13 @@ export default function PatientReviewSubmission({
         {/* Comment */}
         <div className="mb-6">
           <Label htmlFor="comment" className="text-gray-900 mb-2">
-            {t.commentLabel}
+            Add a comment (optional)
           </Label>
           <Textarea
             id="comment"
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            placeholder={t.commentPlaceholder}
+            placeholder="Share your experience..."
             className="min-h-[100px] resize-none bg-white text-gray-900 border-gray-300 placeholder:text-gray-400"
           />
         </div>
@@ -169,13 +134,13 @@ export default function PatientReviewSubmission({
             variant="outline"
             className="flex-1"
           >
-            {t.cancel}
+            Cancel
           </Button>
           <Button
             onClick={handleSubmit}
             className="flex-1 bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600"
           >
-            {t.submit}
+            Submit Review
           </Button>
         </div>
       </div>

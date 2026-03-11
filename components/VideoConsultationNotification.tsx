@@ -1,6 +1,6 @@
 import { Video, Calendar, Clock, ExternalLink, AlertCircle, CheckCircle, User } from 'lucide-react';
 import TemplateDisplay from './TemplateDisplay';
-import { useAITranslation } from '../hooks/useAITranslation';
+
 import type { Language } from '../utils/translations';
 
 interface VideoConsultationNotificationProps {
@@ -23,7 +23,7 @@ export default function VideoConsultationNotification({
   bookingId = 'V7-001',
   language = 'english'
 }: VideoConsultationNotificationProps) {
-  const { bt } = useAITranslation(language);
+  
 
   return (
     <div className="min-h-screen bg-[#1a1f2e] text-white p-4 sm:p-6 flex items-center justify-center">
@@ -38,7 +38,7 @@ export default function VideoConsultationNotification({
                   <Video className="w-6 h-6 text-red-500" />
                 </div>
                 <div>
-                  <h2 className="text-white font-semibold">{bt('VIDEO CONSULTATION READY')}</h2>
+                  <h2 className="text-white font-semibold">VIDEO CONSULTATION READY</h2>
                   <p className="text-white/80 text-xs">Online Video Call</p>
                 </div>
               </div>
@@ -50,14 +50,14 @@ export default function VideoConsultationNotification({
             {/* Greeting */}
             <div className="text-gray-800">
               <p className="text-base">
-                {bt('Hello')} <span className="font-semibold text-red-600">{patientName}</span>, 👋
+                Hello <span className="font-semibold text-red-600">{patientName}</span>, 👋
               </p>
             </div>
 
             {/* Message */}
             <div className="bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200 rounded-xl p-4">
               <p className="text-gray-700 text-sm leading-relaxed">
-                {bt('Your video consultation with')} <span className="font-semibold text-red-600">{doctorName}</span> {bt('is scheduled.')}
+                Your video consultation with <span className="font-semibold text-red-600">{doctorName}</span> is scheduled.
               </p>
             </div>
 
@@ -83,21 +83,21 @@ export default function VideoConsultationNotification({
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600 flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-blue-600" />
-                  {bt('Date:')}
+                  Date:
                 </span>
                 <span className="text-gray-900 font-semibold">{consultationDate}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600 flex items-center gap-2">
                   <Clock className="w-4 h-4 text-blue-600" />
-                  {bt('Time:')}
+                  Time:
                 </span>
                 <span className="text-gray-900 font-semibold">{consultationTime}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600 flex items-center gap-2">
                   <User className="w-4 h-4 text-blue-600" />
-                  {bt('Booking ID:')}
+                  Booking ID:
                 </span>
                 <span className="text-gray-900 font-semibold font-mono">{bookingId}</span>
               </div>
@@ -105,11 +105,11 @@ export default function VideoConsultationNotification({
 
             {/* Before Joining Checklist */}
             <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
-              <h4 className="text-purple-900 font-semibold text-sm mb-3">{bt('Before Joining:')}</h4>
+              <h4 className="text-purple-900 font-semibold text-sm mb-3">Before Joining:</h4>
               <div className="space-y-2 text-sm text-purple-800">
-                <p>{bt('• Check camera and microphone')}</p>
-                <p>{bt('• Ensure stable internet')}</p>
-                <p>{bt('• Find a quiet space')}</p>
+                <p>• Check camera and microphone</p>
+                <p>• Ensure stable internet</p>
+                <p>• Find a quiet space</p>
               </div>
             </div>
 
@@ -122,7 +122,7 @@ export default function VideoConsultationNotification({
             >
               <button className="w-full bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white py-4 rounded-xl font-semibold text-base shadow-lg hover:shadow-xl transition-all transform hover:scale-[1.02] flex items-center justify-center gap-2">
                 <Video className="w-5 h-5" />
-                {bt('Join Video Consultation')}
+                Join Video Consultation
                 <ExternalLink className="w-4 h-4" />
               </button>
             </a>
@@ -132,7 +132,7 @@ export default function VideoConsultationNotification({
               <div className="flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 text-orange-600 flex-shrink-0 mt-0.5" />
                 <div className="text-xs text-orange-900">
-                  <span className="font-semibold">{bt('Note:')}</span> {bt('Please join 5 minutes before the scheduled time. The link will be active 10 minutes before your appointment.')}
+                  <span className="font-semibold">Note:</span> Please join 5 minutes before the scheduled time. The link will be active 10 minutes before your appointment.
                 </div>
               </div>
             </div>

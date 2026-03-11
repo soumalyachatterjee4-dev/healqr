@@ -1,8 +1,6 @@
 import { Calendar } from 'lucide-react';
 import TemplateDisplay from './TemplateDisplay';
-import { useAITranslation } from '../hooks/useAITranslation';
 import type { Language } from '../utils/translations';
-
 interface AppointmentCancelledNotificationProps {
   bookingId?: string;
   language?: Language;
@@ -27,8 +25,6 @@ export default function AppointmentCancelledNotification({
   cancellationReason = 'Unavoidable circumstances',
 }: AppointmentCancelledNotificationProps) {
 
-  const { bt } = useAITranslation(language);
-
   return (
     <div className="flex items-center justify-center py-8">
       {/* Phone Mockup with Black Border */}
@@ -44,7 +40,7 @@ export default function AppointmentCancelledNotification({
                   <Calendar className="w-5 h-5 text-white" />
                 </div>
                 <div className="flex-1">
-                  <h2 className="text-gray-900 leading-tight">{bt('APPOINTMENT CANCELLED')}</h2>
+                  <h2 className="text-gray-900 leading-tight">APPOINTMENT CANCELLED</h2>
                 </div>
               </div>
             </div>
@@ -65,14 +61,14 @@ export default function AppointmentCancelledNotification({
       {/* Greeting */}
       <div className="px-6 pb-3">
         <p className="text-gray-700">
-          {bt(`Hello ${patientName},`)} <span className="inline-block">👋</span>
+          {`Hello ${patientName},`} <span className="inline-block">👋</span>
         </p>
       </div>
 
       {/* Main Message */}
       <div className="px-6 pb-4">
         <p className="text-gray-600 text-sm leading-relaxed">
-          {bt(`Due to unavoidable circumstances, your appointment at ${clinicName} scheduled for ${cancelledDate} has been cancelled.`)}
+          {`Due to unavoidable circumstances, your appointment at ${clinicName} scheduled for ${cancelledDate} has been cancelled.`}
         </p>
       </div>
 
@@ -80,24 +76,24 @@ export default function AppointmentCancelledNotification({
       <div className="px-6 pb-4 bg-gray-50 mx-6 rounded-lg p-4">
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
-            <span className="text-gray-700">{bt('Chamber:')}</span>
+            <span className="text-gray-700">Chamber:</span>
             <span className="text-gray-900 font-medium">{clinicName}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-700">{bt('Cancelled Date:')}</span>
+            <span className="text-gray-700">Cancelled Date:</span>
             <span className="text-gray-900 font-medium">{cancelledDate}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-700">{bt('Time:')}</span>
+            <span className="text-gray-700">Time:</span>
             <span className="text-gray-900 font-medium">{cancellationTime}</span>
           </div>
           <div className="pt-2 border-t">
-            <span className="text-gray-700">{bt('Reason:')}</span>{' '}
+            <span className="text-gray-700">Reason:</span>{' '}
             <span className="text-gray-900 font-medium">{cancellationReason}</span>
           </div>
           <div className="pt-2 border-t">
-            <span className="text-gray-700">{bt('Rescheduling:')}</span>{' '}
-            <span className="text-gray-900">{bt("Scan Dr's unique QR code for new appointment")}</span>
+            <span className="text-gray-700">Rescheduling:</span>{' '}
+            <span className="text-gray-900">Scan Dr's unique QR code for new appointment</span>
           </div>
         </div>
       </div>

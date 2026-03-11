@@ -1401,14 +1401,6 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
         </main>
       </div>
 
-      {/* Floating Support Button */}
-      <button
-        onClick={() => setSupportOpen(true)}
-        className="fixed bottom-6 right-6 md:bottom-8 md:right-8 w-12 h-12 md:w-14 md:h-14 bg-emerald-500 hover:bg-emerald-600 rounded-full flex items-center justify-center shadow-lg transition-colors z-50"
-      >
-        <MessageSquare className="w-5 h-5 md:w-6 md:h-6 text-white" />
-      </button>
-
       {/* Contact Support Modal */}
       <ContactSupport
         open={supportOpen}

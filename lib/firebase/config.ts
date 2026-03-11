@@ -1,6 +1,6 @@
 /**
  * Firebase Configuration
- * 
+ *
  * This file contains the Firebase project configuration.
  * Safe for frontend preview - will not crash if Firebase unavailable.
  */
@@ -37,10 +37,10 @@ const firebaseConfig: FirebaseConfig = {
 };
 
 // Initialize Firebase
-let app: FirebaseApp | null = null;
-let auth: Auth | null = null;
-let db: Firestore | null = null;
-let storage: FirebaseStorage | null = null;
+let app = null as unknown as FirebaseApp;
+let auth = null as unknown as Auth;
+let db = null as unknown as Firestore;
+let storage = null as unknown as FirebaseStorage;
 
 // Firebase configuration status
 const isFirebaseConfigured = !PROTOTYPE_MODE;
@@ -49,12 +49,12 @@ if (isFirebaseConfigured) {
   try {
     // Initialize Firebase app
     app = initializeApp(firebaseConfig);
-    
+
     // Initialize Firebase services
     auth = getAuth(app);
     db = getFirestore(app);
     storage = getStorage(app);
-    
+
     // Enable auth persistence - CRITICAL for PWA
     // Force LOCAL persistence to survive page reloads
     if (auth) {
@@ -66,7 +66,7 @@ if (isFirebaseConfigured) {
           console.warn('⚠️ Could not set auth persistence:', error);
         });
     }
-    
+
     console.log('✅ Firebase initialized successfully');
   } catch (error: any) {
     // Silent fallback to DEMO MODE

@@ -19,6 +19,12 @@ import {
   Send,
   QrCode as QrIcon,
   MessageCircle,
+  Plus,
+  CreditCard,
+  Weight,
+  Scale,
+  Save,
+  PlusCircle,
 } from "lucide-react";
 import QRCode from "qrcode";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";

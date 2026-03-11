@@ -1,8 +1,6 @@
 import { RotateCcw } from 'lucide-react';
 import TemplateDisplay from './TemplateDisplay';
-import { useAITranslation } from '../hooks/useAITranslation';
 import type { Language } from '../utils/translations';
-
 interface AppointmentRestoredNotificationProps {
   bookingId?: string;
   // Doctor Info
@@ -46,8 +44,6 @@ export default function AppointmentRestoredNotification({
   healthTip = "Regular health checkups help detect problems before they start.",
 }: AppointmentRestoredNotificationProps) {
 
-  const { bt, dt } = useAITranslation(language);
-
   return (
     <div className="flex items-center justify-center py-8">
       {/* Phone Mockup with Black Border */}
@@ -63,7 +59,7 @@ export default function AppointmentRestoredNotification({
                   <RotateCcw className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-gray-900">{bt('APPOINTMENT RESTORED')}</h1>
+                  <h1 className="text-gray-900">APPOINTMENT RESTORED</h1>
                 </div>
               </div>
 
@@ -79,44 +75,44 @@ export default function AppointmentRestoredNotification({
               </div>
 
               {/* Greeting */}
-              <p className="text-gray-700 mb-4">{bt(`Hello ${patientName}, 👋`)}</p>
+              <p className="text-gray-700 mb-4">{`Hello ${patientName}, 👋`}</p>
 
               {/* Message */}
               <p className="text-gray-700 mb-6 leading-relaxed">
-                {bt(`We are pleased to inform you that your appointment at ${clinicName} for ${restoredDate} has been restored. Your appointment with Dr. ${doctorName} is confirmed.`)}
+                {`We are pleased to inform you that your appointment at ${clinicName} for ${restoredDate} has been restored. Your appointment with Dr. ${doctorName} is confirmed.`}
               </p>
 
               {/* Appointment Details Box */}
               <div className="bg-gray-50 rounded-xl p-4 mb-6 space-y-2 mx-6">
             <div className="flex justify-between">
-              <span className="text-gray-600">{bt('Chamber:')}</span>
+              <span className="text-gray-600">Chamber:</span>
               <span className="text-gray-900">{chamberName}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">{bt('Date:')}</span>
+              <span className="text-gray-600">Date:</span>
               <span className="text-gray-900">{restoredDate}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">{bt('Schedule Time:')}</span>
+              <span className="text-gray-600">Schedule Time:</span>
               <span className="text-gray-900">{scheduleTime}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">{bt('Location:')}</span>
+              <span className="text-gray-600">Location:</span>
               <span className="text-gray-900">{location}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">{bt('Booking Serial No:')}</span>
+              <span className="text-gray-600">Booking Serial No:</span>
               <span className="text-gray-900">{bookingSerialNo}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">{bt('Unique Booking ID:')}</span>
+              <span className="text-gray-600">Unique Booking ID:</span>
               <span className="text-gray-900">{uniqueBookingId}</span>
             </div>
               </div>
 
               {/* Arrival Message */}
               <p className="text-gray-700 mb-6 px-6">
-                {bt('Please arrive 15 minutes before your scheduled time.')}
+                Please arrive 15 minutes before your scheduled time.
               </p>
 
               {/* Health Tip Section */}

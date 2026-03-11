@@ -46,12 +46,12 @@ const LANGUAGE_INFO = {
 /**
  * Batch translate texts via Gemini AI (server-side proxy)
  * Keeps API key secure on the server, never exposed to client
- * 
+ *
  * Input:
  * - texts: string[] (required, max 50)
  * - targetLanguage: string (required)
  * - context: 'ui' | 'medical' | 'chat' | 'notification' (optional, default 'ui')
- * 
+ *
  * Returns: { translations: string[] }
  */
 exports.translateBatch = onCall({ maxInstances: 10 }, async (request) => {
@@ -84,16 +84,23 @@ exports.translateBatch = onCall({ maxInstances: 10 }, async (request) => {
     medical: 'These are medical terms and healthcare-related texts.',
     chat: 'These are chat messages between patient and doctor.',
     notification: 'These are push notification messages for appointment updates.',
+    transliterate: 'TRANSLITERATE ONLY — do NOT translate meaning. Convert each English word into the target script phonetically so pronunciation stays identical. Example for Bengali: "Signoflam" → "সিগনোফ্লাম", "Cardiologist" → "কার্ডিওলজিস্ট", "After Food" → "আফটার ফুড".',
   }[context] || '';
 
-  const prompt = `Translate the following English texts to ${langInfo.nativeName} (${targetLanguage}). ${contextInstructions}
-
-RULES:
-- Return ONLY a JSON array of translated strings in the same order
-- Use ${langInfo.script} script
+  const transliterateRules = context === 'transliterate' ? `
+- TRANSLITERATE only — write the same English word phonetically in ${langInfo.script} script
+- Do NOT translate meaning — preserve the original English pronunciation
+- Keep numbers in Arabic numerals (0-9)
+- Keep symbols like mg, ml, %, / as-is` : `
 - Keep medical terms, drug names, doctor names, and proper nouns in English
 - Keep numbers in standard Arabic numerals (0-9)
-- Maintain the same tone and formality level
+- Maintain the same tone and formality level`;
+
+  const prompt = `${context === 'transliterate' ? 'Transliterate' : 'Translate'} the following English texts to ${langInfo.nativeName} (${targetLanguage}). ${contextInstructions}
+
+RULES:
+- Return ONLY a JSON array of ${context === 'transliterate' ? 'transliterated' : 'translated'} strings in the same order
+- Use ${langInfo.script} script${transliterateRules}
 
 Texts to translate:
 ${numberedTexts}

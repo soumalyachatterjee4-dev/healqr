@@ -1,19 +1,27 @@
 /**
- * AI ChatBot Service — Booking & System Assistant
+ * AI ChatBot Service — HealQR PM Assistant
  *
- * Powered by Gemini 2.0 Flash. Handles ONLY:
- * - Booking guidance (how to book, reschedule, cancel)
- * - Doctor/clinic search help
- * - Platform navigation (prescriptions, notifications, follow-ups, dashboard)
- * - System troubleshooting
+ * Calls Cloud Function healqrAssistant (Gemini 2.5 Flash, server-side).
+ * Handles conversation persistence via Firestore.
  *
- * NEVER provides medical advice. Redirects to "book an appointment" for any health query.
+ * THREE ABSOLUTE RESTRICTIONS enforced server-side:
+ * 🚫 ZERO medical advice
+ * 🚫 ZERO data sharing
+ * 🚫 ZERO identity trust
  */
 
-import { aiTranslate, type AILanguage } from './aiTranslationService';
+import { getFunctions, httpsCallable, type HttpsCallable } from 'firebase/functions';
+import { app } from '../lib/firebase/config';
 
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
-const API_KEY = 'AIzaSyAEXO21T32uegMq4U57OnSDuBdA6CC_OOc';
+let healqrAssistantFn: HttpsCallable | null = null;
+
+function getAssistantFn(): HttpsCallable {
+  if (!healqrAssistantFn) {
+    const functions = getFunctions(app!);
+    healqrAssistantFn = httpsCallable(functions, 'healqrAssistant');
+  }
+  return healqrAssistantFn;
+}
 
 export interface ChatMessage {
   id: string;
@@ -22,147 +30,115 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
-const SYSTEM_PROMPT = `You are HealQR Assistant — a helpful booking and system guide for the HealQR healthcare platform.
+export type UserRole = 'patient' | 'doctor' | 'clinic' | 'admin' | 'visitor';
 
-STRICT RULES:
-1. You ONLY help with platform usage: booking appointments, finding doctors/clinics, navigating the app, understanding prescriptions/notifications/follow-ups, and troubleshooting.
-2. You NEVER give medical advice, treatment suggestions, diagnoses, drug recommendations, or health tips.
-3. If the user asks ANY medical/health/treatment question (symptoms, medicines, diet, disease), respond EXACTLY: "For proper medical guidance, please book an appointment with your doctor through HealQR. Our qualified doctors will provide the best treatment for you."
-4. Keep responses concise (2-4 sentences max).
-5. Be friendly, professional, and helpful.
-6. If unsure, guide them to contact support or book an appointment.
-
-PLATFORM KNOWLEDGE:
-- HealQR is a QR-based healthcare booking platform (100% free for doctors, clinics, and patients)
-- Patients scan a QR code or visit a doctor's profile link to book appointments
-- Booking flow: Select Language → View Doctor Profile → Select Date → Select Chamber → Fill Details → Confirm (get serial number + QR)
-- Patients get push notifications for reminders, consultation updates, RX (prescription) availability, follow-up reminders
-- Doctors can share prescriptions digitally (RX PDF) after consultation
-- "Find a Doctor" search lets patients search by name, specialty, or location
-- Patients can view their consultation history, prescriptions, and health records in their dashboard
-- Video consultation is available for remote visits
-- Doctors manage their schedule via chambers (locations) with specific time slots
-- Clinics can have multiple doctors, each with their own schedule
-- Follow-up appointments can be scheduled by the doctor after consultation
-- Serial number tells the patient their position in the queue
-- Live tracker shows real-time queue position on appointment day`;
-
-// Chat history for context (per session, max 20 messages)
-let chatHistory: Array<{ role: string; parts: Array<{ text: string }> }> = [];
-const MAX_HISTORY = 20;
+// Active conversation ID (per session)
+let currentConversationId: string | null = null;
 
 /**
- * Send a message to the AI ChatBot and get a response
+ * Send a message to the HealQR PM Assistant via Cloud Function
  */
 export async function sendChatMessage(
   userMessage: string,
-  language: AILanguage = 'english'
+  language: string = 'english',
+  userRole: UserRole = 'visitor'
 ): Promise<string> {
   if (!userMessage.trim()) return '';
 
-  // Translate user message to English for processing (if not English)
-  let processMessage = userMessage;
-  if (language !== 'english') {
-    const translated = await aiTranslate(userMessage, 'english', 'chat');
-    if (translated.translated !== userMessage) {
-      processMessage = translated.translated;
-    }
-  }
-
-  // Build conversation with system prompt
-  const contents = [
-    { role: 'user', parts: [{ text: SYSTEM_PROMPT + '\n\nUser message: ' + processMessage }] },
-    { role: 'model', parts: [{ text: 'I understand. I am HealQR Assistant and will only help with booking and platform usage. I will never provide medical advice.' }] },
-    ...chatHistory,
-    { role: 'user', parts: [{ text: processMessage }] }
-  ];
-
   try {
-    const response = await fetch(`${GEMINI_API_URL}?key=${API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents,
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 300,
-        }
-      })
+    const fn = getAssistantFn();
+    const result = await fn({
+      message: userMessage.trim(),
+      conversationId: currentConversationId,
+      userRole,
+      language,
     });
 
-    if (!response.ok) {
-      return getOfflineResponse(processMessage);
+    const data = result.data as { response: string; conversationId: string };
+
+    // Track conversation ID for continuity
+    if (data.conversationId) {
+      currentConversationId = data.conversationId;
     }
 
-    const data = await response.json();
-    let botResponse = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || getOfflineResponse(processMessage);
-
-    // Update conversation history
-    chatHistory.push(
-      { role: 'user', parts: [{ text: processMessage }] },
-      { role: 'model', parts: [{ text: botResponse }] }
-    );
-
-    // Trim history if too long
-    if (chatHistory.length > MAX_HISTORY * 2) {
-      chatHistory = chatHistory.slice(-MAX_HISTORY * 2);
-    }
-
-    // Translate response to user's language
-    if (language !== 'english') {
-      const translated = await aiTranslate(botResponse, language, 'chat');
-      botResponse = translated.translated;
-    }
-
-    return botResponse;
-  } catch {
-    return getOfflineResponse(processMessage);
+    return data.response || 'I apologize, I couldn\'t process that. Please try again.';
+  } catch (error: unknown) {
+    console.error('PM Assistant error:', error);
+    return getOfflineResponse(userMessage);
   }
 }
 
 /**
- * Offline fallback responses for common queries
+ * Offline fallback responses when Cloud Function is unavailable
  */
 function getOfflineResponse(message: string): string {
   const lower = message.toLowerCase();
 
   if (lower.includes('book') || lower.includes('appointment')) {
-    return 'To book an appointment: Scan the doctor\'s QR code or visit their profile link → Select your language → Choose a date → Select chamber → Fill your details → Confirm! You\'ll receive a serial number and QR code.';
+    return 'To book an appointment: Scan the doctor\'s QR code → Select language → Choose date → Select chamber → Fill details → Confirm. You\'ll get a serial number and QR code.';
   }
   if (lower.includes('find') || lower.includes('search') || lower.includes('doctor')) {
-    return 'Use "Find a Doctor" from the patient dashboard to search by doctor name, specialty, or location. You can also scan any HealQR code to directly book with that doctor.';
+    return 'Use "Find a Doctor" from the patient dashboard to search by name, specialty, or location. You can also scan any HealQR code to book directly.';
   }
   if (lower.includes('cancel')) {
-    return 'To cancel an appointment, go to your Patient Dashboard → find the appointment → tap Cancel. The doctor will be notified automatically.';
+    return 'Go to your Patient Dashboard → find the appointment → tap Cancel. The doctor will be notified automatically.';
   }
   if (lower.includes('prescription') || lower.includes('rx')) {
-    return 'After your consultation, the doctor will share your prescription digitally. You\'ll receive a notification when it\'s ready. View it anytime from your Patient Dashboard → Consultation History.';
+    return 'After consultation, your doctor shares the prescription digitally. You\'ll get a notification when it\'s ready — view it in your Patient Dashboard.';
   }
   if (lower.includes('notification') || lower.includes('reminder')) {
-    return 'HealQR sends push notifications for appointment reminders, consultation updates, prescription availability, and follow-up reminders. Make sure notifications are enabled in your browser.';
+    return 'HealQR sends push notifications for reminders, prescription availability, and follow-ups. Enable notifications in your browser for the best experience.';
   }
-  if (lower.includes('queue') || lower.includes('serial') || lower.includes('wait') || lower.includes('position')) {
-    return 'Your serial number shows your position in the queue. On appointment day, use the Live Tracker to see real-time queue updates so you know exactly when to arrive.';
+  if (lower.includes('queue') || lower.includes('serial') || lower.includes('wait')) {
+    return 'Your serial number shows your queue position. Use the Live Tracker on appointment day to see real-time updates.';
   }
   if (lower.includes('video') || lower.includes('online') || lower.includes('virtual')) {
-    return 'Video consultations are available if your doctor has enabled them. You\'ll receive a video call link via notification when the doctor is ready for your session.';
+    return 'Video consultations are available if your doctor has enabled them. You\'ll receive a link via notification when the doctor is ready.';
   }
 
   // Medical query catch
   if (lower.includes('medicine') || lower.includes('symptom') || lower.includes('pain') ||
       lower.includes('treatment') || lower.includes('disease') || lower.includes('cure') ||
-      lower.includes('tablet') || lower.includes('dosage') || lower.includes('health') ||
-      lower.includes('fever') || lower.includes('cold') || lower.includes('cough')) {
-    return 'For proper medical guidance, please book an appointment with your doctor through HealQR. Our qualified doctors will provide the best treatment for you.';
+      lower.includes('tablet') || lower.includes('dosage') || lower.includes('fever')) {
+    return 'I cannot provide medical advice. Please consult your doctor through HealQR for proper medical guidance. Would you like help booking an appointment?';
   }
 
-  return 'I can help you with booking appointments, finding doctors, navigating your dashboard, and understanding notifications. What would you like help with?';
+  return 'I\'m temporarily offline. I can usually help with booking, finding doctors, navigating your dashboard, and platform features. Please try again shortly.';
 }
 
 /**
- * Get quick-reply suggestions based on context
+ * Get quick-reply suggestions based on user role
  */
-export function getQuickReplies(language: AILanguage = 'english'): string[] {
+export function getQuickReplies(userRole: UserRole = 'visitor'): string[] {
+  if (userRole === 'doctor') {
+    return [
+      'How to write a prescription?',
+      'How to manage my schedule?',
+      'How to generate a diet chart?',
+      'How do notifications work?',
+      'How to share my QR code?',
+    ];
+  }
+
+  if (userRole === 'clinic') {
+    return [
+      'How to add a new doctor?',
+      'How to manage chambers?',
+      'How to set up clinic profile?',
+      'How do patient bookings work?',
+    ];
+  }
+
+  if (userRole === 'admin') {
+    return [
+      'Platform health status?',
+      'How many bookings today?',
+      'Any issues detected?',
+      'Active doctor count?',
+    ];
+  }
+
+  // Patient / Visitor
   return [
     'How do I book an appointment?',
     'How to find a doctor near me?',
@@ -173,8 +149,8 @@ export function getQuickReplies(language: AILanguage = 'english'): string[] {
 }
 
 /**
- * Reset chat history (new conversation)
+ * Reset chat (start new conversation)
  */
 export function resetChatHistory(): void {
-  chatHistory = [];
+  currentConversationId = null;
 }

@@ -50,6 +50,10 @@ interface Patient {
   clinicId?: string; // Which clinic facilitated the booking (if any)
   digitalRxUrl?: string; // URL of generated Digital RX (if any)
   dietChartUrl?: string; // URL of generated AI Diet Chart (if any)
+  vcLinkSentAt?: any;
+  vcPatientJoined?: boolean;
+  vcCompleted?: boolean;
+  consultationStatus?: 'pending' | 'completed';
 }
 
 interface PatientDetailsProps {

@@ -1,6 +1,5 @@
 import { CalendarCheck } from 'lucide-react';
 import TemplateDisplay from './TemplateDisplay';
-import { useAITranslation } from '../hooks/useAITranslation';
 import type { Language } from '../utils/translations';
 
 interface FollowUpNotificationProps {
@@ -24,8 +23,6 @@ export default function FollowUpNotification({
   followUpDays = 7,
   followUpDate = 'December 11, 2025',
 }: FollowUpNotificationProps) {
-  const { bt } = useAITranslation(language);
-
   return (
     <div className="flex items-center justify-center py-8">
       <div className="w-full max-w-sm">
@@ -38,7 +35,7 @@ export default function FollowUpNotification({
                 </div>
                 <div>
                   <h3 className="text-gray-900 uppercase tracking-wide text-sm">
-                    {bt('FOLLOW-UP APPOINTMENT')}
+                    FOLLOW-UP APPOINTMENT
                   </h3>
                 </div>
               </div>
@@ -52,15 +49,15 @@ export default function FollowUpNotification({
                 </div>
               </div>
               <p className="text-gray-900 mb-4">
-                {bt(`Hello ${patientName}, 👋`)}
+                {`Hello ${patientName}, 👋`}
               </p>
               <p className="text-gray-700 text-sm mb-4 leading-relaxed">
-                {bt(`As discussed during your consultation with ${doctorName}, please schedule your follow-up appointment.`)}
+                {`As discussed during your consultation with ${doctorName}, please schedule your follow-up appointment.`}
               </p>
               <div className="bg-blue-50 border-l-4 border-blue-400 rounded-r-lg p-3 mb-4">
                 <div className="flex items-start gap-2 mb-2">
                   <span className="text-blue-600 text-sm">💌</span>
-                  <p className="text-gray-700 text-sm">{bt("Doctor's Message:")}</p>
+                  <p className="text-gray-700 text-sm">Doctor's Message:</p>
                 </div>
                 <p className="text-gray-600 text-sm italic pl-6">
                   "{doctorMessage}"
@@ -68,20 +65,20 @@ export default function FollowUpNotification({
               </div>
               <div className="bg-gray-50 rounded-lg p-4 mb-4 space-y-3">
                 <div>
-                  <span className="text-gray-900 font-semibold">{bt('Scheduled Follow-up Date:')}</span>{' '}
+                  <span className="text-gray-900 font-semibold">Scheduled Follow-up Date:</span>{' '}
                   <span className="text-blue-600 font-medium">{followUpDate}</span>
                 </div>
                 <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
                   <p className="text-gray-700 text-sm">
-                    {bt('⏰ This is an advance reminder (sent 3 days before your scheduled date)')}
+                    ⏰ This is an advance reminder (sent 3 days before your scheduled date)
                   </p>
                   <p className="text-gray-900 text-sm font-medium mt-1">
-                    {bt('📅 Please book your appointment within ±2 days of the scheduled date')}
+                    📅 Please book your appointment within ±2 days of the scheduled date
                   </p>
                 </div>
                 <div>
-                  <span className="text-gray-900">{bt('Booking:')}</span>{' '}
-                  <span className="text-gray-600">{bt("Scan Dr's unique QR code for next appointment")}</span>
+                  <span className="text-gray-900">Booking:</span>{' '}
+                  <span className="text-gray-600">Scan Dr's unique QR code for next appointment</span>
                 </div>
               </div>
               <TemplateDisplay placement="notif-follow-up" className="mb-4" />

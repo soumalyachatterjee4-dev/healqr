@@ -12,8 +12,8 @@ import {
 } from './ui/select';
 import { ArrowLeft, CreditCard, Clock, FileText, CheckCircle2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { type Language, normalizeIndicNumerals, normalizePatientName } from '../utils/translations';
-import { useAITranslation } from '../hooks/useAITranslation';
+
+
 import { PatientRxUploadModal } from './PatientRxUploadModal';
 import TemplateDisplay from './TemplateDisplay';
 import { db } from '../lib/firebase/config';
@@ -21,11 +21,15 @@ import { doc, getDoc, addDoc, collection, updateDoc, increment, serverTimestamp,
 import { toast } from 'sonner';
 import { requestNotificationPermission } from '../services/fcm.service';
 import { generateBookingId } from '../utils/idGenerator';
+import type { Language } from '../utils/translations';
+import { normalizePatientName, normalizeIndicNumerals } from '../utils/translations';
+import { encrypt } from '../utils/encryptionService';
+import { saveNotificationHistory } from '../services/notificationHistoryService';
+import { scheduleBookingReminder } from '../services/notificationService';
 
 interface PatientDetailsFormProps {
   onBack: () => void;
   onSubmit: (data: PatientFormData) => void;
-  language: Language;
   // Payment related props
   requiresPrepayment?: boolean;
   consultationFee?: number;
@@ -46,6 +50,7 @@ interface PatientDetailsFormProps {
   useDrPrefix?: boolean;
   themeColor?: 'emerald' | 'blue';
   isClinicBooking?: boolean;
+  language?: Language;
 }
 
 export interface PatientFormData {
@@ -87,7 +92,6 @@ export default function PatientDetailsForm({
   themeColor = 'emerald',
   isClinicBooking = false
 }: PatientDetailsFormProps) {
-  const { bt, dt } = useAITranslation(language);
   const [formData, setFormData] = useState<PatientFormData>({
     patientName: '',
     whatsappNumber: '',
@@ -138,7 +142,7 @@ export default function PatientDetailsForm({
     }
 
     if (!doctorId) {
-      toast.error(dt('Doctor information missing'));
+      toast.error('Doctor information missing');
       return;
     }
 
@@ -155,7 +159,7 @@ export default function PatientDetailsForm({
       const demoBookingId = `DEMO-${Date.now().toString().slice(-6)}`;
       const demoTokenNumber = `#DEMO`;
 
-      toast.success(dt('Demo booking preview!'));
+      toast.success('Demo booking preview!');
 
       // Show confirmation page with demo data
       onSubmit({
@@ -177,7 +181,7 @@ export default function PatientDetailsForm({
     try {
       // Generate serial token number based on existing bookings for this chamber slot
       if (!db) {
-        toast.error(dt('Database connection error'));
+        toast.error('Database connection error');
         setIsSubmitting(false);
         return;
       }
@@ -185,7 +189,7 @@ export default function PatientDetailsForm({
       // Get doctor's code from Firestore
       const doctorDoc = await getDoc(doc(db, 'doctors', doctorId));
       if (!doctorDoc.exists()) {
-        toast.error(dt('Doctor not found'));
+        toast.error('Doctor not found');
         setIsSubmitting(false);
         return;
       }
@@ -194,7 +198,7 @@ export default function PatientDetailsForm({
       const doctorCode = doctorData.doctorCode;
 
       if (!doctorCode) {
-        toast.error(dt('Doctor code not found. Please contact support.'));
+        toast.error('Doctor code not found. Please contact support.');
         setIsSubmitting(false);
         return;
       }
@@ -381,7 +385,7 @@ export default function PatientDetailsForm({
             });
 
             if (bookingDate >= startDate && bookingDate <= endDate) {
-              toast.error(dt('This date is unavailable due to planned off period. Please select another date.'));
+              toast.error('This date is unavailable due to planned off period. Please select another date.');
               setIsSubmitting(false);
               return;
             }
@@ -392,7 +396,7 @@ export default function PatientDetailsForm({
         if (doctorData.chambers && Array.isArray(doctorData.chambers) && chamberId !== -1) {
           const foundChamber = doctorData.chambers.find((c: any) => c.id === chamberId);
           if (foundChamber && foundChamber.isActive === false) {
-            toast.error(dt('This chamber is currently unavailable for bookings. Please try again later.'));
+            toast.error('This chamber is currently unavailable for bookings. Please try again later.');
             setIsSubmitting(false);
             return;
           }
@@ -400,7 +404,6 @@ export default function PatientDetailsForm({
       }
 
       // 🔐 Encrypt sensitive patient data before saving
-      const { encrypt } = await import('../utils/encryptionService');
 
       // 🎯 NORMALIZE DATA: Convert Indic numerals and names to English before encryption
       const normalizedName = normalizePatientName(formData.patientName);
@@ -456,7 +459,6 @@ export default function PatientDetailsForm({
         const scanSessionId = sessionStorage.getItem('scan_session_id');
         if (scanSessionId) {
           try {
-            const { collection, query, where, getDocs, updateDoc, doc } = await import('firebase/firestore');
             const scansRef = collection(db, 'qrScans');
             const scanQuery = query(scansRef, where('scanSessionId', '==', scanSessionId));
             const scanSnapshot = await getDocs(scanQuery);
@@ -477,7 +479,6 @@ export default function PatientDetailsForm({
 
         // Save to notification history for patient history feature (non-blocking)
         try {
-          const { saveNotificationHistory } = await import('../services/notificationHistoryService');
           await saveNotificationHistory({
             patientPhone: formData.whatsappNumber,
             patientName: normalizedName,
@@ -555,18 +556,18 @@ export default function PatientDetailsForm({
           const token = await requestNotificationPermission(userId, 'patient');
           if (token) {
 
-            toast.success(dt('Notifications enabled! You will receive appointment updates.'), {
+            toast.success('Notifications enabled! You will receive appointment updates.', {
               duration: 4000
             });
           } else {
             console.warn('⚠️ FCM token not obtained, but booking continues');
-            toast.warning(dt('Notifications may not work. Enable browser notifications in settings.'), {
+            toast.warning('Notifications may not work. Enable browser notifications in settings.', {
               duration: 5000
             });
           }
         } catch (error) {
           console.error('❌ [FCM] Token registration failed:', error);
-          toast.error(dt('Could not enable notifications. You can enable them later in settings.'), {
+          toast.error('Could not enable notifications. You can enable them later in settings.', {
             duration: 5000
           });
           // Don't block booking flow if FCM fails
@@ -581,7 +582,6 @@ export default function PatientDetailsForm({
       let reminderScheduled = false;
       try {
         if (selectedDate && selectedTime) {
-          const { scheduleBookingReminder } = await import('../services/notificationService');
 
           // Build appointment datetime in local time using selectedDate + selectedTime (e.g., "02:30 PM")
           const appointmentDateTime = new Date(selectedDate);
@@ -617,8 +617,7 @@ export default function PatientDetailsForm({
       if (reminderScheduled) {
         try {
           const bookingsRef = collection(db, 'bookings');
-          const { query: firestoreQuery, where, getDocs } = await import('firebase/firestore');
-          const q = firestoreQuery(
+          const q = query(
             bookingsRef,
             where('bookingId', '==', bookingId)
           );
@@ -639,7 +638,7 @@ export default function PatientDetailsForm({
       // ✅ NOW SHOW CONFIRMATION AND NAVIGATE
       // FCM registration completed above
       // ============================================
-      toast.success(dt('Booking confirmed successfully!'));
+      toast.success('Booking confirmed successfully!');
 
       // Show confirmation page
       onSubmit({
@@ -654,7 +653,7 @@ export default function PatientDetailsForm({
       setShowConfetti(true);
     } catch (error) {
       console.error('Error adding document: ', error);
-      toast.error(dt('Failed to book appointment. Please try again.'));
+      toast.error('Failed to book appointment. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -681,7 +680,7 @@ export default function PatientDetailsForm({
     >
       <div className="pb-24">
         {/* Subtitle */}
-        <p className="text-emerald-400 text-sm mb-6">{bt('Please fill in the patient details')}</p>
+        <p className="text-emerald-400 text-sm mb-6">Please fill in the patient details</p>
 
         {/* Blocked Alert */}
         {isBlocked && (
@@ -700,21 +699,21 @@ export default function PatientDetailsForm({
           </div>
         )}
 
-        {/* Main Form Card */}
-        <div className="bg-[#1a1f2e] rounded-xl p-6 mb-6">
+        {/* Main Form Card — NOT translated (data stored as English for doctor) */}
+        <div className="bg-[#1a1f2e] rounded-xl p-6 mb-6" data-no-translate>
           {/* Required Information */}
           <div className="mb-6">
-            <h3 className="text-white mb-4">{bt('Required Information')}</h3>
+            <h3 className="text-white mb-4">Required Information</h3>
 
             {/* Patient Name */}
-            <div className="mb-4">
+            <div className="mb-4" data-no-translate>
               <Label htmlFor="patientName" className="text-gray-300 mb-2 block">
-                {bt('Patient Name')} <span className="text-red-500">*</span>
+                Patient Name <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="patientName"
                 type="text"
-                placeholder={dt('Enter patient full name')}
+                placeholder="Enter patient full name"
                 value={formData.patientName}
                 onChange={(e) => setFormData({ ...formData, patientName: e.target.value })}
                 className="bg-[#0f1419] border-gray-700 text-white placeholder:text-gray-500 focus:border-emerald-500 focus:ring-emerald-500"
@@ -730,7 +729,7 @@ export default function PatientDetailsForm({
             {/* WhatsApp Number */}
             <div className="mb-0">
               <Label htmlFor="whatsappNumber" className="text-gray-300 mb-2 block">
-                {bt('WhatsApp Number')} <span className="text-red-500">*</span>
+                WhatsApp Number <span className="text-red-500">*</span>
               </Label>
               <div className="flex gap-2">
                 <Input
@@ -754,17 +753,17 @@ export default function PatientDetailsForm({
 
           {/* Optional Information */}
           <div>
-            <h3 className="text-white mb-4">{bt('Optional Information')}</h3>
+            <h3 className="text-white mb-4">Optional Information</h3>
 
             {/* Age */}
             <div className="mb-4">
               <Label htmlFor="age" className="text-gray-300 mb-2 block">
-                {bt('Age')}
+                Age
               </Label>
               <Input
                 id="age"
                 type="text"
-                placeholder={dt('Enter age')}
+                placeholder="Enter age"
                 value={formData.age}
                 onChange={(e) => {
                   // Normalize Indic numerals to English digits in real-time
@@ -783,21 +782,21 @@ export default function PatientDetailsForm({
             {/* Gender */}
             <div className="mb-4">
               <Label htmlFor="gender" className="text-gray-300 mb-2 block">
-                {bt('Gender')}
+                Gender
               </Label>
               <Select value={formData.gender} onValueChange={(value: string) => setFormData({ ...formData, gender: value })}>
                 <SelectTrigger className="bg-[#0f1419] border-gray-700 text-white focus:border-emerald-500 focus:ring-emerald-500">
-                  <SelectValue placeholder={dt('Select gender')} />
+                  <SelectValue placeholder="Select gender" />
                 </SelectTrigger>
                 <SelectContent className="bg-[#1a1f2e] border-gray-700">
                   <SelectItem value="male" className="text-white hover:bg-gray-700 focus:bg-gray-700">
-                    {bt('Male')}
+                    Male
                   </SelectItem>
                   <SelectItem value="female" className="text-white hover:bg-gray-700 focus:bg-gray-700">
-                    {bt('Female')}
+                    Female
                   </SelectItem>
                   <SelectItem value="other" className="text-white hover:bg-gray-700 focus:bg-gray-700">
-                    {bt('Other')}
+                    Other
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -806,27 +805,27 @@ export default function PatientDetailsForm({
             {/* Purpose of Visit */}
             <div className="mb-0">
               <Label htmlFor="purposeOfVisit" className="text-gray-300 mb-2 block">
-                {bt('Purpose of Visit')}
+                Purpose of Visit
               </Label>
               <Select value={formData.purposeOfVisit} onValueChange={(value: string) => setFormData({ ...formData, purposeOfVisit: value })}>
                 <SelectTrigger className="bg-[#0f1419] border-gray-700 text-white focus:border-emerald-500 focus:ring-emerald-500">
-                  <SelectValue placeholder={dt('Select purpose of visit')} />
+                  <SelectValue placeholder="Select purpose of visit" />
                 </SelectTrigger>
                 <SelectContent className="bg-[#1a1f2e] border-gray-700">
                   <SelectItem value="new-patient" className="text-white hover:bg-gray-700 focus:bg-gray-700">
-                    {bt('New Patient - Initial Consultation')}
+                    New Patient - Initial Consultation
                   </SelectItem>
                   <SelectItem value="existing-patient" className="text-white hover:bg-gray-700 focus:bg-gray-700">
-                    {bt('Existing Patient - New Treatment')}
+                    Existing Patient - New Treatment
                   </SelectItem>
                   <SelectItem value="report-review" className="text-white hover:bg-gray-700 focus:bg-gray-700">
-                    {bt('Report Review')}
+                    Report Review
                   </SelectItem>
                   <SelectItem value="follow-up" className="text-white hover:bg-gray-700 focus:bg-gray-700">
-                    {bt('Follow-Up Consultation')}
+                    Follow-Up Consultation
                   </SelectItem>
                   <SelectItem value="routine-checkup" className="text-white hover:bg-gray-700 focus:bg-gray-700">
-                    {bt('Routine Checkup')}
+                    Routine Checkup
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -841,16 +840,16 @@ export default function PatientDetailsForm({
               <FileText className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <h3 className="text-white mb-2">
-                  {bt('Have a previous prescription?')}
+                  Have a previous prescription?
                 </h3>
                 <p className="text-sm text-gray-400 mb-4">
-                  {bt('Upload your previous prescription to help the doctor')}
+                  Upload your previous prescription to help the doctor
                 </p>
                 {uploadedRx ? (
                   <div className="flex items-center gap-2 text-green-400 text-sm">
                     <CheckCircle2 className="w-4 h-4" />
                     <span>
-                      {bt('Prescription uploaded successfully!')}
+                      Prescription uploaded successfully!
                       {Array.isArray(formData.prescriptionUrl) && formData.prescriptionUrl.length > 1 && (
                         <span className="ml-2">({formData.prescriptionUrl.length} files)</span>
                       )}
@@ -864,7 +863,7 @@ export default function PatientDetailsForm({
                     className="border-blue-500 text-blue-400 hover:bg-blue-500/10 hover:text-blue-400"
                   >
                     <FileText className="w-4 h-4 mr-2" />
-                    {bt('Upload Previous Prescription')}
+                    Upload Previous Prescription
                   </Button>
                 )}
               </div>
@@ -874,7 +873,7 @@ export default function PatientDetailsForm({
 
         {/* Consent & Terms Card */}
         <div className="bg-[#1a1f2e] rounded-xl p-6 mb-6">
-          <h3 className="text-white mb-4">{bt('Consent & Terms')}</h3>
+          <h3 className="text-white mb-4">Consent & Terms</h3>
 
           {/* Consent Checkbox */}
           <div className="flex items-start gap-3">
@@ -890,7 +889,7 @@ export default function PatientDetailsForm({
             />
             <div className="flex-1">
               <label htmlFor="consent1" className="text-gray-300 text-sm leading-6 cursor-pointer block">
-                {dt('I accept receiving push notifications from')} <span className="text-emerald-400">www.healqr.com</span> {dt('and understand that it is only a digital booking platform without any medical treatment role.')}
+                I accept receiving push notifications from <span className="text-emerald-400">www.healqr.com</span> and understand that it is only a digital booking platform without any medical treatment role.
               </label>
             </div>
           </div>
@@ -899,10 +898,10 @@ export default function PatientDetailsForm({
         {/* Payment Section */}
         {requiresPrepayment && (
           <div className="bg-[#1a1f2e] rounded-xl p-6 mb-6">
-            <h3 className="text-white mb-4">{bt('Consultation Fee')} 💰</h3>
+            <h3 className="text-white mb-4">Consultation Fee 💰</h3>
 
             <div className="flex justify-between items-center mb-4 pb-4 border-b border-gray-700">
-              <span className="text-gray-400">{dt('Consultation Charge')}:</span>
+              <span className="text-gray-400">Consultation Charge:</span>
               <span className="text-2xl text-emerald-500">₹{consultationFee}</span>
             </div>
 
@@ -914,14 +913,14 @@ export default function PatientDetailsForm({
                   className="h-12 bg-transparent border-gray-600 text-white hover:bg-gray-800 hover:text-white rounded-lg"
                 >
                   <Clock className="w-4 h-4 mr-2" />
-                  {bt('Pay at Clinic')}
+                  Pay at Clinic
                 </Button>
                 <Button
                   onClick={handlePayNow}
                   className="h-12 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg"
                 >
                   <CreditCard className="w-4 h-4 mr-2" />
-                  {dt('Pay Now')} ₹{consultationFee}
+                  Pay Now ₹{consultationFee}
                 </Button>
               </div>
             )}
@@ -934,13 +933,13 @@ export default function PatientDetailsForm({
                       <path d="M5 13l4 4L19 7"></path>
                     </svg>
                   </div>
-                  <span className="text-emerald-400">{bt('Payment Submitted Successfully!')} ✓</span>
+                  <span className="text-emerald-400">Payment Submitted Successfully! ✓</span>
                 </div>
                 <p className="text-sm text-gray-400 ml-9">
                   UTR: {formData.utrNumber}
                 </p>
                 <p className="text-xs text-yellow-400 ml-9 mt-2">
-                  ⏳ {dt('Payment verification pending. Doctor will confirm before consultation.')}
+                  ⏳ Payment verification pending. Doctor will confirm before consultation.
                 </p>
               </div>
             )}
@@ -950,9 +949,9 @@ export default function PatientDetailsForm({
                 <div className="flex items-center gap-3">
                   <Clock className="w-5 h-5 text-yellow-400" />
                   <div>
-                    <p className="text-yellow-400">{bt('Pay at Clinic')}</p>
+                    <p className="text-yellow-400">Pay at Clinic</p>
                     <p className="text-sm text-gray-400">
-                      {dt('Please pay')} ₹{consultationFee} {dt('at the clinic before consultation')}
+                      Please pay ₹{consultationFee} at the clinic before consultation
                     </p>
                   </div>
                 </div>
@@ -971,7 +970,7 @@ export default function PatientDetailsForm({
             variant="outline"
             className="flex-1 h-12 bg-transparent border-gray-600 text-white hover:bg-gray-800 hover:text-white rounded-lg"
           >
-            {bt('Back')}
+            Back
           </Button>
           {showSubmit && (
             <Button
@@ -983,7 +982,7 @@ export default function PatientDetailsForm({
                   : 'bg-gray-700 text-gray-500 cursor-not-allowed'
               }`}
             >
-              {isSubmitting ? dt('Submitting...') : bt('Submit')}
+              {isSubmitting ? 'Submitting...' : 'Submit'}
             </Button>
           )}
         </div>

@@ -12,7 +12,10 @@ import { onForegroundMessage, ensureFCMInitialized } from "./services/fcm.servic
 import { getActivityTracker } from "./utils/activityTracker";
 import { getSessionPersistence } from "./utils/sessionPersistence";
 import type { Language } from "./utils/translations";
+// AIChatBot — direct import, always visible
+import AIChatBot from './components/AIChatBot';
 import type { PatientFormData } from "./components/PatientDetailsForm";
+import { TranslationProvider } from "./components/TranslationProvider";
 import AssistantAccessManager from "./components/AssistantAccessManager";
 
 // Lazy Load Heavy Components
@@ -96,7 +99,7 @@ const PharmaLogin = lazy(() => import("./components/PharmaLogin"));
 const PharmaVerifyLogin = lazy(() => import("./components/PharmaVerifyLogin"));
 const PharmaPortal = lazy(() => import("./components/PharmaPortal"));
 const PharmaSignUp = lazy(() => import("./components/PharmaSignUp"));
-const AIChatBot = lazy(() => import("./components/AIChatBot"));
+// AIChatBot is imported directly at the top (not lazy)
 
 // Loading Component
 const PageLoader = () => (
@@ -407,6 +410,8 @@ export default function App() {
 
   const [bookingLanguage, setBookingLanguage] =
     useState<Language>("english");
+  const [previewLanguage, setPreviewLanguage] =
+    useState<Language | null>(null);
   const [doctorPreferredLanguage, setDoctorPreferredLanguage] =
     useState<Language>("english");
   const [selectedDate, setSelectedDate] = useState<Date | null>(
@@ -574,6 +579,12 @@ export default function App() {
     const pathname = window.location.pathname;
     const hash = window.location.hash;
     const fullUrl = window.location.href;
+
+    // Restore patient language from URL params (notification links include ?language=...)
+    const urlLanguage = urlParams.get('language');
+    if (urlLanguage && urlLanguage !== 'english' && urlLanguage !== 'en') {
+      setBookingLanguage(urlLanguage as Language);
+    }
     console.log("ðŸš€ App.tsx mounted. URL:", fullUrl);
     console.log("   - page:", pageParam);
     console.log("   - source:", urlParams.get('source'));
@@ -1898,13 +1909,14 @@ export default function App() {
 
   const handleLanguageSelect = (language: Language) => {
     setBookingLanguage(language);
+    setPreviewLanguage(null);
     setCurrentPage("booking-mini-website");
   };
 
   const handleDateSelection = (date: Date) => {
     setSelectedDate(date);
     // Use first chamber's start time as default slot
-    const defaultTime = doctorChambers.length > 0 ? doctorChambers[0].startTime : "10:00";
+    const defaultTime = doctorChambers.length > 0 && doctorChambers[0].startTime ? doctorChambers[0].startTime : "10:00";
     setSelectedSlot(defaultTime);
     setCurrentPage("booking-select-chamber");
   };
@@ -2339,10 +2351,57 @@ export default function App() {
     return <PageLoader />;
   }
 
+  // Active language for automatic DOM-level translation
+  // FIXED (English): Dashboards, AI tool UIs, admin, auth, legal pages
+  // DYNAMIC (patient language): Booking flow, notifications, patient portal, AI RX reader
+  // DYNAMIC (doctor language): Schedule/booking views with patient data (for assistant reading)
+  const activeTranslationLanguage: Language = (() => {
+    // Language selection page: use preview language (live translate as user picks)
+    if (currentPage === 'booking-language') {
+      return previewLanguage || 'english';
+    }
+    // Patient-facing: booking flow
+    if (currentPage.startsWith('booking-') || currentPage === 'clinic-booking-flow') {
+      return bookingLanguage;
+    }
+    // Patient-facing: notifications & review
+    if (
+      currentPage === 'consultation-completed' || currentPage === 'follow-up' ||
+      currentPage === 'review-request' || currentPage === 'appointment-reminder' ||
+      currentPage === 'appointment-cancelled' || currentPage === 'appointment-restored' ||
+      currentPage === 'rx-updated' || currentPage === 'verify-walkin' ||
+      currentPage === 'patient-review-submission'
+    ) {
+      return bookingLanguage;
+    }
+    // Patient portal: history, chat, AI RX reader, dashboard, notifications
+    if (
+      currentPage === 'patient-history' || currentPage === 'patient-chat' ||
+      currentPage === 'ai-rx-reader' || currentPage === 'patient-dashboard' ||
+      currentPage === 'patient-login'
+    ) {
+      // Use bookingLanguage if set, otherwise check localStorage for returning patients
+      if (bookingLanguage !== 'english') return bookingLanguage;
+      const storedLang = localStorage.getItem('patient_language');
+      return (storedLang || 'english') as Language;
+    }
+    // Doctor/clinic reading patient data (assists non-English staff)
+    if (
+      currentPage === 'todays-schedule' || currentPage === 'advance-booking' ||
+      currentPage === 'patient-details' || currentPage === 'doctor-patient-chat' ||
+      currentPage === 'reminder-notifications'
+    ) {
+      return doctorPreferredLanguage;
+    }
+    // Everything else: English (dashboards, admin, AI tools, auth, legal)
+    return 'english';
+  })();
+
   return (
     <Suspense fallback={<PageLoader />}>
       {/* Prototype Mode Banner */}
       <PrototypeModeBanner />
+      <TranslationProvider language={activeTranslationLanguage}>
 
       {currentPage === "landing" && (
         <LandingPage
@@ -2488,8 +2547,6 @@ export default function App() {
           profilePhoto={userProfilePhoto}
           doctorStats={doctorStats}
           useDrPrefix={useDrPrefix}
-          isSidebarCollapsed={isSidebarCollapsed}
-          setIsSidebarCollapsed={setIsSidebarCollapsed}
         />
       )}
 
@@ -2516,7 +2573,7 @@ export default function App() {
             image: userProfileData.profileImage || userProfilePhoto || null,
             name: userProfileData.name || userName,
             degrees: userProfileData.degrees,
-            specialities: userProfileData.specialities,
+            specialties: userProfileData.specialities,
             language: doctorPreferredLanguage as any
           }}
           onProfileUpdate={(profileData) => {
@@ -2531,7 +2588,7 @@ export default function App() {
               profileImage: profileData.image || "",
               name: profileData.name || userName,
               degrees: profileData.degrees || [],
-              specialities: profileData.specialities || []
+              specialities: profileData.specialties || []
             });
           }}
           onLogout={() => {
@@ -2567,8 +2624,6 @@ export default function App() {
           }}
           activeAddOns={activeAddOns}
           initialTab={qrManagerInitialTab}
-          isSidebarCollapsed={isSidebarCollapsed}
-          setIsSidebarCollapsed={setIsSidebarCollapsed}
         />
       )}
 
@@ -2578,8 +2633,6 @@ export default function App() {
             onMenuChange={menuChangeHandler}
             onLogout={handleLogout}
             activeAddOns={activeAddOns}
-            isSidebarCollapsed={isSidebarCollapsed}
-            setIsSidebarCollapsed={setIsSidebarCollapsed}
           />
         </Suspense>
       )}
@@ -2591,8 +2644,6 @@ export default function App() {
           onLogout={handleLogout}
           onMenuChange={menuChangeHandler}
           activeAddOns={activeAddOns}
-          isSidebarCollapsed={isSidebarCollapsed}
-          setIsSidebarCollapsed={setIsSidebarCollapsed}
         />
       )}
 
@@ -2602,8 +2653,6 @@ export default function App() {
           onMenuChange={menuChangeHandler}
           activeAddOns={activeAddOns}
           doctorLanguage={doctorPreferredLanguage as any}
-          isSidebarCollapsed={isSidebarCollapsed}
-          setIsSidebarCollapsed={setIsSidebarCollapsed}
         />
       )}
 
@@ -2612,20 +2661,21 @@ export default function App() {
           onLogout={handleLogout}
           onMenuChange={menuChangeHandler}
           activeAddOns={activeAddOns}
-          isSidebarCollapsed={isSidebarCollapsed}
-          setIsSidebarCollapsed={setIsSidebarCollapsed}
         />
       )}
 
       {currentPage === "patient-details" && (
         <PatientDetails
-          doctorName={userName}
-          email={userEmail}
-          onLogout={handleLogout}
           onMenuChange={menuChangeHandler}
           onBack={() => setCurrentPage("todays-schedule")}
-          patientId="sample-patient"
           activeAddOns={activeAddOns}
+          chamberName=""
+          chamberAddress=""
+          scheduleTime=""
+          scheduleDate=""
+          currentPatients={0}
+          totalPatients={0}
+          patients={[]}
         />
       )}
 
@@ -2649,8 +2699,6 @@ export default function App() {
           onLogout={handleLogout}
           onMenuChange={menuChangeHandler}
           activeAddOns={activeAddOns}
-          isSidebarCollapsed={isSidebarCollapsed}
-          setIsSidebarCollapsed={setIsSidebarCollapsed}
         />
       )}
 
@@ -2669,8 +2717,6 @@ export default function App() {
           onLogout={handleLogout}
           onMenuChange={menuChangeHandler}
           activeAddOns={activeAddOns}
-          isSidebarCollapsed={isSidebarCollapsed}
-          setIsSidebarCollapsed={setIsSidebarCollapsed}
           uploadedTemplates={[]} // Provide a default or actual state if needed
           onTemplatesUpdate={() => {}} // Provide a proper handler if needed
         />
@@ -2691,18 +2737,13 @@ export default function App() {
       )}
 
       {currentPage === "reminder-notifications" && (
-        <ReminderNotificationsDemo
-          onLogout={handleLogout}
-          onMenuChange={menuChangeHandler}
-          activeAddOns={activeAddOns}
-          isSidebarCollapsed={isSidebarCollapsed}
-          setIsSidebarCollapsed={setIsSidebarCollapsed}
-        />
+        <ReminderNotificationsDemo />
       )}
 
       {currentPage === "booking-language" && (
         <LanguageSelection
           onContinue={handleLanguageSelect}
+          onLanguagePreview={(lang) => setPreviewLanguage(lang)}
           onBack={() => {
             // Clear booking session data
             sessionStorage.removeItem('booking_doctor_id');
@@ -2803,7 +2844,7 @@ export default function App() {
             onContinue={handleChamberSelection}
             onBack={() => setCurrentPage("booking-select-date")}
             hasVideoConsultation={activeAddOns.includes('video-consultation')}
-            chambers={filteredChambers}
+            chambers={filteredChambers as any}
             doctorName={bookingDoctorName}
             doctorSpecialty={bookingDoctorSpecialty}
             doctorPhoto={bookingDoctorPhoto}
@@ -2996,7 +3037,7 @@ export default function App() {
 
       {currentPage === "admin-alert" && (
         <AdminAlertNotification
-          language={bookingLanguage === 'hindi' ? 'hi' : bookingLanguage === 'bengali' ? 'bn' : 'en'}
+          language={bookingLanguage}
           doctorName={notifData?.doctorName}
           eventType={notifData?.date || 'System Alert'}
           severity={notifData?.time || 'High'}
@@ -3143,8 +3184,6 @@ export default function App() {
           onLogout={handleLogout}
           onMenuChange={menuChangeHandler}
           activeAddOns={activeAddOns}
-          isSidebarCollapsed={isSidebarCollapsed}
-          setIsSidebarCollapsed={setIsSidebarCollapsed}
         />
       )}
 
@@ -3155,8 +3194,6 @@ export default function App() {
           onLogout={handleLogout}
           onMenuChange={menuChangeHandler}
           activeAddOns={activeAddOns}
-          isSidebarCollapsed={isSidebarCollapsed}
-          setIsSidebarCollapsed={setIsSidebarCollapsed}
         />
       )}
 
@@ -3227,13 +3264,13 @@ export default function App() {
 
       {currentPage === "patient-dashboard" && (
         <Suspense fallback={<PageLoader />}>
-          <PatientDashboardNew />
+          <PatientDashboardNew onLanguageDetected={(lang) => setBookingLanguage(lang as Language)} />
         </Suspense>
       )}
 
       {currentPage === "patient-history" && (
         <Suspense fallback={<PageLoader />}>
-          <PatientDashboardNew />
+          <PatientDashboardNew onLanguageDetected={(lang) => setBookingLanguage(lang as Language)} />
         </Suspense>
       )}
 
@@ -3349,10 +3386,24 @@ export default function App() {
         />
       )}
 
-      {/* AI ChatBot - Floating widget on patient-facing pages */}
-      {(currentPage.startsWith('booking-') || currentPage.startsWith('patient-') || currentPage === 'clinic-booking-flow') && (
-        <AIChatBot language={bookingLanguage} />
-      )}
+
+      </TranslationProvider>
+
+      {/* AI PM Assistant — always visible on every page */}
+      <AIChatBot
+        language="english"
+        userRole={
+          currentPage === 'doctor-dashboard' || currentPage === 'dashboard'
+            ? 'doctor'
+            : currentPage === 'clinic-dashboard'
+            ? 'clinic'
+            : currentPage === 'patient-dashboard' || currentPage === 'patient-login'
+            ? 'patient'
+            : currentPage === 'admin-panel'
+            ? 'admin'
+            : 'visitor'
+        }
+      />
 
       <Toaster
         position="top-center"

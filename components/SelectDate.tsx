@@ -2,26 +2,28 @@ import { Button } from './ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { ChevronLeft, ChevronRight, Lightbulb } from 'lucide-react';
 import { useState } from 'react';
-import { type Language } from '../utils/translations';
-import { useAITranslation } from '../hooks/useAITranslation';
+
+
 import TemplateDisplay from './TemplateDisplay';
 import BookingFlowLayout from './BookingFlowLayout';
+
+import type { Language } from '../utils/translations';
 
 interface SelectDateProps {
   onBack: () => void;
   onContinue: (date: Date) => void;
-  language: Language;
   maxAdvanceDays?: number;
   plannedOffPeriods?: Array<{
-    startDate: string;
-    endDate: string;
+    startDate: any;
+    endDate: any;
     status: string;
     appliesTo?: 'clinic' | 'doctor';
     clinicId?: string;
+    chamberName?: string;
   }>;
   clinicPlannedOffPeriods?: Array<{
-    startDate: string;
-    endDate: string;
+    startDate: any;
+    endDate: any;
     status: string;
     clinicId?: string;
     chamberName?: string;
@@ -44,12 +46,13 @@ interface SelectDateProps {
   themeColor?: 'emerald' | 'blue';
   clinicId?: string;
   doctorId?: string;
+  language?: Language;
 }
 
 export default function SelectDate({ onBack, onContinue, language, maxAdvanceDays = 30, plannedOffPeriods = [], clinicPlannedOffPeriods = [], chambers = [], schedules = [], globalBookingEnabled = true, doctorName = '', doctorSpecialty = '', doctorPhoto = '', useDrPrefix = true, themeColor = 'emerald', clinicId, doctorId }: SelectDateProps) {
-  console.log('📅 SelectDate Props:', { 
-    maxAdvanceDays, 
-    globalBookingEnabled, 
+  console.log('📅 SelectDate Props:', {
+    maxAdvanceDays,
+    globalBookingEnabled,
     plannedOffPeriodsCount: plannedOffPeriods.length,
     clinicId: clinicId || 'NOT_FROM_CLINIC',
     doctorId: doctorId || 'NOT_SET',
@@ -57,21 +60,21 @@ export default function SelectDate({ onBack, onContinue, language, maxAdvanceDay
     doctorName,
     doctorSpecialty
   });
-  
+
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const { bt, dt } = useAITranslation(language);
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const [currentMonth, setCurrentMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
 
   const daysOfWeek = [
-    dt('Sun'),
-    dt('Mon'),
-    dt('Tue'),
-    dt('Wed'),
-    dt('Thu'),
-    dt('Fri'),
-    dt('Sat'),
+    'Sun',
+    'Mon',
+    'Tue',
+    'Wed',
+    'Thu',
+    'Fri',
+    'Sat',
   ];
 
   const getDaysInMonth = (date: Date) => {
@@ -79,19 +82,19 @@ export default function SelectDate({ onBack, onContinue, language, maxAdvanceDay
     const month = date.getMonth();
     const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    
+
     const days: (number | null)[] = [];
-    
+
     // Add empty slots for days before the first day of the month
     for (let i = 0; i < firstDay; i++) {
       days.push(null);
     }
-    
+
     // Add all days of the month
     for (let i = 1; i <= daysInMonth; i++) {
       days.push(i);
     }
-    
+
     return days;
   };
 
@@ -101,25 +104,25 @@ export default function SelectDate({ onBack, onContinue, language, maxAdvanceDay
   const isDateDisabled = (day: number): boolean => {
     const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
     date.setHours(0, 0, 0, 0);
-    
+
     // Disable past dates
     if (date < today) {
       return true;
     }
-    
+
     // Disable dates beyond max advance booking days
     const maxDate = new Date(today);
     maxDate.setDate(maxDate.getDate() + maxAdvanceDays);
-    console.log(`📅 Checking date ${day}:`, { 
-      date: date.toDateString(), 
-      maxDate: maxDate.toDateString(), 
+    console.log(`📅 Checking date ${day}:`, {
+      date: date.toDateString(),
+      maxDate: maxDate.toDateString(),
       maxAdvanceDays,
-      isDisabled: date > maxDate 
+      isDisabled: date > maxDate
     });
     if (date > maxDate) {
       return true;
     }
-    
+
     // ========================================
     // CLEAR BLOCKING LOGIC (Rebuilt from scratch)
     // ========================================
@@ -130,43 +133,43 @@ export default function SelectDate({ onBack, onContinue, language, maxAdvanceDay
     //    - Clinic QR → BLOCK date (entire clinic affected)
     //    - Doctor QR → DON'T BLOCK (personal chambers may be available)
     // ========================================
-    
+
     const isClinicQr = !!clinicId;
     const isDoctorQr = !isClinicQr;
-    
+
     // Process doctor's own planned-off periods
     const activePlannedOffPeriods = plannedOffPeriods.filter(p => {
       if (p.status !== 'active') return false;
-      
+
       // Chamber-specific off → Don't block date (chamber selection handles it)
       if (p.chamberName) return false;
-      
+
       // Doctor full-day off (no clinicId means full personal off)
       if (p.appliesTo === 'doctor' && !p.clinicId) {
         return true; // BLOCK date
       }
-      
+
       // Clinic-scoped doctor off → Don't block date (only affects clinic chambers)
       if (p.clinicId) return false;
-      
+
       // Legacy periods without appliesTo → Assume full-day off
       if (!p.appliesTo) return true;
-      
+
       return false;
     });
-    
+
     // Process clinic planned-off periods
     const activeClinicPeriods = clinicPlannedOffPeriods.filter(p => {
       if (p.status !== 'active') return false;
-      
+
       // Chamber-specific off → Don't block date (chamber selection handles it)
       if (p.chamberName) return false;
-      
+
       // Doctor-scoped clinic off: only apply to matching doctor
       if (p.doctorId && doctorId && p.doctorId !== doctorId) {
         return false; // Different doctor's off period
       }
-      
+
       // Clinic QR mode: Block ALL clinic-wide off periods
       if (isClinicQr) {
         // Filter to current clinic only
@@ -175,7 +178,7 @@ export default function SelectDate({ onBack, onContinue, language, maxAdvanceDay
         }
         return true; // BLOCK date for clinic QR
       }
-      
+
       // Doctor QR mode: NEVER block dates for clinic off
       // Reason: Doctor may have personal chambers (HOME) available
       // SelectChamber will filter clinic chambers
@@ -183,7 +186,7 @@ export default function SelectDate({ onBack, onContinue, language, maxAdvanceDay
         console.log(`🏥 Doctor QR: NOT blocking date for clinic off - chambers will handle filtering`);
         return false; // DON'T BLOCK date for doctor QR
       }
-      
+
       return false;
     });
 
@@ -200,18 +203,18 @@ export default function SelectDate({ onBack, onContinue, language, maxAdvanceDay
       console.log('  🧩 Period:', {
         startDate: p.startDate,
         endDate: p.endDate,
-        appliesTo: p.appliesTo,
+        appliesTo: (p as any).appliesTo,
         clinicId: p.clinicId,
         chamberName: p.chamberName,
         status: p.status
       });
     });
-    
+
     for (const period of allBlockingPeriods) {
       // Handle both string dates and Firestore timestamps
       let startDate: Date;
       let endDate: Date;
-      
+
       if (typeof period.startDate === 'string') {
         // String format: "2025-12-15"
         // Parse as local date to avoid timezone issues
@@ -224,7 +227,7 @@ export default function SelectDate({ onBack, onContinue, language, maxAdvanceDay
         // Already a Date object
         startDate = new Date(period.startDate);
       }
-      
+
       if (typeof period.endDate === 'string') {
         const [year, month, dayVal] = period.endDate.split('-').map(Number);
         endDate = new Date(year, month - 1, dayVal);
@@ -233,22 +236,22 @@ export default function SelectDate({ onBack, onContinue, language, maxAdvanceDay
       } else {
         endDate = new Date(period.endDate);
       }
-      
+
       startDate.setHours(0, 0, 0, 0);
       endDate.setHours(0, 0, 0, 0);
-      
+
       console.log(`  📅 Comparing with period:`, {
         startDate: startDate.toDateString(),
         endDate: endDate.toDateString(),
         isInRange: date >= startDate && date <= endDate
       });
-      
+
       if (date >= startDate && date <= endDate) {
         console.log(`  ❌ Date ${day} IS BLOCKED by planned off period`);
         return true;
       }
     }
-    
+
     console.log(`  ✅ Date ${day} is NOT blocked`);
     return false;
   };
@@ -285,7 +288,7 @@ export default function SelectDate({ onBack, onContinue, language, maxAdvanceDay
       <div>
 
         {/* Select Date Section */}
-        <h2 className="text-white mb-4">{bt('Select Date')}</h2>
+        <h2 className="text-white mb-4">Select Date</h2>
 
         {/* Calendar */}
         <div className="bg-[#1a1f2e] rounded-2xl border border-gray-700 p-6 mb-6">
@@ -351,13 +354,13 @@ export default function SelectDate({ onBack, onContinue, language, maxAdvanceDay
           disabled={!selectedDate}
           className={`w-full h-12 rounded-xl ${
             selectedDate
-              ? themeColor === 'blue' 
+              ? themeColor === 'blue'
                 ? 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white'
                 : 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white'
               : 'bg-gray-700 text-gray-500 cursor-not-allowed'
           }`}
         >
-          {bt('Continue to Chamber Selection')}
+          Continue to Chamber Selection
         </Button>
       </div>
     </BookingFlowLayout>

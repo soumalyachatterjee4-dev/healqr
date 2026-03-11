@@ -150,7 +150,7 @@ export default function AdminRolesManager() {
     }
 
     const roleId = newRoleName.toLowerCase().replace(/\s+/g, '_');
-    
+
     // Check if role already exists
     if (roles.some(r => r.id === roleId)) {
       alert('A role with this name already exists');
@@ -228,10 +228,11 @@ export default function AdminRolesManager() {
     // Remove the permission from all admins
     setAdmins(prevAdmins =>
       prevAdmins.map(admin => {
-        const { [roleId]: _, ...remainingPermissions } = admin.permissions;
+        const newPermissions = { ...admin.permissions };
+        delete newPermissions[roleId];
         return {
           ...admin,
-          permissions: remainingPermissions,
+          permissions: newPermissions as AdminPermissions,
         };
       })
     );

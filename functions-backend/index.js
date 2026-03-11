@@ -14,4 +14,7 @@ exports.checkVideoCallExpiry = checkVideoCallExpiry.checkVideoCallExpiry;
 exports.analyzeRXWithGemini = require('./analyzeRXWithGemini').analyzeRXWithGemini;
 exports.processScheduledNotifications = processScheduledNotifications.processScheduledNotifications;
 exports.translateBatch = translateBatch.translateBatch;
+exports.healqrAssistant = require('./healqrAssistant').healqrAssistant;
+exports.monitorPlatformHealth = require('./monitorPlatformHealth').monitorPlatformHealth;
+exports.resolveLocationPincode = require('./resolveLocationPincode').resolveLocationPincode;
 

@@ -1,14 +1,14 @@
 import { Button } from './ui/button';
 import { Check, ArrowRight, Sparkles, MessageSquare, Bell, FileText, Globe } from 'lucide-react';
 import { useState } from 'react';
-import { type Language, languageDisplayNames, languageCodes } from '../utils/translations';
-import { useAITranslation } from '../hooks/useAITranslation';
 import TemplateDisplay from './TemplateDisplay';
 import BookingFlowLayout from './BookingFlowLayout';
+import { Language, languageCodes, languageDisplayNames } from '../utils/translations';
 
 interface LanguageSelectionProps {
-  onContinue: (language: Language) => void;
+  onContinue: (lang: Language) => void;
   onBack?: () => void;
+  onLanguagePreview?: (lang: Language) => void;
   doctorName?: string;
   doctorSpecialty?: string;
   doctorPhoto?: string;
@@ -17,9 +17,13 @@ interface LanguageSelectionProps {
   themeColor?: 'emerald' | 'blue';
 }
 
-export default function LanguageSelection({ onContinue, onBack, doctorName = '', doctorSpecialty = '', doctorPhoto = '', doctorDegrees = [], useDrPrefix = true, themeColor = 'emerald' }: LanguageSelectionProps) {
+export default function LanguageSelection({ onContinue, onBack, onLanguagePreview, doctorName = '', doctorSpecialty = '', doctorPhoto = '', doctorDegrees = [], useDrPrefix = true, themeColor = 'emerald' }: LanguageSelectionProps) {
   const [selectedLanguage, setSelectedLanguage] = useState<Language>('english');
-  const { bt } = useAITranslation(selectedLanguage);
+
+  const handleLanguageSelect = (lang: Language) => {
+    setSelectedLanguage(lang);
+    onLanguagePreview?.(lang);
+  };
 
   // Theme-aware color variables
   const iconGradient = themeColor === 'blue' ? 'from-blue-400 to-blue-600' : 'from-emerald-400 to-emerald-600';
@@ -150,9 +154,9 @@ export default function LanguageSelection({ onContinue, onBack, doctorName = '',
         </div>
 
         {/* Heading */}
-        <h1 className="text-white text-center mb-3">{bt('Choose Your Language')}</h1>
+        <h1 className="text-white text-center mb-3">Choose Your Language</h1>
         <p className="text-gray-400 text-center mb-8">
-          {bt('Select your preferred language for all communications')}
+          Select your preferred language for all communications
         </p>
 
         {/* Language Options */}
@@ -160,7 +164,7 @@ export default function LanguageSelection({ onContinue, onBack, doctorName = '',
           {coreIndianLanguages.map((language) => (
             <button
               key={language.id}
-              onClick={() => setSelectedLanguage(language.id)}
+              onClick={() => handleLanguageSelect(language.id)}
               className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center gap-4 ${
                 selectedLanguage === language.id
                   ? `${selectedBorder} ${selectedBg}`
@@ -197,7 +201,7 @@ export default function LanguageSelection({ onContinue, onBack, doctorName = '',
               {moreIndianLanguages.map((language) => (
                 <button
                   key={language.id}
-                  onClick={() => setSelectedLanguage(language.id)}
+                  onClick={() => handleLanguageSelect(language.id)}
                   className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center gap-4 ${
                     selectedLanguage === language.id
                       ? `${selectedBorder} ${selectedBg}`
@@ -221,7 +225,7 @@ export default function LanguageSelection({ onContinue, onBack, doctorName = '',
               {internationalLanguages.map((language) => (
                 <button
                   key={language.id}
-                  onClick={() => setSelectedLanguage(language.id)}
+                  onClick={() => handleLanguageSelect(language.id)}
                   className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center gap-4 ${
                     selectedLanguage === language.id
                       ? `${selectedBorder} ${selectedBg}`
@@ -247,20 +251,20 @@ export default function LanguageSelection({ onContinue, onBack, doctorName = '',
         <div className="mb-6 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/30 rounded-xl p-4">
           <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-blue-400" />
-            {bt('Your Language Benefits')}
+            Your Language Benefits
           </h3>
           <ul className="space-y-2 text-sm text-gray-300">
             <li className="flex items-start gap-2">
               <MessageSquare className={`w-4 h-4 ${benefitIconColor} mt-0.5 flex-shrink-0`} />
-              <span>{bt('All messages in your language')}</span>
+              <span>All messages in your language</span>
             </li>
             <li className="flex items-start gap-2">
               <Bell className={`w-4 h-4 ${benefitIconColor} mt-0.5 flex-shrink-0`} />
-              <span>{bt('Notifications translated automatically')}</span>
+              <span>Notifications translated automatically</span>
             </li>
             <li className="flex items-start gap-2">
               <FileText className={`w-4 h-4 ${benefitIconColor} mt-0.5 flex-shrink-0`} />
-              <span>{bt('Booking confirmations in your language')}</span>
+              <span>Booking confirmations in your language</span>
             </li>
           </ul>
         </div>
@@ -273,7 +277,7 @@ export default function LanguageSelection({ onContinue, onBack, doctorName = '',
           onClick={() => onContinue(selectedLanguage)}
           className={`w-full h-14 bg-gradient-to-r ${buttonGradient} text-white rounded-2xl flex items-center justify-center gap-2 shadow-lg`}
         >
-          <span>{bt('Continue')}</span>
+          <span>Continue</span>
           <ArrowRight className="w-5 h-5" />
         </Button>
 

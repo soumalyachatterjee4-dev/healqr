@@ -10,7 +10,7 @@ import ClinicSidebar from './ClinicSidebar';
 
 interface ClinicAnalyticsProps {
   onMenuChange: (menu: string) => void;
-  onLogout: () => void;
+  onLogout: () => void | Promise<void>;
   isSidebarCollapsed: boolean;
   setIsSidebarCollapsed: (collapsed: boolean) => void;
   clinicId?: string;

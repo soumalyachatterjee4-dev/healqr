@@ -1,7 +1,16 @@
 import { Button } from './ui/button';
 import { useState, useEffect } from 'react';
-import { type Language, languageDisplayNames } from '../utils/translations';
-import { useAITranslation } from '../hooks/useAITranslation';
+import type { Language } from '../utils/translations';
+
+
+
+// Convert slug like "general_medicine" to "General Medicine"
+function formatSpecialty(slug: string): string {
+  if (!slug) return '';
+  return slug
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase());
+}
 import BookingFlowLayout from './BookingFlowLayout';
 import { Badge } from './ui/badge';
 import {
@@ -33,9 +42,8 @@ interface SelectChamberProps {
   onBack: () => void;
   onContinue?: (chamberName: string, consultationType: 'chamber' | 'video') => void;
   onChamberSelect?: (chamberId: number, chamberName: string) => void; // For clinic QR flow
-  language: Language;
   selectedDate: Date;
-  onLanguageChange?: (language: Language) => void;
+  onLanguageChange?: () => void;
   hasVideoConsultation?: boolean; // Premium add-on
   chambers?: Chamber[]; // Chambers from Schedule Manager
   doctorName?: string;
@@ -58,6 +66,7 @@ interface SelectChamberProps {
     chamberName?: string; // Specific chamber closure (if omitted, applies to all chambers in clinic)
     appliesTo?: string;
   }>; // Clinic planned off periods with metadata
+  language?: Language;
 }
 
 export default function SelectChamber({
@@ -80,7 +89,7 @@ export default function SelectChamber({
   clinicAddress,
   clinicPlannedOffPeriods = [],
 }: SelectChamberProps) {
-  const { bt } = useAITranslation(language);
+
   const accentColor = themeColor === 'blue' ? 'blue' : 'emerald';
   console.log('🏥 SelectChamber received:', {
     doctorName,
@@ -511,7 +520,7 @@ export default function SelectChamber({
       onBack={onBack}
       doctorName={doctorName}
       doctorPhoto={doctorPhoto}
-      doctorSpecialty={doctorSpecialty}
+      doctorSpecialty={formatSpecialty(doctorSpecialty || '')}
       doctorDegrees={doctorDegrees}
       useDrPrefix={useDrPrefix}
       themeColor={themeColor}
@@ -519,8 +528,8 @@ export default function SelectChamber({
       <div>
         {/* Title */}
         <div className="text-center mb-2">
-          <h1 className="text-white mb-2">{bt('Select Chamber')}</h1>
-          <p className="text-gray-400 text-sm mb-4">{bt('Choose your preferred location')}</p>
+          <h1 className="text-white mb-2">Select Chamber</h1>
+          <p className="text-gray-400 text-sm mb-4">Choose your preferred location</p>
 
           {/* Selected Date Badge */}
           <div className={`inline-block bg-${accentColor}-500/20 border border-${accentColor}-500/30 backdrop-blur-sm rounded-full px-4 py-2 mb-6`}>
@@ -592,7 +601,7 @@ export default function SelectChamber({
           {/* Available Chambers - ONLY show if chamber consultation is selected */}
           {consultationType === 'chamber' && (
             <>
-              <h3 className="text-white mb-4">{bt('Available Chambers')}</h3>
+              <h3 className="text-white mb-4">Available Chambers</h3>
 
           {/* Loading state */}
           {loadingCounts && chambers.length > 0 ? (
@@ -730,7 +739,7 @@ export default function SelectChamber({
                   : 'border-gray-700 bg-[#0f1419] hover:border-gray-600'
                 }`}
               >
-                <h4 className="text-white mb-2">{bt('Main Chamber')}</h4>
+                <h4 className="text-white mb-2">Main Chamber</h4>
                 <p className="text-sm text-gray-400 mb-1">123 Medical Plaza, Room 101</p>
                 <p className="text-sm text-gray-400">06:00 - 17:00</p>
               </button>
@@ -742,7 +751,7 @@ export default function SelectChamber({
                   : 'border-gray-700 bg-[#0f1419] hover:border-gray-600'
                 }`}
               >
-                <h4 className="text-white mb-2">{bt('Secondary Chamber')}</h4>
+                <h4 className="text-white mb-2">Secondary Chamber</h4>
                 <p className="text-sm text-gray-400 mb-1">456 Health Center, Suite 205</p>
                 <p className="text-sm text-gray-400">10:00 - 18:00</p>
               </button>
@@ -801,7 +810,7 @@ export default function SelectChamber({
                 : 'bg-gray-700 text-gray-500 cursor-not-allowed'
             }`}
           >
-            {consultationType === 'video' ? 'Continue to Patient Details' : bt('Continue to Patient Details')}
+            {consultationType === 'video' ? 'Continue to Patient Details' : 'Continue to Patient Details'}
           </Button>
         </div>
       </div>

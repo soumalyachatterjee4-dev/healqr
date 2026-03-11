@@ -26,7 +26,7 @@ const VIEW_PACKAGES = [
 
 export default function AdvertiserCampaigns() {
   const [mode, setMode] = useState<'create' | 'history'>('create');
-  
+
   // Creation State
   const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
   const [selectedPincodes, setSelectedPincodes] = useState<string[]>([]);
@@ -35,13 +35,13 @@ export default function AdvertiserCampaigns() {
   const [pincodeSearch, setPincodeSearch] = useState('');
 
   const toggleTemplate = (id: string) => {
-    setSelectedTemplates(prev => 
+    setSelectedTemplates(prev =>
       prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]
     );
   };
 
   const togglePincode = (code: string) => {
-    setSelectedPincodes(prev => 
+    setSelectedPincodes(prev =>
       prev.includes(code) ? prev.filter(p => p !== code) : [...prev, code]
     );
   };
@@ -59,7 +59,7 @@ export default function AdvertiserCampaigns() {
   const toggleAllPincodes = () => {
     const targetPincodes = filteredPincodes;
     const allSelected = targetPincodes.length > 0 && targetPincodes.every(code => selectedPincodes.includes(code));
-    
+
     if (allSelected) {
       setSelectedPincodes(prev => prev.filter(code => !targetPincodes.includes(code)));
     } else {
@@ -78,7 +78,7 @@ export default function AdvertiserCampaigns() {
 
     try {
       const user = auth.currentUser;
-      
+
       // Demo Mode Simulation
       if (!user) {
         await new Promise(resolve => setTimeout(resolve, 2000));
@@ -115,7 +115,7 @@ export default function AdvertiserCampaigns() {
       <div className="p-6 md:p-8">
         <div className="flex justify-between items-center mb-8">
           <h2 className="text-2xl font-bold text-white">Campaign History</h2>
-          <button 
+          <button
             onClick={() => setMode('create')}
             className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2.5 rounded-xl font-medium transition-colors flex items-center gap-2"
           >
@@ -123,7 +123,7 @@ export default function AdvertiserCampaigns() {
             Create New
           </button>
         </div>
-        
+
         <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-12 text-center">
           <div className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-4">
             <Layout className="w-8 h-8 text-zinc-500" />
@@ -141,7 +141,7 @@ export default function AdvertiserCampaigns() {
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
       {/* Header Tabs */}
       <div className="flex items-center gap-1 bg-zinc-900/50 p-1 rounded-xl w-fit mb-8 border border-zinc-800">
-        <button 
+        <button
           onClick={() => setMode('create')}
           className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${
             mode === 'create' ? 'bg-emerald-600 text-white shadow-lg' : 'text-zinc-400 hover:text-white'
@@ -149,11 +149,9 @@ export default function AdvertiserCampaigns() {
         >
           Create Campaign
         </button>
-        <button 
+        <button
           onClick={() => setMode('history')}
-          className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${
-            mode === 'history' ? 'bg-emerald-600 text-white shadow-lg' : 'text-zinc-400 hover:text-white'
-          }`}
+          className="px-6 py-2 rounded-lg text-sm font-medium transition-all text-zinc-400 hover:text-white"
         >
           History
         </button>
@@ -162,7 +160,7 @@ export default function AdvertiserCampaigns() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Left Column: Configuration */}
         <div className="lg:col-span-8 space-y-8">
-          
+
           {/* Step 1: Templates */}
           <section className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6">
             <div className="flex items-center justify-between mb-6">
@@ -170,22 +168,22 @@ export default function AdvertiserCampaigns() {
                 <div className="w-8 h-8 bg-emerald-500/10 rounded-lg flex items-center justify-center text-emerald-500 font-bold">1</div>
                 <h3 className="text-lg font-semibold text-white">Choose Templates</h3>
               </div>
-              <button 
+              <button
                 onClick={toggleAllTemplates}
                 className="text-sm text-emerald-500 hover:text-emerald-400 font-medium"
               >
                 {selectedTemplates.length === TEMPLATES.length ? 'Deselect All' : 'Select All'}
               </button>
             </div>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {TEMPLATES.map(template => (
-                <div 
+                <div
                   key={template.id}
                   onClick={() => toggleTemplate(template.id)}
                   className={`relative group cursor-pointer rounded-xl overflow-hidden border-2 transition-all duration-200 ${
-                    selectedTemplates.includes(template.id) 
-                      ? 'border-emerald-500 ring-2 ring-emerald-500/20' 
+                    selectedTemplates.includes(template.id)
+                      ? 'border-emerald-500 ring-2 ring-emerald-500/20'
                       : 'border-zinc-800 hover:border-zinc-600'
                   }`}
                 >
@@ -212,7 +210,7 @@ export default function AdvertiserCampaigns() {
                 <div className="w-8 h-8 bg-emerald-500/10 rounded-lg flex items-center justify-center text-emerald-500 font-bold">2</div>
                 <h3 className="text-lg font-semibold text-white">Select Target Areas</h3>
               </div>
-              <button 
+              <button
                 onClick={toggleAllPincodes}
                 className="text-sm text-emerald-500 hover:text-emerald-400 font-medium"
               >
@@ -222,7 +220,7 @@ export default function AdvertiserCampaigns() {
 
             <div className="relative mb-4">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
-              <input 
+              <input
                 type="text"
                 placeholder="Search pincodes..."
                 value={pincodeSearch}
@@ -262,8 +260,8 @@ export default function AdvertiserCampaigns() {
                   key={pkg.id}
                   onClick={() => setSelectedPackage(pkg.id)}
                   className={`relative p-4 rounded-xl border-2 text-left transition-all ${
-                    selectedPackage === pkg.id 
-                      ? 'bg-emerald-500/10 border-emerald-500' 
+                    selectedPackage === pkg.id
+                      ? 'bg-emerald-500/10 border-emerald-500'
                       : 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
                   }`}
                 >
@@ -288,7 +286,7 @@ export default function AdvertiserCampaigns() {
         <div className="lg:col-span-4 space-y-6">
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 sticky top-24">
             <h3 className="text-lg font-semibold text-white mb-6">Campaign Summary</h3>
-            
+
             <div className="space-y-4 mb-8">
               <div className="flex justify-between text-sm">
                 <span className="text-zinc-400">Templates Selected</span>
@@ -326,7 +324,7 @@ export default function AdvertiserCampaigns() {
                 </>
               )}
             </button>
-            
+
             <p className="text-xs text-zinc-500 text-center mt-4">
               By proceeding, you agree to our advertising terms and conditions.
             </p>

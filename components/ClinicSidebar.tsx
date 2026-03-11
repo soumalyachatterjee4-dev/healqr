@@ -42,11 +42,14 @@ interface Section {
 interface ClinicSidebarProps {
   activeMenu: string;
   onMenuChange: (menu: string) => void;
-  onLogout: () => void;
+  onLogout: () => void | Promise<void>;
   isOpen?: boolean;
   onClose?: () => void;
   isAssistant?: boolean;
   assistantAllowedPages?: string[];
+  activeAddOns?: string[];
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 export default function ClinicSidebar({
@@ -56,7 +59,10 @@ export default function ClinicSidebar({
   isOpen = false,
   onClose,
   isAssistant = false,
-  assistantAllowedPages = []
+  assistantAllowedPages = [],
+  activeAddOns = [],
+  isCollapsed = false,
+  onToggleCollapse
 }: ClinicSidebarProps) {
   const [expandedSections, setExpandedSections] = useState({
     management: true,

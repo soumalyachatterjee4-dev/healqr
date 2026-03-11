@@ -1,5 +1,5 @@
 import { AlertTriangle } from 'lucide-react';
-import { useAITranslation } from '../hooks/useAITranslation';
+
 import type { Language } from '../utils/translations';
 import TemplateDisplay from './TemplateDisplay';
 
@@ -20,7 +20,7 @@ export default function AdminAlertNotification({
   timestamp = 'October 10, 2025, 09:45 AM',
   severity = 'High',
 }: AdminAlertNotificationProps) {
-  const { bt } = useAITranslation(language);
+  
   
   return (
     <div className="flex items-center justify-center py-8">
@@ -38,7 +38,7 @@ export default function AdminAlertNotification({
                 </div>
                 <div>
                   <h2 className="text-gray-900 uppercase tracking-wide text-sm">
-                    {bt('URGENT ADMIN ALERT')}
+                    URGENT ADMIN ALERT
                   </h2>
                 </div>
               </div>
@@ -55,35 +55,35 @@ export default function AdminAlertNotification({
 
               {/* Greeting */}
               <p className="text-gray-900 mb-4">
-                {bt('Dear')} {doctorName}, 👋
+                Dear {doctorName}, 👋
               </p>
 
               {/* Message Body */}
               <p className="text-gray-700 text-sm mb-4 leading-relaxed">
-                {bt('Immediate attention required! A critical system event needs your review.')}
+                Immediate attention required! A critical system event needs your review.
               </p>
 
               {/* Alert Details */}
               <div className="bg-orange-50 border-l-4 border-orange-500 rounded-r-lg p-4 mb-4 space-y-2">
-                <h3 className="text-gray-900">{bt('Alert Details:')}</h3>
+                <h3 className="text-gray-900">Alert Details:</h3>
                 <div>
-                  <span className="text-gray-900">{bt('Event Type:')}</span>{' '}
-                  <span className="text-gray-600">{bt('System Alert')}</span>
+                  <span className="text-gray-900">Event Type:</span>{' '}
+                  <span className="text-gray-600">System Alert</span>
                 </div>
                 <div>
-                  <span className="text-gray-900">{bt('Timestamp:')}</span>{' '}
+                  <span className="text-gray-900">Timestamp:</span>{' '}
                   <span className="text-gray-600">{timestamp}</span>
                 </div>
                 <div>
-                  <span className="text-gray-900">{bt('Severity:')}</span>{' '}
-                  <span className="text-red-600">{bt('High')}</span>
+                  <span className="text-gray-900">Severity:</span>{' '}
+                  <span className="text-red-600">High</span>
                 </div>
               </div>
 
               {/* Action Required */}
               <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                <p className="text-gray-900 mb-2">{bt('Action Required:')}</p>
-                <p className="text-gray-600 text-sm">{bt('Please review and respond immediately')}</p>
+                <p className="text-gray-900 mb-2">Action Required:</p>
+                <p className="text-gray-600 text-sm">Please review and respond immediately</p>
               </div>
 
               {/* Health Tip Section */}

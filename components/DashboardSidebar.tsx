@@ -28,12 +28,14 @@ import healqrLogo from '../assets/healqr-logo.png';
 interface DashboardSidebarProps {
   activeMenu?: string;
   onMenuChange: (menu: string) => void;
-  onLogout?: () => void;
+  onLogout?: () => void | Promise<void>;
   isOpen?: boolean;
   onClose?: () => void;
   activeAddOns?: string[];
-  isAssistant?: boolean; // Hide logout for assistants
-  assistantAllowedPages?: string[]; // Pages assistant can access
+  isAssistant?: boolean;
+  assistantAllowedPages?: string[];
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 export default function DashboardSidebar({
@@ -44,7 +46,9 @@ export default function DashboardSidebar({
   onClose,
   activeAddOns = [],
   isAssistant = false,
-  assistantAllowedPages = []
+  assistantAllowedPages = [],
+  isCollapsed = false,
+  onToggleCollapse
 }: DashboardSidebarProps) {
   const [isManagementOpen, setIsManagementOpen] = useState(true);
   const [isPracticeEnhancerOpen, setIsPracticeEnhancerOpen] = useState(true);
@@ -239,8 +243,9 @@ export default function DashboardSidebar({
 
       {/* Sidebar */}
       <aside className={`
-        fixed lg:fixed top-0 left-0 h-full w-64 bg-zinc-950 border-r border-zinc-900 flex flex-col z-50
-        transform transition-transform duration-300 ease-in-out
+        fixed lg:fixed top-0 left-0 h-full bg-zinc-950 border-r border-zinc-900 flex flex-col z-50
+        transform transition-all duration-300 ease-in-out
+        ${isCollapsed ? 'w-20' : 'w-64'}
         ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         {/* Logo & Close Button */}

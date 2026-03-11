@@ -29,57 +29,13 @@ export const PatientRxUploadModal: React.FC<PatientRxUploadModalProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const MAX_FILES = 8;
 
-  const translations = {
-    english: {
-      title: 'Upload Previous Prescription',
-      subtitle: 'Help your doctor provide better care',
-      addMore: 'Add More',
-      upload: 'Upload All',
-      uploading: 'Uploading...',
-      cancel: 'Cancel',
-      dropHere: 'Drop prescription image here or click to browse',
-      fileTypes: 'Supports JPG, PNG (Max 10MB per file)',
-      maxFiles: 'Upload up to 8 pages (Old RX + Reports)',
-      uploadedCount: 'uploaded',
-      limitReached: 'Maximum 8 files reached',
-    },
-    hindi: {
-      title: 'पिछला प्रिस्क्रिप्शन अपलोड करें',
-      subtitle: 'अपने डॉक्टर को बेहतर देखभाल प्रदान करने में मदद करें',
-      addMore: 'और जोड़ें',
-      upload: 'सभी अपलोड करें',
-      uploading: 'अपलोड हो रहा है...',
-      cancel: 'रद्द करें',
-      dropHere: 'प्रिस्क्रिप्शन छवि यहां छोड़ें या ब्राउज़ करने के लिए क्लिक करें',
-      fileTypes: 'JPG, PNG समर्थित (प्रति फ़ाइल अधिकतम 10MB)',
-      maxFiles: '8 पृष्ठ तक अपलोड करें (पुराना RX + रिपोर्ट)',
-      uploadedCount: 'अपलोड किया गया',
-      limitReached: 'अधिकतम 8 फ़ाइलें पहुंच गई',
-    },
-    bengali: {
-      title: 'আগের প্রেসক্রিপশন আপলোড করুন',
-      subtitle: 'আপনার ডাক্তারকে আরও ভাল যত্ন প্রদান করতে সাহায্য করুন',
-      addMore: 'আরো যোগ করুন',
-      upload: 'সব আপলোড করুন',
-      uploading: 'আপলোড হচ্ছে...',
-      cancel: 'বাতিল',
-      dropHere: 'প্রেসক্রিপশন ছবি এখানে ফেলুন বা ব্রাউজ করতে ক্লিক করুন',
-      fileTypes: 'JPG, PNG সমর্থিত (প্রতি ফাইল সর্বোচ্চ 10MB)',
-      maxFiles: '৮টি পৃষ্ঠা পর্যন্ত আপলোড করুন (পুরানো RX + রিপোর্ট)',
-      uploadedCount: 'আপলোড করা হয়েছে',
-      limitReached: 'সর্বোচ্চ ৮টি ফাইল পৌঁছেছে',
-    },
-  };
-
-  const t = translations[language];
-
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files) return;
 
     // Check if adding these files would exceed the limit
     if (uploadedFiles.length + files.length > MAX_FILES) {
-      toast.error(t.limitReached);
+      toast.error('Maximum 8 files reached');
       return;
     }
 
@@ -132,12 +88,10 @@ export const PatientRxUploadModal: React.FC<PatientRxUploadModalProps> = ({
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
       const fileUrls = uploadedFiles.map((f) => f.previewUrl);
-      
 
-      
       toast.success(`${uploadedFiles.length} file(s) uploaded successfully!`);
       onUploadSuccess(fileUrls);
-      
+
       // Reset and close
       setTimeout(() => {
         setUploadedFiles([]);
@@ -173,8 +127,8 @@ export const PatientRxUploadModal: React.FC<PatientRxUploadModalProps> = ({
               <FileText className="w-8 h-8" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold">{t.title}</h2>
-              <p className="text-blue-50 text-sm mt-1">{t.subtitle}</p>
+              <h2 className="text-2xl font-bold">Upload Previous Prescription</h2>
+              <p className="text-blue-50 text-sm mt-1">Help your doctor provide better care</p>
             </div>
           </div>
         </div>
@@ -183,9 +137,9 @@ export const PatientRxUploadModal: React.FC<PatientRxUploadModalProps> = ({
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {/* Info Badge */}
           <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 text-center">
-            <p className="text-blue-300 text-sm">{t.maxFiles}</p>
+            <p className="text-blue-300 text-sm">Upload up to 8 pages (Old RX + Reports)</p>
             <p className="text-gray-400 text-xs mt-1">
-              {uploadedFiles.length} / {MAX_FILES} {t.uploadedCount}
+              {uploadedFiles.length} / {MAX_FILES} uploaded
             </p>
           </div>
 
@@ -235,8 +189,8 @@ export const PatientRxUploadModal: React.FC<PatientRxUploadModalProps> = ({
                     <Plus className="w-6 h-6 text-blue-400" />
                   </div>
                   <div className="text-gray-300">
-                    <div className="font-semibold">{uploadedFiles.length === 0 ? t.dropHere : t.addMore}</div>
-                    <div className="text-sm mt-1 text-gray-500">{t.fileTypes}</div>
+                    <div className="font-semibold">{uploadedFiles.length === 0 ? 'Drop prescription image here or click to browse' : 'Add More'}</div>
+                    <div className="text-sm mt-1 text-gray-500">Supports JPG, PNG (Max 10MB per file)</div>
                   </div>
                 </div>
               </div>
@@ -252,7 +206,7 @@ export const PatientRxUploadModal: React.FC<PatientRxUploadModalProps> = ({
             disabled={isUploading}
             className="flex-1 border-gray-600 text-gray-300"
           >
-            {t.cancel}
+            Cancel
           </Button>
           <Button
             onClick={handleUpload}
@@ -262,12 +216,12 @@ export const PatientRxUploadModal: React.FC<PatientRxUploadModalProps> = ({
             {isUploading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                {t.uploading}
+                Uploading...
               </>
             ) : (
               <>
                 <Upload className="w-4 h-4 mr-2" />
-                {t.upload} ({uploadedFiles.length})
+                Upload All ({uploadedFiles.length})
               </>
             )}
           </Button>

@@ -197,7 +197,7 @@ export default function ClinicDashboard() {
 
       // 1. Fetch all doctor bookings in parallel
       const doctorBookingsPromises = (data.linkedDoctorsDetails || []).map(async (doctor) => {
-        const docId = doctor?.doctorId || doctor?.uid;
+        const docId = doctor?.doctorId || (doctor as any)?.uid;
         if (!docId) return null;
 
         try {
@@ -305,7 +305,7 @@ export default function ClinicDashboard() {
 
       // 1. Fetch all doctors and their chambers in parallel
       const doctorDetailsPromises = linkedDoctors.map(async (doctor) => {
-        const docId = doctor?.doctorId || doctor?.uid;
+        const docId = doctor?.doctorId || (doctor as any)?.uid;
         if (!docId) return null;
 
         try {
@@ -343,8 +343,10 @@ export default function ClinicDashboard() {
           chambers.push({
             id: chamber.id,
             doctorName: doctorData.name || 'Doctor',
-            specialization: doctorData.specialties?.[0] || 'Medical Specialist',
+            specialty: doctorData.specialties?.[0] || 'Medical Specialist',
             chamberName: chamber.chamberName,
+            chamberNo: chamber.chamberNo || '1',
+            doctorId: doctorData.doctorId,
             address: chamber.chamberAddress,
             startTime: chamber.startTime || '00:00',
             endTime: chamber.endTime || '00:00',

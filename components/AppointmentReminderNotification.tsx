@@ -1,8 +1,6 @@
 import { Bell } from 'lucide-react';
 import TemplateDisplay from './TemplateDisplay';
-import { useAITranslation } from '../hooks/useAITranslation';
 import type { Language } from '../utils/translations';
-
 interface AppointmentReminderNotificationProps {
   language?: Language;
   patientName?: string;
@@ -28,8 +26,6 @@ export default function AppointmentReminderNotification({
   location = '123 Medical Plaza, Downtown',
   serialNumber = '#7',
 }: AppointmentReminderNotificationProps) {
-  const { bt } = useAITranslation(language);
-
   return (
     <div className="flex items-center justify-center py-8">
       <div className="w-full max-w-sm">
@@ -42,7 +38,7 @@ export default function AppointmentReminderNotification({
                 </div>
                 <div>
                   <h2 className="text-gray-900 uppercase tracking-wide text-sm">
-                    {bt('APPOINTMENT REMINDER')}
+                    APPOINTMENT REMINDER
                   </h2>
                 </div>
               </div>
@@ -56,35 +52,35 @@ export default function AppointmentReminderNotification({
                 </div>
               </div>
               <p className="text-gray-900 mb-4">
-                {bt(`Hello ${patientName}, 👋`)}
+                {`Hello ${patientName}, 👋`}
               </p>
               <p className="text-gray-700 text-sm mb-4 leading-relaxed">
-                {bt(`This is a gentle reminder about your upcoming appointment with ${doctorName} at ${clinicName}.`)}
+                {`This is a gentle reminder about your upcoming appointment with ${doctorName} at ${clinicName}.`}
               </p>
               <div className="bg-gray-50 rounded-lg p-4 mb-4 space-y-2">
                 <div>
-                  <span className="text-gray-900">{bt('Appointment Date:')}</span>{' '}
+                  <span className="text-gray-900">Appointment Date:</span>{' '}
                   <span className="text-gray-600">{appointmentDate}</span>
                 </div>
                 <div>
-                  <span className="text-gray-900">{bt('Appointment Time:')}</span>{' '}
+                  <span className="text-gray-900">Appointment Time:</span>{' '}
                   <span className="text-gray-600">{appointmentTime}</span>
                 </div>
                 <div>
-                  <span className="text-gray-900">{bt('Location:')}</span>{' '}
+                  <span className="text-gray-900">Location:</span>{' '}
                   <span className="text-gray-600">{location}</span>
                 </div>
                 <div>
-                  <span className="text-gray-900">{bt('Serial Number:')}</span>{' '}
+                  <span className="text-gray-900">Serial Number:</span>{' '}
                   <span className="text-gray-600">{serialNumber}</span>
                 </div>
               </div>
               <div className="mb-4">
-                <p className="text-gray-900 text-sm mb-2">{bt('Remember to bring:')}</p>
+                <p className="text-gray-900 text-sm mb-2">Remember to bring:</p>
                 <div className="text-gray-600 text-sm space-y-1 ml-2">
-                  <p>{bt('• Previous medical reports')}</p>
-                  <p>{bt('• Current medications list')}</p>
-                  <p>{bt('• Any questions or concerns')}</p>
+                  <p>• Previous medical reports</p>
+                  <p>• Current medications list</p>
+                  <p>• Any questions or concerns</p>
                 </div>
               </div>
               <TemplateDisplay placement="notif-appointment-reminder" className="mb-4" />

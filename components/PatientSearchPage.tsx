@@ -71,8 +71,13 @@ const PatientSearchPage: React.FC<PatientSearchPageProps> = ({ isDashboard = fal
 
       // Filter by doctor name if provided
       if (doctorName) {
+        // Strip common prefixes like "dr", "dr.", "doctor" before matching
+        const cleanedName = doctorName
+          .toLowerCase()
+          .replace(/^(dr\.?\s+|doctor\s+)/i, '')
+          .trim();
         doctors = doctors.filter(doc =>
-          doc.name?.toLowerCase().includes(doctorName.toLowerCase())
+          doc.name?.toLowerCase().includes(cleanedName)
         );
       }
 

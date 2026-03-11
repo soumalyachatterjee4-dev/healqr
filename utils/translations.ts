@@ -780,13 +780,15 @@ export function transliterateName(name: string, targetLanguage: Language): strin
     return transliterateToLatin(name);
   }
 
-  // If doctor wants Hindi and name is in Latin script → convert to Hindi
-  if (targetLanguage === 'hindi' && !hasIndicScript) {
+  // Devanagari-script languages → use Hindi transliteration map
+  const devanagariLangs: Language[] = ['hindi', 'marathi', 'nepali', 'konkani', 'maithili', 'dogri', 'bodo'];
+  if (devanagariLangs.includes(targetLanguage) && !hasIndicScript) {
     return transliterateFromLatin(name, 'hindi');
   }
 
-  // If doctor wants Bengali and name is in Latin script → convert to Bengali
-  if (targetLanguage === 'bengali' && !hasIndicScript) {
+  // Bengali-script languages → use Bengali transliteration map
+  const bengaliScriptLangs: Language[] = ['bengali', 'assamese', 'manipuri'];
+  if (bengaliScriptLangs.includes(targetLanguage) && !hasIndicScript) {
     return transliterateFromLatin(name, 'bengali');
   }
 

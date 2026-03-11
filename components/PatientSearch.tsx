@@ -14,7 +14,7 @@ import {
 } from "./ui/select";
 import { MEDICAL_SPECIALTIES } from '../utils/medicalSpecialties';
 import DashboardPromoDisplay from './DashboardPromoDisplay';
-import { useAITranslation } from '../hooks/useAITranslation';
+
 import type { Language } from '../utils/translations';
 
 interface Doctor {
@@ -28,6 +28,11 @@ interface Doctor {
   pinCode?: string;
   clinicName?: string;
   landmark?: string;
+  practisingPincodes?: string[];
+  chambers?: {
+    main?: { pincode?: string; address?: string };
+    secondary?: { pincode?: string; address?: string };
+  };
 }
 
 interface PatientSearchProps {
@@ -35,7 +40,7 @@ interface PatientSearchProps {
 }
 
 export default function PatientSearch({ language = 'english' }: PatientSearchProps) {
-  const { dt, bt } = useAITranslation(language);
+
   const [areaInput, setAreaInput] = useState('');
   const [pinCode, setPinCode] = useState('');
   const [isAreaLocked, setIsAreaLocked] = useState(false);
@@ -52,8 +57,28 @@ export default function PatientSearch({ language = 'english' }: PatientSearchPro
 
     setGeocodingLoading(true);
     try {
-      // Smart Logic: Strip intent-based keywords from the query before geocoding
-      // e.g., "ent dr near moulali" -> "moulali"
+      // Step 1: Use Gemini AI to resolve location → pincode (best for Indian localities)
+      console.log('🤖 Asking Gemini AI to resolve pincode for:', areaInput);
+      try {
+        const { getFunctions, httpsCallable } = await import('firebase/functions');
+        const { app } = await import('../lib/firebase/config');
+        const functions = getFunctions(app!);
+        const resolvePin = httpsCallable(functions, 'resolveLocationPincode');
+        const result = await resolvePin({ query: areaInput });
+        const data = result.data as { pincode: string | null; source: string };
+
+        if (data.pincode && /^\d{6}$/.test(data.pincode)) {
+          console.log('✅ Gemini resolved pincode:', data.pincode);
+          setPinCode(data.pincode);
+          setIsAreaLocked(true);
+          return data.pincode;
+        }
+        console.log('⚠️ Gemini could not resolve pincode, trying geocoding fallback...');
+      } catch (geminiErr) {
+        console.log('⚠️ Gemini resolver failed, trying geocoding fallback...', geminiErr);
+      }
+
+      // Step 2: Fallback — Google Geocoding API
       const intentKeywords = [
         'doctor', 'dr', 'dentist', 'near', 'specialist', 'clinic', 'hospital',
         'best', 'top', 'in', 'at', 'specialty', 'physician', 'surgeon',
@@ -62,45 +87,53 @@ export default function PatientSearch({ language = 'english' }: PatientSearchPro
 
       let cleanQuery = areaInput.toLowerCase();
       intentKeywords.forEach(keyword => {
-        // Use word boundary to avoid stripping partial matches (e.g., "Indira" -> "ira" if "in" is stripped)
         const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
         cleanQuery = cleanQuery.replace(regex, '');
       });
-
-      // Clean up multiple spaces and trim
       cleanQuery = cleanQuery.replace(/\s+/g, ' ').trim();
 
-      console.log('🔍 Geocoding cleaned query:', cleanQuery, '(Original:', areaInput + ')');
-
-      // Use Firebase API key - already has Geocoding API enabled
       const apiKey = 'AIzaSyB1AVXeao1bqTah8cD1bGAiAQMbZ5nw0WI';
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(cleanQuery || areaInput)}, India&key=${apiKey}`
-      );
-      const data = await response.json();
+      const queryText = cleanQuery || areaInput;
 
-      if (data.results && data.results.length > 0) {
-        // Extract pincode from address components
-        const addressComponents = data.results[0].address_components;
-        const postalCode = addressComponents.find((component: any) =>
-          component.types.includes('postal_code')
+      for (const suffix of [', India', ', West Bengal, India']) {
+        const response = await fetch(
+          `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(queryText + suffix)}&key=${apiKey}`
         );
+        const data = await response.json();
 
-        if (postalCode) {
-          setPinCode(postalCode.long_name);
-          setIsAreaLocked(true);
-          return postalCode.long_name;
-        } else {
-          alert('Could not find pincode for this area. Please try a more specific location.');
-          return null;
+        if (data.results && data.results.length > 0) {
+          const addressComponents = data.results[0].address_components;
+          const postalCode = addressComponents.find((component: any) =>
+            component.types.includes('postal_code')
+          );
+
+          if (postalCode) {
+            setPinCode(postalCode.long_name);
+            setIsAreaLocked(true);
+            return postalCode.long_name;
+          }
         }
-      } else {
-        alert('Location not found. Please try again.');
-        return null;
       }
+
+      // Step 3: Fallback — Nominatim (free, no API key)
+      console.log('🔄 Google geocoding failed, trying Nominatim fallback...');
+      const nomResponse = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(queryText)}, India&format=json&addressdetails=1&limit=1`,
+        { headers: { 'Accept-Language': 'en' } }
+      );
+      const nomData = await nomResponse.json();
+
+      if (nomData.length > 0 && nomData[0].address?.postcode) {
+        const postcode = nomData[0].address.postcode;
+        setPinCode(postcode);
+        setIsAreaLocked(true);
+        return postcode;
+      }
+
+      console.log('⚠️ All resolvers failed for:', queryText, '— falling back to text search');
+      return null;
     } catch (error) {
-      console.error('Geocoding error:', error);
-      alert('Error finding location. Please enter pincode manually.');
+      console.error('Location resolve error:', error);
       return null;
     } finally {
       setGeocodingLoading(false);
@@ -137,16 +170,49 @@ export default function PatientSearch({ language = 'english' }: PatientSearchPro
 
   const handleSearch = async () => {
     let searchPinCode = pinCode;
+    let areaTextFallback = ''; // Used when geocoding fails
+    let detectedSpecialty = specialty; // May be auto-detected from natural language input
+
+    // Smart specialty extraction from area input (e.g. "GENERAL PHYSICIAN NEAR BAKSARA")
+    if (!detectedSpecialty && areaInput) {
+      const inputLower = areaInput.toLowerCase();
+      for (const spec of MEDICAL_SPECIALTIES) {
+        // Check searchTerms first (e.g. 'general physician', 'heart', 'bone')
+        const matched = spec.searchTerms.some(term => inputLower.includes(term));
+        // Also check the label (e.g. 'cardiology', 'orthopedics')
+        if (matched || inputLower.includes(spec.label.toLowerCase().split(' ')[0].replace('(', ''))) {
+          detectedSpecialty = spec.id;
+          console.log('🎯 Auto-detected specialty from input:', spec.label);
+          break;
+        }
+      }
+    }
 
     // If no pinCode but areaInput exists (and it's not a numeric pincode), try geocoding automatically
     if (!searchPinCode && areaInput && !/^\d{6}$/.test(areaInput)) {
       console.log('🔄 Triggering auto-geocoding for search...');
       const resolvedPin = await handleAreaSearch();
-      if (!resolvedPin) return; // Geocoding failed or alerted
-      searchPinCode = resolvedPin;
+      if (resolvedPin) {
+        searchPinCode = resolvedPin;
+      } else {
+        // Geocoding failed — use cleaned area text for text-based matching
+        const intentKeywords = [
+          'doctor', 'dr', 'dentist', 'near', 'specialist', 'clinic', 'hospital',
+          'best', 'top', 'in', 'at', 'specialty', 'physician', 'surgeon',
+          'medical', 'center', 'centre', 'lookup', 'find', 'search', 'cardiologist',
+          'orthopedic', 'dermatologist', 'ent', 'gynecologist', 'pediatrician',
+          'neurologist', 'ophthalmologist', 'psychiatrist', 'urologist',
+          'general', 'cardiology', 'neurology', 'gynecology', 'urology',
+        ];
+        areaTextFallback = areaInput.toLowerCase();
+        intentKeywords.forEach(kw => {
+          areaTextFallback = areaTextFallback.replace(new RegExp(`\\b${kw}\\b`, 'gi'), '');
+        });
+        areaTextFallback = areaTextFallback.replace(/\s+/g, ' ').trim();
+      }
     }
 
-    if (!searchPinCode && !specialty && !doctorName) return;
+    if (!searchPinCode && !areaTextFallback && !detectedSpecialty && !doctorName) return;
 
     setLoading(true);
     setSearched(true);
@@ -157,34 +223,58 @@ export default function PatientSearch({ language = 'english' }: PatientSearchPro
         setLoading(false);
         return;
       }
-      const { collection, query, where, getDocs } = await import('firebase/firestore');
+      const { collection, query, getDocs } = await import('firebase/firestore');
 
       const doctorsRef = collection(db, 'doctors');
-      let q = query(doctorsRef);
 
-      // Query by pinCode if provided
-      if (searchPinCode) {
-        q = query(doctorsRef, where('pinCode', '==', searchPinCode));
-      }
-
-      const snapshot = await getDocs(q);
+      // Fetch all doctors, then filter by pincode match
+      // This allows matching against residential pinCode, practisingPincodes, and chamber pincodes
+      const snapshot = await getDocs(query(doctorsRef));
       let doctors = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Doctor[];
 
-      // Filter by specialty if provided
-      if (specialty) {
+      // Filter by pinCode — match residential, practising, or chamber pincodes
+      if (searchPinCode) {
         doctors = doctors.filter(doc => {
-          // Check for matching ID or label to handle fallback/transitional state
+          if (doc.pinCode === searchPinCode) return true;
+          if (doc.practisingPincodes?.includes(searchPinCode)) return true;
+          if (doc.chambers?.main?.pincode === searchPinCode) return true;
+          if (doc.chambers?.secondary?.pincode === searchPinCode) return true;
+          return false;
+        });
+      } else if (areaTextFallback) {
+        // Geocoding failed — text-match against addresses, landmarks, names, clinic names
+        const searchText = areaTextFallback.toLowerCase();
+        doctors = doctors.filter(doc => {
+          const fields = [
+            doc.landmark,
+            doc.clinicName,
+            doc.name,
+            doc.chambers?.main?.address,
+            doc.chambers?.secondary?.address,
+          ].filter(Boolean).join(' ').toLowerCase();
+          return fields.includes(searchText);
+        });
+      }
+
+      // Filter by specialty (manually selected OR auto-detected from input)
+      if (detectedSpecialty) {
+        doctors = doctors.filter(doc => {
           return doc.specialties?.some(s =>
-            s.toLowerCase() === specialty.toLowerCase() ||
-            MEDICAL_SPECIALTIES.find(ms => ms.id === s)?.label.toLowerCase() === specialty.toLowerCase()
+            s.toLowerCase() === detectedSpecialty.toLowerCase() ||
+            MEDICAL_SPECIALTIES.find(ms => ms.id === s)?.label.toLowerCase() === detectedSpecialty.toLowerCase()
           );
         });
       }
 
       // Filter by doctor name if provided
       if (doctorName) {
+        // Strip common prefixes like "dr", "dr.", "doctor" before matching
+        const cleanedName = doctorName
+          .toLowerCase()
+          .replace(/^(dr\.?\s+|doctor\s+)/i, '')
+          .trim();
         doctors = doctors.filter(doc =>
-          doc.name?.toLowerCase().includes(doctorName.toLowerCase())
+          doc.name?.toLowerCase().includes(cleanedName)
         );
       }
 
@@ -209,7 +299,7 @@ export default function PatientSearch({ language = 'english' }: PatientSearchPro
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-lg font-semibold text-white">{bt('Find a Doctor')}</h1>
+          <h1 className="text-lg font-semibold text-white">Find a Doctor</h1>
         </div>
       </div>
 
@@ -226,7 +316,7 @@ export default function PatientSearch({ language = 'english' }: PatientSearchPro
           className="w-full mb-4 h-12 text-base border-orange-600 text-orange-600 hover:bg-orange-600 hover:text-white bg-zinc-900 border-2 flex items-center justify-center gap-2"
         >
           <History className="h-5 w-5" />
-          {bt('Patient Login - View History & Status')}
+          Patient Login - View History & Status
         </Button>
 
         {/* Search Box */}
@@ -237,7 +327,7 @@ export default function PatientSearch({ language = 'english' }: PatientSearchPro
               <div className="relative">
                 <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                 <Input
-                  placeholder={isAreaLocked ? pinCode : dt("Enter area or pincode")}
+                  placeholder={isAreaLocked ? pinCode : 'Enter area or pincode'}
                   className="pl-10 pr-20 h-12 text-base bg-zinc-800 border-zinc-700 text-white placeholder:text-gray-400"
                   value={isAreaLocked ? `${areaInput} (${pinCode})` : areaInput}
                   onChange={(e) => !isAreaLocked && handleAreaInputChange(e.target.value)}
@@ -302,7 +392,7 @@ export default function PatientSearch({ language = 'english' }: PatientSearchPro
               <div className="relative">
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                 <Input
-                  placeholder={dt('Search by Doctor Name (optional)')}
+                  placeholder="Search by Doctor Name (optional)"
                   className="pl-10 pr-10 h-12 text-base bg-zinc-800 border-zinc-700 text-white placeholder:text-gray-400"
                   value={doctorName}
                   onChange={(e) => setDoctorName(e.target.value)}
@@ -325,7 +415,7 @@ export default function PatientSearch({ language = 'english' }: PatientSearchPro
                 <Stethoscope className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5 z-10" />
                 <Select value={specialty} onValueChange={setSpecialty}>
                   <SelectTrigger className="pl-10 pr-10 h-12 text-base w-full bg-zinc-800 border-zinc-700 text-white">
-                    <SelectValue placeholder={dt('Select Specialty (optional)')} />
+                    <SelectValue placeholder="Select Specialty (optional)" />
                   </SelectTrigger>
                   <SelectContent className="bg-zinc-800 border-zinc-700">
                     {MEDICAL_SPECIALTIES.map((spec) => (
@@ -353,7 +443,7 @@ export default function PatientSearch({ language = 'english' }: PatientSearchPro
               onClick={handleSearch}
               disabled={loading}
             >
-              {loading ? bt('Searching...') : bt('Search Doctors')}
+              {loading ? 'Searching...' : 'Search Doctors'}
             </Button>
           </CardContent>
         </Card>
@@ -362,7 +452,7 @@ export default function PatientSearch({ language = 'english' }: PatientSearchPro
         {searched && (
           <div className="space-y-4">
             <h2 className="text-xl font-semibold text-white mb-4">
-              {results.length} {dt('Doctors Found')}
+              {results.length} Doctors Found
             </h2>
 
             {results.map((doctor) => (
@@ -402,7 +492,7 @@ export default function PatientSearch({ language = 'english' }: PatientSearchPro
                         </span>
                       </div>
                       <Button variant="ghost" className="text-orange-500 hover:text-orange-400 hover:bg-orange-500/10 p-0 h-auto font-medium">
-                        {bt('Book Appointment')} <ChevronRight className="h-4 w-4 ml-1" />
+                        Book Appointment <ChevronRight className="h-4 w-4 ml-1" />
                       </Button>
                     </div>
                   </div>
@@ -415,8 +505,8 @@ export default function PatientSearch({ language = 'english' }: PatientSearchPro
                 <div className="h-16 w-16 bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Search className="h-8 w-8 text-gray-400" />
                 </div>
-                <h3 className="text-lg font-medium text-white">{bt('No doctors found')}</h3>
-                <p className="text-gray-400 mt-1">{bt('Try adjusting your search criteria')}</p>
+                <h3 className="text-lg font-medium text-white">No doctors found</h3>
+                <p className="text-gray-400 mt-1">Try adjusting your search criteria</p>
               </div>
             )}
           </div>
