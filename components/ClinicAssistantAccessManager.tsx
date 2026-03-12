@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowLeft, Users, Mail, CheckCircle, XCircle, Eye, Edit, Trash, Copy } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -33,23 +33,23 @@ interface ClinicAssistantAccessManagerProps {
 
 // All available pages for access control (Dashboard is always accessible)
 const AVAILABLE_PAGES = [
-  { id: 'doctors', label: 'Manage Doctors', icon: 'ðŸ‘¥' },
-  { id: 'profile', label: 'Clinic Profile', icon: 'ðŸ¢' },
-  { id: 'qr-manager', label: 'QR Manager', icon: 'ðŸ“±' },
-  { id: 'schedule-manager', label: 'Schedule Manager', icon: 'ðŸ“…' },
-  { id: 'todays-schedule', label: "Today's Schedule", icon: 'ðŸ—“ï¸' },
-  { id: 'advance-booking', label: 'Advance Booking', icon: 'ðŸ“†' },
-  { id: 'analytics', label: 'Analytics', icon: 'ðŸ“ˆ' },
-  { id: 'reports', label: 'Reports', icon: 'ðŸ“„' },
-  { id: 'social-kit', label: 'Social Kit & Offers', icon: 'ðŸ“£' },
-  { id: 'monthly-planner', label: 'Monthly Planner', icon: 'ðŸ—“ï¸' },
-  { id: 'preview', label: 'Preview Centre', icon: 'ðŸ‘ï¸' },
-  { id: 'lab-referral', label: 'Lab Referral Tracking', icon: 'ðŸ”¬' },
-  { id: 'templates', label: 'Personalized Templates', icon: 'ðŸ“' },
-  { id: 'ai-diet-chart', label: 'AI Diet Chart', icon: 'ðŸŽ' },
-  { id: 'ai-rx-reader', label: 'AI RX Reader', icon: 'ðŸ¤–' },
-  { id: 'video-consultation', label: 'Video Consultation', icon: 'ðŸŽ¥' },
-  { id: 'emergency', label: 'Emergency Button', icon: 'ðŸš¨' },
+  { id: 'doctors', label: 'Manage Doctors', icon: '👥' },
+  { id: 'profile', label: 'Clinic Profile', icon: '🏢' },
+  { id: 'qr-manager', label: 'QR Manager', icon: '📱' },
+  { id: 'schedule-manager', label: 'Schedule Manager', icon: '📅' },
+  { id: 'todays-schedule', label: "Today's Schedule", icon: '🗓️' },
+  { id: 'advance-booking', label: 'Advance Booking', icon: '📆' },
+  { id: 'analytics', label: 'Analytics', icon: '📈' },
+  { id: 'reports', label: 'Reports', icon: '📄' },
+  { id: 'social-kit', label: 'Social Kit & Offers', icon: '📣' },
+  { id: 'monthly-planner', label: 'Monthly Planner', icon: '🗓️' },
+  { id: 'preview', label: 'Preview Centre', icon: '👁️' },
+  { id: 'lab-referral', label: 'Lab Referral Tracking', icon: '🔬' },
+  { id: 'templates', label: 'Personalized Templates', icon: '📝' },
+  { id: 'ai-diet-chart', label: 'AI Diet Chart', icon: '🍎' },
+  { id: 'ai-rx-reader', label: 'AI RX Reader', icon: '🤖' },
+  { id: 'video-consultation', label: 'Video Consultation', icon: '🎥' },
+  { id: 'emergency', label: 'Emergency Button', icon: '🚨' },
 ];
 
 export default function ClinicAssistantAccessManager({
@@ -59,7 +59,7 @@ export default function ClinicAssistantAccessManager({
   onMenuChange,
   activeAddOns
 }: ClinicAssistantAccessManagerProps) {
-  console.log('ðŸ›¡ï¸ ClinicAssistantAccessManager: Component Initializing...');
+  console.log('🛡️ ClinicAssistantAccessManager: Component Initializing...');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeAssistants, setActiveAssistants] = useState<AssistantData[]>([]);
@@ -84,7 +84,7 @@ export default function ClinicAssistantAccessManager({
     if (!auth) return;
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      console.log('ðŸ” Auth state changed:', user?.uid || 'No user');
+      console.log('🔐 Auth state changed:', user?.uid || 'No user');
       setCurrentUser(user);
       setAuthReady(true);
     });
@@ -107,7 +107,7 @@ export default function ClinicAssistantAccessManager({
       return;
     }
 
-    console.log('ðŸ“‹ Loading assistants for clinicId:', clinicId);
+    console.log('📋 Loading assistants for clinicId:', clinicId);
 
     try {
       const assistantsRef = collection(db, 'assistants');
@@ -331,11 +331,11 @@ export default function ClinicAssistantAccessManager({
                 <div>
                   <h3 className="font-medium text-blue-500">Clinic Access Guidelines</h3>
                   <ul className="text-sm text-gray-300 mt-2 space-y-1">
-                    <li>â€¢ Create <strong>unlimited</strong> assistants for your clinic</li>
-                    <li>â€¢ Each assistant gets a unique secure link and 6-digit PIN</li>
-                    <li>â€¢ Share both link and PIN via WhatsApp or Email</li>
-                    <li>â€¢ Control exactly which pages each assistant can access</li>
-                    <li>â€¢ <strong>Dashboard</strong> access is included by default</li>
+                    <li>• Create <strong>unlimited</strong> assistants for your clinic</li>
+                    <li>• Each assistant gets a unique secure link and 6-digit PIN</li>
+                    <li>• Share both link and PIN via WhatsApp or Email</li>
+                    <li>• Control exactly which pages each assistant can access</li>
+                    <li>• <strong>Dashboard</strong> access is included by default</li>
                   </ul>
                 </div>
               </div>
@@ -597,7 +597,7 @@ export default function ClinicAssistantAccessManager({
                     }}
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                    >
-                     ðŸ“‹ Copy All for WhatsApp
+                     📋 Copy All for WhatsApp
                    </Button>
                 </div>
 

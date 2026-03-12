@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { FlaskConical, Search, Calendar, DollarSign, TrendingUp, FileText, Edit2, Save, X, Phone, ArrowLeft, Info, User } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -119,7 +119,7 @@ export default function ClinicLabReferralManager({
       // Save back if any were removed
       if (cleaned.length !== parsed.length) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
-        console.log(`ðŸ—‘ï¸ Cleaned ${parsed.length - cleaned.length} old entries (>90 days)`);
+        console.log(`🗑️ Cleaned ${parsed.length - cleaned.length} old entries (>90 days)`);
       }
     } catch (error) {
       console.error('Error cleaning up old entries:', error);
@@ -147,9 +147,9 @@ export default function ClinicLabReferralManager({
         where('isMarkedSeen', '==', true)
       );
 
-      console.log('ðŸ” Fetching Clinic consultations:', clinicId, 'Date:', queryDate.toLocaleDateString());
+      console.log('🔍 Fetching Clinic consultations:', clinicId, 'Date:', queryDate.toLocaleDateString());
       const snapshot = await getDocs(q);
-      console.log('ðŸ“„ Total seen bookings found for clinic:', snapshot.size);
+      console.log('📄 Total seen bookings found for clinic:', snapshot.size);
 
       const existingReferrals = [...referrals];
       let newCount = 0;
@@ -362,12 +362,12 @@ export default function ClinicLabReferralManager({
             <div className="flex items-start gap-3">
               <Info className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
               <div className="space-y-2 text-sm">
-                <h3 className="text-blue-300 font-semibold">ðŸ“‹ Clinic Lab Referral Tracking Rules:</h3>
+                <h3 className="text-blue-300 font-semibold">📋 Clinic Lab Referral Tracking Rules:</h3>
                 <ul className="space-y-1 text-gray-300">
-                  <li>â€¢ <strong>Unified Tracking:</strong> Automatically fetches completed consultations from ALL doctors in this clinic</li>
-                  <li>â€¢ <strong>Auto-Populate:</strong> Patient details and Doctor name are filled automatically when a consultation is marked as "Seen"</li>
-                  <li>â€¢ <strong>Manual Tracking:</strong> Add tests, lab names, and commission amounts to track your revenue share</li>
-                  <li>â€¢ <strong>Privacy:</strong> Data is stored locally in your browser and cleaned up every 90 days</li>
+                  <li>• <strong>Unified Tracking:</strong> Automatically fetches completed consultations from ALL doctors in this clinic</li>
+                  <li>• <strong>Auto-Populate:</strong> Patient details and Doctor name are filled automatically when a consultation is marked as "Seen"</li>
+                  <li>• <strong>Manual Tracking:</strong> Add tests, lab names, and commission amounts to track your revenue share</li>
+                  <li>• <strong>Privacy:</strong> Data is stored locally in your browser and cleaned up every 90 days</li>
                 </ul>
               </div>
             </div>
@@ -403,7 +403,7 @@ export default function ClinicLabReferralManager({
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-gray-400 text-sm mb-1">Total Amount</p>
-                  <p className="text-white text-2xl font-bold">â‚¹{totalAmount.toLocaleString()}</p>
+                  <p className="text-white text-2xl font-bold">₹{totalAmount.toLocaleString()}</p>
                 </div>
                 <div className="p-3 bg-yellow-500/10 rounded-lg">
                   <DollarSign className="w-6 h-6 text-yellow-500" />
@@ -518,12 +518,12 @@ export default function ClinicLabReferralManager({
                             <Input
                               value={editForm.referralAmount}
                               onChange={(e) => setEditForm({ ...editForm, referralAmount: e.target.value })}
-                              placeholder="â‚¹"
+                              placeholder="₹"
                               type="number"
                               className="bg-zinc-800 border-zinc-700 h-9 w-24"
                             />
                           ) : (
-                            <span className="text-white font-medium">{referral.referralAmount ? `â‚¹${referral.referralAmount}` : '-'}</span>
+                            <span className="text-white font-medium">{referral.referralAmount ? `₹${referral.referralAmount}` : '-'}</span>
                           )}
                         </td>
                         <td className="p-4">

@@ -1,4 +1,4 @@
-﻿import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -427,7 +427,7 @@ export default function ClinicReports({
                             <span className="text-blue-400 font-bold">{record.patientName}</span>
                             <div className="flex items-center gap-2 mt-1">
                               <span className="text-xs text-gray-400">{record.age > 0 ? `${record.age} Yrs` : 'N/A'}</span>
-                              <span className="text-xs text-gray-600">â€¢</span>
+                              <span className="text-xs text-gray-600">•</span>
                               <span className="text-xs text-gray-400">{record.phone}</span>
                             </div>
                           </div>

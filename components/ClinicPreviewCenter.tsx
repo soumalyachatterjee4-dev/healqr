@@ -1,4 +1,4 @@
-﻿import { Button } from './ui/button';
+import { Button } from './ui/button';
 import { Menu } from 'lucide-react';
 import { useState } from 'react';
 import { Label } from './ui/label';
@@ -84,7 +84,7 @@ export default function ClinicPreviewCenter({
             <div className="flex items-center gap-2 bg-blue-500/10 px-4 py-3 rounded-xl border border-blue-500/30 mb-6">
               <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
               <span className="text-blue-400 font-medium">
-                âœ“ {uploadedReviews.length} review{uploadedReviews.length > 1 ? 's' : ''} are now LIVE on your mini website
+                ✓ {uploadedReviews.length} review{uploadedReviews.length > 1 ? 's' : ''} are now LIVE on your mini website
               </span>
             </div>
           )}

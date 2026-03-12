@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   Upload,
   Eye,
@@ -492,7 +492,7 @@ export default function ClinicPersonalizedTemplatesManager({
                 <h2 className="text-xl font-bold text-white mb-2">Important Notice - Compliance</h2>
                 <div className="space-y-3 text-gray-300 text-sm">
                   <p className="font-semibold text-white">
-                    âš ï¸ NO MEDICINE OR DRUG-RELATED CONTENT ALLOWED
+                    ⚠️ NO MEDICINE OR DRUG-RELATED CONTENT ALLOWED
                   </p>
                   <p>
                     This feature is for <strong>display purposes only</strong> and is NOT a marketplace. You may upload:
@@ -503,7 +503,7 @@ export default function ClinicPersonalizedTemplatesManager({
                     <li>Clinic announcements and updates</li>
                   </ul>
                   <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mt-4">
-                    <p className="text-red-400 font-medium mb-2">âŒ STRICTLY PROHIBITED:</p>
+                    <p className="text-red-400 font-medium mb-2">❌ STRICTLY PROHIBITED:</p>
                     <ul className="list-disc list-inside space-y-1 text-red-300 text-sm">
                       <li>Medicine names, brands, or pharmaceutical products</li>
                       <li>Drug advertisements or promotions</li>

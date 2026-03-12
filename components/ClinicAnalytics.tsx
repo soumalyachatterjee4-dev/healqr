@@ -1,4 +1,4 @@
-﻿import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Menu, Filter, TrendingUp, Users, QrCode, UserPlus, UserX, Building2, UserMinus, Cake, User, FileText, Home, ToggleLeft } from 'lucide-react';
@@ -73,10 +73,10 @@ export default function ClinicAnalytics({
         setLoading(true);
         const userId = propClinicId || auth?.currentUser?.uid || localStorage.getItem('userId');
 
-        console.log(`ðŸ“Š [ClinicAnalytics] Starting loadAnalytics for userId: ${userId} (Prop: ${propClinicId})`);
+        console.log(`📊 [ClinicAnalytics] Starting loadAnalytics for userId: ${userId} (Prop: ${propClinicId})`);
 
         if (!userId) {
-          console.warn("âš ï¸ [ClinicAnalytics] Waiting for userId...");
+          console.warn("⚠️ [ClinicAnalytics] Waiting for userId...");
           const checkAuth = setTimeout(() => {
             if (!auth?.currentUser?.uid && !propClinicId) {
               setLoading(false);

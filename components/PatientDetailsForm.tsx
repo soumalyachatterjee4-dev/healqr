@@ -1,4 +1,4 @@
-﻿import { Button } from './ui/button';
+import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
@@ -115,7 +115,7 @@ export default function PatientDetailsForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // ============================================
-  // 🔓 BOOKING BLOCKING DISABLED FOR NOW
+  // ?? BOOKING BLOCKING DISABLED FOR NOW
   // Will be re-implemented with correct logic
   // ============================================
   useEffect(() => {
@@ -153,7 +153,7 @@ export default function PatientDetailsForm({
     setIsSubmitting(true);
 
     // ============================================
-    // 🎯 TEST MODE - DEMO ONLY, NO DATABASE SAVE
+    // ?? TEST MODE - DEMO ONLY, NO DATABASE SAVE
     // ============================================
     if (isTestMode) {
       const demoBookingId = `DEMO-${Date.now().toString().slice(-6)}`;
@@ -175,7 +175,7 @@ export default function PatientDetailsForm({
     }
 
     // ============================================
-    // 🎯 CALCULATE REAL SERIAL NUMBER FIRST
+    // ?? CALCULATE REAL SERIAL NUMBER FIRST
     // Wait for this before showing confirmation
     // ============================================
     try {
@@ -208,7 +208,7 @@ export default function PatientDetailsForm({
       const bookingId = await generateBookingId(doctorCode, selectedDate || new Date());
 
       // ============================================
-      // 🎯 STEP 1: GET CHAMBER ID FIRST
+      // ?? STEP 1: GET CHAMBER ID FIRST
       // Must resolve chamber before querying bookings
       // ============================================
       let chamberId = -1; // Default to -1 instead of null for better querying
@@ -245,20 +245,20 @@ export default function PatientDetailsForm({
 
           if (foundChamber) {
             chamberId = foundChamber.id;
-            console.log('✅ Chamber resolved:', {
+            console.log('? Chamber resolved:', {
               selectedChamber,
               foundChamber: foundChamber.chamberName,
               chamberId
             });
           } else {
-            console.error('❌ Chamber not found! Selected:', selectedChamber, '| Available:', doctorData.chambers.map((c: any) => c.chamberName));
-            console.error('⚠️ Using chamberId = -1 (this booking will not appear in chamber views)');
+            console.error('? Chamber not found! Selected:', selectedChamber, '| Available:', doctorData.chambers.map((c: any) => c.chamberName));
+            console.error('?? Using chamberId = -1 (this booking will not appear in chamber views)');
           }
         }
       }
 
       // ============================================
-      // 🎯 STEP 2: QUERY CHAMBER-SPECIFIC BOOKINGS
+      // ?? STEP 2: QUERY CHAMBER-SPECIFIC BOOKINGS
       // Filter by BOTH doctorId AND chamberId for unified serial numbers
       // ============================================
       // ============================================
@@ -272,7 +272,7 @@ export default function PatientDetailsForm({
       // Get TARGET DATE STRING for filtering (same as saved appointmentDate)
       const todayStr = appointmentDateToSave;
 
-      // 🔑 CRITICAL FIX: Query by BOTH doctorId AND chamberId
+      // ?? CRITICAL FIX: Query by BOTH doctorId AND chamberId
       // This ensures unified serial numbers per chamber across all booking sources
       // (Doctor QR, Clinic QR, Walk-in all share the same sequence for the same chamber)
       // Prepare chamber IDs to query (handle both string and number types for safety)
@@ -286,7 +286,7 @@ export default function PatientDetailsForm({
         where('chamberId', 'in', uniqueChamberIds)
       );
 
-      console.log('🔍 Querying CHAMBER-SPECIFIC bookings for unified serial numbers:', {
+      console.log('?? Querying CHAMBER-SPECIFIC bookings for unified serial numbers:', {
         doctorId,
         chamberId,
         queriedChamberIds: uniqueChamberIds,
@@ -298,28 +298,28 @@ export default function PatientDetailsForm({
 
       const querySnapshot = await getDocs(q);
 
-      // 🔄 FILTER FOR TODAY ONLY
+      // ?? FILTER FOR TODAY ONLY
       const todaysBookings = querySnapshot.docs.filter(doc => {
         const bookingData = doc.data();
 
-        // 1️⃣ Plan A: Check explicit string match (Most robust)
+        // 1?? Plan A: Check explicit string match (Most robust)
         // This matches exactly how we save it (appointmentDateToSave)
         if (bookingData.appointmentDate === todayStr) return true;
         if (bookingData.bookingDate === todayStr) return true;
 
-        // 2️⃣ Plan B: Fallback to Timestamp calculation (Legacy compatibility)
+        // 2?? Plan B: Fallback to Timestamp calculation (Legacy compatibility)
         const bookingDate = bookingData.date?.toDate ? bookingData.date.toDate() : bookingData.date;
         const bookingDateStr = bookingDate instanceof Date ? bookingDate.toISOString().split('T')[0] : '';
         return bookingDateStr === todayStr;
       });
 
-      // 🎯 Generate CHAMBER-SPECIFIC serial number
+      // ?? Generate CHAMBER-SPECIFIC serial number
       // All bookings for this chamber today (Dr QR + Clinic QR + Walk-in) share one sequence
       const tokenNumber = `#${todaysBookings.length + 1}`;
       const serialNo = todaysBookings.length + 1;
 
 
-      console.log('✅ CHAMBER-SPECIFIC Serial Number (UNIFIED across all sources):', {
+      console.log('? CHAMBER-SPECIFIC Serial Number (UNIFIED across all sources):', {
         serialNo,
         tokenNumber,
         chamberId,
@@ -331,11 +331,11 @@ export default function PatientDetailsForm({
       });
 
       // ============================================
-      // 💾 SAVE TO DATABASE IMMEDIATELY (PREVENT RACE CONDITION)
+      // ?? SAVE TO DATABASE IMMEDIATELY (PREVENT RACE CONDITION)
       // Must save BEFORE showing confirmation to ensure correct serial numbers
       // ============================================
 
-      // ✅ Validate planned off periods and chamber active status
+      // ? Validate planned off periods and chamber active status
       if (doctorDoc.exists()) {
         const doctorData = doctorDoc.data();
 
@@ -347,7 +347,7 @@ export default function PatientDetailsForm({
           const bookingDate = new Date(selectedDate);
           bookingDate.setHours(0, 0, 0, 0);
 
-          console.log('🔍 PatientDetailsForm: Checking planned off periods', {
+          console.log('?? PatientDetailsForm: Checking planned off periods', {
             bookingDate: bookingDate.toDateString(),
             activePeriods: activePlannedOffPeriods.length
           });
@@ -378,7 +378,7 @@ export default function PatientDetailsForm({
             startDate.setHours(0, 0, 0, 0);
             endDate.setHours(0, 0, 0, 0);
 
-            console.log('  📅 Comparing with period:', {
+            console.log('  ?? Comparing with period:', {
               startDate: startDate.toDateString(),
               endDate: endDate.toDateString(),
               isInRange: bookingDate >= startDate && bookingDate <= endDate
@@ -403,9 +403,9 @@ export default function PatientDetailsForm({
         }
       }
 
-      // 🔐 Encrypt sensitive patient data before saving
+      // ?? Encrypt sensitive patient data before saving
 
-      // 🎯 NORMALIZE DATA: Convert Indic numerals and names to English before encryption
+      // ?? NORMALIZE DATA: Convert Indic numerals and names to English before encryption
       const normalizedName = normalizePatientName(formData.patientName);
       const normalizedAge = normalizeIndicNumerals(formData.age?.toString() || '');
       // Save booking to Firestore with encrypted sensitive fields
@@ -416,7 +416,7 @@ export default function PatientDetailsForm({
           tokenNumber,
           serialNo, // Store numeric serial for sorting
 
-          // 🔐 ENCRYPTED SENSITIVE FIELDS (with normalized data)
+          // ?? ENCRYPTED SENSITIVE FIELDS (with normalized data)
           patientName_encrypted: encrypt(normalizedName),
           whatsappNumber_encrypted: encrypt(`+91${formData.whatsappNumber}`),
           age_encrypted: encrypt(normalizedAge),
@@ -424,8 +424,8 @@ export default function PatientDetailsForm({
           purposeOfVisit_encrypted: encrypt(formData.purposeOfVisit || ''),
 
           // Plain searchable fields
-          patientPhone: `+91${formData.whatsappNumber}`, // 🔍 SEARCHABLE phone for history queries
-          patientName: normalizedName, // 🔍 SEARCHABLE name for queries
+          patientPhone: `+91${formData.whatsappNumber}`, // ?? SEARCHABLE phone for history queries
+          patientName: normalizedName, // ?? SEARCHABLE name for queries
           doctorId,
           doctorName,
           doctorSpecialty: doctorSpecialty || 'General Medicine', // For history display
@@ -470,7 +470,7 @@ export default function PatientDetailsForm({
                 bookingId: bookingId,
                 completedAt: serverTimestamp()
               });
-              console.log('✅ QR scan marked as completed');
+              console.log('? QR scan marked as completed');
             }
           } catch (error) {
             console.error('Error updating scan record:', error);
@@ -498,14 +498,14 @@ export default function PatientDetailsForm({
             walkInVerified: bookingType === 'qr_booking' // QR bookings are verified, walk-in are not yet
           });
         } catch (historyError) {
-          console.error('❌ Failed to save notification history (non-blocking):', historyError);
+          console.error('? Failed to save notification history (non-blocking):', historyError);
         }
       } catch (saveError) {
-        console.error('❌ Failed to save booking to Firestore:', saveError);
+        console.error('? Failed to save booking to Firestore:', saveError);
         throw saveError; // Re-throw to be caught by outer try-catch
       }
 
-      // ✅ INCREMENT DOCTOR'S BOOKING COUNT (CRITICAL)
+      // ? INCREMENT DOCTOR'S BOOKING COUNT (CRITICAL)
 
       await updateDoc(doc(db, 'doctors', doctorId), {
         bookingsCount: increment(1)
@@ -539,7 +539,7 @@ export default function PatientDetailsForm({
       }
 
       // ============================================
-      // 🔔 FCM TOKEN REGISTRATION (BEFORE NAVIGATION)
+      // ?? FCM TOKEN REGISTRATION (BEFORE NAVIGATION)
       // CRITICAL: Must complete BEFORE onSubmit() navigates away
       // ============================================
       if (formData.consent1) {
@@ -560,13 +560,13 @@ export default function PatientDetailsForm({
               duration: 4000
             });
           } else {
-            console.warn('⚠️ FCM token not obtained, but booking continues');
+            console.warn('?? FCM token not obtained, but booking continues');
             toast.warning('Notifications may not work. Enable browser notifications in settings.', {
               duration: 5000
             });
           }
         } catch (error) {
-          console.error('❌ [FCM] Token registration failed:', error);
+          console.error('? [FCM] Token registration failed:', error);
           toast.error('Could not enable notifications. You can enable them later in settings.', {
             duration: 5000
           });
@@ -577,7 +577,7 @@ export default function PatientDetailsForm({
       }
 
       // ============================================
-      // 🔔 BOOKING REMINDER SCHEDULING (1h before, only if booked ≥6h prior)
+      // ?? BOOKING REMINDER SCHEDULING (1h before, only if booked =6h prior)
       // ============================================
       let reminderScheduled = false;
       try {
@@ -635,7 +635,7 @@ export default function PatientDetailsForm({
       }
 
       // ============================================
-      // ✅ NOW SHOW CONFIRMATION AND NAVIGATE
+      // ? NOW SHOW CONFIRMATION AND NAVIGATE
       // FCM registration completed above
       // ============================================
       toast.success('Booking confirmed successfully!');
@@ -699,7 +699,7 @@ export default function PatientDetailsForm({
           </div>
         )}
 
-        {/* Main Form Card — NOT translated (data stored as English for doctor) */}
+        {/* Main Form Card � NOT translated (data stored as English for doctor) */}
         <div className="bg-[#1a1f2e] rounded-xl p-6 mb-6" data-no-translate>
           {/* Required Information */}
           <div className="mb-6">
@@ -721,7 +721,7 @@ export default function PatientDetailsForm({
               />
               {formData.patientName && formData.patientName !== normalizePatientName(formData.patientName) && (
                 <p className="text-xs text-emerald-400 mt-1">
-                  ✓ Will be stored as: {normalizePatientName(formData.patientName)}
+                  ? Will be stored as: {normalizePatientName(formData.patientName)}
                 </p>
               )}
             </div>
@@ -774,7 +774,7 @@ export default function PatientDetailsForm({
               />
               {formData.age && formData.age !== normalizeIndicNumerals(formData.age) && (
                 <p className="text-xs text-emerald-400 mt-1">
-                  ✓ Converted to: {normalizeIndicNumerals(formData.age)}
+                  ? Converted to: {normalizeIndicNumerals(formData.age)}
                 </p>
               )}
             </div>
@@ -898,11 +898,11 @@ export default function PatientDetailsForm({
         {/* Payment Section */}
         {requiresPrepayment && (
           <div className="bg-[#1a1f2e] rounded-xl p-6 mb-6">
-            <h3 className="text-white mb-4">Consultation Fee 💰</h3>
+            <h3 className="text-white mb-4">Consultation Fee ??</h3>
 
             <div className="flex justify-between items-center mb-4 pb-4 border-b border-gray-700">
               <span className="text-gray-400">Consultation Charge:</span>
-              <span className="text-2xl text-emerald-500">₹{consultationFee}</span>
+              <span className="text-2xl text-emerald-500">?{consultationFee}</span>
             </div>
 
             {formData.paymentStatus === 'pending' && (
@@ -920,7 +920,7 @@ export default function PatientDetailsForm({
                   className="h-12 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg"
                 >
                   <CreditCard className="w-4 h-4 mr-2" />
-                  Pay Now ₹{consultationFee}
+                  Pay Now ?{consultationFee}
                 </Button>
               </div>
             )}
@@ -933,13 +933,13 @@ export default function PatientDetailsForm({
                       <path d="M5 13l4 4L19 7"></path>
                     </svg>
                   </div>
-                  <span className="text-emerald-400">Payment Submitted Successfully! ✓</span>
+                  <span className="text-emerald-400">Payment Submitted Successfully! ?</span>
                 </div>
                 <p className="text-sm text-gray-400 ml-9">
                   UTR: {formData.utrNumber}
                 </p>
                 <p className="text-xs text-yellow-400 ml-9 mt-2">
-                  ⏳ Payment verification pending. Doctor will confirm before consultation.
+                  ? Payment verification pending. Doctor will confirm before consultation.
                 </p>
               </div>
             )}
@@ -951,7 +951,7 @@ export default function PatientDetailsForm({
                   <div>
                     <p className="text-yellow-400">Pay at Clinic</p>
                     <p className="text-sm text-gray-400">
-                      Please pay ₹{consultationFee} at the clinic before consultation
+                      Please pay ?{consultationFee} at the clinic before consultation
                     </p>
                   </div>
                 </div>

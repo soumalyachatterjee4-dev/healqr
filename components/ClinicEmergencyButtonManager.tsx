@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -514,10 +514,10 @@ export default function ClinicEmergencyButtonManager({
                 <div className="text-sm text-blue-300">
                   <p className="font-medium mb-1">How it works:</p>
                   <ul className="space-y-1 text-blue-300/80">
-                    <li>â€¢ Red emergency button appears on your clinic's booking page</li>
-                    <li>â€¢ Patients click it to directly call your emergency number</li>
-                    <li>â€¢ Use for genuine medical emergencies only</li>
-                    <li>â€¢ You can deactivate anytime when not available</li>
+                    <li>• Red emergency button appears on your clinic's booking page</li>
+                    <li>• Patients click it to directly call your emergency number</li>
+                    <li>• Use for genuine medical emergencies only</li>
+                    <li>• You can deactivate anytime when not available</li>
                   </ul>
                 </div>
               </div>
@@ -764,7 +764,7 @@ export default function ClinicEmergencyButtonManager({
 
                   {/* Priority Info */}
                   <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
-                    <p className="text-blue-300 text-xs font-medium mb-1">ðŸ“‹ Priority System:</p>
+                    <p className="text-blue-300 text-xs font-medium mb-1">📋 Priority System:</p>
                     <ul className="text-blue-300/80 text-xs space-y-0.5">
                       <li>1. Manual Override (highest priority)</li>
                       <li>2. Time-Based Schedule</li>
@@ -799,15 +799,15 @@ export default function ClinicEmergencyButtonManager({
                   </p>
                   <ul className="text-sm text-yellow-500/80 space-y-2">
                     <li className="flex items-start gap-2">
-                      <span className="mt-1 flex-shrink-0">â€¢</span>
+                      <span className="mt-1 flex-shrink-0">•</span>
                       <span>This number will be visible to all patients visiting your booking page</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="mt-1 flex-shrink-0">â€¢</span>
+                      <span className="mt-1 flex-shrink-0">•</span>
                       <span>Ensure you or your staff are available to answer calls on this number</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="mt-1 flex-shrink-0">â€¢</span>
+                      <span className="mt-1 flex-shrink-0">•</span>
                       <span>You can manually deactivate this feature at any time</span>
                     </li>
                   </ul>

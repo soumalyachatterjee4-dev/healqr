@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Scan, Settings, TrendingUp, Zap, FileText, History, Info, Menu, ChevronLeft } from 'lucide-react';
 import { Button } from './ui/button';
 import { Label } from './ui/label';
@@ -267,13 +267,13 @@ export default function ClinicAIRXReaderManager({
               <div className="space-y-2 text-sm text-gray-300">
                 <p>1. Go to <span className="text-blue-400">Patient Details</span> page</p>
                 <p>2. Select a patient from your list</p>
-                <p>3. Click the <span className="text-blue-400">âœ¨ AI Upload RX</span> button (sparkles icon)</p>
+                <p>3. Click the <span className="text-blue-400">✨ AI Upload RX</span> button (sparkles icon)</p>
                 <p>4. Upload prescription image - AI will automatically analyze it</p>
                 <p>5. Patient receives notification with decoded prescription in their language</p>
               </div>
               <div className="mt-4 p-3 bg-black/30 rounded-lg border border-blue-500/20">
                 <p className="text-xs text-gray-400">
-                  ðŸ’¡ <span className="text-white">Tip:</span> AI RX Reader works for ALL patients (both video and in-person consultations)
+                  💡 <span className="text-white">Tip:</span> AI RX Reader works for ALL patients (both video and in-person consultations)
                 </p>
               </div>
             </div>

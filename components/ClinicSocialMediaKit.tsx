@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
@@ -617,8 +617,8 @@ export default function ClinicSocialMediaKit({
                     <TabsTrigger value="story" className="text-zinc-400 shrink-0 text-xs px-3">Story</TabsTrigger>
                     <TabsTrigger value="post" className="text-zinc-400 shrink-0 text-xs px-3">Post</TabsTrigger>
                     <TabsTrigger value="status" className="text-zinc-400 shrink-0 text-xs px-3">Status</TabsTrigger>
-                    <TabsTrigger value="health-tip" className="text-zinc-400 shrink-0 text-xs px-3">Tip ðŸ’¡</TabsTrigger>
-                    <TabsTrigger value="reel-animated" className="text-blue-400 shrink-0 text-xs px-3">Reel ðŸŽ¬</TabsTrigger>
+                    <TabsTrigger value="health-tip" className="text-zinc-400 shrink-0 text-xs px-3">Tip 💡</TabsTrigger>
+                    <TabsTrigger value="reel-animated" className="text-blue-400 shrink-0 text-xs px-3">Reel 🎬</TabsTrigger>
                   </TabsList>
                 </div>
               </Tabs>
@@ -837,7 +837,7 @@ export default function ClinicSocialMediaKit({
       </div>
     </div>
     <footer className="py-12 text-center opacity-30 mt-auto">
-      <p className="text-[10px] text-gray-500 uppercase tracking-[0.4em]">Integrated Care â€¢ HealQR</p>
+      <p className="text-[10px] text-gray-500 uppercase tracking-[0.4em]">Integrated Care • HealQR</p>
     </footer>
     </div>
     </div>

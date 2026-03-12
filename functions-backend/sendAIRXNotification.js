@@ -71,7 +71,7 @@ exports.sendAIRXNotification = functions.https.onCall(async (data, context) => {
       },
       webpush: {
         notification: {
-          icon: '/healqr-logo.png',
+          icon: '/healqr-logo.svg',
           badge: '/badge-icon.png',
           vibrate: [200, 100, 200],
           requireInteraction: true,

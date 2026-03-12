@@ -1,4 +1,4 @@
-﻿import { Button } from './ui/button';
+import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { Menu, Calendar, MapPin, Clock, ArrowLeft, Phone, Users, ChevronDown, ChevronRight } from 'lucide-react';
@@ -503,7 +503,7 @@ export default function ClinicAdvanceBooking({
       </div>
 
       <footer className="py-20 text-center opacity-30">
-        <p className="text-[10px] text-gray-500 uppercase tracking-[0.4em]">Integrated Care â€¢ HealQR</p>
+        <p className="text-[10px] text-gray-500 uppercase tracking-[0.4em]">Integrated Care • HealQR</p>
       </footer>
       </div>
     </div>
