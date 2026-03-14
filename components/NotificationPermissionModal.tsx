@@ -47,3 +47,4 @@ export default function NotificationPermissionModal({ onClose }: NotificationPer
     </div>
   );
 }
+

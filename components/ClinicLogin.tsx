@@ -2,7 +2,7 @@ import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Mail, ArrowLeft, Building2 } from 'lucide-react';
 import { useState } from 'react';
-import healqrLogo from '../assets/healqr-logo.png';
+import healqrLogo from '../assets/healqr.logo.png';
 import { auth, db } from '../lib/firebase/config';
 import { sendSignInLinkToEmail, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -166,58 +166,6 @@ export default function ClinicLogin({ onBack, onSignUp, onSuccess }: ClinicLogin
           </div>
 
           {/* Demo Access Button */}
-          <div className="mb-6 pt-4 border-t border-zinc-800">
-            <Button 
-              variant="outline"
-              onClick={() => {
-                setEmail('demo@clinic.com');
-                // Small delay to let state update before triggering login
-                setTimeout(() => {
-                    const demoEmail = 'demo@clinic.com';
-                    // Trigger the demo login logic directly
-                    setLoading(true);
-                    setTimeout(async () => {
-                        try {
-                            await signInWithEmailAndPassword(auth, demoEmail, 'HealQRClinicUser2025!');
-                            toast.success('Demo Login Successful', { description: 'Redirecting...' });
-                            if (onSuccess) onSuccess();
-                        } catch (e: any) {
-                            console.error("Demo login failed, trying to create account:", e);
-                            if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential' || e.code === 'auth/invalid-login-credentials') {
-                                try {
-                                    const userCredential = await createUserWithEmailAndPassword(auth, demoEmail, 'HealQRClinicUser2025!');
-                                    const user = userCredential.user;
-                                    await setDoc(doc(db, 'clinics', user.uid), {
-                                        uid: user.uid,
-                                        email: demoEmail,
-                                        name: 'Demo Clinic',
-                                        address: '123 Demo St, Medical District',
-                                        pinCode: '000000',
-                                        qrNumber: 'DEMO-CLINIC-QR',
-                                        createdAt: serverTimestamp(),
-                                        type: 'clinic',
-                                        isDemo: true
-                                    });
-                                    if (onSuccess) onSuccess();
-                                    toast.success('Demo Account Created', { description: 'Logging you in...' });
-                                } catch (createError: any) {
-                                    console.error("Failed to create demo account:", createError);
-                                    toast.error('Demo Login Failed', { description: createError.message });
-                                }
-                            } else {
-                                toast.error('Demo Login Failed', { description: 'Check credentials or create a new demo account.' });
-                            }
-                        } finally {
-                            setLoading(false);
-                        }
-                    }, 500);
-                }, 100);
-              }}
-              className="w-full border-zinc-700 text-gray-300 hover:bg-zinc-800 hover:text-white h-12"
-            >
-              Try Demo Dashboard
-            </Button>
-          </div>
 
           {/* Back Button */}
           <div className="text-center">
@@ -234,3 +182,4 @@ export default function ClinicLogin({ onBack, onSignUp, onSuccess }: ClinicLogin
     </div>
   );
 }
+

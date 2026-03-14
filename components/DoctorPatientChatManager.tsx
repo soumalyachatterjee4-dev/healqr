@@ -1141,3 +1141,4 @@ export default function DoctorPatientChatManager({
     );
   }
 }
+

@@ -1822,3 +1822,4 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
     }
   }
 }
+

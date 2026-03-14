@@ -209,3 +209,4 @@ export default function ClinicProfile({ clinicId, onDoctorSelect }: ClinicProfil
     </div>
   );
 }
+

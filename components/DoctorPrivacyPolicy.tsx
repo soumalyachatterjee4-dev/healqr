@@ -402,3 +402,4 @@ export default function DoctorPrivacyPolicy({ onClose }: DoctorPrivacyPolicyProp
     </div>
   );
 }
+

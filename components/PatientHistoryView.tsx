@@ -167,3 +167,4 @@ export const PatientHistoryView: React.FC<PatientHistoryViewProps> = ({ patientP
 };
 
 export default PatientHistoryView;
+

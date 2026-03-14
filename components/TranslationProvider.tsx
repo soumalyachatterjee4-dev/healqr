@@ -293,3 +293,4 @@ export function TranslationProvider({ language, children }: TranslationProviderP
   // When English, the useEffect simply won't activate translation.
   return <div ref={containerRef}>{children}</div>;
 }
+

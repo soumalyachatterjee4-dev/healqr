@@ -1512,3 +1512,4 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
     </div>
   );
 }
+

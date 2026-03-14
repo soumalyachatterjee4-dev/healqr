@@ -544,3 +544,4 @@ export default function DoctorReports({
     </div>
   );
 }
+

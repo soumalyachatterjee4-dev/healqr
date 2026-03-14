@@ -504,3 +504,4 @@ export const PatientNewRXViewer: React.FC<PatientNewRXViewerProps> = ({
     </div>
   );
 };
+

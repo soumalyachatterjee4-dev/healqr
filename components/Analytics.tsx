@@ -692,3 +692,4 @@ export default function Analytics({ onMenuChange = () => {}, onLogout, activeAdd
     </div>
   );
 }
+

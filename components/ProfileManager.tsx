@@ -1236,3 +1236,4 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
     </div>
   );
 }
+

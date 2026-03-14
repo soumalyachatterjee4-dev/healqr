@@ -1343,3 +1343,4 @@ export default function InlineDietChartModal({ patient, doctorInfo, onClose, onG
     </div>
   );
 }
+

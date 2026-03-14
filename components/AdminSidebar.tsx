@@ -22,7 +22,7 @@ import {
   Brain
 } from 'lucide-react';
 import { useState } from 'react';
-import healqrLogo from '../assets/healqr-logo.png';
+import healqrLogo from '../assets/healqr.logo.png';
 
 interface AdminSidebarProps {
   currentPage: string;
@@ -283,3 +283,4 @@ export default function AdminSidebar({
     </>
   );
 }
+

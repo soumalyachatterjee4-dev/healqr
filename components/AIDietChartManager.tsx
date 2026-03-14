@@ -1280,3 +1280,4 @@ export default function AIDietChartManager({
     </div>
   );
 }
+

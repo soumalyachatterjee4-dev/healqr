@@ -3,7 +3,7 @@ import { auth, db } from '../lib/firebase/config';
 import { sendSignInLinkToEmail } from 'firebase/auth';
 import { collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Loader2, ArrowLeft, Shield, Building2, CheckCircle2, Mail, ChevronDown, X, MapPin } from 'lucide-react';
-import healqrLogo from '../assets/healqr-logo.png';
+import healqrLogo from '../assets/healqr.logo.png';
 import { toast } from 'sonner';
 import { getAllStates, getStateFromPincode } from '../utils/pincodeMapping';
 import { MEDICAL_SPECIALTIES } from '../utils/medicalSpecialties';
@@ -405,3 +405,4 @@ export default function PharmaSignUp({ onBack, onLogin }: PharmaSignUpProps) {
     </div>
   );
 }
+

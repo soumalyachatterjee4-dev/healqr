@@ -375,3 +375,4 @@ export default function PharmaDashboard({ companyId, companyName }: PharmaDashbo
     </div>
   );
 }
+

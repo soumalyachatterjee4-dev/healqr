@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Lock, BarChart3, History, Bell, FolderHeart, Search, LogOut, Calendar, Stethoscope, Activity, TrendingUp, Heart } from 'lucide-react';
 import { getFirestore, collection, query, where, getDocs, onSnapshot, orderBy, limit, doc, getDoc } from 'firebase/firestore';
-import healqrLogo from '../assets/healqr-logo.png';
+import healqrLogo from '../assets/healqr.logo.png';
 
 // Import sub-components
 import PatientConsultationHistory from './PatientConsultationHistory';
@@ -871,3 +871,4 @@ const PatientDashboardNew = ({ onLanguageDetected }: { onLanguageDetected?: (lan
 };
 
 export default PatientDashboardNew;
+

@@ -776,3 +776,4 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
     </div>
   );
 }
+

@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Mail, User, Calendar, MapPin, ArrowLeft, CheckCircle2, X, QrCode, Stethoscope, Building2 } from 'lucide-react';
 import { useState } from 'react';
-import healqrLogo from '../assets/healqr-logo.png';
+import healqrLogo from '../assets/healqr.logo.png';
 import DoctorTermsConditions from './DoctorTermsConditions';
 import DoctorPrivacyPolicy from './DoctorPrivacyPolicy';
 import { auth, db } from '../lib/firebase/config';
@@ -834,3 +834,4 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
     </>
   );
 }
+

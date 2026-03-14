@@ -206,3 +206,4 @@ export default function QRCodeSuccess({ name, email, onProceedToLogin }: QRCodeS
     </div>
   );
 }
+

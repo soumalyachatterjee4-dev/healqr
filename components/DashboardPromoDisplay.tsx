@@ -187,3 +187,4 @@ export default function DashboardPromoDisplay({ doctorBirthday, hideBirthday = f
     </div>
   );
 }
+

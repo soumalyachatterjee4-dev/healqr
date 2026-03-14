@@ -226,3 +226,4 @@ export const PatientHistoryCard: React.FC<PatientHistoryCardProps> = ({ record, 
     </div>
   );
 };
+

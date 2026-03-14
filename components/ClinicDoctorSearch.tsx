@@ -100,8 +100,28 @@ export default function ClinicDoctorSearch({
           });
         }
 
-        setDoctors(allDoctorsData);
-        setFilteredDoctors(allDoctorsData);
+        const selectedLocationId = sessionStorage.getItem('booking_location_id');
+
+        const locationFilteredDoctors = selectedLocationId
+          ? allDoctorsData.filter((doc) => {
+              // If doctor has an explicit locationId, only show if matches the selected location
+              if ((doc as any).locationId) {
+                return (doc as any).locationId === selectedLocationId;
+              }
+
+              // If doctor has chambers, match any chamber's locationId
+              const chambers = (doc as any).chambers || [];
+              if (Array.isArray(chambers) && chambers.length > 0) {
+                return chambers.some((ch: any) => ch.locationId === selectedLocationId);
+              }
+
+              // Otherwise, treat as location-agnostic (compatibility fallback)
+              return true;
+            })
+          : allDoctorsData;
+
+        setDoctors(locationFilteredDoctors);
+        setFilteredDoctors(locationFilteredDoctors);
 
         // Extract unique specialties from all doctors
         const specialtiesSet = new Set<string>();
@@ -416,3 +436,4 @@ export default function ClinicDoctorSearch({
     </BookingFlowLayout>
   );
 }
+

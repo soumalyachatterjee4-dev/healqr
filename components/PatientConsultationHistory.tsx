@@ -513,3 +513,4 @@ export default function PatientConsultationHistory({ patientPhone, language = 'e
     </div>
   );
 }
+

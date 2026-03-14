@@ -1281,3 +1281,4 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
     </div>
   );
 }
+

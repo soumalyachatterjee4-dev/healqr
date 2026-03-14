@@ -105,3 +105,4 @@ export default function SocialMediaPromoBanner({ onNavigate, onDismiss, compact 
     </div>
   );
 }
+

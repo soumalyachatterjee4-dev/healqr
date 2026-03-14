@@ -75,6 +75,12 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
   const [name, setName] = useState('');
   const [landmark, setLandmark] = useState('');
 
+  // Multi-location support (branches)
+  const [locations, setLocations] = useState<Array<{ id: string; name: string; address?: string }>>([]);
+  const [defaultLocationId, setDefaultLocationId] = useState<string>('');
+  const [newLocationName, setNewLocationName] = useState('');
+  const [newLocationAddress, setNewLocationAddress] = useState('');
+
   // Optional fields
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [establishmentDate, setEstablishmentDate] = useState('');
@@ -125,6 +131,8 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
         setEmail(data.email || user.email || '');
         setPinCode(data.pinCode || '');
         setLandmark(data.landmark || '');
+        setLocations(data.locations || []);
+        setDefaultLocationId(data.defaultLocationId || (data.locations?.[0]?.id || ''));
         setQrNumber(data.qrNumber || '');
         setClinicCode(data.clinicCode || '');
         setCompanyName(data.companyName || '');
@@ -326,6 +334,8 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
       await updateDoc(clinicDocRef, {
         name: name.trim(),
         landmark: landmark.trim(),
+        locations,
+        defaultLocationId,
         profileImage,
         establishmentDate,
         languages: selectedLanguages,
@@ -911,3 +921,4 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
     </div>
   );
 }
+

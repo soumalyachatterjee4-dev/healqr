@@ -36,3 +36,4 @@ export default function DemoModeBanner({ onExitDemo, hasSidebar = false }: DemoM
     </div>
   );
 }
+

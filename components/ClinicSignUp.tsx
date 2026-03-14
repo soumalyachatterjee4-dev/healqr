@@ -3,7 +3,7 @@ import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Mail, Building2, MapPin, ArrowLeft, CheckCircle2, X, QrCode } from 'lucide-react';
 import { useState } from 'react';
-import healqrLogo from '../assets/healqr-logo.png';
+import healqrLogo from '../assets/healqr.logo.png';
 import { auth, db } from '../lib/firebase/config';
 import { sendSignInLinkToEmail, createUserWithEmailAndPassword } from 'firebase/auth';
 import { toast } from 'sonner';
@@ -24,6 +24,9 @@ export default function ClinicSignUp({ onBack, onLogin }: ClinicSignUpProps) {
   const [qrNumber, setQrNumber] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [division, setDivision] = useState("");
+
+  // Location landmark for geocoding
+  const [newLocationLandmark, setNewLocationLandmark] = useState('');
   const [virtualQrGenerated, setVirtualQrGenerated] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -31,10 +34,11 @@ export default function ClinicSignUp({ onBack, onLogin }: ClinicSignUpProps) {
 
   const handleRegister = async () => {
     // Validate required fields
-    if (!email || !clinicName || !address || !pinCode || !acceptedTerms) {
+    if (!email || !clinicName || !address || !pinCode || !newLocationLandmark || !acceptedTerms) {
       toast.error('Please fill all required fields');
       return;
     }
+
     if (qrType === 'preprinted') {
       if (!companyName) {
         toast.error('Please enter the company name');
@@ -154,6 +158,7 @@ export default function ClinicSignUp({ onBack, onLogin }: ClinicSignUpProps) {
         qrType: qrType,
         companyName: qrType === 'preprinted' ? companyName.trim() : '',
         division: qrType === 'preprinted' ? division.trim() : '',
+        locations: [{ id: '001', name: newLocationLandmark.trim(), landmark: newLocationLandmark.trim() }],
       };
       localStorage.setItem('healqr_pending_clinic_signup', JSON.stringify(signupData));
       localStorage.setItem('healqr_email_for_signin', email);
@@ -279,6 +284,25 @@ export default function ClinicSignUp({ onBack, onLogin }: ClinicSignUpProps) {
                 <span className="text-gray-500 text-xs">(auto-detected, locked after signup)</span>
               </div>
             )}
+          </div>
+
+          {/* Location / Landmark */}
+          <div className="mb-6">
+            <label className="block mb-3">
+              Location / Landmark <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <Input
+                value={newLocationLandmark}
+                onChange={(e) => setNewLocationLandmark(e.target.value)}
+                placeholder="e.g. Baksara Bazar, Howrah"
+                className="pl-12 bg-black border-zinc-800 text-white h-14 rounded-lg focus:border-blue-500"
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              Helps patients find your clinic via map. More locations can be added later.
+            </p>
           </div>
 
           {/* QR Type Selection */}
@@ -446,3 +470,4 @@ export default function ClinicSignUp({ onBack, onLogin }: ClinicSignUpProps) {
     </div>
   );
 }
+

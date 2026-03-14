@@ -167,6 +167,7 @@ export default function PatientDetailsForm({
         bookingId: demoBookingId,
         tokenNumber: demoTokenNumber,
         serialNo: 999,
+        location: sessionStorage.getItem('booking_location_name') || '',
         paymentStatus: finalPaymentStatus
       });
 
@@ -439,7 +440,9 @@ export default function PatientDetailsForm({
           chamber: selectedChamber || 'walk-in', // MUST MATCH QUERY DEFAULT
           chamberId, // Numeric ID for querying
           clinicId: sessionStorage.getItem('booking_clinic_id') || null,
+          clinicLocationId: sessionStorage.getItem('booking_location_id') || null,
           clinicName: sessionStorage.getItem('booking_clinic_name') || selectedChamber || 'Clinic',
+          clinicLocationName: sessionStorage.getItem('booking_location_name') || null,
           clinicQRCode: sessionStorage.getItem('booking_clinic_qr') || null,
           bookingSource: sessionStorage.getItem('booking_source') || 'doctor_qr', // 'clinic_qr' or 'doctor_qr' or 'walkin'
           type: bookingType, // 'qr_booking' or 'walkin_booking'
@@ -646,6 +649,7 @@ export default function PatientDetailsForm({
         bookingId,
         tokenNumber,
         serialNo,
+        location: sessionStorage.getItem('booking_location_name') || '',
         paymentStatus: finalPaymentStatus
       } as any);
 
@@ -699,7 +703,7 @@ export default function PatientDetailsForm({
           </div>
         )}
 
-        {/* Main Form Card — NOT translated (data stored as English for doctor) */}
+        {/* Main Form Card ï¿½ NOT translated (data stored as English for doctor) */}
         <div className="bg-[#1a1f2e] rounded-xl p-6 mb-6" data-no-translate>
           {/* Required Information */}
           <div className="mb-6">
@@ -1003,3 +1007,4 @@ export default function PatientDetailsForm({
     </BookingFlowLayout>
   );
 }
+

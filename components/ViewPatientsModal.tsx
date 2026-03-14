@@ -372,3 +372,4 @@ export default function ViewPatientsModal({ isOpen, onClose, patients: initialPa
     </Dialog>
   );
 }
+

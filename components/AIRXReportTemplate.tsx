@@ -26,7 +26,7 @@ export const AIRXReportTemplate: React.FC<AIRXReportTemplateProps> = ({
           {/* Logo - Left Top */}
           <div className="flex items-center gap-2">
             <img
-              src="/healqr-logo.png"
+              src="/healqr.logo.png"
               alt="HealQR"
               className="h-12 w-12"
               onError={(e) => {
@@ -150,3 +150,4 @@ export const AIRXReportTemplate: React.FC<AIRXReportTemplateProps> = ({
     </div>
   );
 };
+

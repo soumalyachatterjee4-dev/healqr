@@ -110,3 +110,4 @@ const PatientLanguageSelector: React.FC<PatientLanguageSelectorProps> = ({
 };
 
 export default PatientLanguageSelector;
+

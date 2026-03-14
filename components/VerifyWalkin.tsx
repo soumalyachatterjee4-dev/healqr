@@ -338,3 +338,4 @@ export default function VerifyWalkin({ bookingId }: VerifyWalkinProps) {
     </BookingFlowLayout>
   );
 }
+

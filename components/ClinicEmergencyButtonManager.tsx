@@ -916,3 +916,4 @@ export default function ClinicEmergencyButtonManager({
     </div>
   );
 }
+

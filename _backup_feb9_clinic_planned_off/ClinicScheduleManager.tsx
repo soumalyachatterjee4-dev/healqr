@@ -1644,3 +1644,4 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({ onMenuCha
 };
 
 export default ClinicScheduleManager;
+

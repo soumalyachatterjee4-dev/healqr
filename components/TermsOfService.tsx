@@ -1,5 +1,5 @@
 import { ArrowLeft } from 'lucide-react';
-import healqrLogo from '../assets/healqr-logo.png';
+import healqrLogo from '../assets/healqr.logo.png';
 
 interface TermsOfServiceProps {
   onBack: () => void;
@@ -382,3 +382,4 @@ export default function TermsOfService({ onBack }: TermsOfServiceProps) {
     </div>
   );
 }
+

@@ -328,3 +328,4 @@ function StatusBadge({ status }: { status: string }) {
   const c = config[status] || { color: 'bg-gray-500/20 text-gray-400', label: status };
   return <span className={`text-xs px-2.5 py-1 rounded-full ${c.color}`}>{c.label}</span>;
 }
+

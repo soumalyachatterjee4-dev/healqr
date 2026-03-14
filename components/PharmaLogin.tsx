@@ -4,7 +4,7 @@ import { sendSignInLinkToEmail } from 'firebase/auth';
 import { db } from '../lib/firebase/config';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { Loader2, ArrowLeft, Shield, Building2, CheckCircle2, Mail } from 'lucide-react';
-import healqrLogo from '../assets/healqr-logo.png';
+import healqrLogo from '../assets/healqr.logo.png';
 import { toast } from 'sonner';
 
 interface PharmaLoginProps {
@@ -203,3 +203,4 @@ export default function PharmaLogin({ onBack, onSignUp }: PharmaLoginProps) {
     </div>
   );
 }
+

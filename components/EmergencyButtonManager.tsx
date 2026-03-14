@@ -884,3 +884,4 @@ export default function EmergencyButtonManager({ onBack }: EmergencyButtonManage
     </div>
   );
 }
+

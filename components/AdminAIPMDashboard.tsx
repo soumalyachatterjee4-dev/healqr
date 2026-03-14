@@ -271,3 +271,4 @@ function CostCard({ title, cost, detail, highlight }: {
     </div>
   );
 }
+

@@ -22,7 +22,7 @@ import {
   Check,
   LogOut
 } from 'lucide-react';
-import healqrLogo from '../assets/healqr-logo.png';
+import healqrLogo from '../assets/healqr.logo.png';
 import { useState, useEffect } from 'react';
 import { Lock } from 'lucide-react';
 
@@ -50,6 +50,7 @@ interface ClinicSidebarProps {
   activeAddOns?: string[];
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  isLocationManager?: boolean;
 }
 
 export default function ClinicSidebar({
@@ -62,8 +63,12 @@ export default function ClinicSidebar({
   assistantAllowedPages = [],
   activeAddOns = [],
   isCollapsed = false,
-  onToggleCollapse
+  onToggleCollapse,
+  isLocationManager: isLocationManagerProp = false
 }: ClinicSidebarProps) {
+  // Always check localStorage as fallback — many components don't pass this prop
+  const isLocationManager = isLocationManagerProp || localStorage.getItem('healqr_is_location_manager') === 'true';
+
   const [expandedSections, setExpandedSections] = useState({
     management: true,
     'practice-enhancer': true,
@@ -83,11 +88,19 @@ export default function ClinicSidebar({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Branch managers get a restricted set of pages
+  const branchAllowedPages = [
+    'dashboard', 'doctors', 'schedule-manager', 'todays-schedule',
+    'advance-booking', 'analytics', 'reports'
+  ];
+
   const sections: Section[] = [
     {
       id: 'management',
       title: 'MANAGEMENT TOOLS',
       items: [
+        // Hide Location Manager for branch manager users
+        ...((!isLocationManager) ? [{ id: 'location-manager', label: 'Location Manager', icon: Building2 }] : []),
         { id: 'doctors', label: 'Manage Doctors', icon: Users },
         { id: 'profile', label: 'Clinic Profile', icon: Building2 },
         { id: 'qr-manager', label: 'QR Manager', icon: QrCode },
@@ -260,3 +273,4 @@ export default function ClinicSidebar({
     </>
   );
 }
+

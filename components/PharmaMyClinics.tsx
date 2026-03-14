@@ -436,3 +436,4 @@ export default function PharmaMyClinics({ companyId }: PharmaMyClinicsProps) {
     </div>
   );
 }
+

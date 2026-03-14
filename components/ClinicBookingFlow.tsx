@@ -6,6 +6,8 @@ import SelectDate from './SelectDate';
 import SelectChamber from './SelectChamber';
 import PatientDetailsForm from './PatientDetailsForm';
 import BookingConfirmation from './BookingConfirmation';
+import BookingFlowLayout from './BookingFlowLayout';
+import TemplateDisplay from './TemplateDisplay';
 import type { Language } from '../utils/translations';
 
 
@@ -13,6 +15,7 @@ import type { Language } from '../utils/translations';
 type BookingStep =
   | 'language'
   | 'clinic-website'
+  | 'location'
   | 'doctor-search'
   | 'select-date'
   | 'select-chamber'
@@ -32,6 +35,13 @@ interface SelectedDoctor {
   chambers?: any[]; // Doctor's chambers
 }
 
+interface ClinicLocation {
+  id: string;
+  name: string;
+  address?: string;
+  landmark?: string;
+}
+
 interface ClinicData {
   id: string;
   name: string;
@@ -40,6 +50,7 @@ interface ClinicData {
   phone?: string;
   email?: string;
   linkedDoctorsDetails?: any[];
+  locations?: ClinicLocation[];
 }
 
 export default function ClinicBookingFlow() {
@@ -50,6 +61,8 @@ export default function ClinicBookingFlow() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedChamberId, setSelectedChamberId] = useState<number | null>(null);
   const [selectedChamberName, setSelectedChamberName] = useState<string>('');
+  const [selectedLocationId, setSelectedLocationId] = useState<string>('');
+  const [selectedLocationName, setSelectedLocationName] = useState<string>('');
   const [bookingId, setBookingId] = useState<string>('');
   const [confirmationData, setConfirmationData] = useState<any>(null); // Store full booking data for confirmation
   const [clinic, setClinic] = useState<ClinicData | null>(null);
@@ -105,6 +118,19 @@ export default function ClinicBookingFlow() {
         if (clinicSnap.exists()) {
           const clinicData = { id: clinicSnap.id, ...clinicSnap.data() } as ClinicData;
           setClinic(clinicData);
+
+          // Determine available locations for this clinic
+          const clinicLocations = clinicData.locations && clinicData.locations.length > 0
+            ? clinicData.locations
+            : [{ id: '1', name: clinicData.name || 'Clinic', address: clinicData.address || '' }];
+
+          // If only one location, auto-select it; else user must choose
+          if (clinicLocations.length === 1) {
+            setSelectedLocationId(clinicLocations[0].id);
+            setSelectedLocationName(clinicLocations[0].name);
+            sessionStorage.setItem('booking_location_id', clinicLocations[0].id);
+            sessionStorage.setItem('booking_location_name', clinicLocations[0].name);
+          }
 
           const clinicPlannedOffPeriods = (clinicData as any).plannedOffPeriods || [];
           const plannedOffPeriodsWithMetadata = clinicPlannedOffPeriods.map((p: any) => ({
@@ -164,6 +190,23 @@ export default function ClinicBookingFlow() {
   };
 
   const handleBookNow = () => {
+    const clinicLocations = clinic?.locations || [];
+
+    // If clinic has multiple locations, always show location selection
+    if (clinicLocations.length > 1) {
+      setCurrentStep('location');
+      return;
+    }
+
+    // One location or none - proceed directly
+    setCurrentStep('doctor-search');
+  };
+
+  const handleLocationSelect = (location: { id: string; name: string }) => {
+    setSelectedLocationId(location.id);
+    setSelectedLocationName(location.name);
+    sessionStorage.setItem('booking_location_id', location.id);
+    sessionStorage.setItem('booking_location_name', location.name);
     setCurrentStep('doctor-search');
   };
 
@@ -342,10 +385,14 @@ export default function ClinicBookingFlow() {
     sessionStorage.removeItem('booking_date');
     sessionStorage.removeItem('booking_chamber_id');
     sessionStorage.removeItem('booking_chamber_name');
+    sessionStorage.removeItem('booking_location_id');
+    sessionStorage.removeItem('booking_location_name');
     setSelectedDoctor(null);
     setSelectedDate(null);
     setSelectedChamberId(null);
     setSelectedChamberName('');
+    setSelectedLocationId('');
+    setSelectedLocationName('');
     setCurrentStep('clinic-website');
   };
 
@@ -354,9 +401,23 @@ export default function ClinicBookingFlow() {
       case 'clinic-website':
         setCurrentStep('language');
         break;
-      case 'doctor-search':
+      case 'location':
         setCurrentStep('clinic-website');
         break;
+      case 'doctor-search': {
+        const clinicLocations = clinic?.locations || [];
+        // Clear saved location so user can re-select
+        sessionStorage.removeItem('booking_location_id');
+        sessionStorage.removeItem('booking_location_name');
+        setSelectedLocationId('');
+        setSelectedLocationName('');
+        if (clinicLocations.length > 1) {
+          setCurrentStep('location');
+        } else {
+          setCurrentStep('clinic-website');
+        }
+        break;
+      }
       case 'select-date':
         setCurrentStep('doctor-search');
         setSelectedDoctor(null);
@@ -422,6 +483,115 @@ export default function ClinicBookingFlow() {
         />
       );
 
+    case 'location': {
+      const locations = clinic?.locations && clinic.locations.length > 0
+        ? clinic.locations
+        : [{ id: '1', name: clinic.name || 'Clinic', address: clinic.address || '' }];
+
+      // Count doctors per branch
+      const allDoctors = clinic?.linkedDoctorsDetails || [];
+      const getDoctorCountForBranch = (branchId: string) => {
+        return allDoctors.filter((doc: any) => {
+          if (doc.locationId) return doc.locationId === branchId;
+          const chambers = doc.chambers || [];
+          if (Array.isArray(chambers) && chambers.length > 0) {
+            return chambers.some((ch: any) => ch.locationId === branchId);
+          }
+          return false;
+        }).length;
+      };
+
+      // Collect unique specialties per branch
+      const getSpecialtiesForBranch = (branchId: string) => {
+        const specs = new Set<string>();
+        allDoctors.forEach((doc: any) => {
+          let belongs = false;
+          if (doc.locationId) belongs = doc.locationId === branchId;
+          else {
+            const chambers = doc.chambers || [];
+            if (Array.isArray(chambers) && chambers.length > 0) {
+              belongs = chambers.some((ch: any) => ch.locationId === branchId);
+            }
+          }
+          if (belongs && doc.specialties) {
+            doc.specialties.forEach((s: string) => specs.add(s));
+          }
+        });
+        return specs.size;
+      };
+
+      return (
+        <BookingFlowLayout
+          onBack={() => setCurrentStep('clinic-website')}
+          doctorName={clinic.name}
+          doctorPhoto={clinic.logoUrl}
+          useDrPrefix={false}
+          themeColor="blue"
+        >
+          <div className="bg-[#1a1f2e] rounded-2xl shadow-xl overflow-hidden max-w-full">
+            <div className="px-4 sm:px-6 py-4 sm:py-6">
+              <h1 className="text-2xl font-bold text-white mb-2">Choose Your Branch</h1>
+              <p className="text-blue-200 mb-4 text-sm">Select the branch you want to visit</p>
+
+              <div className="grid grid-cols-1 gap-3">
+                {locations.map((loc) => {
+                  const docCount = getDoctorCountForBranch(loc.id);
+                  const specCount = getSpecialtiesForBranch(loc.id);
+                  const displayAddress = (loc as any).landmark || loc.address || '';
+
+                  return (
+                    <button
+                      key={loc.id}
+                      type="button"
+                      onClick={() => handleLocationSelect(loc)}
+                      className="group text-left bg-gradient-to-br from-gray-800/80 to-gray-900/80 border border-blue-500/20 rounded-2xl p-5 hover:border-blue-400/50 hover:bg-gray-800/90 hover:shadow-lg hover:shadow-blue-500/5 transition-all duration-200"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h2 className="text-lg font-semibold text-white truncate">{loc.name}</h2>
+                            {loc.id === '001' && (
+                              <span className="flex-shrink-0 text-[10px] font-bold bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full">MAIN</span>
+                            )}
+                          </div>
+                          {displayAddress && (
+                            <p className="text-sm text-gray-400 mt-1 flex items-center gap-1">
+                              <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                              <span className="truncate">{displayAddress}</span>
+                            </p>
+                          )}
+                          <div className="flex items-center gap-3 mt-2">
+                            {docCount > 0 && (
+                              <span className="text-xs text-blue-300 bg-blue-500/10 px-2 py-0.5 rounded-full">
+                                {docCount} Doctor{docCount !== 1 ? 's' : ''}
+                              </span>
+                            )}
+                            {specCount > 0 && (
+                              <span className="text-xs text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded-full">
+                                {specCount} Specialt{specCount !== 1 ? 'ies' : 'y'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-300 group-hover:bg-blue-500/30 transition">
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Health Tip / Ad Card */}
+              <div className="mt-5">
+                <TemplateDisplay placement="booking-location" className="rounded-xl" />
+              </div>
+            </div>
+          </div>
+        </BookingFlowLayout>
+      );
+    }
+
     case 'doctor-search':
       return (
         <ClinicDoctorSearch
@@ -482,12 +652,18 @@ export default function ClinicBookingFlow() {
         ...(clinicSchedule?.plannedOffPeriods || []),
         ...(doctorSchedule?.plannedOffPeriods || []).filter((p: any) => p.clinicId)
       ];
+
+      const filteredChambers = (selectedDoctor?.chambers || []).filter((chamber: any) => {
+        if (!selectedLocationId) return true;
+        return (chamber as any).locationId === selectedLocationId;
+      });
+
       return (
         <SelectChamber
           onChamberSelect={handleChamberSelect}
           onBack={handleBack}
           selectedDate={selectedDate || new Date()}
-          chambers={selectedDoctor?.chambers || []}
+          chambers={filteredChambers}
           doctorName={selectedDoctor?.name || ''}
           doctorDegrees={selectedDoctor?.degrees}
           doctorSpecialty={selectedDoctor?.specialties?.[0]}
@@ -554,3 +730,4 @@ export default function ClinicBookingFlow() {
       return null;
   }
 }
+

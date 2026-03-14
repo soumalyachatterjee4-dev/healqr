@@ -140,3 +140,4 @@ export default function ChatLinkNotification({
     </div>
   );
 }
+

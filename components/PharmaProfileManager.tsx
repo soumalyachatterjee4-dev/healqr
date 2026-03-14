@@ -698,3 +698,4 @@ export default function PharmaProfileManager({ companyId }: PharmaProfileManager
     </div>
   );
 }
+

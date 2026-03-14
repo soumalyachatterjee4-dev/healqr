@@ -515,3 +515,4 @@ export default function PatientSearch({ language = 'english' }: PatientSearchPro
     </div>
   );
 }
+

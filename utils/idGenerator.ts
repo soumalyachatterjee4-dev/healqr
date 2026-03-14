@@ -1,8 +1,8 @@
 /**
  * HealQR ID Generation System
- * 
+ *
  * Format: HQR-PINCODE-SERIAL-TYPE
- * 
+ *
  * Examples:
  * - Doctor: HQR-711110-0029-DR
  * - Business Associate: HQR-711110-0029-BA
@@ -15,10 +15,10 @@ import { db } from '../lib/firebase/config';
 /**
  * Generate unique Doctor Code
  * Format: HQR-PINCODE-SERIAL-DR
- * 
+ *
  * @param pincode - Doctor's residential pincode (6 digits)
  * @returns Promise<string> - Unique doctor code
- * 
+ *
  * @example
  * generateDoctorCode('711110') -> 'HQR-711110-0029-DR'
  */
@@ -36,7 +36,7 @@ export async function generateDoctorCode(pincode: string): Promise<string> {
     // Query to find the highest serial number for this pincode
     const doctorsRef = collection(db, 'doctors');
     const prefix = `HQR-${pincode}-`;
-    
+
     // Get all doctors with this pincode prefix
     const q = query(
       doctorsRef,
@@ -45,11 +45,11 @@ export async function generateDoctorCode(pincode: string): Promise<string> {
       orderBy('doctorCode', 'desc'),
       limit(1)
     );
-    
+
     const snapshot = await getDocs(q);
-    
+
     let nextSerial = 1; // Default: first doctor in this pincode
-    
+
     if (!snapshot.empty) {
       const lastCode = snapshot.docs[0].data().doctorCode;
       // Extract serial number from: HQR-711110-0029-DR
@@ -58,17 +58,17 @@ export async function generateDoctorCode(pincode: string): Promise<string> {
         nextSerial = parseInt(match[1]) + 1;
       }
     }
-    
+
     // Format serial as 4-digit number (e.g., 0001, 0029, 0150)
     const serialFormatted = nextSerial.toString().padStart(4, '0');
-    
+
     // Generate final code: HQR-711110-0029-DR
     const doctorCode = `HQR-${pincode}-${serialFormatted}-DR`;
-    
+
     console.log(`✅ Generated Doctor Code: ${doctorCode} (${nextSerial}th doctor in pincode ${pincode})`);
-    
+
     return doctorCode;
-    
+
   } catch (error) {
     console.error('❌ Error generating doctor code:', error);
     // Fallback: Generate based on timestamp
@@ -80,10 +80,10 @@ export async function generateDoctorCode(pincode: string): Promise<string> {
 /**
  * Generate unique Business Associate Code
  * Format: HQR-PINCODE-SERIAL-BA
- * 
+ *
  * @param pincode - BA's operational pincode (6 digits)
  * @returns Promise<string> - Unique BA code
- * 
+ *
  * @example
  * generateBACode('711110') -> 'HQR-711110-0029-BA'
  */
@@ -101,7 +101,7 @@ export async function generateBACode(pincode: string): Promise<string> {
     // Query to find the highest serial number for this pincode
     const basRef = collection(db, 'businessAssociates');
     const prefix = `HQR-${pincode}-`;
-    
+
     // Get all BAs with this pincode prefix
     const q = query(
       basRef,
@@ -110,11 +110,11 @@ export async function generateBACode(pincode: string): Promise<string> {
       orderBy('baCode', 'desc'),
       limit(1)
     );
-    
+
     const snapshot = await getDocs(q);
-    
+
     let nextSerial = 1; // Default: first BA in this pincode
-    
+
     if (!snapshot.empty) {
       const lastCode = snapshot.docs[0].data().baCode;
       // Extract serial number from: HQR-711110-0029-BA
@@ -123,17 +123,17 @@ export async function generateBACode(pincode: string): Promise<string> {
         nextSerial = parseInt(match[1]) + 1;
       }
     }
-    
+
     // Format serial as 4-digit number
     const serialFormatted = nextSerial.toString().padStart(4, '0');
-    
+
     // Generate final code: HQR-711110-0029-BA
     const baCode = `HQR-${pincode}-${serialFormatted}-BA`;
-    
+
     console.log(`✅ Generated BA Code: ${baCode} (${nextSerial}th BA in pincode ${pincode})`);
-    
+
     return baCode;
-    
+
   } catch (error) {
     console.error('❌ Error generating BA code:', error);
     // Fallback: Generate based on timestamp
@@ -144,13 +144,13 @@ export async function generateBACode(pincode: string): Promise<string> {
 
 /**
  * Generate unique Clinic Code
- * Format: HQR-PINCODE-SERIAL-CLN
- * 
+ * Format: HQR-PINCODE-SERIAL-BRANCH-CLN
+ *
  * @param pincode - Clinic's pincode (6 digits)
  * @returns Promise<string> - Unique clinic code
- * 
+ *
  * @example
- * generateClinicCode('700001') -> 'HQR-700001-0001-CLN'
+ * generateClinicCode('700001') -> 'HQR-700001-0001-001-CLN'
  */
 export async function generateClinicCode(pincode: string): Promise<string> {
   if (!db) {
@@ -166,7 +166,7 @@ export async function generateClinicCode(pincode: string): Promise<string> {
     // Query to find the highest serial number for this pincode
     const clinicsRef = collection(db, 'clinics');
     const prefix = `HQR-${pincode}-`;
-    
+
     // Get all clinics with this pincode prefix
     const q = query(
       clinicsRef,
@@ -175,46 +175,77 @@ export async function generateClinicCode(pincode: string): Promise<string> {
       orderBy('clinicCode', 'desc'),
       limit(1)
     );
-    
+
     const snapshot = await getDocs(q);
-    
+
     let nextSerial = 1; // Default: first clinic in this pincode
-    
+
     if (!snapshot.empty) {
       const lastCode = snapshot.docs[0].data().clinicCode;
-      // Extract serial number from: HQR-700001-0001-CLN
-      const match = lastCode.match(/HQR-\d{6}-(\d{4})-CLN/);
+      // Extract serial number from: HQR-700001-0001-001-CLN (new) or HQR-700001-0001-CLN (old)
+      const matchNew = lastCode.match(/HQR-\d{6}-(\d{4})-\d{3}-CLN/);
+      const matchOld = lastCode.match(/HQR-\d{6}-(\d{4})-CLN/);
+      const match = matchNew || matchOld;
       if (match) {
         nextSerial = parseInt(match[1]) + 1;
       }
     }
-    
+
     // Format serial as 4-digit number
     const serialFormatted = nextSerial.toString().padStart(4, '0');
-    
-    // Generate final code: HQR-700001-0001-CLN
-    const clinicCode = `HQR-${pincode}-${serialFormatted}-CLN`;
-    
+
+    // Generate final code: HQR-PINCODE-SERIAL-BRANCH-CLN
+    // Branch 001 = main branch (always starts with 001)
+    const clinicCode = `HQR-${pincode}-${serialFormatted}-001-CLN`;
+
     console.log(`✅ Generated Clinic Code: ${clinicCode} (${nextSerial}th clinic in pincode ${pincode})`);
-    
+
     return clinicCode;
-    
+
   } catch (error) {
     console.error('❌ Error generating clinic code:', error);
     // Fallback: Generate based on timestamp
     const timestamp = Date.now().toString().slice(-4);
-    return `HQR-${pincode}-${timestamp}-CLN`;
+    return `HQR-${pincode}-${timestamp}-001-CLN`;
   }
+}
+
+/**
+ * Generate a location-aware clinic code given a base clinicCode and a locationId.
+ *
+ * Example:
+ *   base: HQR-700001-0001-001-CLN
+ *   locationId: 002
+ *   result: HQR-700001-0001-002-CLN
+ */
+export function generateClinicLocationCode(clinicCode: string, locationId: string | number): string {
+  if (!clinicCode) return clinicCode;
+  const branchNum = String(locationId).trim().padStart(3, '0');
+  if (!branchNum) return clinicCode;
+
+  // Replace the branch segment (3 digits before -CLN)
+  if (clinicCode.endsWith('-CLN')) {
+    // New format: HQR-PINCODE-SERIAL-BRANCH-CLN
+    const newFormatMatch = clinicCode.match(/^(HQR-\d{6}-\d{4})-\d{3}-CLN$/);
+    if (newFormatMatch) {
+      return `${newFormatMatch[1]}-${branchNum}-CLN`;
+    }
+    // Old format: HQR-PINCODE-SERIAL-CLN (no branch segment)
+    return clinicCode.replace(/-CLN$/, `-${branchNum}-CLN`);
+  }
+
+  // Fallback: just append
+  return `${clinicCode}-${branchNum}`;
 }
 
 /**
  * Generate unique Patient Booking ID
  * Format: HQR-DOCTORCODE-YYMMDD-SERIAL-P
- * 
+ *
  * @param doctorCode - Doctor's unique code (e.g., HQR-711110-0029-DR)
  * @param bookingDate - Date of booking (optional, defaults to today)
  * @returns Promise<string> - Unique booking ID
- * 
+ *
  * @example
  * generateBookingId('HQR-711110-0029-DR') -> 'HQR-711110-0029-DR-251210-0523-P'
  */
@@ -229,18 +260,18 @@ export async function generateBookingId(doctorCode: string, bookingDate?: Date):
   }
 
   const date = bookingDate || new Date();
-  
+
   // Format date as YYMMDD (e.g., 251210 for Dec 10, 2025)
   const year = date.getFullYear().toString().slice(-2);
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
   const day = date.getDate().toString().padStart(2, '0');
   const dateStr = `${year}${month}${day}`;
-  
+
   try {
     // Query to find the highest serial number for this doctor + date
     const bookingsRef = collection(db, 'bookings');
     const prefix = `${doctorCode}-${dateStr}-`;
-    
+
     // Get all bookings with this doctor code + date prefix
     const q = query(
       bookingsRef,
@@ -249,11 +280,11 @@ export async function generateBookingId(doctorCode: string, bookingDate?: Date):
       orderBy('bookingId', 'desc'),
       limit(1)
     );
-    
+
     const snapshot = await getDocs(q);
-    
+
     let nextSerial = 1; // Default: first booking for this date
-    
+
     if (!snapshot.empty) {
       const lastId = snapshot.docs[0].data().bookingId;
       // Extract serial number from: HQR-711110-0029-DR-251210-0523-P
@@ -262,17 +293,17 @@ export async function generateBookingId(doctorCode: string, bookingDate?: Date):
         nextSerial = parseInt(match[1]) + 1;
       }
     }
-    
+
     // Format serial as 4-digit number
     const serialFormatted = nextSerial.toString().padStart(4, '0');
-    
+
     // Generate final ID: HQR-711110-0029-DR-251210-0523-P
     const bookingId = `${doctorCode}-${dateStr}-${serialFormatted}-P`;
-    
+
     console.log(`✅ Generated Booking ID: ${bookingId} (${nextSerial}th booking on ${dateStr} for doctor ${doctorCode})`);
-    
+
     return bookingId;
-    
+
   } catch (error) {
     console.error('❌ Error generating booking ID:', error);
     // Fallback: Generate based on timestamp
@@ -327,11 +358,11 @@ export function extractSerialFromCode(code: string): number | null {
   // For doctor/BA codes: HQR-711110-0029-DR
   let match = code.match(/^HQR-\d{6}-(\d{4})-(DR|BA)$/);
   if (match) return parseInt(match[1]);
-  
+
   // For booking IDs: HQR-711110-251210-0523-P
   match = code.match(/^HQR-\d{6}-\d{6}-(\d{4})-P$/);
   if (match) return parseInt(match[1]);
-  
+
   return null;
 }
 
@@ -343,11 +374,11 @@ export function extractSerialFromCode(code: string): number | null {
 export function extractDateFromBookingId(bookingId: string): Date | null {
   const match = bookingId.match(/^HQR-\d{6}-(\d{6})-\d{4}-P$/);
   if (!match) return null;
-  
+
   const dateStr = match[1]; // e.g., 251210
   const year = 2000 + parseInt(dateStr.slice(0, 2)); // 25 -> 2025
   const month = parseInt(dateStr.slice(2, 4)) - 1; // 12 -> 11 (0-indexed)
   const day = parseInt(dateStr.slice(4, 6)); // 10
-  
+
   return new Date(year, month, day);
 }

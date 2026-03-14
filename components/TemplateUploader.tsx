@@ -267,3 +267,4 @@ export default function TemplateUploader({ onMenuChange, onLogout, uploadedTempl
     </div>
   );
 }
+

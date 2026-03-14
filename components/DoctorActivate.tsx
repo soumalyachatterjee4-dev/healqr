@@ -286,3 +286,4 @@ export default function DoctorActivate({ doctorCode, email }: DoctorActivateProp
     </div>
   );
 }
+

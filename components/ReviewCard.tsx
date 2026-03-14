@@ -88,3 +88,4 @@ export default function ReviewCard({ doctorName, patientName, rating, date, comm
     </div>
   );
 }
+

@@ -2,7 +2,7 @@ import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { X, CheckCircle2, Mail, ArrowRight, Users } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import healqrLogo from '../assets/healqr-logo.png';
+import healqrLogo from '../assets/healqr.logo.png';
 import { auth } from '../lib/firebase/config';
 import { sendSignInLinkToEmail } from 'firebase/auth';
 import { toast } from 'sonner';
@@ -313,3 +313,4 @@ export default function Login({ onNext, onSignUp, onClose, isDemoMode }: LoginPr
     </div>
   );
 }
+

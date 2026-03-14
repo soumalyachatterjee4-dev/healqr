@@ -88,8 +88,13 @@ export default function ClinicQRManager({ onMenuChange, onLogout, profileData }:
         return;
       }
 
+      // For branch managers, use parent clinic ID so the QR points to the main clinic
+      const isLocationManager = localStorage.getItem('healqr_is_location_manager') === 'true';
+      const parentClinicId = localStorage.getItem('healqr_parent_clinic_id');
+      const clinicIdForQR = (isLocationManager && parentClinicId) ? parentClinicId : userId;
+
       // Set personalized QR URL with clinic UID FIRST (before loading other data)
-      const bookingUrl = `https://teamhealqr.web.app?clinicId=${userId}`;
+      const bookingUrl = `https://teamhealqr.web.app?clinicId=${clinicIdForQR}`;
       setQrUrl(bookingUrl);
       console.log('✅ QR URL set to:', bookingUrl);
 
@@ -100,7 +105,7 @@ export default function ClinicQRManager({ onMenuChange, onLogout, profileData }:
       }
 
       const { doc, getDoc } = await import('firebase/firestore');
-      const clinicDocRef = doc(db, 'clinics', userId);
+      const clinicDocRef = doc(db, 'clinics', clinicIdForQR);
       const clinicDoc = await getDoc(clinicDocRef);
 
       if (clinicDoc.exists()) {
@@ -714,3 +719,4 @@ export default function ClinicQRManager({ onMenuChange, onLogout, profileData }:
     </div>
   );
 }
+

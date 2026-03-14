@@ -1440,3 +1440,4 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
     </div>
   );
 }
+

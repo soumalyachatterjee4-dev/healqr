@@ -319,3 +319,4 @@ export default function AdvertiserDashboard({ onLogout }: AdvertiserDashboardPro
     </div>
   );
 }
+

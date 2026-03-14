@@ -6,7 +6,7 @@ import { db } from '../lib/firebase/config';
 import LandingSupportModal from './LandingSupportModal';
 import AdvertiserGatewayModal from './AdvertiserGatewayModal';
 import DashboardPromoDisplay from './DashboardPromoDisplay';
-import healqrLogo from '../assets/healqr-logo.png';
+import healqrLogo from '../assets/healqr.logo.png';
 import doctorsHeroImage from '../assets/healqr-hero.png';
 
 interface DoctorTestimonial {
@@ -223,30 +223,30 @@ export default function LandingPage({
             {/* 3-Way Entry Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto mb-16">
 
-              {/* 1. Doctors */}
-              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 hover:border-emerald-500/50 transition-all group">
-                <div className="h-12 w-12 bg-emerald-500/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-emerald-500/20 transition-colors">
-                  <User className="w-6 h-6 text-emerald-500" />
+              {/* 1. Patients - Orange */}
+              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 hover:border-orange-500/50 transition-all group">
+                <div className="h-12 w-12 bg-orange-500/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-orange-500/20 transition-colors">
+                  <Users className="w-6 h-6 text-orange-500" />
                 </div>
-                <h3 className="text-xl font-semibold text-white mb-2">For Doctors</h3>
-                <p className="text-gray-400 text-sm mb-6">Your practice with instant QR booking</p>
+                <h3 className="text-xl font-semibold text-orange-500 mb-2">For Patients</h3>
+                <p className="text-gray-400 text-sm mb-6">Easily find doctors, book appointments, and access your medical records securely. Experience seamless healthcare with QR-powered convenience and multi-language support.</p>
                 <div className="flex flex-col gap-2">
                   <Button
-                    onClick={() => setShowDoctorOptions(true)}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                    onClick={() => setShowPatientOptions(true)}
+                    className="w-full bg-orange-600 hover:bg-orange-700 text-white"
                   >
                     Get Started
                   </Button>
                 </div>
               </div>
 
-              {/* 2. Clinics */}
-              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 hover:border-blue-500/50 transition-all group">
+              {/* 2. Clinics - White + Blue */}
+              <div className="bg-zinc-900/50 border border-blue-600 rounded-xl p-6 hover:border-blue-700 transition-all group">
                 <div className="h-12 w-12 bg-blue-500/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-blue-500/20 transition-colors">
                   <Building2 className="w-6 h-6 text-blue-500" />
                 </div>
                 <h3 className="text-xl font-semibold text-white mb-2">For Clinics</h3>
-                <p className="text-gray-400 text-sm mb-6">Manage Multiple Doctors under One QR</p>
+                <p className="text-white text-sm mb-6">Easily manage multiple doctors across multiple clinic locations, all unified under a single QR code. Streamline scheduling, doctor access, and clinic operations with our advanced platform.</p>
                 <div className="flex flex-col gap-2">
                   <Button
                     onClick={() => setShowClinicOptions(true)}
@@ -257,17 +257,17 @@ export default function LandingPage({
                 </div>
               </div>
 
-              {/* 3. Patients */}
-              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 hover:border-orange-500/50 transition-all group">
-                <div className="h-12 w-12 bg-orange-500/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-orange-500/20 transition-colors">
-                  <Users className="w-6 h-6 text-orange-500" />
+              {/* 3. Doctors - Green */}
+              <div className="bg-zinc-900/50 border border-emerald-600 rounded-xl p-6 hover:border-emerald-700 transition-all group">
+                <div className="h-12 w-12 bg-emerald-500/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-emerald-500/20 transition-colors">
+                  <User className="w-6 h-6 text-emerald-500" />
                 </div>
-                <h3 className="text-xl font-semibold text-white mb-2">For Patients</h3>
-                <p className="text-gray-400 text-sm mb-6">Find doctors or access your medical locker.</p>
+                <h3 className="text-xl font-semibold text-emerald-500 mb-2">For Doctors</h3>
+                <p className="text-gray-400 text-sm mb-6">Effortlessly manage your practice, appointments, and patient records with QR-based booking. Enjoy multi-location access, analytics, and secure patient data ownership—all in one platform.</p>
                 <div className="flex flex-col gap-2">
                   <Button
-                    onClick={() => setShowPatientOptions(true)}
-                    className="w-full bg-orange-600 hover:bg-orange-700 text-white"
+                    onClick={() => setShowDoctorOptions(true)}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
                   >
                     Get Started
                   </Button>
@@ -1031,3 +1031,4 @@ export default function LandingPage({
     </div>
   );
 }
+

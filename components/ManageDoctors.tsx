@@ -117,7 +117,12 @@ const SPECIALTIES = [
   'Other'
 ];
 
-const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) => void }> = ({ onNavigate }) => {
+interface ManageDoctorsProps {
+  onNavigate?: (view: string, doctorId?: string) => void;
+  clinicId?: string;
+}
+
+const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: propClinicId }) => {
   const [linkedDoctors, setLinkedDoctors] = useState<LinkedDoctor[]>([]);
   const [expandedDoctors, setExpandedDoctors] = useState<Set<string>>(new Set());
   const [allDoctors, setAllDoctors] = useState<any[]>([]); // For searching existing doctors
@@ -127,6 +132,12 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
   const [showAddModal, setShowAddModal] = useState(false);
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [clinicData, setClinicData] = useState<any>(null);
+  const effectiveClinicId = propClinicId || auth.currentUser?.uid;
+  const NO_LOCATION_ID = '__no_locations__';
+
+  const [clinicLocations, setClinicLocations] = useState<Array<{ id: string; name: string; address?: string }>>([]);
+  const [defaultLocationId, setDefaultLocationId] = useState<string>(NO_LOCATION_ID);
+  const [selectedDoctorLocationId, setSelectedDoctorLocationId] = useState<string>(NO_LOCATION_ID);
 
   // Calculate default dates for toggle off (tomorrow and 7 days ahead)
   const tomorrow = new Date();
@@ -165,14 +176,16 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
   const [copiedTempField, setCopiedTempField] = useState<string>('');
 
   useEffect(() => {
-    loadClinicData();
-    loadAllDoctors();
-  }, []);
+    if (effectiveClinicId) {
+      loadClinicData();
+      loadAllDoctors();
+    }
+  }, [effectiveClinicId, auth?.currentUser]);
 
   // Generate Temporary Doctor Access (link + PIN)
   const handleGenerateTempAccess = async (doctor: LinkedDoctor) => {
-    if (!auth?.currentUser) return;
-    const clinicId = auth.currentUser.uid;
+    const clinicId = effectiveClinicId;
+    if (!clinicId) return;
     setTempAccessLoading(doctor.uid);
 
     try {
@@ -231,6 +244,8 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
 
   // Load all doctors for search/add
   const loadAllDoctors = async () => {
+    const clinicId = effectiveClinicId;
+    if (!clinicId) return;
     try {
       const doctorsRef = collection(db, 'doctors');
       const snapshot = await getDocs(doctorsRef);
@@ -249,7 +264,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
     const currentUser = auth.currentUser;
     if (!currentUser) return;
     try {
-      await DatabaseService.linkDoctorToClinic(doctorId, currentUser.uid);
+      await DatabaseService.linkDoctorToClinic(doctorId, effectiveClinicId!);
       toast.success('Doctor linked to clinic');
       loadClinicData();
     } catch (error: any) {
@@ -303,6 +318,9 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
             <CardContent>
               <div className="mb-2 text-sm text-gray-300">Email: {doc.email}</div>
               <div className="mb-2 text-sm text-gray-300">Doctor Code: {doc.doctorCode}</div>
+              {doc.locationId && (
+                <div className="mb-2 text-sm text-gray-300">Location: {clinicLocations.find(loc => loc.id === doc.locationId)?.name || doc.locationId}</div>
+              )}
               <div className="mb-2 text-sm text-gray-300">Type: {doc.profileType || 'solo'}</div>
               <div className="mb-2 text-sm text-gray-300">Chambers: {doc.chambers?.length || 0}</div>
               {doc.profileType === 'clinic-only' && (
@@ -317,6 +335,12 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
   );
 
   const loadClinicData = async () => {
+    const clinicId = effectiveClinicId;
+    if (!clinicId) {
+      console.log('No clinic ID available for loading clinic data');
+      setLoading(false);
+      return;
+    }
     try {
       if (!auth || !db) {
         setLoading(false);
@@ -329,17 +353,38 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
         return;
       }
 
-      const clinicRef = doc(db, 'clinics', currentUser.uid);
+      const clinicRef = doc(db, 'clinics', clinicId);
       const clinicSnap = await getDoc(clinicRef);
 
       if (clinicSnap.exists()) {
         const data = clinicSnap.data();
         setClinicData(data);
+        const rawLocations = data.locations || [];
+        const clinicLocations = rawLocations.filter((loc: any) => loc?.id && loc?.name); // Remove any malformed entries
+        setClinicLocations(clinicLocations);
+        const resolvedDefaultLocationId = clinicLocations.length > 0 ? (data.defaultLocationId || clinicLocations[0].id) : NO_LOCATION_ID;
+        setDefaultLocationId(resolvedDefaultLocationId);
+        setSelectedDoctorLocationId(resolvedDefaultLocationId);
 
         // Load doctor data including chambers
         const doctorsData = data.linkedDoctorsDetails || [];
+
+        // Branch managers: filter to only doctors assigned to their branch
+        const branchId = localStorage.getItem('healqr_location_id') || '';
+        const isBranchManager = localStorage.getItem('healqr_is_location_manager') === 'true';
+        const filteredDoctorsData = isBranchManager && branchId
+          ? doctorsData.filter((doctor: LinkedDoctor) => {
+              if ((doctor as any).locationId) return (doctor as any).locationId === branchId;
+              const chambers = (doctor as any).chambers || [];
+              if (Array.isArray(chambers) && chambers.length > 0) {
+                return chambers.some((ch: any) => (ch.clinicLocationId || ch.locationId) === branchId);
+              }
+              return false;
+            })
+          : doctorsData;
+
         const doctorsWithChambers = await Promise.all(
-          doctorsData.map(async (doctor: LinkedDoctor) => {
+          filteredDoctorsData.map(async (doctor: LinkedDoctor) => {
             try {
               const doctorRef = doc(db, 'doctors', doctor.uid);
               const doctorSnap = await getDoc(doctorRef);
@@ -350,13 +395,13 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
                 // CRITICAL FILTER: Show ONLY chambers belonging to THIS clinic
                 const allChambers = doctorData.chambers || [];
                 const clinicChambers = allChambers.filter((chamber: Chamber) =>
-                  chamber.clinicId === currentUser.uid
+                  chamber.clinicId === clinicId
                 );
 
                 console.log(`🔒 SECURITY FILTER for Dr. ${doctor.name}:`, {
                   totalChambers: allChambers.length,
                   clinicChambers: clinicChambers.length,
-                  clinicId: currentUser.uid
+                  clinicId: clinicId
                 });
 
                 return {
@@ -430,8 +475,9 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
   };
 
   const handleAddNewDoctor = async () => {
-    if (!newDoctor.email || !newDoctor.name || selectedSpecialties.length === 0 || !newDoctor.pinCode || !newDoctor.dateOfBirth) {
-      toast.error('Please fill all required fields');
+    const locationIdToUse = selectedDoctorLocationId && selectedDoctorLocationId !== NO_LOCATION_ID ? selectedDoctorLocationId : (defaultLocationId !== NO_LOCATION_ID ? defaultLocationId : '');
+    if (!newDoctor.email || !newDoctor.name || selectedSpecialties.length === 0 || !newDoctor.pinCode || !newDoctor.dateOfBirth || !locationIdToUse) {
+      toast.error('Please fill all required fields including clinic location');
       return;
     }
 
@@ -470,14 +516,14 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
         const currentLinkedClinics = existingDoctorData.linkedClinics || [];
         await updateDoc(doctorRef, {
           linkedClinics: [...currentLinkedClinics, {
-            clinicId: currentUser.uid,
+            clinicId: effectiveClinicId,
             clinicName: clinicData?.name || 'Clinic',
             clinicCode: clinicData?.clinicCode || ''
           }]
         });
 
         // Add to clinic's linkedDoctorsDetails
-        const clinicRef = doc(db, 'clinics', currentUser.uid);
+        const clinicRef = doc(db, 'clinics', effectiveClinicId);
         const existingDoctors = linkedDoctors || [];
         const newLinkedDoctor = {
           uid: existingDoctorId,
@@ -523,6 +569,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
         dateOfBirth: newDoctor.dateOfBirth,
         specialties: selectedSpecialties, // Array of specialties
         pinCode: newDoctor.pinCode,
+        locationId: locationIdToUse,
         doctorCode, // Generated immediately: HQR-{PINCODE}-{COUNT}-DR
         qrNumber, // Clinic uses this QR immediately for appointments
         status: 'pending_invitation', // Clinic can still book appointments
@@ -531,12 +578,12 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
         dashboardAccessEnabled: false, // Enabled ONLY after email verification
         profileLocked: false, // Will be true after activation (freezes email, DOB, pinCode)
         invitedBy: {
-          clinicId: currentUser.uid,
+          clinicId: effectiveClinicId,
           clinicName: clinicData?.name || 'Clinic',
           timestamp: new Date()
         },
         linkedClinics: [{
-          clinicId: currentUser.uid,
+          clinicId: effectiveClinicId,
           clinicName: clinicData?.name || 'Clinic',
           clinicCode: clinicData?.clinicCode || ''
         }],
@@ -560,7 +607,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
           await updateDoc(doc(db, 'qrPool', qrSnap.docs[0].id), {
             status: 'assigned',
             assignedTo: doctorId,
-            assignedBy: currentUser.uid,
+            assignedBy: effectiveClinicId,
             assignedAt: new Date()
           });
         }
@@ -569,7 +616,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
       }
 
       // Update clinic's linkedDoctorsDetails
-      const clinicRef = doc(db, 'clinics', currentUser.uid);
+      const clinicRef = doc(db, 'clinics', effectiveClinicId);
       const existingDoctors = linkedDoctors || [];
       const newLinkedDoctor = {
         uid: doctorId,
@@ -578,6 +625,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
         dateOfBirth: newDoctor.dateOfBirth,
         specialties: selectedSpecialties,
         pinCode: newDoctor.pinCode,
+        locationId: locationIdToUse,
         doctorCode,
         qrNumber,
         status: 'pending_invitation'
@@ -616,6 +664,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
       setShowAddModal(false);
       setNewDoctor({ email: '', name: '', pinCode: '', dateOfBirth: '' });
       setSelectedSpecialties([]);
+      setSelectedDoctorLocationId(defaultLocationId);
 
     } catch (error) {
       console.error('Error adding doctor:', error);
@@ -660,6 +709,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
         dateOfBirth: searchedDoctor.dateOfBirth || '',
         specialties: searchedDoctor.specialties || (searchedDoctor.specialty ? [searchedDoctor.specialty] : []),
         pinCode: searchedDoctor.pinCode || '',
+        locationId: selectedDoctorLocationId || defaultLocationId,
         doctorCode: searchedDoctor.doctorCode || '',
         qrNumber: searchedDoctor.qrNumber || '',
         status: searchedDoctor.status || 'active'
@@ -668,7 +718,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
       console.log('📝 New linked doctor data:', newLinkedDoctor);
 
       // Update clinic's linkedDoctorsDetails
-      const clinicRef = doc(db, 'clinics', currentUser.uid);
+      const clinicRef = doc(db, 'clinics', effectiveClinicId!);
       const clinicSnap = await getDoc(clinicRef);
 
       let currentLinkedDoctors: LinkedDoctor[] = [];
@@ -705,14 +755,20 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
         if (!alreadyLinkedToClinic) {
           await updateDoc(doctorRef, {
             linkedClinics: [...existingClinics, {
-              clinicId: currentUser.uid,
+              clinicId: effectiveClinicId,
               clinicName: clinicData?.name || 'Clinic',
               clinicCode: clinicData?.clinicCode || ''
-            }]
+            }],
+            locationId: selectedDoctorLocationId || defaultLocationId
           });
-          console.log('✅ Updated doctor linkedClinics');
+          console.log('✅ Updated doctor linkedClinics and locationId');
         } else {
           console.log('ℹ️ Clinic already in doctor linkedClinics');
+          // Ensure doctor has a locationId set for this clinic (optional override)
+          await updateDoc(doctorRef, {
+            locationId: selectedDoctorLocationId || defaultLocationId
+          });
+          console.log('✅ Updated doctor locationId for existing link');
         }
       } else {
         console.error('❌ Doctor document does not exist!');
@@ -751,7 +807,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
 
     try {
       // Remove from clinic's linkedDoctorsDetails
-      const clinicRef = doc(db, 'clinics', currentUser.uid);
+      const clinicRef = doc(db, 'clinics', effectiveClinicId!);
       const clinicSnap = await getDoc(clinicRef);
 
       if (clinicSnap.exists()) {
@@ -767,7 +823,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
 
       if (doctorSnap.exists()) {
         const existingClinics = doctorSnap.data().linkedClinics || [];
-        const updatedClinics = existingClinics.filter((c: any) => c.clinicId !== currentUser.uid);
+        const updatedClinics = existingClinics.filter((c: any) => c.clinicId !== effectiveClinicId);
         await updateDoc(doctorRef, {
           linkedClinics: updatedClinics
         });
@@ -960,28 +1016,29 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
       const newStatus = 'inactive';
 
       // Update in clinic's linkedDoctorsDetails
-      const clinicRef = doc(db, 'clinics', user.uid);
-      const clinicSnap = await getDoc(clinicRef);
+      if (effectiveClinicId) {
+        const clinicRef = doc(db, 'clinics', effectiveClinicId);
+        const clinicSnap = await getDoc(clinicRef);
 
-      if (clinicSnap.exists()) {
-        const data = clinicSnap.data();
-        const updatedDoctors = (data.linkedDoctorsDetails || []).map((d: any) =>
-          d.doctorId === selectedDoctorForToggle.id ? {
-            ...d,
-            status: newStatus,
-            toggleOffPeriod: {
-              startDate: toggleOffStartDate,
-              endDate: toggleOffEndDate,
-              reason: toggleOffReason,
-              setBy: user.uid,
-              setAt: new Date().toISOString()
-            }
-          } : d
-        );
+        if (clinicSnap.exists()) {
+          const data = clinicSnap.data();
+          const updatedDoctors = (data.linkedDoctorsDetails || []).map((d: any) =>
+            (d.doctorId === selectedDoctorForToggle.id || d.uid === selectedDoctorForToggle.id) ? {
+              ...d,
+              status: newStatus,
+              toggleOffPeriod: {
+                startDate: toggleOffStartDate,
+                endDate: toggleOffEndDate,
+                reason: toggleOffReason,
+                setBy: auth.currentUser?.uid || effectiveClinicId,
+                setAt: new Date().toISOString()
+              }
+            } : d
+          );
 
-        await updateDoc(clinicRef, {
-          linkedDoctorsDetails: updatedDoctors
-        });
+          await updateDoc(clinicRef, {
+            linkedDoctorsDetails: updatedDoctors
+          });
 
         // Update local state
         setLinkedDoctors(prev => prev.map(d =>
@@ -1008,7 +1065,8 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
         setShowConfirmOffModal(false);
         setSelectedDoctorForToggle(null);
       }
-    } catch (error) {
+    }
+  } catch (error) {
       console.error('Error turning off doctor:', error);
       toast.error('Failed to turn off doctor');
     }
@@ -1021,19 +1079,19 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
 
   const reactivateDoctor = async (doctorId: string, doctorName: string) => {
     try {
-      const user = auth.currentUser;
-      if (!user) return;
+      const clinicId = effectiveClinicId;
+      if (!clinicId) return;
 
       const newStatus = 'active';
 
       // Update in clinic's linkedDoctorsDetails
-      const clinicRef = doc(db, 'clinics', user.uid);
+      const clinicRef = doc(db, 'clinics', clinicId);
       const clinicSnap = await getDoc(clinicRef);
 
       if (clinicSnap.exists()) {
         const data = clinicSnap.data();
         const updatedDoctors = (data.linkedDoctorsDetails || []).map((d: any) => {
-          if (d.doctorId === doctorId) {
+          if (d.doctorId === doctorId || d.uid === doctorId) {
             const { toggleOffPeriod, ...rest } = d;
             return { ...rest, status: newStatus };
           }
@@ -1070,10 +1128,10 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
 
   const handleTogglePatientDataAccess = async (doctorId: string, restrict: boolean) => {
     try {
-      const user = auth.currentUser;
-      if (!user) return;
+      const clinicId = effectiveClinicId;
+      if (!clinicId) return;
 
-      const clinicRef = doc(db, 'clinics', user.uid);
+      const clinicRef = doc(db, 'clinics', clinicId);
       const clinicSnap = await getDoc(clinicRef);
 
       if (clinicSnap.exists()) {
@@ -1187,6 +1245,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
       const bookingsQuery = fbQuery(
         bookingsRef,
         where('doctorId', '==', doctorId),
+        where('clinicId', '==', effectiveClinicId),
         where('appointmentDate', 'in', blockedDates.slice(0, 10)) // Firestore 'in' limit is 10
       );
 
@@ -1285,8 +1344,13 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
                 Link Existing Doctor
               </Button>
               <Button
-                onClick={() => setShowAddModal(true)}
+                onClick={() => {
+                  setSelectedDoctorLocationId(defaultLocationId);
+                  setShowAddModal(true);
+                }}
                 className="bg-blue-600 hover:bg-blue-700 text-white"
+                // disabled={clinicLocations.length === 0}
+                // title={clinicLocations.length === 0 ? 'Add a clinic location first' : ''}
               >
                 <UserPlus className="w-4 h-4 mr-2" />
                 Add New Doctor
@@ -1315,8 +1379,13 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
                     Link Existing Doctor
                   </Button>
                   <Button
-                    onClick={() => setShowAddModal(true)}
+                    onClick={() => {
+                      setSelectedDoctorLocationId(defaultLocationId);
+                      setShowAddModal(true);
+                    }}
                     className="bg-blue-600 hover:bg-blue-700 text-white"
+                    disabled={clinicLocations.length === 0}
+                    title={clinicLocations.length === 0 ? 'Add a clinic location first' : ''}
                   >
                     <UserPlus className="w-4 h-4 mr-2" />
                     Add New Doctor
@@ -1335,7 +1404,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
                 >
                   {/* Collapsed Header Row - Always visible */}
                   <div
-                    className="flex items-center gap-3 p-4 cursor-pointer hover:bg-gray-700/30 transition-colors"
+                    className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-4 cursor-pointer hover:bg-gray-700/30 transition-colors"
                     onClick={() => setExpandedDoctors(prev => {
                       const next = new Set(prev);
                       if (next.has(doctor.uid)) next.delete(doctor.uid);
@@ -1349,8 +1418,8 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
                       <User className="w-5 h-5 text-white" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-white font-semibold text-base break-words">Dr. {doctor.name}</h3>
-                      <p className="text-gray-400 text-sm break-words">
+                      <h3 className="text-white font-semibold text-base break-words whitespace-normal">Dr. {doctor.name}</h3>
+                      <p className="text-gray-400 text-sm break-words whitespace-normal">
                         {Array.isArray(doctor.specialties)
                           ? doctor.specialties.join(', ')
                           : doctor.specialty || 'N/A'}
@@ -1953,6 +2022,38 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
                   className="bg-gray-900/50 border-gray-700 text-white"
                 />
               </div>
+
+              {/* Location (Branch) */}
+              <div className="space-y-2">
+                <Label className="text-gray-300">
+                  Clinic Location <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={selectedDoctorLocationId || defaultLocationId || NO_LOCATION_ID}
+                  onValueChange={(value) => setSelectedDoctorLocationId(value)}
+                  disabled={clinicLocations.length === 0}
+                >
+                  <SelectTrigger className="bg-gray-900/50 border-gray-700 text-white">
+                    <SelectValue placeholder="Select location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clinicLocations.length > 0 ? (
+                      clinicLocations.map((loc) => (
+                        <SelectItem key={loc.id} value={loc.id}>
+                          {loc.name} {loc.address ? `(${loc.address})` : ''}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value={NO_LOCATION_ID} disabled>
+                        No locations configured
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500">
+                  Choose which branch this doctor belongs to. This affects booking availability.
+                </p>
+              </div>
             </div>
 
             {/* Medical Specialties - Full Width */}
@@ -2020,6 +2121,7 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
                   setNewDoctor({ email: '', name: '', dateOfBirth: '', pinCode: '' });
                   setSelectedSpecialties([]);
                   setSpecialtyInput('');
+                  setSelectedDoctorLocationId(defaultLocationId);
                 }}
                 variant="outline"
                 className="flex-1 border-gray-700 text-gray-300 hover:bg-gray-900"
@@ -2298,3 +2400,4 @@ const ManageDoctors: React.FC<{ onNavigate?: (view: string, doctorId?: string) =
 };
 
 export default ManageDoctors;
+

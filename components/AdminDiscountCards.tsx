@@ -298,3 +298,4 @@ export default function AdminDiscountCards() {
     </div>
   );
 }
+

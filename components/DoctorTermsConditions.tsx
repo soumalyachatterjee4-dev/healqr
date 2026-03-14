@@ -497,3 +497,4 @@ export default function DoctorTermsConditions({ onClose, onNavigateToPricing }: 
     </div>
   );
 }
+

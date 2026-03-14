@@ -4,7 +4,7 @@ import { isSignInWithEmailLink, signInWithEmailLink } from 'firebase/auth';
 import { db } from '../lib/firebase/config';
 import { collection, query, where, getDocs, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { CheckCircle2, Loader2, XCircle, Clock, ShieldCheck } from 'lucide-react';
-import healqrLogo from '../assets/healqr-logo.png';
+import healqrLogo from '../assets/healqr.logo.png';
 
 interface PharmaVerifyLoginProps {
   onSuccess?: (companyId: string, companyName: string) => void;
@@ -200,3 +200,4 @@ export default function PharmaVerifyLogin({ onSuccess, onError }: PharmaVerifyLo
     </div>
   );
 }
+

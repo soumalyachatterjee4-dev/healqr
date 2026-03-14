@@ -52,6 +52,7 @@ const PLACEMENT_OPTIONS = [
   { id: 'booking-select-chamber', label: 'Chamber Selection Page' },
   { id: 'booking-patient-details', label: 'Patient Details Form' },
   { id: 'booking-confirmation', label: 'Booking Confirmation Page' },
+  { id: 'booking-location', label: 'Branch Selection Page' },
   // Notification Templates (21 total)
   { id: 'notif-appointment-reminder', label: 'Appointment Reminder' },
   { id: 'notif-consultation-completed', label: 'Consultation Completed' },
@@ -1121,3 +1122,4 @@ export default function AdminTemplateUploader() {
     </div>
   );
 }
+

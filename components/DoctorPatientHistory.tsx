@@ -182,3 +182,4 @@ export const DoctorPatientHistory: React.FC<DoctorPatientHistoryProps> = ({
 };
 
 export default DoctorPatientHistory;
+

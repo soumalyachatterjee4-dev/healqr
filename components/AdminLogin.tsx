@@ -3,7 +3,7 @@ import { Label } from './ui/label';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Mail, ArrowLeft, Shield } from 'lucide-react';
-import healqrLogo from '../assets/healqr-logo.png';
+import healqrLogo from '../assets/healqr.logo.png';
 import { auth, db } from '../lib/firebase/config';
 import { sendSignInLinkToEmail } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -184,3 +184,4 @@ export default function AdminLogin({ onSuccess, onBack }: AdminLoginProps) {
     </div>
   );
 }
+

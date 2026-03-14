@@ -270,3 +270,4 @@ function getWelcomeMessage(role: UserRole): string {
       return 'Hi! I\'m the HealQR PM Assistant. I can help you book appointments, find doctors, navigate the platform, and answer any questions. How can I help?';
   }
 }
+

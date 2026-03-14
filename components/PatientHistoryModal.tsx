@@ -265,3 +265,4 @@ export const PatientHistoryModal: React.FC<PatientHistoryModalProps> = ({
 };
 
 export default PatientHistoryModal;
+

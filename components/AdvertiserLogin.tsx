@@ -157,3 +157,4 @@ export default function AdvertiserLogin({ onBack, onSignUp, onSuccess }: Adverti
     </div>
   );
 }
+

@@ -60,3 +60,4 @@ export default function UpgradePage({ onLogout, reason = 'limit_reached' }: Upgr
     </div>
   );
 }
+

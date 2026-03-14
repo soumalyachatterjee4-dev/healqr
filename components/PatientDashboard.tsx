@@ -362,3 +362,4 @@ export default function PatientDashboard({ initialView = 'dashboard', onLogout }
     </div>
   );
 }
+

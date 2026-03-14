@@ -306,3 +306,4 @@ const PatientSearchPage: React.FC<PatientSearchPageProps> = ({ isDashboard = fal
 };
 
 export default PatientSearchPage;
+

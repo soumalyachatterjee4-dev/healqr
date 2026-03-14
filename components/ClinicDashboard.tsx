@@ -30,6 +30,8 @@ import { signOut } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { toast } from 'sonner';
 import ClinicSidebar from './ClinicSidebar';
+import LocationManagerCreator from './LocationManagerCreator';
+import ClinicMasterAccess from './ClinicMasterAccess';
 import ClinicProfileManager from './ClinicProfileManager';
 import ClinicQRManager from './ClinicQRManager';
 import ClinicScheduleManager from './ClinicScheduleManager';
@@ -89,7 +91,7 @@ interface TodayChamber {
   isExpired: boolean;
 }
 
-export default function ClinicDashboard() {
+export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | Promise<void> }) {
   const [clinicData, setClinicData] = useState<ClinicData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeMenu, setActiveMenu] = useState('dashboard');
@@ -98,15 +100,19 @@ export default function ClinicDashboard() {
   const [todaysChambers, setTodaysChambers] = useState<TodayChamber[]>([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0); // Real-time refresh trigger
 
-  // Assistant detection
+  // Assistant and Location Manager detection
   const isAssistant = localStorage.getItem('healqr_is_assistant') === 'true';
+  const isLocationManager = localStorage.getItem('healqr_is_location_manager') === 'true';
+  const locationManagerBranchId = localStorage.getItem('healqr_location_id') || '';
   const assistantAllowedPages: string[] = isAssistant
     ? (() => { try { return JSON.parse(localStorage.getItem('healqr_assistant_pages') || '["dashboard"]'); } catch { return ['dashboard']; } })()
     : [];
 
-  // Resolve the clinic ID: for assistants, use parent clinic's ID
+  // Resolve the clinic ID: for assistants use parent clinic's ID, for branch managers use parent clinic ID
   const resolvedClinicId = isAssistant
     ? localStorage.getItem('healqr_assistant_doctor_id') || auth?.currentUser?.uid || ''
+    : isLocationManager
+    ? localStorage.getItem('healqr_parent_clinic_id') || auth?.currentUser?.uid || ''
     : auth?.currentUser?.uid || '';
 
   // Analytics State
@@ -245,6 +251,14 @@ export default function ClinicDashboard() {
         if (!snap) return;
         snap.forEach((docSnap) => {
           const bookingData = docSnap.data();
+
+          // Branch managers: only count bookings for their branch
+          if (isLocationManager && locationManagerBranchId) {
+            const bLocId = bookingData.clinicLocationId || bookingData.locationId || '';
+            // Exclude bookings without a locationId — they belong to main branch
+            if (!bLocId || bLocId !== locationManagerBranchId) return;
+          }
+
           const isCancelled = bookingData.status === 'cancelled' || bookingData.isCancelled === true;
 
           if (bookingData.appointmentDate && bookingData.appointmentDate < todayStr) {
@@ -318,6 +332,12 @@ export default function ClinicDashboard() {
           // Filter chambers for this clinic and for TODAY
           const todayChambers = (doctorData.chambers as any[]).filter((chamber: any) => {
             if (!chamber || chamber.clinicId !== resolvedClinicId) return false;
+            // Branch managers: only show chambers for their branch
+            if (isLocationManager && locationManagerBranchId) {
+              const chamberLocId = chamber.clinicLocationId || chamber.locationId || '';
+              // Exclude chambers without locationId — they belong to main branch
+              if (!chamberLocId || chamberLocId !== locationManagerBranchId) return false;
+            }
             if (chamber.frequency === 'Custom') {
               return chamber.customDate === today.toISOString().split('T')[0];
             }
@@ -364,7 +384,29 @@ export default function ClinicDashboard() {
   };
 
   const handleLogout = async () => {
+    if (onLogout) {
+      await onLogout();
+      return;
+    }
     try {
+      // Clear all clinic/session localStorage to prevent stale redirects
+      localStorage.removeItem('healqr_authenticated');
+      localStorage.removeItem('healqr_qr_code');
+      localStorage.removeItem('healqr_user_email');
+      localStorage.removeItem('healqr_user_name');
+      localStorage.removeItem('healqr_is_clinic');
+      localStorage.removeItem('healqr_is_assistant');
+      localStorage.removeItem('healqr_assistant_pages');
+      localStorage.removeItem('healqr_assistant_doctor_id');
+      localStorage.removeItem('healqr_is_location_manager');
+      localStorage.removeItem('healqr_location_id');
+      localStorage.removeItem('healqr_parent_clinic_id');
+      localStorage.removeItem('userId');
+      localStorage.removeItem('healqr_profile_photo');
+      localStorage.removeItem('healqr_doctor_stats');
+      localStorage.removeItem('healqr_qr_id');
+      localStorage.removeItem('healqr_booking_url');
+      localStorage.removeItem('healqr_sidebar_collapsed');
       await signOut(auth);
       window.location.href = '/';
     } catch (error) {
@@ -374,12 +416,47 @@ export default function ClinicDashboard() {
   };
 
   const copyClinicCode = () => {
-    if (clinicData?.clinicCode) {
-      navigator.clipboard.writeText(clinicData.clinicCode);
+    // Branch managers: copy their branch clinic code
+    let code = clinicData?.clinicCode || '';
+    if (isLocationManager && locationManagerBranchId && clinicData?.locations) {
+      const branchLoc = clinicData.locations.find((l: any) => l.id === locationManagerBranchId);
+      if (branchLoc?.clinicCode) code = branchLoc.clinicCode;
+    }
+    if (code) {
+      navigator.clipboard.writeText(code);
       toast.success('Clinic code copied to clipboard!');
       setShareMenuOpen(false);
     }
   };
+
+  // Render Master Access analytics
+  if (activeMenu === 'master-access') {
+    if (isLocationManager) {
+      setActiveMenu('dashboard');
+      return null;
+    }
+    return (
+      <ClinicMasterAccess
+        onBack={() => setActiveMenu('location-manager')}
+        clinicId={resolvedClinicId}
+      />
+    );
+  }
+
+  // Render Location Manager if menu is active
+  if (activeMenu === 'location-manager') {
+    // Only show to non-location-manager users (clinic owners)
+    if (isLocationManager) {
+      setActiveMenu('dashboard');
+      return null;
+    }
+    return (
+      <LocationManagerCreator
+        onMenuChange={(menu) => setActiveMenu(menu)}
+        onLogout={handleLogout}
+      />
+    );
+  }
 
   // Render Profile Manager if menu is active
   if (activeMenu === 'profile') {
@@ -417,12 +494,15 @@ export default function ClinicDashboard() {
 
   // Render Manage Doctors if menu is active
   if (activeMenu === 'doctors') {
-    return <ManageDoctors onNavigate={(view, doctorId) => {
-      setActiveMenu(view);
-      if (doctorId) {
-        localStorage.setItem('selectedDoctorId', doctorId);
-      }
-    }} />;
+    return <ManageDoctors
+      clinicId={resolvedClinicId}
+      onNavigate={(view, doctorId) => {
+        setActiveMenu(view);
+        if (doctorId) {
+          localStorage.setItem('selectedDoctorId', doctorId);
+        }
+      }}
+    />;
   }
 
   // Render Advance Booking if menu is active
@@ -608,6 +688,7 @@ export default function ClinicDashboard() {
           onClose={() => setMobileMenuOpen(false)}
           isAssistant={isAssistant}
           assistantAllowedPages={assistantAllowedPages}
+          isLocationManager={isLocationManager}
         />
         <div className="flex-1 lg:ml-64 flex flex-col items-center justify-center p-8">
           <div className="text-center space-y-4">
@@ -666,6 +747,7 @@ export default function ClinicDashboard() {
         onClose={() => setMobileMenuOpen(false)}
         isAssistant={isAssistant}
         assistantAllowedPages={assistantAllowedPages}
+        isLocationManager={isLocationManager}
       />
 
       {/* Main Content Container */}
@@ -739,7 +821,10 @@ export default function ClinicDashboard() {
               <div className="space-y-4">
                 <div>
                   <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
-                    Welcome Back, {clinicData?.name || 'Clinic'} !
+                    Welcome Back, {isLocationManager
+                      ? `${localStorage.getItem('healqr_user_name') || 'Clinic'} !`
+                      : `${clinicData?.name || 'Clinic'} !`
+                    }
                   </h1>
 
                   {/* Rating Placeholder */}
@@ -776,7 +861,13 @@ export default function ClinicDashboard() {
                   <div className="flex items-center gap-3 mb-4">
                     <div className="flex items-center gap-2">
                       <Building2 className="w-5 h-5 text-blue-500" />
-                      <span className="text-sm text-gray-400">{clinicData?.address || 'No address set'}</span>
+                      <span className="text-sm text-gray-400">{isLocationManager
+                        ? (() => {
+                            const loc = clinicData?.locations?.find((l: any) => l.id === locationManagerBranchId);
+                            return loc?.landmark || clinicData?.address || 'No address set';
+                          })()
+                        : clinicData?.address || 'No address set'
+                      }</span>
                     </div>
                     {clinicData?.phone && (
                       <div className="flex items-center gap-2">
@@ -862,14 +953,28 @@ export default function ClinicDashboard() {
                 {clinicData?.linkedDoctorsDetails && clinicData.linkedDoctorsDetails.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {(() => {
-                      // Group doctors by specialty
+                      // Group doctors by specialty — filter by branch for location managers
+                      const doctorsToShow = isLocationManager && locationManagerBranchId
+                        ? clinicData.linkedDoctorsDetails.filter((doctor) => {
+                            if ((doctor as any).locationId) return (doctor as any).locationId === locationManagerBranchId;
+                            const chambers = (doctor as any).chambers || [];
+                            if (Array.isArray(chambers) && chambers.length > 0) {
+                              return chambers.some((ch: any) => (ch.clinicLocationId || ch.locationId) === locationManagerBranchId);
+                            }
+                            return false;
+                          })
+                        : clinicData.linkedDoctorsDetails;
                       const specialtyCounts: Record<string, number> = {};
-                      clinicData.linkedDoctorsDetails.forEach((doctor) => {
+                      doctorsToShow.forEach((doctor) => {
                         const specialties = doctor.specialties || ['General Physician'];
                         specialties.forEach((spec) => {
                           specialtyCounts[spec] = (specialtyCounts[spec] || 0) + 1;
                         });
                       });
+
+                      if (doctorsToShow.length === 0) {
+                        return [<p key="empty" className="text-gray-400 text-sm">No doctors assigned to this branch yet</p>];
+                      }
 
                       return Object.entries(specialtyCounts).map(([specialty, count]) => (
                         <div
@@ -1081,3 +1186,4 @@ export default function ClinicDashboard() {
     </div>
   );
 }
+

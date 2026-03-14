@@ -407,3 +407,4 @@ export default function PatientReviewsPanel({ isOpen, onClose, doctorName = 'Dr.
     </>
   );
 }
+

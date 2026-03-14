@@ -836,3 +836,4 @@ export default function PatientLiveStatus({ bookingId, language = 'english' }: P
     </div>
   );
 }
+

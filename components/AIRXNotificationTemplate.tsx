@@ -95,3 +95,4 @@ export const AIRXNotificationTemplate: React.FC<AIRXNotificationTemplateProps> =
     </div>
   );
 };
+

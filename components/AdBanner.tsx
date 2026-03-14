@@ -156,3 +156,4 @@ export default function AdBanner({ language = 'english', placement = 'booking_fl
     </div>
   );
 }
+

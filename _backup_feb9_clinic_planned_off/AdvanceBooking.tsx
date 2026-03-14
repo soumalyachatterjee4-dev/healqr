@@ -626,3 +626,4 @@ export default function AdvanceBooking({ onMenuChange, onLogout, activeAddOns = 
     </div>
   );
 }
+

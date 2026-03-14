@@ -1,5 +1,5 @@
 import { ArrowLeft, AlertTriangle } from 'lucide-react';
-import healqrLogo from '../assets/healqr-logo.png';
+import healqrLogo from '../assets/healqr.logo.png';
 
 interface RefundPolicyProps {
   onBack: () => void;
@@ -417,3 +417,4 @@ export default function RefundPolicy({ onBack }: RefundPolicyProps) {
     </div>
   );
 }
+

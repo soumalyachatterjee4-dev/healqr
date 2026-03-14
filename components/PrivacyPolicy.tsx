@@ -1,5 +1,5 @@
 import { ArrowLeft } from 'lucide-react';
-import healqrLogo from '../assets/healqr-logo.png';
+import healqrLogo from '../assets/healqr.logo.png';
 
 interface PrivacyPolicyProps {
   onBack: () => void;
@@ -237,3 +237,4 @@ export default function PrivacyPolicy({ onBack }: PrivacyPolicyProps) {
     </div>
   );
 }
+

@@ -3,7 +3,7 @@ import { auth, db } from '../lib/firebase/config';
 import { isSignInWithEmailLink, signInWithEmailLink } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
-import healqrLogo from '../assets/healqr-logo.png';
+import healqrLogo from '../assets/healqr.logo.png';
 
 interface AdminVerifyLoginProps {
   onSuccess?: (email: string) => void;
@@ -180,3 +180,4 @@ export default function AdminVerifyLogin({ onSuccess, onError }: AdminVerifyLogi
     </div>
   );
 }
+

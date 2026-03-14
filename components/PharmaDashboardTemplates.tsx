@@ -705,3 +705,4 @@ export default function PharmaDashboardTemplates({ companyId }: PharmaDashboardT
     </div>
   );
 }
+

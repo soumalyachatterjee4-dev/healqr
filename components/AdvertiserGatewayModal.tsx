@@ -76,3 +76,4 @@ export default function AdvertiserGatewayModal({ open, onOpenChange, onSignUp, o
     </div>
   );
 }
+

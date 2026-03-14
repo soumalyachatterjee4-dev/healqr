@@ -387,3 +387,4 @@ export default function AdminQRManagement({ onBack }: AdminQRManagementProps) {
     </div>
   );
 }
+

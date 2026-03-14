@@ -570,3 +570,4 @@ export default function Report({ onMenuChange, onLogout, activeAddOns = [] }: Re
     </div>
   );
 }
+

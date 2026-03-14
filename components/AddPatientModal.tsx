@@ -749,3 +749,4 @@ export default function AddPatientModal({ isOpen, onClose, onAddPatient, doctorI
     </Dialog>
   );
 }
+

@@ -1,4 +1,4 @@
-﻿// HealQR PWA - Optimized with Lazy Loading
+// HealQR PWA - Optimized with Lazy Loading
 import { useState, useEffect, Suspense, lazy } from "react";
 import { auth, db } from "./lib/firebase/config";
 import { AuthService } from "./lib/firebase/auth.service";
@@ -12,7 +12,7 @@ import { onForegroundMessage, ensureFCMInitialized } from "./services/fcm.servic
 import { getActivityTracker } from "./utils/activityTracker";
 import { getSessionPersistence } from "./utils/sessionPersistence";
 import type { Language } from "./utils/translations";
-// AIChatBot — direct import, always visible
+// AIChatBot � direct import, always visible
 import AIChatBot from './components/AIChatBot';
 import type { PatientFormData } from "./components/PatientDetailsForm";
 import { TranslationProvider } from "./components/TranslationProvider";
@@ -210,7 +210,14 @@ export default function App() {
     | "purchase-history"
     | "video-call"
     | "braindeck"
-  >("landing");
+  >(() => {
+    // Initialize currentPage from localStorage to prevent flash/auto-logout on refresh
+    const isClinic = localStorage.getItem('healqr_is_clinic') === 'true';
+    const isAssistant = localStorage.getItem('healqr_is_assistant') === 'true';
+    const hasClinicSession = isClinic && (localStorage.getItem('userId') || localStorage.getItem('healqr_user_email'));
+    if (hasClinicSession && !isAssistant) return 'clinic-dashboard';
+    return 'landing';
+  });
   const [notifData, setNotifData] = useState<{
     bookingId?: string; // For smart data fetching from Firestore
     patientName: string;
@@ -351,7 +358,7 @@ export default function App() {
                 setDoctorPreferredLanguage(data.preferredLanguage);
               }
 
-              // âœ… Reload doctor stats (Live Rating/Reviews Update)
+              // ✅ Reload doctor stats (Live Rating/Reviews Update)
               if (data.stats) {
                 const updatedStats = {
                   averageRating: data.stats.averageRating || 0,
@@ -391,10 +398,10 @@ export default function App() {
               });
             }
           }, (error) => {
-            console.error('âŒ Error in real-time listener:', error);
+            console.error('❌ Error in real-time listener:', error);
           });
         } catch (error) {
-          console.error('âŒ Error setting up real-time listener:', error);
+          console.error('❌ Error setting up real-time listener:', error);
         }
       }
     };
@@ -512,7 +519,7 @@ export default function App() {
 
   // Helper: Load clinic planned off periods from clinic documents
   const loadClinicSchedules = async (chambers: any[], db: any) => {
-    console.log('ðŸ¥ [LOAD CLINICS] Loading for', chambers.length, 'chambers');
+    console.log('🏥 [LOAD CLINICS] Loading for', chambers.length, 'chambers');
 
     const { doc: firestoreDoc, getDoc } = await import('firebase/firestore');
     const clinicIds = new Set<string>();
@@ -524,7 +531,7 @@ export default function App() {
       }
     }
 
-    console.log('ðŸ†” [LOAD CLINICS] Unique clinic IDs:', Array.from(clinicIds));
+    console.log('🆔 [LOAD CLINICS] Unique clinic IDs:', Array.from(clinicIds));
 
     const allClinicPeriods: any[] = [];
 
@@ -555,15 +562,15 @@ export default function App() {
               }));
 
             allClinicPeriods.push(...activePeriods);
-            console.log(`âœ… [LOAD CLINICS] ${clinicName}: ${activePeriods.length} periods`);
+            console.log(`✅ [LOAD CLINICS] ${clinicName}: ${activePeriods.length} periods`);
           }
         }
       } catch (e) {
-        console.error(`âŒ [LOAD CLINICS] Error loading clinic ${clinicId}:`, e);
+        console.error(`❌ [LOAD CLINICS] Error loading clinic ${clinicId}:`, e);
       }
     }
 
-    console.log(`ðŸ“Š [LOAD CLINICS] Total: ${allClinicPeriods.length} periods`);
+    console.log(`📊 [LOAD CLINICS] Total: ${allClinicPeriods.length} periods`);
     return allClinicPeriods;
   };
 
@@ -585,7 +592,7 @@ export default function App() {
     if (urlLanguage && urlLanguage !== 'english' && urlLanguage !== 'en') {
       setBookingLanguage(urlLanguage as Language);
     }
-    console.log("ðŸš€ App.tsx mounted. URL:", fullUrl);
+    console.log("🚀 App.tsx mounted. URL:", fullUrl);
     console.log("   - page:", pageParam);
     console.log("   - source:", urlParams.get('source'));
 
@@ -702,7 +709,7 @@ export default function App() {
       setCurrentPage('video-library');
       return;
     } else if (pageParam === 'temp-doctor-dashboard') {
-      // Temp doctor dashboard — check localStorage for valid session
+      // Temp doctor dashboard � check localStorage for valid session
       if (localStorage.getItem('healqr_is_temp_doctor') === 'true') {
         setCurrentPage('temp-doctor-dashboard');
       } else {
@@ -935,7 +942,7 @@ export default function App() {
                 scanSessionId: scanSessionId,
                 completed: false // Will be updated when booking is confirmed
               });
-              console.log('ðŸ“Š Doctor QR scan tracked');
+              console.log('📊 Doctor QR scan tracked');
             } catch (error) {
               console.error('Error tracking scan:', error);
             }
@@ -950,7 +957,7 @@ export default function App() {
 
             // Load chambers
             if (data.chambers && data.chambers.length > 0) {
-              console.log('ðŸ¥ [QR PATH] LOADING CHAMBERS:', data.chambers);
+              console.log('🏥 [QR PATH] LOADING CHAMBERS:', data.chambers);
               setDoctorChambers(data.chambers);
 
               // Load clinic planned off periods from clinic documents
@@ -958,7 +965,7 @@ export default function App() {
                 const clinicPeriods = await loadClinicSchedules(data.chambers, db);
                 setClinicPlannedOffPeriods(clinicPeriods);
               } catch (e) {
-                console.error('âŒ [QR PATH] Error loading clinic schedules:', e);
+                console.error('❌ [QR PATH] Error loading clinic schedules:', e);
                 setClinicPlannedOffPeriods([]);
               }
             } else {
@@ -983,7 +990,7 @@ export default function App() {
                 doctorId: p.doctorId,
                 doctorName: p.doctorName
               }));
-              console.log('âœ… Doctor solo booking - Loaded ALL planned off periods (doctor + clinic):', periods.length);
+              console.log('✅ Doctor solo booking - Loaded ALL planned off periods (doctor + clinic):', periods.length);
               setPlannedOffPeriods(periods);
             }
 
@@ -1014,7 +1021,7 @@ export default function App() {
               scanSessionId: scanSessionId,
               completed: false // Will be updated when booking is confirmed
             });
-            console.log('ðŸ“Š Doctor QR scan tracked (direct ID)');
+            console.log('📊 Doctor QR scan tracked (direct ID)');
           } catch (error) {
             console.error('Error tracking scan:', error);
           }
@@ -1033,7 +1040,7 @@ export default function App() {
 
             // Load chambers
             if (data.chambers && data.chambers.length > 0) {
-              console.log('ðŸ¥ [DIRECT ID PATH] LOADING CHAMBERS:', data.chambers);
+              console.log('🏥 [DIRECT ID PATH] LOADING CHAMBERS:', data.chambers);
               setDoctorChambers(data.chambers);
 
               // Load clinic planned off periods from clinic documents
@@ -1041,7 +1048,7 @@ export default function App() {
                 const clinicPeriods = await loadClinicSchedules(data.chambers, db);
                 setClinicPlannedOffPeriods(clinicPeriods);
               } catch (e) {
-                console.error('âŒ [DIRECT ID PATH] Error loading clinic schedules:', e);
+                console.error('❌ [DIRECT ID PATH] Error loading clinic schedules:', e);
                 setClinicPlannedOffPeriods([]);
               }
             } else {
@@ -1066,7 +1073,7 @@ export default function App() {
                 doctorId: p.doctorId,
                 doctorName: p.doctorName
               }));
-              console.log('âœ… Doctor solo booking - Loaded ALL planned off periods (doctor + clinic):', periods.length);
+              console.log('✅ Doctor solo booking - Loaded ALL planned off periods (doctor + clinic):', periods.length);
               setPlannedOffPeriods(periods);
             }
 
@@ -1076,7 +1083,7 @@ export default function App() {
             }
           }
         }).catch(error => {
-          console.error('âŒ Error loading doctor data:', error);
+          console.error('❌ Error loading doctor data:', error);
         });
         }
       }
@@ -1096,7 +1103,12 @@ export default function App() {
     } else if (pathname.includes('/assistant-login')) {
       setCurrentPage('assistant-login');
     } else if (pathname.includes('/verify-login')) {
-      setCurrentPage('verify-login');
+      // Don't override if branch manager already has valid clinic session
+      const hasClinicSession = localStorage.getItem('healqr_is_clinic') === 'true' && 
+        (localStorage.getItem('userId') || localStorage.getItem('healqr_user_email'));
+      if (!hasClinicSession) {
+        setCurrentPage('verify-login');
+      }
     } else if (pathname.includes('/verify-visit/')) {
       // Extract booking ID from path
       const pathParts = pathname.split('/verify-visit/');
@@ -1149,7 +1161,7 @@ export default function App() {
       );
 
       const isVerifyVisit = window.location.pathname.includes('/verify-visit/');
-      const isOnVerifyLoginPage = window.location.pathname.includes('/verify-login');
+      const isOnVerifyLoginPage = window.location.pathname.includes('/verify-login') && currentPage !== 'clinic-dashboard';
       const isOnVerifyEmailPage = window.location.pathname.includes('/verify-email');
       const isOnAssistantLoginPage = window.location.pathname.includes('/assistant-login');
       const isClinicPage = currentPage === 'clinic-login' || currentPage === 'clinic-signup' || pageParam === 'clinic-login' || pageParam === 'clinic-signup';
@@ -1166,7 +1178,7 @@ export default function App() {
         try {
           const idTokenResult = await user.getIdTokenResult();
           if (idTokenResult.claims.admin) {
-            console.log('✅ Admin user confirmed via custom claims');
+            console.log('? Admin user confirmed via custom claims');
             localStorage.setItem('healqr_admin_email', user.email || '');
             localStorage.setItem('healqr_admin_authenticated', 'true');
             setAdminEmail(user.email || '');
@@ -1188,7 +1200,7 @@ export default function App() {
 
         if (isClinicFromStorage && !isAssistantFromStorage) {
           // Pure clinic owner - fast route to clinic dashboard (assistants need validation below)
-          console.log('✅ Clinic user detected from localStorage - routing to clinic dashboard');
+          console.log('? Clinic user detected from localStorage - routing to clinic dashboard');
           setCurrentPage('clinic-dashboard');
           setIsAuthInitialized(true);
           return;
@@ -1202,10 +1214,10 @@ export default function App() {
             // Check doctors collection FIRST to give doctor identity priority
             const doctorDocExists = await getDoc(doc(db, 'doctors', user.uid));
             if (!doctorDocExists.exists()) {
-              // Not a doctor — check if clinic
+              // Not a doctor � check if clinic
               const clinicDoc = await getDoc(doc(db, 'clinics', user.uid));
               if (clinicDoc.exists()) {
-                console.log('✅ Clinic user detected from Firestore - routing to clinic dashboard');
+                console.log('? Clinic user detected from Firestore - routing to clinic dashboard');
                 localStorage.setItem('healqr_is_clinic', 'true'); // Cache for next time
                 setCurrentPage('clinic-dashboard');
                 setIsAuthInitialized(true);
@@ -1312,20 +1324,25 @@ export default function App() {
           localStorage.removeItem('healqr_assistant_doctor_id');
         }
 
-        // âœ… CHECK FOR MAJOR BLOCKING (Payment Failure, Trial Expired, Booking Limit)
+        // ✅ CHECK FOR MAJOR BLOCKING (Payment Failure, Trial Expired, Booking Limit)
         if (db) {
           try {
             const isAssistant = localStorage.getItem('healqr_is_assistant') === 'true';
             const isClinic = localStorage.getItem('healqr_is_clinic') === 'true';
+            const isLocManager = localStorage.getItem('healqr_is_location_manager') === 'true';
             const doctorIdToLoad = isAssistant
               ? localStorage.getItem('healqr_assistant_doctor_id') || user.uid
               : user.uid;
 
             if (isClinic) {
-              const clinicDoc = await getDoc(doc(db, 'clinics', doctorIdToLoad));
+              // For branch managers, load parent clinic doc; for owners, load own doc
+              const clinicIdToLoad = isLocManager
+                ? localStorage.getItem('healqr_parent_clinic_id') || doctorIdToLoad
+                : doctorIdToLoad;
+              const clinicDoc = await getDoc(doc(db, 'clinics', clinicIdToLoad));
               if (clinicDoc.exists()) {
                 const data = clinicDoc.data();
-                if (data.name) {
+                if (!isLocManager && data.name) {
                   localStorage.setItem('healqr_user_name', data.name);
                   setUserName(data.name);
                 }
@@ -1346,7 +1363,7 @@ export default function App() {
               // Load essential profile data to localStorage and state - ALWAYS sync from Firestore
               if (data.name) {
                 localStorage.setItem('healqr_user_name', data.name);
-                setUserName(data.name); // âœ… Update state to fix dashboard display
+                setUserName(data.name); // ✅ Update state to fix dashboard display
               }
               if (data.qrCode) {
                 localStorage.setItem('healqr_qr_code', data.qrCode);
@@ -1409,7 +1426,7 @@ export default function App() {
                 setSelfCreatedReviews(data.placeholderReviews);
               }
 
-              // âœ… LOAD PATIENT-SUBMITTED REVIEWS FROM REVIEWS COLLECTION (NEW!)
+              // ✅ LOAD PATIENT-SUBMITTED REVIEWS FROM REVIEWS COLLECTION (NEW!)
               try {
                 const { collection, query, where, getDocs } = await import('firebase/firestore');
                 const reviewsRef = collection(db, 'reviews');
@@ -1438,7 +1455,7 @@ export default function App() {
 
                 setIncomingReviews(loadedReviews);
 
-                // âœ… SELF-HEALING STATS SYNC (NEW!)
+                // ✅ SELF-HEALING STATS SYNC (NEW!)
                 // Calculate actual total pool: Patient Pool (reviewsSnapshot) + Self-Created Pool (placeholderReviews)
                 // We exclude miniWebsiteReviews as they are now redundant copies/flags of the source reviews
                 const patientCount = reviewsSnapshot.size;
@@ -1475,14 +1492,14 @@ export default function App() {
                     const doctorRef = doc(db, 'doctors', doctorIdToLoad);
                     await updateDoc(doctorRef, { stats: updatedStats });
                   } catch (syncError) {
-                    console.error('âŒ Error syncing stats:', syncError);
+                    console.error('❌ Error syncing stats:', syncError);
                   }
                 } else {
                   setDoctorStats(currentStoredStats);
                   localStorage.setItem('healqr_doctor_stats', JSON.stringify(currentStoredStats));
                 }
               } catch (reviewError) {
-                console.error('âŒ Error loading patient reviews:', reviewError);
+                console.error('❌ Error loading patient reviews:', reviewError);
               }
 
               // Load subscription data with corrected trial calculation
@@ -1540,7 +1557,7 @@ export default function App() {
           }
         }
 
-        // âœ… All Firestore data loaded - mark auth as initialized
+        // ✅ All Firestore data loaded - mark auth as initialized
         setIsAuthInitialized(true);
 
         // Check if this is after email verification (QR code generated)
@@ -1613,7 +1630,7 @@ export default function App() {
               return;
             } else {
               // Admin is not authorized - clear localStorage and redirect to landing
-              console.warn('âš ï¸ Unauthorized admin session detected, clearing...');
+              console.warn('⚠️ Unauthorized admin session detected, clearing...');
               localStorage.removeItem('healqr_admin_authenticated');
               localStorage.removeItem('healqr_admin_email');
               localStorage.removeItem('healqr_admin_email_for_signin');
@@ -1623,7 +1640,7 @@ export default function App() {
               }
             }
           } catch (error) {
-            console.error('âŒ Error verifying admin session:', error);
+            console.error('❌ Error verifying admin session:', error);
             // On error, clear admin session to be safe
             localStorage.removeItem('healqr_admin_authenticated');
             localStorage.removeItem('healqr_admin_email');
@@ -1636,6 +1653,16 @@ export default function App() {
         const isAuthenticated = localStorage.getItem('healqr_authenticated');
         const storedEmail = localStorage.getItem('healqr_user_email');
         const userId = localStorage.getItem('userId');
+
+        // Check for clinic/branch manager session first
+        const isClinicSession = localStorage.getItem('healqr_is_clinic') === 'true';
+        if (isClinicSession && (userId || storedEmail)) {
+          setUserEmail(storedEmail || '');
+          setUserName(localStorage.getItem('healqr_user_name') || '');
+          setCurrentPage('clinic-dashboard');
+          setIsAuthInitialized(true);
+          return;
+        }
 
         // CRITICAL: Check userId OR other auth flags to maintain session
         // This prevents auto-logout for new users after refresh
@@ -1671,6 +1698,7 @@ export default function App() {
           // No valid session - redirect to landing only if on protected page
           const protectedPages = [
             'dashboard',
+            'clinic-dashboard',
             'profile-manager',
             'qr-manager',
             'schedule-manager',
@@ -1690,11 +1718,11 @@ export default function App() {
           }
         }
 
-        // âœ… No user authenticated - mark auth as initialized
+        // ✅ No user authenticated - mark auth as initialized
         setIsAuthInitialized(true);
       }
 
-      // âœ… Removed duplicate setIsAuthInitialized - now called after data loads
+      // ✅ Removed duplicate setIsAuthInitialized - now called after data loads
     });
 
     // Cleanup subscription on unmount
@@ -1702,7 +1730,7 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ðŸ”” Native push registration (Capacitor wrapper) - safe no-op on web
+  // 🔔 Native push registration (Capacitor wrapper) - safe no-op on web
   useEffect(() => {
     const registerNative = async () => {
       try {
@@ -1720,7 +1748,7 @@ export default function App() {
     registerNative();
   }, []);
 
-  // ðŸ”” FCM Foreground Message Listener - Displays notifications when app is open
+  // 🔔 FCM Foreground Message Listener - Displays notifications when app is open
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
 
@@ -1764,7 +1792,7 @@ export default function App() {
           });
         }
       } catch (error) {
-        console.error('âŒ Failed to setup FCM listener:', error);
+        console.error('❌ Failed to setup FCM listener:', error);
       }
     };
 
@@ -1777,7 +1805,7 @@ export default function App() {
 
   // Load active add-ons from localStorage on mount
   useEffect(() => {
-    // ðŸŽ¯ TEAMHEALQR: All features FREE by default (Pan-India Model)
+    // 🎯 TEAMHEALQR: All features FREE by default (Pan-India Model)
     // 5 Premium features unlocked for all doctors
     const freeAddOns = [
       'lab-referral-tracking',
@@ -1949,7 +1977,7 @@ export default function App() {
     }
     setUploadedReviews((prev) => [...prev, review]);
 
-    // âœ… PERSISTENT SOURCES: Do NOT remove from source arrays
+    // ✅ PERSISTENT SOURCES: Do NOT remove from source arrays
     // setIncomingReviews((prev) => prev.filter(r => r.id !== review.id));
     // setSelfCreatedReviews((prev) => prev.filter(r => r.id !== review.id));
 
@@ -1958,7 +1986,7 @@ export default function App() {
       const { doc, updateDoc, arrayUnion } = await import('firebase/firestore');
       const user = auth.currentUser;
       if (user) {
-        // âœ… MARK REVIEW AS PUBLISHED IN REVIEWS COLLECTION (NEW!)
+        // ✅ MARK REVIEW AS PUBLISHED IN REVIEWS COLLECTION (NEW!)
         if (review.firestoreId) {
           try {
             const reviewRef = doc(db, 'reviews', review.firestoreId);
@@ -1967,7 +1995,7 @@ export default function App() {
               publishedAt: new Date(),
             });
           } catch (publishError) {
-            console.error('âŒ Error marking review as published:', publishError);
+            console.error('❌ Error marking review as published:', publishError);
           }
         }
 
@@ -1977,7 +2005,7 @@ export default function App() {
         });
       }
     } catch (error) {
-      console.error('âŒ Error uploading review to Firestore:', error);
+      console.error('❌ Error uploading review to Firestore:', error);
     }
   };
 
@@ -2022,10 +2050,10 @@ export default function App() {
         }
       }
     } catch (error) {
-      console.error('âŒ Error saving placeholder review to Firestore:', error);
+      console.error('❌ Error saving placeholder review to Firestore:', error);
     }
 
-    toast.success('âœ… Placeholder Review Created!', {
+    toast.success('✅ Placeholder Review Created!', {
       description: 'You can now upload it to your Mini Website',
       duration: 3000,
     });
@@ -2033,7 +2061,7 @@ export default function App() {
 
   const handleReviewDelete = async (reviewId: number, source: 'incoming' | 'selfCreated' | 'uploaded') => {
     if (source === 'uploaded') {
-      // âœ… UNPUBLISH ONLY: Remove from uploaded reviews but keep in source tab
+      // ✅ UNPUBLISH ONLY: Remove from uploaded reviews but keep in source tab
       const reviewToDelete = uploadedReviews.find(r => r.id === reviewId);
       setUploadedReviews((prev) => prev.filter(r => r.id !== reviewId));
 
@@ -2054,7 +2082,7 @@ export default function App() {
           }
         }
       } catch (error) {
-        console.error('âŒ Error unpublishing review:', error);
+        console.error('❌ Error unpublishing review:', error);
       }
     } else if (source === 'incoming') {
       // PERMANENT DELETE: Remove from incoming patient reviews AND published list if present
@@ -2078,7 +2106,7 @@ export default function App() {
           });
         }
       } catch (error) {
-        console.error('âŒ Error deleting patient review:', error);
+        console.error('❌ Error deleting patient review:', error);
       }
     } else if (source === 'selfCreated') {
       // PERMANENT DELETE: Remove from self-created reviews AND published list if present
@@ -2098,7 +2126,7 @@ export default function App() {
           });
         }
       } catch (error) {
-        console.error('âŒ Error deleting self-created review:', error);
+        console.error('❌ Error deleting self-created review:', error);
       }
     }
   };
@@ -2117,7 +2145,7 @@ export default function App() {
       const targetDoctorId = auth.currentUser?.uid || sessionStorage.getItem('booking_doctor_id');
 
       if (targetDoctorId) {
-      // âœ… SAVE REVIEW TO REVIEWS COLLECTION (NEW!)
+      // ✅ SAVE REVIEW TO REVIEWS COLLECTION (NEW!)
       try {
         const bookingClinicId = sessionStorage.getItem('booking_clinic_id');
         const bookingSource = sessionStorage.getItem('booking_source');
@@ -2135,7 +2163,7 @@ export default function App() {
           createdAt: serverTimestamp(),
         });
       } catch (reviewError) {
-          console.error('âŒ Error saving review to Firestore:', reviewError);
+          console.error('❌ Error saving review to Firestore:', reviewError);
         }
 
         const doctorRef = doc(db, 'doctors', targetDoctorId);
@@ -2162,10 +2190,10 @@ export default function App() {
         }
       }
     } catch (error) {
-      console.error('âŒ Error updating stats:', error);
+      console.error('❌ Error updating stats:', error);
     }
 
-    toast.success('âœ… Review Submitted Successfully!', {
+    toast.success('✅ Review Submitted Successfully!', {
       description: `Thank you ${reviewData.patientName} for your feedback!`,
       duration: 3000,
     });
@@ -2205,7 +2233,7 @@ export default function App() {
   };
 
   const menuChangeHandler = (menu: string) => {
-    // ðŸ”’ ASSISTANT ACCESS CONTROL: Check if assistant is trying to access unauthorized page
+    // 🔒 ASSISTANT ACCESS CONTROL: Check if assistant is trying to access unauthorized page
     const isAssistant = localStorage.getItem('healqr_is_assistant') === 'true';
     if (isAssistant) {
       const assistantPagesStr = localStorage.getItem('healqr_assistant_pages');
@@ -2221,7 +2249,7 @@ export default function App() {
       }
     }
 
-    // âœ… FIX: Check BOTH booking limit AND date expiry for blocking
+    // ✅ FIX: Check BOTH booking limit AND date expiry for blocking
     const usagePercentage = (subscriptionData.bookingsCount / subscriptionData.bookingsLimit) * 100;
     const isBookingLimitReached = usagePercentage >= 100;
 
@@ -2300,14 +2328,14 @@ export default function App() {
   // Proper logout handler with Firebase signOut
   const handleLogout = async () => {
     try {
-      // ðŸ§¹ Clear demo mode and test data on logout
+      // 🧹 Clear demo mode and test data on logout
       localStorage.removeItem('healqr_demo_mode_addons');
 
-      // ðŸ”’ Clear active addons (user needs to re-authenticate to restore purchases)
+      // 🔒 Clear active addons (user needs to re-authenticate to restore purchases)
       // Note: Purchases will be restored from Firestore on next login
       localStorage.removeItem('healqr_active_addons');
 
-      // 🧹 Clear ALL session data (prevents stale clinic/assistant flags on next login)
+      // ?? Clear ALL session data (prevents stale clinic/assistant flags on next login)
       localStorage.removeItem('healqr_authenticated');
       localStorage.removeItem('healqr_qr_code');
       localStorage.removeItem('healqr_user_email');
@@ -2316,6 +2344,9 @@ export default function App() {
       localStorage.removeItem('healqr_is_assistant');
       localStorage.removeItem('healqr_assistant_pages');
       localStorage.removeItem('healqr_assistant_doctor_id');
+      localStorage.removeItem('healqr_is_location_manager');
+      localStorage.removeItem('healqr_location_id');
+      localStorage.removeItem('healqr_parent_clinic_id');
       localStorage.removeItem('userId');
       localStorage.removeItem('healqr_profile_photo');
       localStorage.removeItem('healqr_doctor_stats');
@@ -2455,7 +2486,7 @@ export default function App() {
             if (storedEmail) setUserEmail(storedEmail);
             if (storedName) setUserName(storedName);
 
-            console.log('âœ… Verification complete, redirecting to QR success page');
+            console.log('✅ Verification complete, redirecting to QR success page');
             console.log('User:', storedName, storedEmail, storedUserId);
 
             setCurrentPage("qr-success");
@@ -2800,12 +2831,12 @@ export default function App() {
 
           // Don't filter by end-time here - SelectChamber will show CHAMBER TIME OVER badge if expired
 
-          // ðŸ”’ CLINIC QR FILTERING: If patient scanned a clinic QR, only show chambers for THAT clinic
+          // 🔒 CLINIC QR FILTERING: If patient scanned a clinic QR, only show chambers for THAT clinic
           const scannedClinicId = sessionStorage.getItem('booking_clinic_id');
           if (scannedClinicId) {
             // Only show chambers that belong to this specific clinic
             if (chamber.clinicId !== scannedClinicId) {
-              console.log('ðŸš« Filtering out chamber (not from scanned clinic):', chamber.chamberName, 'clinicId:', chamber.clinicId);
+              console.log('🚫 Filtering out chamber (not from scanned clinic):', chamber.chamberName, 'clinicId:', chamber.clinicId);
               return false; // Hide personal chambers and other clinics
             }
           }
@@ -2828,7 +2859,7 @@ export default function App() {
           return false;
         });
 
-        console.log('ðŸŽ¯ [APP.TSX] RENDERING SELECT CHAMBER WITH:');
+        console.log('🎯 [APP.TSX] RENDERING SELECT CHAMBER WITH:');
         console.log('  - scannedClinicId:', sessionStorage.getItem('booking_clinic_id'));
         console.log('  - clinicAddress:', clinicAddress);
         console.log('  - clinicPlannedOffPeriods:', clinicPlannedOffPeriods);
@@ -3249,7 +3280,7 @@ export default function App() {
 
       {currentPage === "clinic-dashboard" && (
         <Suspense fallback={<PageLoader />}>
-          <ClinicDashboard />
+          <ClinicDashboard onLogout={handleLogout} />
         </Suspense>
       )}
 
@@ -3389,7 +3420,7 @@ export default function App() {
 
       </TranslationProvider>
 
-      {/* AI PM Assistant — always visible on every page */}
+      {/* AI PM Assistant � always visible on every page */}
       <AIChatBot
         language="english"
         userRole={
@@ -3418,3 +3449,4 @@ export default function App() {
     </Suspense>
   );
 }
+

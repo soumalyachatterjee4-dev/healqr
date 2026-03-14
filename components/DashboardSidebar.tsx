@@ -23,7 +23,7 @@ import {
   Share2
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import healqrLogo from '../assets/healqr-logo.png';
+import healqrLogo from '../assets/healqr.logo.png';
 
 interface DashboardSidebarProps {
   activeMenu?: string;
@@ -524,3 +524,4 @@ export default function DashboardSidebar({
     </>
   );
 }
+

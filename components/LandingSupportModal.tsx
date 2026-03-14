@@ -192,3 +192,4 @@ export default function LandingSupportModal({ open, onOpenChange }: LandingSuppo
     </div>
   );
 }
+

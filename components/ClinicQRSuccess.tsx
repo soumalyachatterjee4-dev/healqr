@@ -220,3 +220,4 @@ export default function ClinicQRSuccess({ name, email, onProceedToLogin }: Clini
     </div>
   );
 }
+

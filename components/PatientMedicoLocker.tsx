@@ -36,3 +36,4 @@ const PatientMedicoLocker: React.FC<PatientMedicoLockerProps> = ({ language = 'e
 };
 
 export default PatientMedicoLocker;
+

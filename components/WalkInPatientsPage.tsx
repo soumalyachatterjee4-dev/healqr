@@ -694,3 +694,4 @@ export default function WalkInPatientsPage({ patients, onBack, onMenuChange }: W
     </div>
   );
 }
+

@@ -574,3 +574,4 @@ export default function BrainDeck({ doctorId, onBack }: BrainDeckProps) {
     </div>
   );
 }
+

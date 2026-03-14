@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { auth } from '../lib/firebase/config';
 import { isSignInWithEmailLink, signInWithEmailLink } from 'firebase/auth';
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
-import healqrLogo from '../assets/healqr-logo.png';
+import healqrLogo from '../assets/healqr.logo.png';
 import QRCode from 'qrcode';
 import { getStateFromPincode } from '../utils/pincodeMapping';
 
@@ -189,7 +189,9 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
                 createdAt: serverTimestamp(),
                 type: 'clinic',
                 linkedDoctorCodes: [],
-                linkedDoctorsDetails: []
+                linkedDoctorsDetails: [],
+                locations: signupData.locations || [{ id: '1', name: signupData.clinicName, address: signupData.address || '' }],
+                defaultLocationId: (signupData.locations && signupData.locations[0]?.id) || '1'
             });
 
             // Store clinic data in localStorage for direct login
@@ -692,3 +694,4 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
     </div>
   );
 }
+

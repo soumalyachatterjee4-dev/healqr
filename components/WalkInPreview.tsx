@@ -129,3 +129,4 @@ export default function WalkInPreview({ mode }: WalkInPreviewProps) {
     </BookingFlowLayout>
   );
 }
+

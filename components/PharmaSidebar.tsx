@@ -3,7 +3,7 @@ import {
   LogOut, X, ChevronDown, ChevronRight, Building2,
   MessageSquare, Hospital
 } from 'lucide-react';
-import healqrLogo from '../assets/healqr-logo.png';
+import healqrLogo from '../assets/healqr.logo.png';
 import { useState } from 'react';
 
 interface PharmaSidebarProps {
@@ -154,3 +154,4 @@ export default function PharmaSidebar({ currentPage, onNavigate, onLogout, isOpe
     </>
   );
 }
+

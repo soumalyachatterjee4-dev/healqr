@@ -202,3 +202,4 @@ export default function AdminPanel({ adminEmail, onLogout, onStartDemo, uploaded
     </div>
   );
 }
+

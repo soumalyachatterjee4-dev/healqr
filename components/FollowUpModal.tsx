@@ -144,3 +144,4 @@ export default function FollowUpModal({
     </div>
   );
 }
+

@@ -483,3 +483,4 @@ export default function BrainDeckManager({ onBack }: { onBack: () => void, docto
 
   return null;
 }
+

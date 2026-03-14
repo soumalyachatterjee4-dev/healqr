@@ -67,3 +67,4 @@ export default function AdvertiserGateway({ onBack, onSignUp, onLogin }: Adverti
     </div>
   );
 }
+
