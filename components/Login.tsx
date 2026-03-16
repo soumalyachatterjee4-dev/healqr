@@ -22,7 +22,7 @@ export default function Login({ onNext, onSignUp, onClose, isDemoMode }: LoginPr
 
   const handleSendLink = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email) {
       toast.error('Please enter your email');
       return;
@@ -40,39 +40,61 @@ export default function Login({ onNext, onSignUp, onClose, isDemoMode }: LoginPr
 
       // Check if this email belongs to a doctor OR assistant
       const { db } = await import('../lib/firebase/config');
-      
+
       if (db) {
         const { collection, query, where, getDocs } = await import('firebase/firestore');
-        
+
         // ✅ Check doctors collection FIRST (this is the Doctor Login page)
         const doctorsRef = collection(db, 'doctors');
         const q = query(doctorsRef, where('email', '==', normalizedEmail));
         const existingDocs = await getDocs(q);
-        
+
         if (existingDocs.empty) {
           // Not a doctor — check if they're an assistant as fallback
           try {
             const assistantsRef = collection(db, 'assistants');
             const assistantQuery = query(assistantsRef, where('assistantEmail', '==', normalizedEmail), where('isActive', '==', true));
             const assistantSnap = await getDocs(assistantQuery);
-            
+
             if (!assistantSnap.empty) {
               // This is an assistant - approved to login
               toast.info('Assistant login detected', {
                 description: 'Sending magic link to assistant email'
               });
             } else {
-              toast.error('Account not found', {
-                description: 'This email is not registered as a doctor or assistant. Please sign up.',
-              });
-              setLoading(false);
-              return;
+              // Not an assistant — check if clinic owner or branch manager
+              const clinicsRef = collection(db, 'clinics');
+              const clinicOwnerQuery = query(clinicsRef, where('email', '==', normalizedEmail));
+              const clinicOwnerSnap = await getDocs(clinicOwnerQuery);
+
+              if (!clinicOwnerSnap.empty) {
+                // This is a clinic owner
+                toast.info('Clinic login detected', {
+                  description: 'Sending magic link to clinic email'
+                });
+              } else {
+                // Check if branch location manager
+                const branchQuery = query(clinicsRef, where('locationEmails', 'array-contains', normalizedEmail));
+                const branchSnap = await getDocs(branchQuery);
+
+                if (!branchSnap.empty) {
+                  toast.info('Branch manager login detected', {
+                    description: 'Sending magic link to branch email'
+                  });
+                } else {
+                  toast.error('Account not found', {
+                    description: 'This email is not registered. Please sign up.',
+                  });
+                  setLoading(false);
+                  return;
+                }
+              }
             }
           } catch (assistantError) {
-            // If assistant query fails due to permissions, just show account not found
-            console.warn('Could not check assistants collection:', assistantError);
+            // If queries fail due to permissions, still allow login attempt
+            console.warn('Could not check all collections:', assistantError);
             toast.error('Account not found', {
-              description: 'This email is not registered as a doctor. Please sign up.',
+              description: 'This email is not registered. Please sign up.',
             });
             setLoading(false);
             return;
@@ -99,19 +121,19 @@ export default function Login({ onNext, onSignUp, onClose, isDemoMode }: LoginPr
       toast.success('Login link sent!', {
         description: `Check your inbox at ${normalizedEmail}`,
       });
-      
+
       // Auto-close modal after 3 seconds to avoid confusion
       setTimeout(() => {
         onClose();
       }, 3000);
-      
+
     } catch (error: any) {
       console.error('❌ Login link send error:', error);
       console.error('Error code:', error.code);
       console.error('Error message:', error.message);
-      
+
       let errorMessage = error.message || 'Please try again';
-      
+
       // Provide specific error messages
       if (error.code === 'auth/invalid-email') {
         errorMessage = 'Invalid email address format';
@@ -124,7 +146,7 @@ export default function Login({ onNext, onSignUp, onClose, isDemoMode }: LoginPr
       } else if (error.code === 'auth/unauthorized-continue-uri') {
         errorMessage = 'Unauthorized redirect URL. Please contact support.';
       }
-      
+
       toast.error('Failed to send login link', {
         description: errorMessage,
       });
@@ -155,13 +177,13 @@ export default function Login({ onNext, onSignUp, onClose, isDemoMode }: LoginPr
             <div className="inline-flex items-center justify-center w-16 h-16 bg-emerald-500/10 rounded-full mb-4">
               <CheckCircle2 className="h-8 w-8 text-emerald-500" />
             </div>
-            
+
             <h2 className="text-white mb-3">Login Link Sent!</h2>
-            
+
             <p className="text-gray-400 text-sm mb-6">
               We've sent a login link to:
             </p>
-            
+
             <div className="bg-zinc-800 rounded-lg p-4 mb-6 border border-zinc-700">
               <p className="text-emerald-500">{email}</p>
             </div>

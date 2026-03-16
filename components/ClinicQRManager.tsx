@@ -1,7 +1,7 @@
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { 
+import {
   Menu,
   Download,
   Palette,
@@ -42,7 +42,7 @@ export default function ClinicQRManager({ onMenuChange, onLogout, profileData }:
   // Clinic Information
   const clinicImage = profileData?.profileImage || profileData?.image || null;
   const clinicName = profileData?.name || 'Clinic Name';
-  
+
   console.log('🏥 QR Manager Profile Data:', {
     hasImage: !!clinicImage,
     imageSrc: clinicImage?.substring(0, 50) + '...',
@@ -81,7 +81,7 @@ export default function ClinicQRManager({ onMenuChange, onLogout, profileData }:
     try {
       // Get user ID from localStorage (works for clinics)
       const userId = localStorage.getItem('userId');
-      
+
       if (!userId) {
         console.log('⚠️ No userId found in localStorage');
         setLoadingSubscription(false);
@@ -111,12 +111,12 @@ export default function ClinicQRManager({ onMenuChange, onLogout, profileData }:
       if (clinicDoc.exists()) {
         const data = clinicDoc.data();
         setSubscriptionData(data);
-        
+
         // Set assigned activation QR code
         if (data.qrNumber) {
           setAssignedQrCode(data.qrNumber);
         }
-        
+
         console.log('✅ Loaded subscription data:', data);
         console.log('✅ Assigned QR Code:', data.qrNumber);
       }
@@ -195,7 +195,7 @@ export default function ClinicQRManager({ onMenuChange, onLogout, profileData }:
     // Subtle decorative corner elements
     const cornerSize = width * 0.08;
     const accentColor = '#3b82f6'; // Blue-500
-    
+
     // Top-left corner accent
     ctx.fillStyle = accentColor;
     ctx.beginPath();
@@ -243,17 +243,17 @@ export default function ClinicQRManager({ onMenuChange, onLogout, profileData }:
     const imageSize = headerHeight * 0.72;
     const imageX = padding + (width * 0.06);
     const imageY = headerY + (headerHeight - imageSize) / 2;
-    
+
     // Clinic image with professional styling
     if (clinicImageElement) {
       ctx.save();
-      
+
       // Clip to circle
       ctx.beginPath();
       ctx.arc(imageX + imageSize / 2, imageY + imageSize / 2, imageSize / 2, 0, Math.PI * 2);
       ctx.closePath();
       ctx.clip();
-      
+
       // Draw image
       ctx.drawImage(clinicImageElement, imageX, imageY, imageSize, imageSize);
       ctx.restore();
@@ -265,7 +265,7 @@ export default function ClinicQRManager({ onMenuChange, onLogout, profileData }:
       );
       borderGradient.addColorStop(0, '#3b82f6');
       borderGradient.addColorStop(1, '#2563eb');
-      
+
       ctx.strokeStyle = borderGradient;
       ctx.lineWidth = Math.max(5, width * 0.006);
       ctx.beginPath();
@@ -279,19 +279,19 @@ export default function ClinicQRManager({ onMenuChange, onLogout, profileData }:
       );
       placeholderGradient.addColorStop(0, '#dbeafe');
       placeholderGradient.addColorStop(1, '#bfdbfe');
-      
+
       ctx.fillStyle = placeholderGradient;
       ctx.beginPath();
       ctx.arc(imageX + imageSize / 2, imageY + imageSize / 2, imageSize / 2, 0, Math.PI * 2);
       ctx.fill();
-      
+
       // Blue border
       ctx.strokeStyle = '#3b82f6';
       ctx.lineWidth = Math.max(5, width * 0.006);
       ctx.beginPath();
       ctx.arc(imageX + imageSize / 2, imageY + imageSize / 2, imageSize / 2, 0, Math.PI * 2);
       ctx.stroke();
-      
+
       // Draw building icon in placeholder
       ctx.fillStyle = '#3b82f6';
       ctx.font = `${imageSize * 0.4}px Arial`;
@@ -311,11 +311,11 @@ export default function ClinicQRManager({ onMenuChange, onLogout, profileData }:
     ctx.font = `bold ${nameFontSize}px system-ui, -apple-system, sans-serif`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    
+
     const nameText = clinicName.toUpperCase();
     let nameLine1 = nameText;
     let nameLine2 = '';
-    
+
     // Check if name needs wrapping
     const nameMetrics = ctx.measureText(nameText);
     if (nameMetrics.width > maxTextWidth) {
@@ -323,13 +323,13 @@ export default function ClinicQRManager({ onMenuChange, onLogout, profileData }:
       nameLine1 = '';
       nameLine2 = '';
       let currentLine = 1;
-      
+
       for (const word of words) {
-        const testLine = currentLine === 1 ? 
+        const testLine = currentLine === 1 ?
           (nameLine1 ? nameLine1 + ' ' + word : word) :
           (nameLine2 ? nameLine2 + ' ' + word : word);
         const testMetrics = ctx.measureText(testLine);
-        
+
         if (testMetrics.width > maxTextWidth && currentLine === 1) {
           currentLine = 2;
           nameLine2 = word;
@@ -339,7 +339,7 @@ export default function ClinicQRManager({ onMenuChange, onLogout, profileData }:
         }
       }
     }
-    
+
     ctx.fillText(nameLine1, textX, headerTextY);
     if (nameLine2) {
       ctx.fillText(nameLine2, textX, headerTextY + (height * 0.048));
@@ -347,7 +347,7 @@ export default function ClinicQRManager({ onMenuChange, onLogout, profileData }:
 
     // MIDDLE SECTION - Elegant call to action
     let currentY = headerY + headerHeight + (height * 0.08);
-    
+
     // "BOOK YOUR APPOINTMENT" text - modern typography
     ctx.fillStyle = '#1f2937';
     ctx.font = `600 ${height * 0.032}px system-ui, -apple-system, sans-serif`;
@@ -413,7 +413,7 @@ export default function ClinicQRManager({ onMenuChange, onLogout, profileData }:
 
     // FOOTER - Minimalist branding
     const footerY = height - padding - footerHeight;
-    
+
     // Subtle divider line
     ctx.strokeStyle = '#dbeafe';
     ctx.lineWidth = Math.max(2, width * 0.002);
@@ -427,7 +427,7 @@ export default function ClinicQRManager({ onMenuChange, onLogout, profileData }:
     ctx.font = `500 ${height * 0.024}px system-ui, -apple-system, sans-serif`;
     ctx.textAlign = 'center';
     ctx.fillText('Powered by', width / 2, footerY + footerHeight * 0.55);
-    
+
     // HealQR branding - blue color
     ctx.fillStyle = '#3b82f6';
     ctx.font = `700 ${height * 0.028}px system-ui, -apple-system, sans-serif`;
@@ -468,8 +468,8 @@ export default function ClinicQRManager({ onMenuChange, onLogout, profileData }:
 
   return (
     <div className="min-h-screen bg-black text-white flex">
-      <ClinicSidebar 
-        activeMenu="qr-manager" 
+      <ClinicSidebar
+        activeMenu="qr-manager"
         onMenuChange={onMenuChange || (() => {})}
         onLogout={onLogout}
         isOpen={sidebarOpen}
@@ -521,9 +521,9 @@ export default function ClinicQRManager({ onMenuChange, onLogout, profileData }:
 
                   <div className="bg-white rounded-lg p-8 flex items-center justify-center min-h-[400px]">
                     {qrCodeDataUrl ? (
-                      <img 
-                        src={qrCodeDataUrl} 
-                        alt="QR Code" 
+                      <img
+                        src={qrCodeDataUrl}
+                        alt="QR Code"
                         className="max-w-full h-auto"
                       />
                     ) : (

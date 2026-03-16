@@ -874,9 +874,16 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
       return;
     }
 
+    // Branch manager support: resolve to parent clinic ID
+    const isLocationManager = localStorage.getItem('healqr_is_location_manager') === 'true';
+    const locationManagerBranchId = localStorage.getItem('healqr_location_id') || '';
+    const resolvedClinicId = isLocationManager
+      ? (localStorage.getItem('healqr_parent_clinic_id') || currentUser.uid)
+      : currentUser.uid;
+
     try {
       setLoading(true);
-      const clinicRef = doc(db, 'clinics', currentUser.uid);
+      const clinicRef = doc(db, 'clinics', resolvedClinicId);
       const clinicSnap = await getDoc(clinicRef);
 
       if (!clinicSnap.exists()) {
@@ -884,7 +891,19 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
         return;
       }
 
-      const linkedDoctors = clinicSnap.data().linkedDoctorsDetails || [];
+      const clinicData = clinicSnap.data();
+      const allLinkedDoctors = clinicData.linkedDoctorsDetails || [];
+      const mainBranchId = (clinicData.locations && clinicData.locations.length > 0) ? clinicData.locations[0].id : '001';
+
+      // Deduplicate doctors by UID (keep unique doctors only)
+      const uniqueDoctorsMap = new Map<string, any>();
+      allLinkedDoctors.forEach((d: any) => {
+        const uid = d.doctorId || d.uid;
+        if (uid && !uniqueDoctorsMap.has(uid)) uniqueDoctorsMap.set(uid, d);
+      });
+      const linkedDoctors = Array.from(uniqueDoctorsMap.values());
+      // Note: Doctor-level locationId filtering is NOT needed here
+      // Chamber-level clinicLocationId filtering handles branch segregation below
       const schedules: DoctorSchedule[] = [];
 
       const now = new Date();
@@ -900,8 +919,18 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
           const allChambers = doctorData.chambers || [];
 
           const todayChambers = allChambers.filter((chamber: any) => {
-            if (chamber.clinicId !== currentUser.uid) {
+            if (chamber.clinicId !== resolvedClinicId) {
               return false;
+            }
+
+            // Branch filtering: branch managers see only their branch chambers
+            if (isLocationManager && locationManagerBranchId) {
+              const chamberLocId = chamber.clinicLocationId || chamber.locationId || '';
+              if (!chamberLocId || chamberLocId !== locationManagerBranchId) return false;
+            } else {
+              // Main clinic: only show chambers without clinicLocationId or with '001' (main branch)
+              const chamberLocId = chamber.clinicLocationId || chamber.locationId || '';
+              if (chamberLocId && chamberLocId !== '001' && chamberLocId !== mainBranchId) return false;
             }
 
             if (chamber.frequency === 'Daily') {
@@ -927,7 +956,7 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
             bookingsRef,
             where('doctorId', '==', doctor.doctorId || doctor.uid),
             where('type', '==', 'walkin_booking'),
-            where('clinicId', '==', currentUser.uid)
+            where('clinicId', '==', resolvedClinicId)
           );
 
           const walkInSnap = await getDocs(walkInQuery);

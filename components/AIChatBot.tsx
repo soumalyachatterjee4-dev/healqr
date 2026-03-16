@@ -117,8 +117,8 @@ export default function AIChatBot({ language = 'english', userRole = 'visitor' }
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          style={{ position: 'fixed', bottom: '80px', right: '16px', zIndex: 99999 }}
-          className="w-14 h-14 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full shadow-lg flex items-center justify-center hover:scale-110 transition-transform group"
+          style={{ position: 'fixed', bottom: '24px', right: '4px', zIndex: 99999 }}
+          className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full shadow-lg flex items-center justify-center hover:scale-110 transition-transform group"
           aria-label="Open PM Assistant"
         >
           <Sparkles className="w-6 h-6 text-white" />

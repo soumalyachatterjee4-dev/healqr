@@ -17,4 +17,5 @@ exports.translateBatch = translateBatch.translateBatch;
 exports.healqrAssistant = require('./healqrAssistant').healqrAssistant;
 exports.monitorPlatformHealth = require('./monitorPlatformHealth').monitorPlatformHealth;
 exports.resolveLocationPincode = require('./resolveLocationPincode').resolveLocationPincode;
+exports.migrateClinicCodes = require('./migrateClinicCodes').migrateClinicCodes;
 

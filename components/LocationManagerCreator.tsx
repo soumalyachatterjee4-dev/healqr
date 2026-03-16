@@ -64,13 +64,18 @@ export default function LocationManagerCreator({ onMenuChange, onLogout }: Locat
 
         // Auto-seed main branch (001) from clinic signup data if missing
         const has001 = locs.some(l => l.id === '001');
+        // Ensure main clinic code includes 001 branch segment
+        const mainClinicCode = data.clinicCode
+          ? generateClinicLocationCode(data.clinicCode, '001')
+          : '';
         if (!has001) {
           const mainLoc: BranchLocation = {
             id: '001',
             name: data.name || data.clinicName || '',
             landmark: data.address || data.landmark || '',
+            pinCode: data.pinCode || '',
             email: data.email || '',
-            clinicCode: data.clinicCode || '',
+            clinicCode: mainClinicCode,
           };
           locs = [mainLoc, ...locs];
           // Persist so it's saved for future loads
@@ -81,10 +86,33 @@ export default function LocationManagerCreator({ onMenuChange, onLogout }: Locat
             ...l,
             name: data.name || data.clinicName || l.name,
             landmark: data.address || data.landmark || l.landmark,
+            pinCode: data.pinCode || l.pinCode,
             email: data.email || l.email,
-            clinicCode: data.clinicCode || l.clinicCode,
+            clinicCode: mainClinicCode || l.clinicCode,
           } : l);
         }
+
+        // Auto-fix branch codes: regenerate using parent clinicCode (universal rule)
+        let needsPersist = false;
+        locs = locs.map(l => {
+          if (l.id !== '001' && data.clinicCode) {
+            const correctCode = generateClinicLocationCode(data.clinicCode, l.id);
+            if (l.clinicCode !== correctCode) {
+              needsPersist = true;
+              return { ...l, clinicCode: correctCode };
+            }
+          }
+          return l;
+        });
+        // Also check if main branch code needs update
+        const main001 = locs.find(l => l.id === '001');
+        if (main001 && mainClinicCode && main001.clinicCode !== mainClinicCode) {
+          needsPersist = true;
+        }
+        if (needsPersist) {
+          await updateDoc(clinicRef, { locations: locs, updatedAt: serverTimestamp() });
+        }
+
         setLocations(locs);
       }
     } catch (err) {
@@ -138,7 +166,7 @@ export default function LocationManagerCreator({ onMenuChange, onLogout }: Locat
     const existingIds = locations.map(l => parseInt(l.id) || 0);
     const maxId = Math.max(...existingIds, 1); // at least 1 so next starts at 002
     const nextId = (maxId + 1).toString().padStart(3, '0');
-    // Reuse parent clinic code base for branch code
+    // Reuse parent clinic code base for branch code (always uses parent pincode)
     const branchClinicCode = clinicData?.clinicCode
       ? generateClinicLocationCode(clinicData.clinicCode, nextId)
       : '';
@@ -170,7 +198,6 @@ export default function LocationManagerCreator({ onMenuChange, onLogout }: Locat
             ...l,
             name: branchName.trim(),
             landmark: branchLandmark.trim(),
-            pinCode: branchPinCode.trim() || l.pinCode,
             email: branchEmail.trim().toLowerCase() || l.email,
           }
         : l
@@ -289,11 +316,14 @@ export default function LocationManagerCreator({ onMenuChange, onLogout }: Locat
                 <div>
                   <p className="text-xs text-zinc-500 mb-1">Clinic Code</p>
                   <button
-                    onClick={() => copyCode(clinicData.clinicCode || '')}
+                    onClick={() => {
+                      const mainLoc = locations.find(l => l.id === '001');
+                      copyCode(mainLoc?.clinicCode || clinicData.clinicCode || '');
+                    }}
                     className="text-white font-mono text-sm flex items-center gap-1 hover:text-emerald-400 transition-colors"
                   >
                     <Hash className="w-3 h-3 text-emerald-400" />
-                    {clinicData.clinicCode || '—'}
+                    {locations.find(l => l.id === '001')?.clinicCode || clinicData.clinicCode || '—'}
                     <Copy className="w-3 h-3 ml-1 text-zinc-500" />
                   </button>
                 </div>
@@ -384,9 +414,9 @@ export default function LocationManagerCreator({ onMenuChange, onLogout }: Locat
                             className="bg-zinc-900 border-zinc-700 text-white h-10 mt-1" />
                         </div>
                         <div>
-                          <Label className="text-xs text-zinc-400">Pincode</Label>
-                          <Input value={branchPinCode} onChange={e => setBranchPinCode(e.target.value)}
-                            className="bg-zinc-900 border-zinc-700 text-white h-10 mt-1" maxLength={6} />
+                          <Label className="text-xs text-zinc-400">Location Pincode</Label>
+                          <Input value={branchPinCode} disabled
+                            className="bg-zinc-900 border-zinc-700 text-gray-500 h-10 mt-1 cursor-not-allowed" maxLength={6} />
                         </div>
                         <div>
                           <Label className="text-xs text-zinc-400">Login Email</Label>
@@ -419,6 +449,10 @@ export default function LocationManagerCreator({ onMenuChange, onLogout }: Locat
                         <div>
                           <p className="text-xs text-zinc-500">Email</p>
                           <p className="text-sm text-white truncate">{branch.email || '—'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-zinc-500">Location Pincode</p>
+                          <p className="text-sm text-white font-mono">{branch.pinCode || '—'}</p>
                         </div>
                         <div>
                           <p className="text-xs text-zinc-500">Code</p>

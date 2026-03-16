@@ -421,6 +421,10 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
     if (isLocationManager && locationManagerBranchId && clinicData?.locations) {
       const branchLoc = clinicData.locations.find((l: any) => l.id === locationManagerBranchId);
       if (branchLoc?.clinicCode) code = branchLoc.clinicCode;
+    } else if (clinicData?.locations) {
+      // Main owner: use 001 location code (with 001 segment)
+      const mainLoc = clinicData.locations.find((l: any) => l.id === '001');
+      if (mainLoc?.clinicCode) code = mainLoc.clinicCode;
     }
     if (code) {
       navigator.clipboard.writeText(code);
@@ -953,17 +957,18 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
                 {clinicData?.linkedDoctorsDetails && clinicData.linkedDoctorsDetails.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {(() => {
+                      // Deduplicate doctors by UID
+                      const allDoctors = clinicData.linkedDoctorsDetails || [];
+                      const uniqueMap = new Map();
+                      allDoctors.forEach((d) => { if (d.uid && !uniqueMap.has(d.uid)) uniqueMap.set(d.uid, d); });
+                      const uniqueDoctors = Array.from(uniqueMap.values());
                       // Group doctors by specialty — filter by branch for location managers
                       const doctorsToShow = isLocationManager && locationManagerBranchId
-                        ? clinicData.linkedDoctorsDetails.filter((doctor) => {
-                            if ((doctor as any).locationId) return (doctor as any).locationId === locationManagerBranchId;
-                            const chambers = (doctor as any).chambers || [];
-                            if (Array.isArray(chambers) && chambers.length > 0) {
-                              return chambers.some((ch: any) => (ch.clinicLocationId || ch.locationId) === locationManagerBranchId);
-                            }
-                            return false;
+                        ? uniqueDoctors.filter((doctor) => {
+                            const docBranch = (doctor as any).locationId || '001';
+                            return docBranch === locationManagerBranchId;
                           })
-                        : clinicData.linkedDoctorsDetails;
+                        : uniqueDoctors;
                       const specialtyCounts: Record<string, number> = {};
                       doctorsToShow.forEach((doctor) => {
                         const specialties = doctor.specialties || ['General Physician'];

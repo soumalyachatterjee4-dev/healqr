@@ -79,9 +79,13 @@ service cloud.firestore {
       // Allow update by:
       // 1. Clinic owner (full access)
       // 2. Doctors linking themselves (can only update linkedDoctorCodes and linkedDoctorsDetails)
+      // 3. Branch location managers (email in locationEmails array)
+      // 4. Any authenticated user updating only linkedDoctorCodes/linkedDoctorsDetails (for doctor-side linking)
       allow update: if isAuthenticated() && (
         request.auth.uid == clinicId ||
-        (isDoctor() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['linkedDoctorCodes', 'linkedDoctorsDetails']))
+        (isDoctor() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['linkedDoctorCodes', 'linkedDoctorsDetails'])) ||
+        (request.auth.token.email in resource.data.locationEmails) ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['linkedDoctorCodes', 'linkedDoctorsDetails']))
       );
 
       // No deletes allowed
@@ -132,17 +136,26 @@ service cloud.firestore {
       // Allow create for:
       // 1. New signups (email verification creates profile with user's UID)
       // 2. Clinics creating doctor profiles (for non-onboarded doctors)
+      // 3. Branch location managers creating doctor profiles (email must be in clinic's locationEmails)
       allow create: if (isAuthenticated() && request.auth.uid == doctorId) ||
                       (request.auth != null && request.auth.token.email_verified == true && request.auth.uid == doctorId) ||
-                      (isAuthenticated() && exists(/databases/$(database)/documents/clinics/$(request.auth.uid)));
+                      (isAuthenticated() && exists(/databases/$(database)/documents/clinics/$(request.auth.uid))) ||
+                      (isAuthenticated() && request.resource.data.invitedBy != null &&
+                       request.resource.data.invitedBy.clinicId != null &&
+                       exists(/databases/$(database)/documents/clinics/$(request.resource.data.invitedBy.clinicId)) &&
+                       request.auth.token.email in get(/databases/$(database)/documents/clinics/$(request.resource.data.invitedBy.clinicId)).data.locationEmails);
 
       // Allow update by:
       // 1. Doctor owner (full access)
       // 2. Clinics that have this doctor linked (can update chambers, linkedClinics, status)
       // 3. System updates (bookingsCount, totalQRScans, stats)
+      // 4. Branch location managers (can update linkedClinics and locationId for doctor linking)
+      // 5. Branch location managers (can update schedule-related fields: chambers, plannedOffPeriods, maxAdvanceBookingDays)
       allow update: if isOwner(doctorId) ||
                       (isAuthenticated() && exists(/databases/$(database)/documents/clinics/$(request.auth.uid))) ||
-                      (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['bookingsCount', 'bookingBlocked', 'blockReason', 'subscriptionStatus', 'totalQRScans', 'lastScanAt', 'stats']));
+                      (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['bookingsCount', 'bookingBlocked', 'blockReason', 'subscriptionStatus', 'totalQRScans', 'lastScanAt', 'stats'])) ||
+                      (isAuthenticated() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['linkedClinics', 'locationId'])) ||
+                      (isAuthenticated() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['chambers', 'plannedOffPeriods', 'maxAdvanceBookingDays']));
 
       // No deletes allowed
       allow delete: if false;

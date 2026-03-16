@@ -10,7 +10,7 @@ import { useState, useEffect } from 'react';
 import DashboardSidebar from './DashboardSidebar';
 import { toast } from 'sonner';
 import { db, auth } from '../lib/firebase/config';
-import { doc, getDoc, updateDoc, setDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, setDoc, serverTimestamp, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { decrypt } from '../utils/encryptionService';
 
@@ -37,6 +37,74 @@ export default function ScheduleManager({
   const [doctorId, setDoctorId] = useState<string>('');
   const [, setLoading] = useState(true);
   const [currentTab, setCurrentTab] = useState<'schedules' | 'clinics'>('clinics');
+
+  // Function to auto-populate manualClinics from linkedClinics
+  const updateManualClinicsFromLinked = async (doctorId: string, linkedClinics: any[], currentManualClinics: any[]) => {
+    const existingClinicCodes = new Set(currentManualClinics.map((c: any) => c.clinicCode).filter(Boolean));
+    const existingClinicIds = new Set(currentManualClinics.map((c: any) => c.id).filter(Boolean));
+
+    const newClinicsToAdd: typeof currentManualClinics = [];
+    for (const linked of linkedClinics) {
+      // Skip if already in manualClinics (by exact clinicCode match)
+      if (linked.clinicCode && existingClinicCodes.has(linked.clinicCode)) {
+        continue;
+      }
+      // Skip if same clinicId AND no branch code (plain manual entry)
+      if (!linked.clinicCode && existingClinicIds.has(linked.clinicId)) {
+        continue;
+      }
+
+      // Fetch clinic details from Firestore
+      try {
+        const clinicDoc = await getDoc(doc(db!, 'clinics', linked.clinicId));
+        if (clinicDoc.exists()) {
+          const clinicData = clinicDoc.data();
+          // Resolve branch-specific code from locations if available
+          let resolvedCode = linked.clinicCode || clinicData.clinicCode || '';
+          const locs = clinicData.locations || [];
+          // If stored code is old format without branch segment, find matching location
+          if (resolvedCode && !resolvedCode.match(/^HQR-\d{6}-\d{4}-\d{3}-CLN$/)) {
+            const mainLoc = locs.find((l: any) => l.id === '001');
+            if (mainLoc?.clinicCode) resolvedCode = mainLoc.clinicCode;
+          }
+
+          // Resolve branch name/address from locations if this is a branch code
+          let resolvedName = clinicData.name || linked.clinicName || 'Clinic';
+          let resolvedAddress = clinicData.address || '';
+          const matchedLoc = locs.find((l: any) => l.clinicCode === resolvedCode);
+          if (matchedLoc) {
+            resolvedName = matchedLoc.name || resolvedName;
+            resolvedAddress = matchedLoc.landmark || resolvedAddress;
+          }
+
+          // Double-check dedup after resolving code (in case code was upgraded)
+          if (existingClinicCodes.has(resolvedCode)) continue;
+
+          newClinicsToAdd.push({
+            id: linked.clinicId,
+            name: resolvedName,
+            address: resolvedAddress,
+            phone: clinicData.phone || '',
+            clinicCode: resolvedCode,
+            createdAt: Date.now(),
+          });
+        }
+      } catch (e) {
+        console.error('Failed to fetch linked clinic details:', e);
+      }
+    }
+
+    if (newClinicsToAdd.length > 0) {
+      const merged = [...currentManualClinics, ...newClinicsToAdd];
+      setManualClinics(merged);
+      // Persist merged clinics back to doctor's manualClinics
+      try {
+        await updateDoc(doc(db!, 'doctors', doctorId), { manualClinics: merged });
+      } catch (e) {
+        console.error('Failed to persist auto-linked clinics:', e);
+      }
+    }
+  };
 
   // Load data from Firestore on mount
   useEffect(() => {
@@ -81,47 +149,7 @@ export default function ScheduleManager({
 
           // Auto-populate My Clinics from linkedClinics (added by clinic side)
           if (data.linkedClinics && Array.isArray(data.linkedClinics)) {
-            const existingManualClinics: typeof manualClinics = data.manualClinics || [];
-            const existingClinicCodes = new Set(existingManualClinics.map((c: any) => c.clinicCode).filter(Boolean));
-            const existingClinicIds = new Set(existingManualClinics.map((c: any) => c.id).filter(Boolean));
-
-            const newClinicsToAdd: typeof manualClinics = [];
-            for (const linked of data.linkedClinics) {
-              // Skip if already in manualClinics (by clinicCode or clinicId)
-              if ((linked.clinicCode && existingClinicCodes.has(linked.clinicCode)) ||
-                  existingClinicIds.has(linked.clinicId)) {
-                continue;
-              }
-
-              // Fetch clinic details from Firestore
-              try {
-                const clinicDoc = await getDoc(doc(db!, 'clinics', linked.clinicId));
-                if (clinicDoc.exists()) {
-                  const clinicData = clinicDoc.data();
-                  newClinicsToAdd.push({
-                    id: linked.clinicId,
-                    name: clinicData.name || linked.clinicName || 'Clinic',
-                    address: clinicData.address || '',
-                    phone: clinicData.phone || '',
-                    clinicCode: linked.clinicCode || clinicData.clinicCode || '',
-                    createdAt: Date.now(),
-                  });
-                }
-              } catch (e) {
-                console.error('Failed to fetch linked clinic details:', e);
-              }
-            }
-
-            if (newClinicsToAdd.length > 0) {
-              const merged = [...existingManualClinics, ...newClinicsToAdd];
-              setManualClinics(merged);
-              // Persist merged clinics back to doctor's manualClinics
-              try {
-                await updateDoc(doc(db!, 'doctors', uid), { manualClinics: merged });
-              } catch (e) {
-                console.error('Failed to persist auto-linked clinics:', e);
-              }
-            }
+            await updateManualClinicsFromLinked(uid, data.linkedClinics, data.manualClinics || []);
           }
 
           // Load Self-Restricted Clinics (doctor-side toggle)
@@ -141,6 +169,28 @@ export default function ScheduleManager({
     const unsubscribe = onAuthStateChanged(auth!, (user) => {
       if (user) {
         loadFromFirestore(user.uid);
+
+        // Set up real-time listener for doctor's document to handle linkedClinics updates
+        const doctorDocRef = doc(db!, 'doctors', user.uid);
+        const unsubscribeDoc = onSnapshot(doctorDocRef, async (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            const currentLinkedClinics = data.linkedClinics || [];
+            const currentManualClinics = data.manualClinics || [];
+
+            // Check if linkedClinics has new entries not in manualClinics
+            const existingClinicCodes = new Set(currentManualClinics.map((c: any) => c.clinicCode).filter(Boolean));
+            const hasNewLinks = currentLinkedClinics.some((linked: any) => 
+              linked.clinicCode && !existingClinicCodes.has(linked.clinicCode)
+            );
+
+            if (hasNewLinks) {
+              await updateManualClinicsFromLinked(user.uid, currentLinkedClinics, currentManualClinics);
+            }
+          }
+        });
+
+        return unsubscribeDoc;
       } else {
         console.log('❌ ScheduleManager: No authenticated user found via listener');
         setLoading(false);
@@ -277,8 +327,63 @@ export default function ScheduleManager({
       // If clinic code is provided, verify it first
       if (clinicFormCode.trim()) {
         const clinicsRef = collection(db, 'clinics');
-        const clinicQuery = query(clinicsRef, where('clinicCode', '==', clinicFormCode.trim()));
-        const clinicSnap = await getDocs(clinicQuery);
+        const enteredCode = clinicFormCode.trim();
+
+        const normalizeCode = (code: string) => (code || '').toUpperCase().replace(/-CLN$/, '');
+        const normalizedEntered = normalizeCode(enteredCode);
+
+        // Try exact match first (main clinic or branch code stored at root)
+        let clinicSnap = await getDocs(query(clinicsRef, where('clinicCode', '==', enteredCode)));
+
+        // If not found, attempt more tolerant lookups (handles old/new format mismatch)
+        if (clinicSnap.empty) {
+          const branchMatch = enteredCode.match(/^(HQR-\d{6}-\d{4})-(\d{3})-CLN$/);
+          if (branchMatch) {
+            const basePrefix = branchMatch[1];
+            // Common clinic codes to try: new format (with 001) and old format (without branch segment)
+            const codesToTry = [`${basePrefix}-001-CLN`, `${basePrefix}-CLN`];
+
+            for (const code of codesToTry) {
+              const snap = await getDocs(query(clinicsRef, where('clinicCode', '==', code)));
+              if (!snap.empty) {
+                clinicSnap = snap;
+                break;
+              }
+            }
+
+            // If still not found, fall back to prefix-based lookup to handle any small formatting mismatch
+            if (clinicSnap.empty) {
+              const prefixQuery = query(
+                clinicsRef,
+                where('clinicCode', '>=', `${basePrefix}-`),
+                where('clinicCode', '<=', `${basePrefix}-\uf8ff`)
+              );
+              const prefixSnap = await getDocs(prefixQuery);
+              if (!prefixSnap.empty) {
+                clinicSnap = prefixSnap;
+              }
+            }
+
+            // If we found a clinic doc, allow main branch even when locations[] doesn't include it
+            if (!clinicSnap.empty) {
+              const cData = clinicSnap.docs[0].data();
+              const clinicMainCode = (cData.clinicCode || '').toString();
+              const normalizedClinicMain = normalizeCode(clinicMainCode);
+
+              const seemsLikeMainOrMainBranch =
+                normalizedEntered === normalizedClinicMain ||
+                normalizedEntered.startsWith(`${normalizedClinicMain}-`);
+
+              if (!seemsLikeMainOrMainBranch) {
+                const locs = cData.locations || [];
+                const branchExists = locs.some((l: any) => normalizeCode(l.clinicCode) === normalizedEntered);
+                if (!branchExists) {
+                  toast.warn('Branch code not found in clinic locations; linking to the main clinic record instead.');
+                }
+              }
+            }
+          }
+        }
 
         if (clinicSnap.empty) {
           toast.error('Clinic code not found. Please check the code or leave it empty for manual entry.');
@@ -287,9 +392,19 @@ export default function ScheduleManager({
 
         matchedClinicId = clinicSnap.docs[0].id;
         const clinicData = clinicSnap.docs[0].data();
-        resolvedClinicName = clinicData.name || clinicFormName;
-        resolvedClinicAddress = clinicData.address || clinicFormAddress;
-        matchedClinicCode = clinicData.clinicCode || clinicFormCode.trim();
+        // Store the code the doctor entered (branch-specific)
+        matchedClinicCode = enteredCode;
+
+        // Resolve name/address from the matching branch location if applicable
+        const clinicLocs = clinicData.locations || [];
+        const matchedBranch = clinicLocs.find((l: any) => normalizeCode(l.clinicCode) === normalizedEntered);
+        if (matchedBranch) {
+          resolvedClinicName = matchedBranch.name || clinicData.name || clinicFormName;
+          resolvedClinicAddress = matchedBranch.landmark || clinicData.address || clinicFormAddress;
+        } else {
+          resolvedClinicName = clinicData.name || clinicFormName;
+          resolvedClinicAddress = clinicData.address || clinicFormAddress;
+        }
 
         toast.info(`Linked to system clinic: ${resolvedClinicName}`);
       }
@@ -312,12 +427,26 @@ export default function ScheduleManager({
         toast.success('Clinic Updated Successfully');
       } else {
         // Add new clinic — use clinic doc ID if matched, otherwise generate
+        const newClinicId = matchedClinicId || Date.now().toString();
+        const targetClinicCode = matchedClinicCode || clinicFormCode;
+
+        // Check for duplicates: allow same clinicId only if clinic code differs (branch-specific)
+        const isDuplicate = manualClinics.some(c => {
+          if (c.id !== newClinicId) return false;
+          if (!targetClinicCode) return true; // Manual entry without code: only one per clinic id
+          return c.clinicCode === targetClinicCode;
+        });
+        if (isDuplicate) {
+          toast.error('This clinic is already in your list');
+          return;
+        }
+
         const newClinic = {
-          id: matchedClinicId || Date.now().toString(),
+          id: newClinicId,
           name: resolvedClinicName || clinicFormName,
           address: resolvedClinicAddress || clinicFormAddress,
           phone: clinicFormPhone,
-          clinicCode: clinicFormCode,
+          clinicCode: targetClinicCode,
           createdAt: Date.now()
         };
         updatedClinics = [...manualClinics, newClinic];
@@ -347,8 +476,25 @@ export default function ScheduleManager({
               ? (clinicSnap.data().linkedDoctorsDetails || [])
               : [];
 
-            const alreadyLinked = existingLinkedDoctors.some((d: any) => d.uid === doctorId);
-            if (!alreadyLinked) {
+            // Determine branch ID from the matched clinic code
+            const clinicLocations = clinicSnap.exists() ? (clinicSnap.data().locations || []) : [];
+            const mainBranchId = clinicLocations.length > 0 ? clinicLocations[0].id : '001';
+
+            // Extract branch ID from the entered code (e.g., '002' from HQR-700008-0001-002-CLN)
+            let resolvedBranchId = mainBranchId;
+            if (matchedClinicCode) {
+              const branchSegment = matchedClinicCode.match(/^HQR-\d{6}-\d{4}-(\d{3})-CLN$/);
+              if (branchSegment) {
+                resolvedBranchId = branchSegment[1];
+              }
+            }
+
+            // Check if already linked to THIS specific branch (allow same doctor on multiple branches)
+            const alreadyLinkedToBranch = existingLinkedDoctors.some(
+              (d: any) => d.uid === doctorId && (d.locationId || mainBranchId) === resolvedBranchId
+            );
+
+            if (!alreadyLinkedToBranch) {
               const newLinkedDoctor = {
                 uid: doctorId,
                 email: doctorData.email || '',
@@ -356,6 +502,7 @@ export default function ScheduleManager({
                 dateOfBirth: doctorData.dateOfBirth || '',
                 specialties: doctorData.specialties || (doctorData.specialty ? [doctorData.specialty] : []),
                 pinCode: doctorData.pinCode || '',
+                locationId: resolvedBranchId,
                 doctorCode: doctorData.doctorCode || '',
                 qrNumber: doctorData.qrNumber || '',
                 status: doctorData.status || 'active'
@@ -408,17 +555,131 @@ export default function ScheduleManager({
     try {
       setLoadingClinic(true);
       const clinicsRef = collection(db!, 'clinics');
-      const clinicQuery = query(clinicsRef, where('clinicCode', '==', clinicFormCode.trim()));
-      const clinicSnap = await getDocs(clinicQuery);
+      const enteredCode = clinicFormCode.trim().toUpperCase();
 
-      if (clinicSnap.empty) {
+      console.log('🔍 Searching for clinic code:', enteredCode);
+
+      let clinicSnap: any = null;
+
+      // Strategy 1: Try exact match on main clinicCode field
+      let result = await getDocs(query(clinicsRef, where('clinicCode', '==', enteredCode)));
+      if (!result.empty) {
+        clinicSnap = result;
+        console.log('✅ Found via exact main clinicCode match');
+      }
+
+      // Strategy 2: Search all clinics for the code in locations[]
+      if (!clinicSnap) {
+        const allClinics = await getDocs(clinicsRef);
+        console.log(`📋 Searching through ${allClinics.size} clinics for code in locations[]...`);
+        
+        for (const clinicDoc of allClinics.docs) {
+          const clinicData = clinicDoc.data();
+          const mainCode = (clinicData.clinicCode || '').toUpperCase().trim();
+          
+          // Exact match on main code
+          if (mainCode === enteredCode) {
+            clinicSnap = { docs: [clinicDoc], empty: false, size: 1 };
+            console.log('✅ Found via main code in all clinics');
+            break;
+          }
+          
+          // Search in locations[] array
+          const locations = clinicData.locations || [];
+          for (const loc of locations) {
+            const locCode = (loc.clinicCode || '').toUpperCase().trim();
+            if (locCode === enteredCode) {
+              clinicSnap = { docs: [clinicDoc], empty: false, size: 1 };
+              console.log('✅ Found via branch code in locations[]:', locCode);
+              break;
+            }
+          }
+          
+          if (clinicSnap) break;
+        }
+      }
+
+      // Strategy 3: If new format code (with -001, -002 etc), search by base prefix
+      if (!clinicSnap) {
+        const newFormatMatch = enteredCode.match(/^(HQR-\d{6}-\d{4})-(\d{3})-CLN$/);
+        if (newFormatMatch) {
+          const basePrefix = newFormatMatch[1];
+          const branchNum = newFormatMatch[2];
+          console.log(`🔎 Trying new format search - base: ${basePrefix}, branch: ${branchNum}`);
+
+          const allClinics = await getDocs(clinicsRef);
+          for (const clinicDoc of allClinics.docs) {
+            const clinicData = clinicDoc.data();
+            const locations = clinicData.locations || [];
+            
+            // Look for any code with same base prefix
+            for (const loc of locations) {
+              const locCode = (loc.clinicCode || '').toUpperCase().trim();
+              if (locCode.startsWith(basePrefix)) {
+                clinicSnap = { docs: [clinicDoc], empty: false, size: 1 };
+                console.log('✅ Found via base prefix match:', locCode);
+                break;
+              }
+            }
+            
+            if (clinicSnap) break;
+          }
+        }
+      }
+
+      // Strategy 4: Old format fallback (HQR-xxxxxx-xxxx-CLN)
+      if (!clinicSnap) {
+        const oldFormatMatch = enteredCode.match(/^(HQR-\d{6}-\d{4})-CLN$/);
+        if (oldFormatMatch) {
+          const basePrefix = oldFormatMatch[1];
+          console.log(`🔎 Trying old format search - prefix: ${basePrefix}`);
+
+          const codesToTry = [`${basePrefix}-001-CLN`, `${basePrefix}-CLN`, enteredCode];
+          for (const code of codesToTry) {
+            const snap = await getDocs(query(clinicsRef, where('clinicCode', '==', code)));
+            if (!snap.empty) {
+              clinicSnap = snap;
+              console.log('✅ Found via old format variation:', code);
+              break;
+            }
+          }
+
+          // Final fallback: prefix-based lookup
+          if (!clinicSnap) {
+            const prefixQuery = query(
+              clinicsRef,
+              where('clinicCode', '>=', `${basePrefix}-`),
+              where('clinicCode', '<=', `${basePrefix}-\uf8ff`)
+            );
+            const prefixSnap = await getDocs(prefixQuery);
+            if (!prefixSnap.empty) {
+              clinicSnap = prefixSnap;
+              console.log('✅ Found via prefix lookup');
+            }
+          }
+        }
+      }
+
+      if (!clinicSnap || clinicSnap.empty) {
+        console.error('❌ Clinic code not found:', enteredCode);
         toast.error('Clinic code not found. Please check and try again.');
         return;
       }
 
       const clinicData = clinicSnap.docs[0].data();
-      setClinicFormName(clinicData.name || '');
-      setClinicFormAddress(clinicData.address || '');
+
+      // Resolve branch-specific name/address if this is a branch code (case-insensitive comparison)
+      const clinicLocs = clinicData.locations || [];
+      const matchedBranch = clinicLocs.find((l: any) => (l.clinicCode || '').toUpperCase().trim() === enteredCode);
+      if (matchedBranch) {
+        console.log('✅ Resolved to branch:', matchedBranch.name);
+        setClinicFormName(matchedBranch.name || clinicData.name || '');
+        setClinicFormAddress(matchedBranch.landmark || clinicData.address || '');
+      } else {
+        console.log('✅ Using main clinic:', clinicData.name);
+        setClinicFormName(clinicData.name || '');
+        setClinicFormAddress(clinicData.address || '');
+      }
 
       toast.success('Clinic Linked Successfully!', {
         description: `Connected to ${clinicData.name}. Click ADD CLINIC to save.`,
@@ -458,7 +719,19 @@ export default function ScheduleManager({
           const clinicSnap = await getDoc(clinicRef);
           if (clinicSnap.exists()) {
             const existingLinkedDoctors = clinicSnap.data().linkedDoctorsDetails || [];
-            const updatedDoctors = existingLinkedDoctors.filter((d: any) => d.uid !== doctorId);
+            const clinicLocs = clinicSnap.data().locations || [];
+            const mainBranch = clinicLocs.length > 0 ? clinicLocs[0].id : '001';
+
+            // Extract branch from the deleted clinic's code
+            const codeMatch = deletedClinic.clinicCode.match(/^HQR-\d{6}-\d{4}-(\d{3})-CLN$/);
+            const deletedBranchId = codeMatch ? codeMatch[1] : mainBranch;
+
+            // Only remove doctor entry matching this specific branch
+            const updatedDoctors = existingLinkedDoctors.filter((d: any) => {
+              if (d.uid !== doctorId) return true;
+              const docBranch = d.locationId || mainBranch;
+              return docBranch !== deletedBranchId;
+            });
             if (updatedDoctors.length !== existingLinkedDoctors.length) {
               await updateDoc(clinicRef, { linkedDoctorsDetails: updatedDoctors });
             }
@@ -540,7 +813,7 @@ export default function ScheduleManager({
   // NEW: Auto-populate schedule form when manual clinic is selected
   useEffect(() => {
     if (selectedManualClinicId) {
-      const clinic = manualClinics.find(c => c.id === selectedManualClinicId);
+      const clinic = manualClinics.find(c => `${c.id}::${c.clinicCode || ''}` === selectedManualClinicId || c.id === selectedManualClinicId);
       if (clinic) {
         setChamberName(clinic.name);
         setChamberAddress(clinic.address);
@@ -586,7 +859,13 @@ export default function ScheduleManager({
     setChamberName(schedule.chamberName);
     setChamberAddress(schedule.chamberAddress);
     setClinicCode(schedule.clinicCode || '');
-    setSelectedManualClinicId(schedule.manualClinicId || ''); // Set manual clinic if exists
+    // Reconstruct composite key for branch-aware selection
+    if (schedule.manualClinicId) {
+      const matchingClinic = manualClinics.find(c => c.id === schedule.manualClinicId && c.clinicCode === schedule.clinicCode);
+      setSelectedManualClinicId(matchingClinic ? `${matchingClinic.id}::${matchingClinic.clinicCode || ''}` : schedule.manualClinicId);
+    } else {
+      setSelectedManualClinicId('');
+    }
 
     // If editing a chamber with clinic, fetch clinic data
     if (schedule.clinicId) {
@@ -615,7 +894,10 @@ export default function ScheduleManager({
       if (clinicSnap.exists()) {
         const data = clinicSnap.data();
         setClinicData({ id: clinicSnap.id, ...data });
-        setClinicCode(data.clinicCode || '');
+        // Only set clinicCode if not already set (preserve branch-specific code)
+        if (!clinicCode) {
+          setClinicCode(data.clinicCode || '');
+        }
         toast.success('Clinic data loaded', {
           description: data.name,
           duration: 2000,
@@ -781,7 +1063,7 @@ export default function ScheduleManager({
     let resolvedClinicPhone: string | undefined = undefined;
 
     if (selectedManualClinicId) {
-      const manualClinic = manualClinics.find(c => c.id === selectedManualClinicId);
+      const manualClinic = manualClinics.find(c => `${c.id}::${c.clinicCode || ''}` === selectedManualClinicId || c.id === selectedManualClinicId);
       if (manualClinic) {
         resolvedManualClinicId = manualClinic.id;
         resolvedClinicPhone = manualClinic.phone;
@@ -2040,8 +2322,8 @@ export default function ScheduleManager({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">None (Enter manually)</SelectItem>
-                      {manualClinics.map((clinic) => (
-                        <SelectItem key={clinic.id} value={clinic.id}>
+                      {manualClinics.map((clinic, idx) => (
+                        <SelectItem key={`${clinic.id}::${clinic.clinicCode || idx}`} value={`${clinic.id}::${clinic.clinicCode || idx}`}>
                           <div className="flex items-center justify-between w-full gap-4">
                             <span>{clinic.name}</span>
                             <span className={`text-[10px] px-2 py-0.5 rounded-full border ${
@@ -2060,12 +2342,12 @@ export default function ScheduleManager({
                   {/* Clinic Status Feedback Box */}
                   {selectedManualClinicId && (
                     <div className={`p-3 rounded-lg border text-xs space-y-2 ${
-                      manualClinics.find(c => c.id === selectedManualClinicId)?.clinicCode
+                      manualClinics.find(c => `${c.id}::${c.clinicCode || ''}` === selectedManualClinicId || c.id === selectedManualClinicId)?.clinicCode
                         ? 'bg-emerald-500/5 border-emerald-500/20'
                         : 'bg-amber-500/5 border-amber-500/20'
                     }`}>
                       <div className="flex items-center gap-2">
-                        {manualClinics.find(c => c.id === selectedManualClinicId)?.clinicCode ? (
+                        {manualClinics.find(c => `${c.id}::${c.clinicCode || ''}` === selectedManualClinicId || c.id === selectedManualClinicId)?.clinicCode ? (
                           <>
                             <Check className="w-3 h-3 text-emerald-500" />
                             <span className="text-emerald-400 font-medium">System Linked</span>
@@ -2078,7 +2360,7 @@ export default function ScheduleManager({
                         )}
                       </div>
                       <p className="text-gray-400 leading-relaxed">
-                        {manualClinics.find(c => c.id === selectedManualClinicId)?.clinicCode
+                        {manualClinics.find(c => `${c.id}::${c.clinicCode || ''}` === selectedManualClinicId || c.id === selectedManualClinicId)?.clinicCode
                           ? "Dual booking enabled via Doctor & Clinic QR codes. Patient lists synced automatically."
                           : "Non-linked clinic. System will block Dr. QR during chamber time and send patient lists via SMS/WhatsApp 1 hour prior."}
                       </p>

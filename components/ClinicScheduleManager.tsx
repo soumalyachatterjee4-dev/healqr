@@ -72,6 +72,7 @@ interface Chamber {
   status: "active" | "inactive";
   createdAt: Date;
   clinicId?: string; // CRITICAL: Track which clinic owns this chamber
+  clinicLocationId?: string; // Track which branch/location this chamber belongs to
 }
 
 interface ClinicScheduleManagerProps {
@@ -83,6 +84,12 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
   onMenuChange,
   onLogout,
 }) => {
+  // Resolve clinic ID: branch managers use parent clinic ID
+  const isLocationManager = localStorage.getItem('healqr_is_location_manager') === 'true';
+  const resolvedClinicId = isLocationManager
+    ? (localStorage.getItem('healqr_parent_clinic_id') || auth?.currentUser?.uid || '')
+    : (auth?.currentUser?.uid || '');
+
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [selectedDoctorId, setSelectedDoctorId] = useState<string>("");
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
@@ -153,17 +160,39 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
       }
 
       try {
-        const clinicRef = doc(db!, "clinics", currentUser.uid);
+        const clinicRef = doc(db!, "clinics", resolvedClinicId);
         const clinicSnap = await getDoc(clinicRef);
 
         if (clinicSnap.exists()) {
           const data = clinicSnap.data();
           const linkedDoctors = data.linkedDoctorsDetails || [];
-          setDoctors(linkedDoctors);
+
+          // Deduplicate doctors by UID (some workflows may add duplicates)
+          const uniqueDoctorsMap = new Map<string, Doctor>();
+          (linkedDoctors as Doctor[]).forEach((doc) => {
+            if (doc?.uid && !uniqueDoctorsMap.has(doc.uid)) {
+              uniqueDoctorsMap.set(doc.uid, doc);
+            }
+          });
+          const filteredDoctors = Array.from(uniqueDoctorsMap.values());
+          // Note: No doctor-level locationId filter needed here
+          // Chamber-level clinicLocationId filtering handles branch segregation
+          setDoctors(filteredDoctors);
 
           // Auto-fetch clinic info
-          const clinicNameValue = data.clinicName || data.name || "";
-          const clinicAddressValue = data.address || "";
+          let clinicNameValue = data.clinicName || data.name || "";
+          let clinicAddressValue = data.address || "";
+
+          // Branch managers: use branch name/address instead of main clinic
+          if (isLocationManager && branchId) {
+            const locations = data.locations || [];
+            const branch = locations.find((l: any) => l.id === branchId);
+            if (branch) {
+              clinicNameValue = branch.name || clinicNameValue;
+              clinicAddressValue = branch.landmark || branch.address || clinicAddressValue;
+            }
+          }
+
           setClinicName(clinicNameValue);
           setClinicAddress(clinicAddressValue);
 
@@ -176,11 +205,11 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
 
           if (
             preSelectedDoctorId &&
-            linkedDoctors.find((d: Doctor) => d.uid === preSelectedDoctorId)
+            filteredDoctors.find((d: Doctor) => d.uid === preSelectedDoctorId)
           ) {
             // Use the pre-selected doctor
             setSelectedDoctorId(preSelectedDoctorId);
-            const selectedDoc = linkedDoctors.find(
+            const selectedDoc = filteredDoctors.find(
               (d: Doctor) => d.uid === preSelectedDoctorId,
             );
             setSelectedDoctor(selectedDoc);
@@ -191,10 +220,10 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
 
             // Show toast notification
             toast.success(`Editing schedule for Dr. ${selectedDoc?.name}`);
-          } else if (linkedDoctors.length > 0 && !selectedDoctorId) {
+          } else if (filteredDoctors.length > 0 && !selectedDoctorId) {
             // Auto-select first doctor if no pre-selection
-            setSelectedDoctorId(linkedDoctors[0].uid);
-            setSelectedDoctor(linkedDoctors[0]);
+            setSelectedDoctorId(filteredDoctors[0].uid);
+            setSelectedDoctor(filteredDoctors[0]);
           }
         } else {
           console.error("Clinic document not found");
@@ -231,16 +260,25 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
         // Load max advance days
         setMaxAdvanceDays(data.maxAdvanceBookingDays || "30");
 
-        // CRITICAL FILTER: Load ONLY chambers belonging to THIS clinic
+        // CRITICAL FILTER: Load ONLY chambers belonging to THIS clinic and branch
         const allChambers = data.chambers || [];
+        const branchLocId = isLocationManager ? (localStorage.getItem('healqr_location_id') || '') : '';
         const clinicChambers = allChambers.filter(
-          (chamber: Chamber) => chamber.clinicId === currentUser.uid,
+          (chamber: Chamber) => {
+            if (chamber.clinicId !== resolvedClinicId) return false;
+            // Branch managers only see their branch's chambers
+            if (isLocationManager && branchLocId) {
+              return (chamber as any).clinicLocationId === branchLocId;
+            }
+            // Main clinic sees chambers without clinicLocationId or with '001'
+            return !(chamber as any).clinicLocationId || (chamber as any).clinicLocationId === '001';
+          },
         );
 
         console.log("🔒 SECURITY FILTER:", {
           totalChambers: allChambers.length,
           clinicChambers: clinicChambers.length,
-          clinicId: currentUser.uid,
+          clinicId: resolvedClinicId,
         });
 
         setChambers(clinicChambers);
@@ -308,11 +346,11 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
           selectedDoctor && {
             doctorId: selectedDoctor.uid,
             doctorName: selectedDoctor.name,
-            clinicId: currentUser.uid,
+            clinicId: resolvedClinicId,
             clinicName: clinicName,
           }),
         ...(globalOffScope === "clinic" && {
-          clinicId: currentUser.uid,
+          clinicId: resolvedClinicId,
           clinicName: clinicName,
         }),
         ...(chamberSpecificClosure === "specific" &&
@@ -323,7 +361,7 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
 
       if (globalOffScope === "clinic") {
         // Store in clinic document FIRST (central source of truth)
-        const clinicRef = doc(db!, "clinics", currentUser.uid);
+        const clinicRef = doc(db!, "clinics", resolvedClinicId);
         const clinicSnap = await getDoc(clinicRef);
 
         if (clinicSnap.exists()) {
@@ -337,7 +375,7 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
           // 🔄 SYNC TO clinicSchedules
           try {
             await setDoc(
-              doc(db!, "clinicSchedules", currentUser.uid),
+              doc(db!, "clinicSchedules", resolvedClinicId),
               {
                 plannedOffPeriods: [...existingClinicPeriods, newPeriod],
               },
@@ -411,7 +449,7 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
         }
 
         // Store in clinic document too (clinic-scoped doctor off)
-        const clinicRef = doc(db!, "clinics", currentUser.uid);
+        const clinicRef = doc(db!, "clinics", resolvedClinicId);
         const clinicSnap = await getDoc(clinicRef);
 
         if (clinicSnap.exists()) {
@@ -425,7 +463,7 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
           // 🔄 SYNC TO clinicSchedules
           try {
             await setDoc(
-              doc(db!, "clinicSchedules", currentUser.uid),
+              doc(db!, "clinicSchedules", resolvedClinicId),
               {
                 plannedOffPeriods: updatedClinicPeriods,
               },
@@ -692,10 +730,10 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
                 chamber: existingChamber,
                 reason: "Overlapping days and time",
                 days: commonDays,
-                isClinicChamber: existingChamber.clinicId === currentUser.uid,
+                isClinicChamber: existingChamber.clinicId === resolvedClinicId,
                 isPersonalChamber:
                   !existingChamber.clinicId ||
-                  existingChamber.clinicId !== currentUser.uid,
+                  existingChamber.clinicId !== resolvedClinicId,
               });
             } else {
               console.log("⏰ No time overlap");
@@ -771,7 +809,8 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
           ? allExistingChambers.find((c: Chamber) => c.id === editingChamberId)
               ?.createdAt || new Date()
           : new Date(),
-        clinicId: currentUser.uid, // CRITICAL: Tag chamber with clinic ownership
+        clinicId: resolvedClinicId, // CRITICAL: Tag chamber with clinic ownership
+        clinicLocationId: isLocationManager ? (localStorage.getItem('healqr_location_id') || '001') : '001', // Tag with branch
       };
 
       // Add or update chamber in doctor's chambers
@@ -919,7 +958,7 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
 
       // Update local state
       setChambers(
-        updatedChambers.filter((c: Chamber) => c.clinicId === currentUser.uid),
+        updatedChambers.filter((c: Chamber) => c.clinicId === resolvedClinicId),
       );
 
       toast.success("Schedule Deleted Successfully", {

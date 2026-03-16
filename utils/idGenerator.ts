@@ -212,29 +212,33 @@ export async function generateClinicCode(pincode: string): Promise<string> {
 
 /**
  * Generate a location-aware clinic code given a base clinicCode and a locationId.
+ * If branchPincode is provided, the branch code will use the branch's own pincode
+ * instead of the main clinic's pincode (for geocoding).
  *
  * Example:
- *   base: HQR-700001-0001-001-CLN
- *   locationId: 002
- *   result: HQR-700001-0001-002-CLN
+ *   base: HQR-700008-0001-001-CLN, locationId: 002, branchPincode: 711110
+ *   result: HQR-711110-0001-002-CLN
  */
 export function generateClinicLocationCode(clinicCode: string, locationId: string | number): string {
   if (!clinicCode) return clinicCode;
   const branchNum = String(locationId).trim().padStart(3, '0');
   if (!branchNum) return clinicCode;
 
-  // Replace the branch segment (3 digits before -CLN)
-  if (clinicCode.endsWith('-CLN')) {
-    // New format: HQR-PINCODE-SERIAL-BRANCH-CLN
-    const newFormatMatch = clinicCode.match(/^(HQR-\d{6}-\d{4})-\d{3}-CLN$/);
-    if (newFormatMatch) {
-      return `${newFormatMatch[1]}-${branchNum}-CLN`;
-    }
-    // Old format: HQR-PINCODE-SERIAL-CLN (no branch segment)
-    return clinicCode.replace(/-CLN$/, `-${branchNum}-CLN`);
+  // Extract serial from clinic code (both old and new formats)
+  const newFormatMatch = clinicCode.match(/^HQR-(\d{6})-(\d{4})-\d{3}-CLN$/);
+  const oldFormatMatch = clinicCode.match(/^HQR-(\d{6})-(\d{4})-CLN$/);
+  const match = newFormatMatch || oldFormatMatch;
+
+  if (match) {
+    const pincode = match[1]; // Always use parent clinic pincode
+    const serial = match[2];
+    return `HQR-${pincode}-${serial}-${branchNum}-CLN`;
   }
 
   // Fallback: just append
+  if (clinicCode.endsWith('-CLN')) {
+    return clinicCode.replace(/-CLN$/, `-${branchNum}-CLN`);
+  }
   return `${clinicCode}-${branchNum}`;
 }
 

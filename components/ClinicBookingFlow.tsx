@@ -117,6 +117,43 @@ export default function ClinicBookingFlow() {
 
         if (clinicSnap.exists()) {
           const clinicData = { id: clinicSnap.id, ...clinicSnap.data() } as ClinicData;
+
+          // RAW DATA LOG - shows exactly what Firestore returned
+          console.warn('⚠️ [BookingFlow] RAW linkedDoctorsDetails from Firestore:', {
+            count: (clinicData.linkedDoctorsDetails || []).length,
+            entries: (clinicData.linkedDoctorsDetails || []).map((d: any) => ({
+              name: d.name, uid: d.uid, locationId: d.locationId, status: d.status
+            }))
+          });
+
+          // Enrich linkedDoctorsDetails with chambers from each doctor's Firestore document
+          // This ensures branch selection page can accurately count doctors per branch
+          if (clinicData.linkedDoctorsDetails && clinicData.linkedDoctorsDetails.length > 0) {
+            const enrichedDoctors = await Promise.all(
+              clinicData.linkedDoctorsDetails.map(async (doctor: any) => {
+                try {
+                  const doctorRef = doc(db, 'doctors', doctor.uid);
+                  const doctorSnap = await getDoc(doctorRef);
+                  if (doctorSnap.exists()) {
+                    const doctorData = doctorSnap.data();
+                    const allChambers = doctorData.chambers || [];
+                    // Only include chambers belonging to this clinic
+                    const clinicChambers = allChambers.filter((ch: any) => ch.clinicId === clinicId);
+                    return {
+                      ...doctor,
+                      chambers: clinicChambers,
+                      locationId: doctor.locationId || doctorData.locationId || ''
+                    };
+                  }
+                } catch (e) {
+                  console.warn('Could not fetch doctor chambers:', doctor.uid);
+                }
+                return doctor;
+              })
+            );
+            clinicData.linkedDoctorsDetails = enrichedDoctors;
+          }
+
           setClinic(clinicData);
 
           // Determine available locations for this clinic
@@ -488,32 +525,58 @@ export default function ClinicBookingFlow() {
         ? clinic.locations
         : [{ id: '1', name: clinic.name || 'Clinic', address: clinic.address || '' }];
 
-      // Count doctors per branch
+      // Count doctors per branch using their CHAMBERS (not doctor-level locationId)
       const allDoctors = clinic?.linkedDoctorsDetails || [];
+      const mainBranchId = locations[0]?.id || '001';
+
+      // Collect ALL locationIds per doctor UID (a doctor may have entries for multiple branches)
+      const allLocationIdsPerDoctor = new Map<string, Set<string>>();
+      allDoctors.forEach((doc: any) => {
+        if (!allLocationIdsPerDoctor.has(doc.uid)) allLocationIdsPerDoctor.set(doc.uid, new Set());
+        if (doc.locationId) allLocationIdsPerDoctor.get(doc.uid)!.add(doc.locationId);
+      });
+
+      // Deduplicate doctors by UID (keep first entry for display data)
+      const uniqueDoctorsMap = new Map<string, any>();
+      allDoctors.forEach((doc: any) => {
+        if (!uniqueDoctorsMap.has(doc.uid)) uniqueDoctorsMap.set(doc.uid, doc);
+      });
+      const uniqueDoctors = Array.from(uniqueDoctorsMap.values());
+
+      console.log('🏷️ [BookingFlow] Branch Count Debug:', {
+        totalLinkedEntries: allDoctors.length,
+        uniqueDoctors: uniqueDoctors.length,
+        doctors: uniqueDoctors.map((d: any) => ({
+          name: d.name, uid: d.uid, locationId: d.locationId, status: d.status,
+          allLocationIds: Array.from(allLocationIdsPerDoctor.get(d.uid) || []),
+          chambers: (d.chambers || []).length,
+          chamberLocations: (d.chambers || []).map((ch: any) => ch.clinicLocationId)
+        }))
+      });
+
+      // Check if a doctor belongs to a branch
+      const doctorBelongsToBranch = (doc: any, branchId: string) => {
+        const chambers = doc.chambers || [];
+        if (chambers.length > 0) {
+          // Doctor has chambers — check if any chamber is at this branch
+          return chambers.some((ch: any) => (ch.clinicLocationId || '001') === branchId);
+        }
+        // Doctor has NO chambers (pending/new) — check ALL locationIds from all entries
+        const locIds = allLocationIdsPerDoctor.get(doc.uid);
+        if (locIds && locIds.size > 0) return locIds.has(branchId);
+        // No locationId at all — show at ALL branches (available everywhere until configured)
+        return true;
+      };
+
       const getDoctorCountForBranch = (branchId: string) => {
-        return allDoctors.filter((doc: any) => {
-          if (doc.locationId) return doc.locationId === branchId;
-          const chambers = doc.chambers || [];
-          if (Array.isArray(chambers) && chambers.length > 0) {
-            return chambers.some((ch: any) => ch.locationId === branchId);
-          }
-          return false;
-        }).length;
+        return uniqueDoctors.filter((doc: any) => doctorBelongsToBranch(doc, branchId)).length;
       };
 
       // Collect unique specialties per branch
       const getSpecialtiesForBranch = (branchId: string) => {
         const specs = new Set<string>();
-        allDoctors.forEach((doc: any) => {
-          let belongs = false;
-          if (doc.locationId) belongs = doc.locationId === branchId;
-          else {
-            const chambers = doc.chambers || [];
-            if (Array.isArray(chambers) && chambers.length > 0) {
-              belongs = chambers.some((ch: any) => ch.locationId === branchId);
-            }
-          }
-          if (belongs && doc.specialties) {
+        uniqueDoctors.forEach((doc: any) => {
+          if (doctorBelongsToBranch(doc, branchId) && doc.specialties) {
             doc.specialties.forEach((s: string) => specs.add(s));
           }
         });
@@ -653,10 +716,11 @@ export default function ClinicBookingFlow() {
         ...(doctorSchedule?.plannedOffPeriods || []).filter((p: any) => p.clinicId)
       ];
 
-      const filteredChambers = (selectedDoctor?.chambers || []).filter((chamber: any) => {
-        if (!selectedLocationId) return true;
-        return (chamber as any).locationId === selectedLocationId;
-      });
+      // Show only chambers matching the selected branch location
+      const allDoctorChambers = selectedDoctor?.chambers || [];
+      const filteredChambers = selectedLocationId
+        ? allDoctorChambers.filter((ch: any) => (ch.clinicLocationId || '001') === selectedLocationId)
+        : allDoctorChambers;
 
       return (
         <SelectChamber

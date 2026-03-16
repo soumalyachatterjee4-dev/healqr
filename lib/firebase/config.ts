@@ -9,6 +9,7 @@ import { initializeApp, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
+import { getFunctions, Functions } from 'firebase/functions';
 
 // Firebase configuration interface
 interface FirebaseConfig {
@@ -41,6 +42,7 @@ let app = null as unknown as FirebaseApp;
 let auth = null as unknown as Auth;
 let db = null as unknown as Firestore;
 let storage = null as unknown as FirebaseStorage;
+let functions = null as unknown as Functions;
 
 // Firebase configuration status
 const isFirebaseConfigured = !PROTOTYPE_MODE;
@@ -54,6 +56,7 @@ if (isFirebaseConfigured) {
     auth = getAuth(app);
     db = getFirestore(app);
     storage = getStorage(app);
+    functions = getFunctions(app);
 
     // Enable auth persistence - CRITICAL for PWA
     // Force LOCAL persistence to survive page reloads
@@ -87,4 +90,4 @@ export const FCM_VAPID_KEY: string | undefined = (import.meta as any)?.env?.VITE
 // Export prototype mode flag for components to check
 export const IS_PROTOTYPE_MODE = PROTOTYPE_MODE;
 
-export { app, auth, db, storage };
+export { app, auth, db, storage, functions };

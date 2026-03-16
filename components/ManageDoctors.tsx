@@ -41,6 +41,7 @@ import {
 import ClinicSidebar from './ClinicSidebar';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
+import { generateClinicLocationCode } from '../utils/idGenerator';
 
 interface Chamber {
   id: string;
@@ -55,6 +56,7 @@ interface Chamber {
   maxCapacity: number;
   status: 'active' | 'inactive';
   clinicId?: string; // CRITICAL: Track which clinic owns this chamber
+  clinicLocationId?: string; // Track which branch owns this chamber
 }
 
 interface LinkedDoctor {
@@ -137,6 +139,8 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
 
   const [clinicLocations, setClinicLocations] = useState<Array<{ id: string; name: string; address?: string }>>([]);
   const [defaultLocationId, setDefaultLocationId] = useState<string>(NO_LOCATION_ID);
+  const [mainBranchId, setMainBranchId] = useState<string>('001');
+  const [currentBranchId, setCurrentBranchId] = useState<string>('001');
   const [selectedDoctorLocationId, setSelectedDoctorLocationId] = useState<string>(NO_LOCATION_ID);
 
   // Calculate default dates for toggle off (tomorrow and 7 days ahead)
@@ -215,7 +219,11 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
         accessPin,
         isActive: true,
         expiryDate: today, // Valid for today only
-        chambers: (doctor.chambers || []).filter(ch => ch.clinicId === clinicId || !ch.clinicId),
+        chambers: (doctor.chambers || []).filter(ch => {
+          if (ch.clinicId !== clinicId && ch.clinicId) return false;
+          const chamberBranch = ch.clinicLocationId || mainBranchId;
+          return chamberBranch === currentBranchId;
+        }),
         createdAt: serverTimestamp(),
         loginCount: 0
       });
@@ -363,25 +371,50 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
         const clinicLocations = rawLocations.filter((loc: any) => loc?.id && loc?.name); // Remove any malformed entries
         setClinicLocations(clinicLocations);
         const resolvedDefaultLocationId = clinicLocations.length > 0 ? (data.defaultLocationId || clinicLocations[0].id) : NO_LOCATION_ID;
-        setDefaultLocationId(resolvedDefaultLocationId);
-        setSelectedDoctorLocationId(resolvedDefaultLocationId);
+        // Branch managers: force default location to their branch
+        const branchManagerLocationId = localStorage.getItem('healqr_location_id') || '';
+        const isBranchMgr = localStorage.getItem('healqr_is_location_manager') === 'true';
+        const effectiveDefaultLocation = (isBranchMgr && branchManagerLocationId) ? branchManagerLocationId : resolvedDefaultLocationId;
+        setDefaultLocationId(effectiveDefaultLocation);
+        setSelectedDoctorLocationId(effectiveDefaultLocation);
 
         // Load doctor data including chambers
         const doctorsData = data.linkedDoctorsDetails || [];
 
-        // Branch managers: filter to only doctors assigned to their branch
+        // Filter doctors by branch - both main clinic and branch managers see only their own branch
         const branchId = localStorage.getItem('healqr_location_id') || '';
         const isBranchManager = localStorage.getItem('healqr_is_location_manager') === 'true';
+        const resolvedMainBranchId = clinicLocations.length > 0 ? clinicLocations[0].id : '001';
+        const resolvedCurrentBranchId = (isBranchManager && branchId) ? branchId : resolvedMainBranchId;
+        setMainBranchId(resolvedMainBranchId);
+        setCurrentBranchId(resolvedCurrentBranchId);
+
+        console.log('🏥 [ManageDoctors] BRANCH FILTER DEBUG:', {
+          isBranchManager,
+          branchId,
+          resolvedMainBranchId,
+          resolvedCurrentBranchId,
+          totalDoctors: doctorsData.length,
+        });
+
+        // Deduplicate doctors by UID (linkedDoctorsDetails may have multiple entries per branch)
+        const uniqueDoctorsMap = new Map<string, LinkedDoctor>();
+        doctorsData.forEach((doctor: LinkedDoctor) => {
+          if (doctor.uid && !uniqueDoctorsMap.has(doctor.uid)) {
+            uniqueDoctorsMap.set(doctor.uid, doctor);
+          }
+        });
+        const uniqueDoctors = Array.from(uniqueDoctorsMap.values());
+
+        // Main clinic: show ALL doctors (main owner manages all branches)
+        // Branch managers: filter by locationId
         const filteredDoctorsData = isBranchManager && branchId
-          ? doctorsData.filter((doctor: LinkedDoctor) => {
-              if ((doctor as any).locationId) return (doctor as any).locationId === branchId;
-              const chambers = (doctor as any).chambers || [];
-              if (Array.isArray(chambers) && chambers.length > 0) {
-                return chambers.some((ch: any) => (ch.clinicLocationId || ch.locationId) === branchId);
-              }
-              return false;
+          ? uniqueDoctors.filter((doctor: LinkedDoctor) => {
+              const docBranch = (doctor as any).locationId || resolvedMainBranchId;
+              return docBranch === resolvedCurrentBranchId;
             })
-          : doctorsData;
+          : uniqueDoctors;
+        console.log(`🏥 [ManageDoctors] After filter: ${filteredDoctorsData.length} doctors`);
 
         const doctorsWithChambers = await Promise.all(
           filteredDoctorsData.map(async (doctor: LinkedDoctor) => {
@@ -392,11 +425,13 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
               if (doctorSnap.exists()) {
                 const doctorData = doctorSnap.data();
 
-                // CRITICAL FILTER: Show ONLY chambers belonging to THIS clinic
+                // CRITICAL FILTER: Show ONLY chambers belonging to THIS clinic AND this branch
                 const allChambers = doctorData.chambers || [];
-                const clinicChambers = allChambers.filter((chamber: Chamber) =>
-                  chamber.clinicId === clinicId
-                );
+                const clinicChambers = allChambers.filter((chamber: Chamber) => {
+                  if (chamber.clinicId !== clinicId) return false;
+                  const chamberBranch = chamber.clinicLocationId || resolvedMainBranchId;
+                  return chamberBranch === resolvedCurrentBranchId;
+                });
 
                 console.log(`🔒 SECURITY FILTER for Dr. ${doctor.name}:`, {
                   totalChambers: allChambers.length,
@@ -489,6 +524,13 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
     const currentUser = auth.currentUser;
     if (!currentUser) return;
 
+    // Resolve branch-specific clinic code and name
+    const branchLoc = (clinicData?.locations || []).find((l: any) => l.id === currentBranchId);
+    const branchClinicName = branchLoc?.name || clinicData?.name || 'Clinic';
+    const branchClinicCode = clinicData?.clinicCode
+      ? generateClinicLocationCode(clinicData.clinicCode, currentBranchId)
+      : '';
+
     try {
       // Check if doctor with this email already exists
       const doctorsRef = collection(db, 'doctors');
@@ -501,30 +543,46 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
         const existingDoctorData = existingDoctor.data();
         const existingDoctorId = existingDoctor.id;
 
-        // Check if already linked to this clinic
-        const isAlreadyLinked = linkedDoctors.some(d => d.uid === existingDoctorId);
-        if (isAlreadyLinked) {
-          toast.error('This doctor is already linked to your clinic');
+        // Check if already linked to this branch (allow same doctor on different branches)
+        const clinicRefForCheck = doc(db, 'clinics', effectiveClinicId!);
+        const clinicSnapForCheck = await getDoc(clinicRefForCheck);
+        const fullLinkedDoctors = clinicSnapForCheck.exists() ? (clinicSnapForCheck.data().linkedDoctorsDetails || []) : [];
+        const locationIdToUseForCheck = selectedDoctorLocationId && selectedDoctorLocationId !== NO_LOCATION_ID ? selectedDoctorLocationId : (defaultLocationId !== NO_LOCATION_ID ? defaultLocationId : '');
+        const isDuplicateOnBranch = fullLinkedDoctors.some(
+          (d: any) => d.uid === existingDoctorId && ((d as any).locationId || '001') === locationIdToUseForCheck
+        );
+        if (isDuplicateOnBranch) {
+          toast.error('This doctor is already linked to this branch');
           return;
         }
 
         // Doctor exists but not linked - link them to this clinic
         console.log('🔗 Doctor found, linking to clinic...');
 
-        // Update doctor's linkedClinics array
+        // Update doctor's linkedClinics array (only if this branch not already linked)
         const doctorRef = doc(db, 'doctors', existingDoctorId);
         const currentLinkedClinics = existingDoctorData.linkedClinics || [];
-        await updateDoc(doctorRef, {
-          linkedClinics: [...currentLinkedClinics, {
-            clinicId: effectiveClinicId,
-            clinicName: clinicData?.name || 'Clinic',
-            clinicCode: clinicData?.clinicCode || ''
-          }]
-        });
+        const clinicAlreadyLinked = currentLinkedClinics.some(
+          (c: any) => c.clinicId === effectiveClinicId && c.clinicCode === branchClinicCode
+        );
+        if (!clinicAlreadyLinked) {
+          try {
+            await updateDoc(doctorRef, {
+              linkedClinics: [...currentLinkedClinics, {
+                clinicId: effectiveClinicId,
+                clinicName: branchClinicName,
+                clinicCode: branchClinicCode
+              }]
+            });
+            console.log('✅ Updated doctor linkedClinics');
+          } catch (linkErr: any) {
+            console.error('⚠️ Failed to update doctor linkedClinics (permission?):', linkErr.message);
+          }
+        }
 
         // Add to clinic's linkedDoctorsDetails
         const clinicRef = doc(db, 'clinics', effectiveClinicId);
-        const existingDoctors = linkedDoctors || [];
+        const existingDoctors = fullLinkedDoctors;
         const newLinkedDoctor = {
           uid: existingDoctorId,
           email: existingDoctorData.email,
@@ -532,6 +590,7 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
           dateOfBirth: existingDoctorData.dateOfBirth,
           specialties: existingDoctorData.specialties,
           pinCode: existingDoctorData.pinCode,
+          locationId: locationIdToUse,
           doctorCode: existingDoctorData.doctorCode,
           qrNumber: existingDoctorData.qrNumber,
           status: existingDoctorData.status || 'active'
@@ -541,13 +600,12 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
           linkedDoctorsDetails: [...existingDoctors, newLinkedDoctor]
         });
 
-        // Update local state immediately
-        setLinkedDoctors([...existingDoctors, newLinkedDoctor]);
-
         toast.success(`✅ Doctor ${existingDoctorData.name} linked to your clinic!`);
         setShowAddModal(false);
         setNewDoctor({ email: '', name: '', pinCode: '', dateOfBirth: '' });
         setSelectedSpecialties([]);
+        // Reload with proper branch filtering
+        loadClinicData();
         return;
       }
 
@@ -579,13 +637,13 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
         profileLocked: false, // Will be true after activation (freezes email, DOB, pinCode)
         invitedBy: {
           clinicId: effectiveClinicId,
-          clinicName: clinicData?.name || 'Clinic',
+          clinicName: branchClinicName,
           timestamp: new Date()
         },
         linkedClinics: [{
           clinicId: effectiveClinicId,
-          clinicName: clinicData?.name || 'Clinic',
-          clinicCode: clinicData?.clinicCode || ''
+          clinicName: branchClinicName,
+          clinicCode: branchClinicCode
         }],
         invitationSentAt: new Date(),
         invitationExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
@@ -616,8 +674,10 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
       }
 
       // Update clinic's linkedDoctorsDetails
+      // IMPORTANT: Fetch full list from Firestore to avoid overwriting other branches' entries
       const clinicRef = doc(db, 'clinics', effectiveClinicId);
-      const existingDoctors = linkedDoctors || [];
+      const freshClinicSnap = await getDoc(clinicRef);
+      const existingDoctors = freshClinicSnap.exists() ? (freshClinicSnap.data().linkedDoctorsDetails || []) : [];
       const newLinkedDoctor = {
         uid: doctorId,
         email: newDoctor.email,
@@ -635,8 +695,8 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
         linkedDoctorsDetails: [...existingDoctors, newLinkedDoctor]
       });
 
-      // Update local state immediately
-      setLinkedDoctors([...existingDoctors, newLinkedDoctor]);
+      // Update local state with branch-appropriate view
+      setLinkedDoctors(prev => [...prev, newLinkedDoctor]);
 
       // Prepare invitation email data
       const invitationData = {
@@ -695,10 +755,43 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
     try {
       console.log('🔗 Starting link process for doctor:', searchedDoctor.uid);
 
-      // Check if already linked
-      const isAlreadyLinked = linkedDoctors.some(d => d.uid === searchedDoctor.uid);
-      if (isAlreadyLinked) {
-        toast.error('This doctor is already linked to your clinic');
+      // Determine the target locationId for this link
+      const branchMgrLocId = localStorage.getItem('healqr_location_id') || '';
+      const isBranchMgr = localStorage.getItem('healqr_is_location_manager') === 'true';
+      const targetLocationId = (isBranchMgr && branchMgrLocId) ? branchMgrLocId : (selectedDoctorLocationId || defaultLocationId);
+
+      console.log('🔗 [LinkDoctor] DEBUG:', {
+        doctorUid: searchedDoctor.uid,
+        doctorName: searchedDoctor.name,
+        isBranchMgr,
+        branchMgrLocId,
+        targetLocationId,
+        effectiveClinicId,
+        selectedDoctorLocationId,
+        defaultLocationId
+      });
+
+      // Check if already linked - fetch FULL list from Firestore (not branch-filtered local state)
+      const clinicRef = doc(db, 'clinics', effectiveClinicId!);
+      const clinicSnap = await getDoc(clinicRef);
+      if (!clinicSnap.exists()) {
+        toast.error('Clinic not found');
+        return;
+      }
+      const clinicDataFromDb = clinicSnap.data();
+      const currentLinkedDoctors: LinkedDoctor[] = clinicDataFromDb.linkedDoctorsDetails || [];
+
+      console.log('🔗 [LinkDoctor] Existing entries:', currentLinkedDoctors.map((d: any) => ({
+        uid: d.uid, name: d.name, locationId: d.locationId
+      })));
+
+      // Allow same doctor on different branches, but not duplicate on same branch
+      const isDuplicateOnBranch = currentLinkedDoctors.some(
+        d => d.uid === searchedDoctor.uid && ((d as any).locationId || '001') === targetLocationId
+      );
+      console.log('🔗 [LinkDoctor] isDuplicateOnBranch:', isDuplicateOnBranch, 'targetLocationId:', targetLocationId);
+      if (isDuplicateOnBranch) {
+        toast.error('This doctor is already linked to this branch');
         return;
       }
 
@@ -709,7 +802,7 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
         dateOfBirth: searchedDoctor.dateOfBirth || '',
         specialties: searchedDoctor.specialties || (searchedDoctor.specialty ? [searchedDoctor.specialty] : []),
         pinCode: searchedDoctor.pinCode || '',
-        locationId: selectedDoctorLocationId || defaultLocationId,
+        locationId: targetLocationId,
         doctorCode: searchedDoctor.doctorCode || '',
         qrNumber: searchedDoctor.qrNumber || '',
         status: searchedDoctor.status || 'active'
@@ -718,28 +811,12 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
       console.log('📝 New linked doctor data:', newLinkedDoctor);
 
       // Update clinic's linkedDoctorsDetails
-      const clinicRef = doc(db, 'clinics', effectiveClinicId!);
-      const clinicSnap = await getDoc(clinicRef);
+      console.log('✅ Clinic document exists');
 
-      let currentLinkedDoctors: LinkedDoctor[] = [];
-
-      if (clinicSnap.exists()) {
-        console.log('✅ Clinic document exists');
-        const clinicDataFromDb = clinicSnap.data();
-        currentLinkedDoctors = clinicDataFromDb.linkedDoctorsDetails || [];
-
-        await updateDoc(clinicRef, {
-          linkedDoctorsDetails: [...currentLinkedDoctors, newLinkedDoctor]
-        });
-        console.log('✅ Updated clinic linkedDoctorsDetails');
-      } else {
-        console.log('⚠️ Clinic document does not exist, creating it');
-        await setDoc(clinicRef, {
-          linkedDoctorsDetails: [newLinkedDoctor],
-          createdAt: new Date()
-        }, { merge: true });
-        console.log('✅ Created clinic document with linked doctor');
-      }
+      await updateDoc(clinicRef, {
+        linkedDoctorsDetails: [...currentLinkedDoctors, newLinkedDoctor]
+      });
+      console.log('✅ Updated clinic linkedDoctorsDetails');
 
       // Update doctor's linkedClinics
       const doctorRef = doc(db, 'doctors', searchedDoctor.uid);
@@ -749,26 +826,33 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
         console.log('✅ Doctor document exists');
         const existingClinics = doctorSnap.data().linkedClinics || [];
 
-        // Check if clinic is already in doctor's linkedClinics
-        const alreadyLinkedToClinic = existingClinics.some((c: any) => c.clinicId === currentUser.uid);
+        // Check if this specific branch is already in doctor's linkedClinics
+        const branchCodeForCheck = clinicData?.clinicCode
+          ? generateClinicLocationCode(clinicData.clinicCode, currentBranchId)
+          : '';
+        const alreadyLinkedToClinic = existingClinics.some(
+          (c: any) => c.clinicId === effectiveClinicId && c.clinicCode === branchCodeForCheck
+        );
 
         if (!alreadyLinkedToClinic) {
-          await updateDoc(doctorRef, {
-            linkedClinics: [...existingClinics, {
-              clinicId: effectiveClinicId,
-              clinicName: clinicData?.name || 'Clinic',
-              clinicCode: clinicData?.clinicCode || ''
-            }],
-            locationId: selectedDoctorLocationId || defaultLocationId
-          });
-          console.log('✅ Updated doctor linkedClinics and locationId');
+          try {
+            // Resolve branch-specific clinic code and name
+            const branchLoc = (clinicData?.locations || []).find((l: any) => l.id === currentBranchId);
+            const branchClinicName = branchLoc?.name || clinicData?.name || 'Clinic';
+            await updateDoc(doctorRef, {
+              linkedClinics: [...existingClinics, {
+                clinicId: effectiveClinicId,
+                clinicName: branchClinicName,
+                clinicCode: branchCodeForCheck
+              }]
+            });
+            console.log('✅ Updated doctor linkedClinics');
+          } catch (linkErr: any) {
+            console.error('⚠️ Failed to update doctor linkedClinics (permission?):', linkErr.message);
+            // Non-fatal: clinic-side link still works
+          }
         } else {
-          console.log('ℹ️ Clinic already in doctor linkedClinics');
-          // Ensure doctor has a locationId set for this clinic (optional override)
-          await updateDoc(doctorRef, {
-            locationId: selectedDoctorLocationId || defaultLocationId
-          });
-          console.log('✅ Updated doctor locationId for existing link');
+          console.log('ℹ️ Clinic already in doctor linkedClinics (branch-level link stored in linkedDoctorsDetails)');
         }
       } else {
         console.error('❌ Doctor document does not exist!');
@@ -807,11 +891,31 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
 
     try {
       // Remove from clinic's linkedDoctorsDetails
+      // IMPORTANT: Read fresh from Firestore (not the filtered state) to preserve other branches' entries
       const clinicRef = doc(db, 'clinics', effectiveClinicId!);
       const clinicSnap = await getDoc(clinicRef);
 
       if (clinicSnap.exists()) {
-        const updatedDoctors = linkedDoctors.filter(d => d.uid !== doctorId);
+        const allDoctors = clinicSnap.data().linkedDoctorsDetails || [];
+        console.log('🗑️ [UnlinkDoctor] Before remove:', {
+          totalEntries: allDoctors.length,
+          targetDoctorId: doctorId,
+          currentBranchId,
+          mainBranchId,
+          entries: allDoctors.map((d: any) => ({ uid: d.uid, name: d.name, locationId: d.locationId }))
+        });
+        // Only remove the entry matching this doctor AND this branch
+        const updatedDoctors = allDoctors.filter((d: any) => {
+          if (d.uid !== doctorId) return true; // keep other doctors
+          // For the matching doctor, only remove if locationId matches current branch
+          const docBranch = d.locationId || mainBranchId;
+          return docBranch !== currentBranchId;
+        });
+        console.log('🗑️ [UnlinkDoctor] After remove:', {
+          remainingEntries: updatedDoctors.length,
+          removed: allDoctors.length - updatedDoctors.length,
+          entries: updatedDoctors.map((d: any) => ({ uid: d.uid, name: d.name, locationId: d.locationId }))
+        });
         await updateDoc(clinicRef, {
           linkedDoctorsDetails: updatedDoctors
         });
@@ -823,7 +927,19 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
 
       if (doctorSnap.exists()) {
         const existingClinics = doctorSnap.data().linkedClinics || [];
-        const updatedClinics = existingClinics.filter((c: any) => c.clinicId !== effectiveClinicId);
+        // Remove the clinic entry that matches this clinic AND this branch code
+        const branchCode = existingClinics.find((c: any) => c.clinicId === effectiveClinicId)?.clinicCode || '';
+        const branchSegment = branchCode.match(/^HQR-\d{6}-\d{4}-(\d{3})-CLN$/);
+        const linkedBranchId = branchSegment ? branchSegment[1] : mainBranchId;
+
+        let updatedClinics;
+        if (linkedBranchId === currentBranchId) {
+          // Only remove if the linked branch matches the current branch doing the unlink
+          updatedClinics = existingClinics.filter((c: any) => c.clinicId !== effectiveClinicId);
+        } else {
+          // Different branch — don't remove
+          updatedClinics = existingClinics;
+        }
         await updateDoc(doctorRef, {
           linkedClinics: updatedClinics
         });

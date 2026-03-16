@@ -34,6 +34,7 @@ import {
 import { auth, storage } from '../lib/firebase/config';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getStateFromPincode } from '../utils/pincodeMapping';
+import { generateClinicLocationCode } from '../utils/idGenerator';
 
 interface ClinicProfileManagerProps {
   onMenuChange?: (menu: string) => void;
@@ -70,6 +71,9 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
   const [companyName, setCompanyName] = useState('');
   const [division, setDivision] = useState('');
   const [qrType, setQrType] = useState('');
+
+  // Branch manager-specific
+  const [locationPinCode, setLocationPinCode] = useState('');
 
   // Editable required field
   const [name, setName] = useState('');
@@ -116,16 +120,37 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
         return;
       }
 
+      // Resolve clinic ID: branch managers use parent clinic ID
+      const isLocMgr = localStorage.getItem('healqr_is_location_manager') === 'true';
+      const resolvedClinicId = isLocMgr
+        ? (localStorage.getItem('healqr_parent_clinic_id') || user.uid)
+        : user.uid;
+
       const { db } = await import('../lib/firebase/config');
       if (!db) return;
 
       const { doc, getDoc } = await import('firebase/firestore');
-      const clinicDocRef = doc(db, 'clinics', user.uid);
+      const clinicDocRef = doc(db, 'clinics', resolvedClinicId);
       const clinicDoc = await getDoc(clinicDocRef);
 
       if (clinicDoc.exists()) {
         const data = clinicDoc.data();
         console.log('✅ Loaded clinic profile:', data);
+
+        // 🔄 MIGRATION: Update old clinic codes to new format
+        const rawCode = data.clinicCode || '';
+        if (rawCode.match(/^HQR-\d{6}-\d{4}-CLN$/)) {
+          const newCode = rawCode.replace(/-CLN$/, '-001-CLN');
+          console.log(`🔄 Migrating clinic code: ${rawCode} → ${newCode}`);
+          try {
+            const { updateDoc } = await import('firebase/firestore');
+            await updateDoc(clinicDocRef, { clinicCode: newCode });
+            data.clinicCode = newCode; // Update local data
+            console.log('✅ Clinic code migrated successfully');
+          } catch (migrationError) {
+            console.warn('⚠️ Clinic code migration failed (non-critical):', migrationError);
+          }
+        }
 
         // Non-editable fields
         setEmail(data.email || user.email || '');
@@ -134,7 +159,20 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
         setLocations(data.locations || []);
         setDefaultLocationId(data.defaultLocationId || (data.locations?.[0]?.id || ''));
         setQrNumber(data.qrNumber || '');
-        setClinicCode(data.clinicCode || '');
+        // Set clinic code: use 001-segment format for display
+        setClinicCode(rawCode ? generateClinicLocationCode(rawCode, '001') : '');
+
+        // For branch managers, override clinicCode and set locationPinCode from their branch
+        if (isLocMgr) {
+          const branchId = localStorage.getItem('healqr_location_id') || '';
+          const branchLocs = data.locations || [];
+          const myBranch = branchLocs.find((l: any) => l.id === branchId);
+          if (myBranch) {
+            if (myBranch.clinicCode) setClinicCode(myBranch.clinicCode);
+            if (myBranch.pinCode) setLocationPinCode(myBranch.pinCode);
+          }
+        }
+
         setCompanyName(data.companyName || '');
         setDivision(data.division || '');
         setQrType(data.qrType || (data.qrNumber ? 'preprinted' : ''));
@@ -330,7 +368,13 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
       }
       const { doc, updateDoc } = await import('firebase/firestore');
 
-      const clinicDocRef = doc(db, 'clinics', user.uid);
+      // Resolve clinic ID: branch managers use parent clinic ID
+      const isLocMgr = localStorage.getItem('healqr_is_location_manager') === 'true';
+      const resolvedClinicId = isLocMgr
+        ? (localStorage.getItem('healqr_parent_clinic_id') || user.uid)
+        : user.uid;
+
+      const clinicDocRef = doc(db, 'clinics', resolvedClinicId);
       await updateDoc(clinicDocRef, {
         name: name.trim(),
         landmark: landmark.trim(),
@@ -543,6 +587,22 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
                     <Input
                       type="text"
                       value={clinicCode}
+                      disabled
+                      className="pl-12 bg-zinc-950 border-zinc-800 text-gray-500 h-12 rounded-lg cursor-not-allowed font-mono"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Location Pincode — shown for branch managers */}
+              {locationPinCode && (
+                <div>
+                  <Label className="mb-2 block text-gray-300">Location Pincode</Label>
+                  <div className="relative">
+                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                    <Input
+                      type="text"
+                      value={locationPinCode}
                       disabled
                       className="pl-12 bg-zinc-950 border-zinc-800 text-gray-500 h-12 rounded-lg cursor-not-allowed font-mono"
                     />

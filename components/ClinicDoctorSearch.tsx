@@ -72,7 +72,30 @@ export default function ClinicDoctorSearch({
 
         // Method 1: Get linkedDoctorsDetails (onboarded doctors with full details)
         const linkedDoctors = clinicData.linkedDoctorsDetails || [];
-        allDoctorsData.push(...linkedDoctors);
+
+        // Enrich doctors with chamber data from their Firestore documents
+        const enrichedDoctors = await Promise.all(
+          linkedDoctors.map(async (doctor: any) => {
+            try {
+              const doctorRef = doc(db, 'doctors', doctor.uid);
+              const doctorSnap = await getDoc(doctorRef);
+              if (doctorSnap.exists()) {
+                const doctorData = doctorSnap.data();
+                const allChambers = doctorData.chambers || [];
+                const clinicChambers = allChambers.filter((ch: any) => ch.clinicId === bookingClinicId);
+                return {
+                  ...doctor,
+                  chambers: clinicChambers,
+                  locationId: doctor.locationId || doctorData.locationId || ''
+                };
+              }
+            } catch (e) {
+              console.warn('Could not fetch doctor chambers:', doctor.uid);
+            }
+            return doctor;
+          })
+        );
+        allDoctorsData.push(...enrichedDoctors);
 
         // Method 2: Get non-onboarded doctors from the doctors collection
         // Check if clinic has a doctors array with email/UIDs
@@ -102,30 +125,61 @@ export default function ClinicDoctorSearch({
 
         const selectedLocationId = sessionStorage.getItem('booking_location_id');
 
+        // Determine main branch ID (first location, typically '001')
+        const clinicLocations = clinicData.locations || [];
+        const mainBranchId = clinicLocations.length > 0 ? clinicLocations[0].id : '001';
+
+        // Collect ALL locationIds per doctor UID (a doctor may have entries for multiple branches)
+        const allLocationIdsPerDoctor = new Map<string, Set<string>>();
+        allDoctorsData.forEach((doc) => {
+          if (!allLocationIdsPerDoctor.has(doc.uid)) allLocationIdsPerDoctor.set(doc.uid, new Set());
+          if ((doc as any).locationId) allLocationIdsPerDoctor.get(doc.uid)!.add((doc as any).locationId);
+        });
+
+        // Deduplicate doctors by UID (keep first entry for display data)
+        const uniqueDoctorsMap = new Map<string, Doctor>();
+        allDoctorsData.forEach((doc) => {
+          if (!uniqueDoctorsMap.has(doc.uid)) uniqueDoctorsMap.set(doc.uid, doc);
+        });
+        const uniqueDoctors = Array.from(uniqueDoctorsMap.values());
+
+        console.log('🔍 [DoctorSearch] Debug:', {
+          selectedLocationId,
+          mainBranchId,
+          totalEntries: allDoctorsData.length,
+          uniqueDoctors: uniqueDoctors.length,
+          doctors: uniqueDoctors.map(d => ({
+            name: d.name, uid: d.uid, status: d.status,
+            locationId: (d as any).locationId,
+            allLocationIds: Array.from(allLocationIdsPerDoctor.get(d.uid) || []),
+            chambers: ((d as any).chambers || []).length
+          }))
+        });
+
+        // Filter doctors by branch using chambers + ALL locationIds across all entries
         const locationFilteredDoctors = selectedLocationId
-          ? allDoctorsData.filter((doc) => {
-              // If doctor has an explicit locationId, only show if matches the selected location
-              if ((doc as any).locationId) {
-                return (doc as any).locationId === selectedLocationId;
-              }
-
-              // If doctor has chambers, match any chamber's locationId
+          ? uniqueDoctors.filter((doc) => {
               const chambers = (doc as any).chambers || [];
-              if (Array.isArray(chambers) && chambers.length > 0) {
-                return chambers.some((ch: any) => ch.locationId === selectedLocationId);
+              if (chambers.length > 0) {
+                // Doctor has chambers — check if any chamber is at this branch
+                return chambers.some((ch: any) => (ch.clinicLocationId || '001') === selectedLocationId);
               }
-
-              // Otherwise, treat as location-agnostic (compatibility fallback)
+              // Doctor has NO chambers (pending/new) — check ALL locationIds from all entries
+              const locIds = allLocationIdsPerDoctor.get(doc.uid);
+              if (locIds && locIds.size > 0) return locIds.has(selectedLocationId);
+              // No locationId at all — show at ALL branches (available everywhere until configured)
               return true;
             })
-          : allDoctorsData;
+          : uniqueDoctors;
+
+        console.log('🔍 [DoctorSearch] After branch filter:', locationFilteredDoctors.length, 'doctors');
 
         setDoctors(locationFilteredDoctors);
         setFilteredDoctors(locationFilteredDoctors);
 
-        // Extract unique specialties from all doctors
+        // Extract unique specialties from branch-filtered doctors only
         const specialtiesSet = new Set<string>();
-        allDoctorsData.forEach((doctor: Doctor) => {
+        locationFilteredDoctors.forEach((doctor: Doctor) => {
           doctor.specialties?.forEach((spec: string) => specialtiesSet.add(spec));
         });
         setAvailableSpecialties(Array.from(specialtiesSet).sort((a, b) =>
