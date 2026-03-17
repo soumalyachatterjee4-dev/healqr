@@ -317,6 +317,10 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
       const today = new Date();
       const todayDay = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][today.getDay()];
 
+      // Determine main branch ID from clinic locations
+      const clinicLocations = data.locations || [];
+      const mainBranchId = clinicLocations.length > 0 ? clinicLocations[0].id : '001';
+
       // 1. Fetch all doctors and their chambers in parallel
       const doctorDetailsPromises = linkedDoctors.map(async (doctor) => {
         const docId = doctor?.doctorId || (doctor as any)?.uid;
@@ -337,6 +341,10 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
               const chamberLocId = chamber.clinicLocationId || chamber.locationId || '';
               // Exclude chambers without locationId — they belong to main branch
               if (!chamberLocId || chamberLocId !== locationManagerBranchId) return false;
+            } else {
+              // Main clinic: only show chambers belonging to main branch
+              const chamberLocId = chamber.clinicLocationId || chamber.locationId || '';
+              if (chamberLocId && chamberLocId !== '001' && chamberLocId !== mainBranchId) return false;
             }
             if (chamber.frequency === 'Custom') {
               return chamber.customDate === today.toISOString().split('T')[0];
@@ -355,11 +363,21 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
 
       // 2. Format and flatten chambers
       const chambers: TodayChamber[] = [];
+      const now = new Date();
       doctorDetails.forEach((res) => {
         if (!res) return;
         const { doctorData, todayChambers } = res;
 
         todayChambers.forEach((chamber) => {
+          // Calculate isExpired based on endTime
+          let isExpired = false;
+          if (chamber.endTime) {
+            const [endHour, endMin] = chamber.endTime.split(':').map(Number);
+            const chamberEndTime = new Date(now);
+            chamberEndTime.setHours(endHour, endMin, 0, 0);
+            isExpired = chamberEndTime < now;
+          }
+
           chambers.push({
             id: chamber.id,
             doctorName: doctorData.name || 'Doctor',
@@ -372,9 +390,18 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
             endTime: chamber.endTime || '00:00',
             booked: 0, // Inferred for now
             capacity: chamber.maxCapacity || 0,
-            isExpired: false // Inferred
+            isExpired
           });
         });
+      });
+
+      // Sort: active chambers first, expired to bottom, then by start time
+      chambers.sort((a, b) => {
+        if (a.isExpired && !b.isExpired) return 1;
+        if (!a.isExpired && b.isExpired) return -1;
+        const aStart = a.startTime.split(':').map(Number);
+        const bStart = b.startTime.split(':').map(Number);
+        return (aStart[0] * 60 + (aStart[1] || 0)) - (bStart[0] * 60 + (bStart[1] || 0));
       });
 
       setTodaysChambers(chambers);

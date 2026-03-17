@@ -41,7 +41,7 @@ interface ChamberWithBookingCount extends Chamber {
 interface SelectChamberProps {
   onBack: () => void;
   onContinue?: (chamberName: string, consultationType: 'chamber' | 'video') => void;
-  onChamberSelect?: (chamberId: number, chamberName: string) => void; // For clinic QR flow
+  onChamberSelect?: (chamberId: number, chamberName: string, startTime?: string, endTime?: string) => void; // For clinic QR flow
   selectedDate: Date;
   onLanguageChange?: () => void;
   hasVideoConsultation?: boolean; // Premium add-on
@@ -794,7 +794,7 @@ export default function SelectChamber({
               } else if (selectedChamber) {
                 // Call onChamberSelect if provided (clinic QR flow), otherwise onContinue (doctor QR flow)
                 if (onChamberSelect) {
-                  onChamberSelect(selectedChamber.id, selectedChamber.chamberName);
+                  onChamberSelect(selectedChamber.id, selectedChamber.chamberName, selectedChamber.startTime, selectedChamber.endTime);
                 } else {
                   onContinue?.(selectedChamber.chamberName, 'chamber');
                 }

@@ -1044,9 +1044,14 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
         }
       }
 
-      // ✅ SIMPLE SORT: Match doctor dashboard - just alphabetical by doctor name
-      // Chambers within each doctor are already sorted by time (active first, then expired)
-      schedules.sort((a, b) => a.doctorName.localeCompare(b.doctorName));
+      // Sort: doctors with all-expired chambers go to bottom, then alphabetical
+      schedules.sort((a, b) => {
+        const aAllExpired = a.chambers.length > 0 && a.chambers.every(ch => ch.isExpired);
+        const bAllExpired = b.chambers.length > 0 && b.chambers.every(ch => ch.isExpired);
+        if (aAllExpired && !bAllExpired) return 1;
+        if (!aAllExpired && bAllExpired) return -1;
+        return a.doctorName.localeCompare(b.doctorName);
+      });
 
       setDoctorSchedules(schedules);
     } catch (error) {

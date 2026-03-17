@@ -160,15 +160,22 @@ export default function ClinicDoctorSearch({
         const locationFilteredDoctors = selectedLocationId
           ? uniqueDoctors.filter((doc) => {
               const chambers = (doc as any).chambers || [];
-              if (chambers.length > 0) {
-                // Doctor has chambers — check if any chamber is at this branch
-                return chambers.some((ch: any) => (ch.clinicLocationId || '001') === selectedLocationId);
-              }
-              // Doctor has NO chambers (pending/new) — check ALL locationIds from all entries
               const locIds = allLocationIdsPerDoctor.get(doc.uid);
-              if (locIds && locIds.size > 0) return locIds.has(selectedLocationId);
-              // No locationId at all — show at ALL branches (available everywhere until configured)
-              return true;
+              
+              // Check chambers: any chamber at this branch?
+              const hasChamberAtBranch = chambers.length > 0 && 
+                chambers.some((ch: any) => (ch.clinicLocationId || '001') === selectedLocationId);
+              
+              // Check linkedDoctorsDetails entries: any entry with this locationId?
+              const hasLocationIdEntry = locIds ? locIds.has(selectedLocationId) : false;
+              
+              // Doctor belongs if EITHER their chambers match OR their locationId entries match
+              if (hasChamberAtBranch || hasLocationIdEntry) return true;
+              
+              // No chambers AND no locationIds at all — show everywhere until configured
+              if (chambers.length === 0 && (!locIds || locIds.size === 0)) return true;
+              
+              return false;
             })
           : uniqueDoctors;
 

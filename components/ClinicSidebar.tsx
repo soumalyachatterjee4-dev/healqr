@@ -160,10 +160,10 @@ export default function ClinicSidebar({
       <div key={section.id} className="mb-4">
         <button
           onClick={() => setExpandedSections(prev => ({ ...prev, [section.id]: !prev[section.id as keyof typeof prev] }))}
-          className="w-full flex items-center justify-between px-4 py-2 text-[10px] font-bold text-zinc-600 uppercase tracking-[0.1em] hover:text-zinc-400 transition-colors text-left"
+          className="w-full flex items-center justify-between px-4 py-2 text-[10px] font-bold text-blue-400/50 uppercase tracking-[0.1em] hover:text-blue-300/70 transition-colors text-left"
         >
           <span className="whitespace-nowrap">{section.title}</span>
-          <ChevronDown className={`w-3 h-3 text-zinc-700 transition-transform duration-200 ${isExpanded ? '' : '-rotate-90'} shrink-0`} />
+          <ChevronDown className={`w-3 h-3 text-blue-500/40 transition-transform duration-200 ${isExpanded ? '' : '-rotate-90'} shrink-0`} />
         </button>
 
         {isExpanded && (
@@ -182,12 +182,12 @@ export default function ClinicSidebar({
                 }}
                 className={`w-full flex items-center justify-between px-4 py-2 rounded-lg transition-all duration-200 group text-left ${
                   !accessible
-                    ? 'text-zinc-700 cursor-not-allowed opacity-50'
+                    ? 'text-slate-600 cursor-not-allowed opacity-50'
                     : activeMenu === item.id
-                    ? 'bg-sky-400/10 text-sky-400'
+                    ? 'bg-blue-500/15 text-blue-400'
                     : item.isAddon
-                      ? 'text-[#38bdf8] hover:bg-white/5'
-                      : 'text-zinc-500 hover:bg-white/5 hover:text-zinc-200'
+                      ? 'text-blue-300 hover:bg-blue-500/10'
+                      : 'text-slate-400 hover:bg-blue-500/10 hover:text-blue-200'
                 }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -195,9 +195,9 @@ export default function ClinicSidebar({
                   <span className="text-[12px] font-normal whitespace-nowrap">{item.label}</span>
                 </div>
                 {!accessible ? (
-                  <Lock className="w-3 h-3 text-zinc-600 shrink-0" />
+                  <Lock className="w-3 h-3 text-slate-600 shrink-0" />
                 ) : item.isAddon ? (
-                  <Check className="w-3 h-3 text-[#38bdf8] opacity-80 shrink-0" />
+                  <Check className="w-3 h-3 text-blue-400 opacity-80 shrink-0" />
                 ) : null}
               </button>
               );
@@ -220,12 +220,13 @@ export default function ClinicSidebar({
 
       {/* Sidebar */}
       <aside
-        className="fixed left-0 top-0 h-screen w-64 bg-black border-r border-zinc-900 z-[9999] transition-transform duration-300 ease-in-out"
+        className="fixed left-0 top-0 h-screen w-64 border-r border-blue-900/30 z-[9999] transition-transform duration-300 ease-in-out"
         style={{
-          transform: isDesktop || isOpen ? 'translateX(0)' : 'translateX(-100%)'
+          transform: isDesktop || isOpen ? 'translateX(0)' : 'translateX(-100%)',
+          backgroundColor: '#0a0f1e'
         }}
       >
-        <div className="flex flex-col h-full bg-black">
+        <div className="flex flex-col h-full" style={{ backgroundColor: '#0a0f1e' }}>
           {/* Logo */}
           <div className="p-6">
             <img src={healqrLogo} alt="healQr" className="h-8 w-auto filter invert brightness-200" />
@@ -242,8 +243,8 @@ export default function ClinicSidebar({
                 }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${
                   activeMenu === 'dashboard'
-                    ? 'bg-[#0ea5e9] text-white shadow-lg shadow-sky-500/20'
-                    : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100'
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/25'
+                    : 'text-slate-400 hover:bg-blue-900/30 hover:text-blue-200'
                 }`}
               >
                 <LayoutDashboard className="w-5 h-5" />
@@ -257,10 +258,10 @@ export default function ClinicSidebar({
 
             {/* Logout Button - hidden for assistants */}
             {!isAssistant && (
-            <div className="mt-8 mb-8 border-t border-zinc-900 pt-4">
+            <div className="mt-8 mb-8 border-t border-blue-900/30 pt-4">
               <button
                 onClick={onLogout}
-                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-zinc-500 hover:text-zinc-200 hover:bg-white/5 transition-colors"
+                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-red-500 hover:text-red-400 hover:bg-red-950/30 transition-colors"
               >
                 <LogOut className="w-4 h-4" />
                 <span>Logout</span>

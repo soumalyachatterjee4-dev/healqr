@@ -175,18 +175,29 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
             }
           });
           const filteredDoctors = Array.from(uniqueDoctorsMap.values());
-          // Note: No doctor-level locationId filter needed here
-          // Chamber-level clinicLocationId filtering handles branch segregation
-          setDoctors(filteredDoctors);
+          // Filter doctors by branch for branch managers
+          const branchLocId = isLocationManager ? (localStorage.getItem('healqr_location_id') || '') : '';
+          const branchFilteredDoctors = (isLocationManager && branchLocId)
+            ? filteredDoctors.filter((doc: Doctor) => {
+                // Check if any chamber belongs to this branch
+                const chambers = (doc as any).chambers || [];
+                const hasChamberAtBranch = chambers.some((ch: any) => ch.clinicLocationId === branchLocId);
+                // Check if doctor's locationId in linkedDoctorsDetails matches
+                const hasLocationIdEntry = (doc as any).locationId === branchLocId;
+                return hasChamberAtBranch || hasLocationIdEntry;
+              })
+            : filteredDoctors;
+          setDoctors(branchFilteredDoctors);
 
           // Auto-fetch clinic info
           let clinicNameValue = data.clinicName || data.name || "";
           let clinicAddressValue = data.address || "";
 
           // Branch managers: use branch name/address instead of main clinic
-          if (isLocationManager && branchId) {
+          const branchIdForInfo = isLocationManager ? (localStorage.getItem('healqr_location_id') || '') : '';
+          if (isLocationManager && branchIdForInfo) {
             const locations = data.locations || [];
-            const branch = locations.find((l: any) => l.id === branchId);
+            const branch = locations.find((l: any) => l.id === branchIdForInfo);
             if (branch) {
               clinicNameValue = branch.name || clinicNameValue;
               clinicAddressValue = branch.landmark || branch.address || clinicAddressValue;
@@ -205,11 +216,11 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
 
           if (
             preSelectedDoctorId &&
-            filteredDoctors.find((d: Doctor) => d.uid === preSelectedDoctorId)
+            branchFilteredDoctors.find((d: Doctor) => d.uid === preSelectedDoctorId)
           ) {
             // Use the pre-selected doctor
             setSelectedDoctorId(preSelectedDoctorId);
-            const selectedDoc = filteredDoctors.find(
+            const selectedDoc = branchFilteredDoctors.find(
               (d: Doctor) => d.uid === preSelectedDoctorId,
             );
             setSelectedDoctor(selectedDoc);
@@ -220,10 +231,10 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
 
             // Show toast notification
             toast.success(`Editing schedule for Dr. ${selectedDoc?.name}`);
-          } else if (filteredDoctors.length > 0 && !selectedDoctorId) {
+          } else if (branchFilteredDoctors.length > 0 && !selectedDoctorId) {
             // Auto-select first doctor if no pre-selection
-            setSelectedDoctorId(filteredDoctors[0].uid);
-            setSelectedDoctor(filteredDoctors[0]);
+            setSelectedDoctorId(branchFilteredDoctors[0].uid);
+            setSelectedDoctor(branchFilteredDoctors[0]);
           }
         } else {
           console.error("Clinic document not found");
@@ -1865,10 +1876,33 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
                       </p>
 
                       <div className="space-y-4">
-                        {chambers.map((chamber) => (
+                        {[...chambers].sort((a, b) => {
+                          const now = new Date();
+                          const getExpired = (ch: Chamber) => {
+                            if (!ch.endTime) return false;
+                            const [h, m] = ch.endTime.split(':').map(Number);
+                            const end = new Date(now);
+                            end.setHours(h, m, 0, 0);
+                            return end < now;
+                          };
+                          const aExp = getExpired(a);
+                          const bExp = getExpired(b);
+                          if (aExp && !bExp) return 1;
+                          if (!aExp && bExp) return -1;
+                          return 0;
+                        }).map((chamber) => {
+                          const now = new Date();
+                          const isTimeOver = (() => {
+                            if (!chamber.endTime) return false;
+                            const [h, m] = chamber.endTime.split(':').map(Number);
+                            const end = new Date(now);
+                            end.setHours(h, m, 0, 0);
+                            return end < now;
+                          })();
+                          return (
                           <Card
                             key={chamber.id}
-                            className="bg-gray-800/50 border-gray-700 overflow-hidden"
+                            className={`bg-gray-800/50 border-gray-700 overflow-hidden ${isTimeOver ? 'opacity-60' : ''}`}
                           >
                             {/* Chamber Header */}
                             <div className="p-4 flex items-center justify-between">
@@ -1888,6 +1922,11 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
                                   </p>
                                 </div>
                                 <div className="flex items-center gap-4">
+                                  {isTimeOver && (
+                                    <span className="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30">
+                                      Time Over
+                                    </span>
+                                  )}
                                   <span
                                     className={`text-xs sm:text-sm font-bold uppercase tracking-wider ${chamber.status === "active" ? "text-blue-400" : "text-zinc-500"}`}
                                   >
@@ -1959,6 +1998,11 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
                                     </Label>
                                     <p className="text-white text-sm">
                                       {chamber.startTime} - {chamber.endTime}
+                                      {isTimeOver && (
+                                        <span className="ml-2 text-xs font-bold px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30">
+                                          Time Over
+                                        </span>
+                                      )}
                                     </p>
                                   </div>
                                   <div>
@@ -2021,7 +2065,8 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
                               </div>
                             )}
                           </Card>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}

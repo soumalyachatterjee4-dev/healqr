@@ -54,6 +54,14 @@ interface ClinicData {
 }
 
 export default function ClinicBookingFlow() {
+  // Helper to convert 24h time ("22:00") to 12h format ("10:00 PM")
+  const formatTime24to12 = (time24: string): string => {
+    const [hours, minutes] = time24.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const hours12 = hours % 12 || 12;
+    return `${hours12}:${String(minutes).padStart(2, '0')} ${period}`;
+  };
+
   const [currentStep, setCurrentStep] = useState<BookingStep>('language');
   const [language, setLanguage] = useState<Language>('english');
 
@@ -61,6 +69,7 @@ export default function ClinicBookingFlow() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedChamberId, setSelectedChamberId] = useState<number | null>(null);
   const [selectedChamberName, setSelectedChamberName] = useState<string>('');
+  const [selectedChamberTime, setSelectedChamberTime] = useState<string>('');
   const [selectedLocationId, setSelectedLocationId] = useState<string>('');
   const [selectedLocationName, setSelectedLocationName] = useState<string>('');
   const [bookingId, setBookingId] = useState<string>('');
@@ -388,11 +397,17 @@ export default function ClinicBookingFlow() {
     setCurrentStep('select-chamber');
   };
 
-  const handleChamberSelect = (chamberId: number, chamberName: string) => {
+  const handleChamberSelect = (chamberId: number, chamberName: string, startTime?: string, endTime?: string) => {
     setSelectedChamberId(chamberId);
     setSelectedChamberName(chamberName);
+    // Format and store chamber time for booking confirmation
+    const timeStr = startTime && endTime
+      ? `${formatTime24to12(startTime)} - ${formatTime24to12(endTime)}`
+      : '';
+    setSelectedChamberTime(timeStr);
     sessionStorage.setItem('booking_chamber_id', chamberId.toString());
     sessionStorage.setItem('booking_chamber_name', chamberName);
+    if (timeStr) sessionStorage.setItem('booking_chamber_time', timeStr);
     setCurrentStep('patient-form');
   };
 
@@ -422,12 +437,14 @@ export default function ClinicBookingFlow() {
     sessionStorage.removeItem('booking_date');
     sessionStorage.removeItem('booking_chamber_id');
     sessionStorage.removeItem('booking_chamber_name');
+    sessionStorage.removeItem('booking_chamber_time');
     sessionStorage.removeItem('booking_location_id');
     sessionStorage.removeItem('booking_location_name');
     setSelectedDoctor(null);
     setSelectedDate(null);
     setSelectedChamberId(null);
     setSelectedChamberName('');
+    setSelectedChamberTime('');
     setSelectedLocationId('');
     setSelectedLocationName('');
     setCurrentStep('clinic-website');
@@ -467,6 +484,7 @@ export default function ClinicBookingFlow() {
         setCurrentStep('select-chamber');
         setSelectedChamberId(null);
         setSelectedChamberName('');
+        setSelectedChamberTime('');
         break;
       default:
         break;
@@ -557,15 +575,22 @@ export default function ClinicBookingFlow() {
       // Check if a doctor belongs to a branch
       const doctorBelongsToBranch = (doc: any, branchId: string) => {
         const chambers = doc.chambers || [];
-        if (chambers.length > 0) {
-          // Doctor has chambers — check if any chamber is at this branch
-          return chambers.some((ch: any) => (ch.clinicLocationId || '001') === branchId);
-        }
-        // Doctor has NO chambers (pending/new) — check ALL locationIds from all entries
         const locIds = allLocationIdsPerDoctor.get(doc.uid);
-        if (locIds && locIds.size > 0) return locIds.has(branchId);
-        // No locationId at all — show at ALL branches (available everywhere until configured)
-        return true;
+        
+        // Check chambers: any chamber at this branch?
+        const hasChamberAtBranch = chambers.length > 0 && 
+          chambers.some((ch: any) => (ch.clinicLocationId || '001') === branchId);
+        
+        // Check linkedDoctorsDetails entries: any entry with this locationId?
+        const hasLocationIdEntry = locIds ? locIds.has(branchId) : false;
+        
+        // Doctor belongs if EITHER their chambers match OR their locationId entries match
+        if (hasChamberAtBranch || hasLocationIdEntry) return true;
+        
+        // No chambers AND no locationIds at all — show at ALL branches (available everywhere until configured)
+        if (chambers.length === 0 && (!locIds || locIds.size === 0)) return true;
+        
+        return false;
       };
 
       const getDoctorCountForBranch = (branchId: string) => {
@@ -750,6 +775,7 @@ export default function ClinicBookingFlow() {
           // Pass required IDs
           doctorId={selectedDoctor?.uid}
           selectedChamber={selectedChamberName}
+          selectedTime={selectedChamberTime}
           // Pass display data
           doctorName={selectedDoctor?.name || ''}
           doctorDegrees={selectedDoctor?.degrees}
@@ -783,7 +809,7 @@ export default function ClinicBookingFlow() {
             bookingId: bookingId,
             doctorName: selectedDoctor?.name || 'Doctor',
             date: selectedDate || new Date(),
-            time: confirmationData?.selectedTime || '10:00 AM - 02:00 PM', // Fallback or need to capture time
+            time: confirmationData?.selectedTime || selectedChamberTime || 'Time not available',
             location: selectedChamberName || clinic?.address || 'Clinic',
             consultationType: 'chamber'
           }}

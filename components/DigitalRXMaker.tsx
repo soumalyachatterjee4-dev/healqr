@@ -487,6 +487,14 @@ export default function DigitalRXMaker({
       const qrDataUrl = await QRCode.toDataURL(qrUrl, { margin: 1, width: 200 });
       doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
 
+      // Show main clinic name below QR code if this is a branch
+      if (isClinic && doctorInfo.clinicInfo?.mainClinicName) {
+        doc.setFontSize(7);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(80);
+        doc.text(doctorInfo.clinicInfo.mainClinicName.toUpperCase(), qrX + (qrSize / 2), qrY + qrSize + 4, { align: 'center' });
+      }
+
       doc.setLineWidth(0.5);
       doc.setDrawColor(200);
       const headerEndY = Math.max(currentY + 5, 65);

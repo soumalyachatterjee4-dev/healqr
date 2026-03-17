@@ -319,7 +319,23 @@ export default function PatientDetails({
                 footerLine1: cd.footerLine1 || '',
                 footerLine2: cd.footerLine2 || '',
                 watermarkLogo: cd.watermarkLogo || '',
+                mainClinicName: '', // Will be set below if this is a branch
               };
+
+              // Check if this chamber belongs to a branch — if so, use branch name/address as header
+              const chamberLocId = currentChamber?.clinicLocationId || '';
+              const clinicLocations = cd.locations || [];
+              const mainBranchId = clinicLocations.length > 0 ? clinicLocations[0].id : '001';
+
+              if (chamberLocId && chamberLocId !== '001' && chamberLocId !== mainBranchId && clinicLocations.length > 1) {
+                // This is a branch chamber — find branch info
+                const branchLoc = clinicLocations.find((l: any) => l.id === chamberLocId);
+                if (branchLoc) {
+                  clinicInfo.mainClinicName = cd.name || cd.clinicName || ''; // Store main clinic name
+                  clinicInfo.name = branchLoc.name || clinicInfo.name; // Use branch name as header
+                  clinicInfo.address = branchLoc.landmark || branchLoc.address || clinicInfo.address;
+                }
+              }
 
               // Load all linked doctors for footer
               const linkedDoctors = cd.linkedDoctorsDetails || [];

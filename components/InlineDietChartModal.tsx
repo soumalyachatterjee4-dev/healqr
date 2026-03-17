@@ -527,6 +527,14 @@ export default function InlineDietChartModal({ patient, doctorInfo, onClose, onG
         }
         const qrDataUrl = await QRCode.toDataURL(qrContent, { margin: 1 });
         doc.addImage(qrDataUrl, 'PNG', pageWidth - 48, 22, 26, 26);
+
+        // Show main clinic name below QR code if this is a branch
+        if (isClinic && doctorInfo.clinicInfo?.mainClinicName) {
+          doc.setFontSize(6);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(80);
+          doc.text(doctorInfo.clinicInfo.mainClinicName.toUpperCase(), pageWidth - 35, 54, { align: 'center' });
+        }
       } catch {
         doc.setTextColor(200);
         doc.setFontSize(8);
