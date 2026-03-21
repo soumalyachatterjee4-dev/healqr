@@ -352,7 +352,8 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
         endDate,
         status: "active",
         createdAt: new Date(),
-        appliesTo: globalOffScope,
+        appliesTo:
+          chamberSpecificClosure === "specific" ? "chamber" : globalOffScope,
         ...(globalOffScope === "doctor" &&
           selectedDoctor && {
             doctorId: selectedDoctor.uid,
@@ -398,41 +399,60 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
 
           console.log("✅ Stored in clinic document");
 
-          // Also push to all linked doctors (for backward compatibility)
           const linkedDoctors = clinicSnap.data().linkedDoctorsDetails || [];
-          console.log(
-            "📋 Also applying to",
-            linkedDoctors.length,
-            "linked doctors",
-          );
-
           let successCount = 0;
           let errorCount = 0;
 
-          for (const doctor of linkedDoctors) {
+          if (chamberSpecificClosure === "specific" && selectedDoctorId) {
+            // Only apply chamber-specific off to the selected doctor
+            console.log("📋 Applying specific chamber off to selected doctor only");
             try {
-              const doctorRef = doc(db!, "doctors", doctor.uid);
+              const doctorRef = doc(db!, "doctors", selectedDoctorId);
               const doctorSnap = await getDoc(doctorRef);
 
               if (doctorSnap.exists()) {
-                const existingPeriods =
-                  doctorSnap.data().plannedOffPeriods || [];
+                const existingPeriods = doctorSnap.data().plannedOffPeriods || [];
                 await updateDoc(doctorRef, {
                   plannedOffPeriods: [...existingPeriods, newPeriod],
                 });
                 successCount++;
-                console.log("✅ Applied to", doctor.name);
+                console.log("✅ Applied to", selectedDoctor?.name || selectedDoctorId);
               } else {
-                console.error(
-                  "❌ Doctor document not found:",
-                  doctor.uid,
-                  doctor.name,
-                );
+                console.error("❌ Selected doctor not found:", selectedDoctorId);
                 errorCount++;
               }
             } catch (err) {
-              console.error("❌ Error updating doctor:", doctor.name, err);
+              console.error("❌ Error updating selected doctor:", selectedDoctorId, err);
               errorCount++;
+            }
+          } else {
+            // Apply to all linked doctors (legacy behavior)
+            console.log(
+              "📋 Also applying to",
+              linkedDoctors.length,
+              "linked doctors",
+            );
+
+            for (const doctor of linkedDoctors) {
+              try {
+                const doctorRef = doc(db!, "doctors", doctor.uid);
+                const doctorSnap = await getDoc(doctorRef);
+
+                if (doctorSnap.exists()) {
+                  const existingPeriods = doctorSnap.data().plannedOffPeriods || [];
+                  await updateDoc(doctorRef, {
+                    plannedOffPeriods: [...existingPeriods, newPeriod],
+                  });
+                  successCount++;
+                  console.log("✅ Applied to", doctor.name);
+                } else {
+                  console.error("❌ Doctor document not found:", doctor.uid, doctor.name);
+                  errorCount++;
+                }
+              } catch (err) {
+                console.error("❌ Error updating doctor:", doctor.name, err);
+                errorCount++;
+              }
             }
           }
 
@@ -859,7 +879,10 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
     }
   };
 
-  const toggleChamberStatus = async (chamberId: string) => {
+  const toggleChamberStatus = async (
+    chamberId: string,
+    clinicLocationId?: string,
+  ) => {
     if (!selectedDoctorId) return;
 
     try {
@@ -868,14 +891,20 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
 
       if (doctorSnap.exists()) {
         const existingChambers = doctorSnap.data().chambers || [];
-        const updatedChambers = existingChambers.map((chamber: Chamber) =>
-          chamber.id === chamberId
-            ? {
-                ...chamber,
-                status: chamber.status === "active" ? "inactive" : "active",
-              }
-            : chamber,
-        );
+        const targetLocation = clinicLocationId || '001';
+        const updatedChambers = existingChambers.map((chamber: Chamber) => {
+          const idMatches = String(chamber.id) === String(chamberId);
+          const locationMatches = String(chamber.clinicLocationId || '001') === String(targetLocation);
+
+          if (!idMatches || !locationMatches) {
+            return chamber;
+          }
+
+          return {
+            ...chamber,
+            status: chamber.status === "active" ? "inactive" : "active",
+          };
+        });
 
         await updateDoc(doctorRef, {
           chambers: updatedChambers,
@@ -1901,7 +1930,7 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
                           })();
                           return (
                           <Card
-                            key={chamber.id}
+                            key={`${chamber.id}-${chamber.clinicLocationId || '001'}`}
                             className={`bg-gray-800/50 border-gray-700 overflow-hidden ${isTimeOver ? 'opacity-60' : ''}`}
                           >
                             {/* Chamber Header */}
@@ -1937,7 +1966,7 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
                                   <Switch
                                     checked={chamber.status === "active"}
                                     onCheckedChange={() =>
-                                      toggleChamberStatus(chamber.id)
+                                      toggleChamberStatus(chamber.id, chamber.clinicLocationId || '001')
                                     }
                                     className="bg-zinc-700"
                                   />

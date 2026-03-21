@@ -93,15 +93,15 @@ function ChamberPatientDetailsLoader({
               if (clinicDoc.exists()) {
                 const clinicCode = clinicDoc.data().clinicCode;
                 if (clinicCode) {
-                  // Find the manual clinic entry that has this clinicCode
+                  // Check if this clinicCode is in the selfRestrictedClinics list
+                  // Also support legacy format where clinic.id was stored instead of clinicCode
                   const matchingManualClinic = manualClinics.find((mc: any) => mc.clinicCode === clinicCode);
-                  if (matchingManualClinic && selfRestrictedClinics.includes(matchingManualClinic.id)) {
+                  if (selfRestrictedClinics.includes(clinicCode) || (matchingManualClinic && selfRestrictedClinics.includes(matchingManualClinic.id))) {
                     isDoctorQrRestricted = true;
                     console.log('🔒 Doctor self-restricted QR data from clinic:', {
                       doctorId,
                       clinicId: currentClinicId,
-                      clinicCode,
-                      manualClinicId: matchingManualClinic.id
+                      clinicCode
                     });
                   }
                 }

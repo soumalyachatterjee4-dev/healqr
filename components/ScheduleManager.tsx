@@ -180,7 +180,7 @@ export default function ScheduleManager({
 
             // Check if linkedClinics has new entries not in manualClinics
             const existingClinicCodes = new Set(currentManualClinics.map((c: any) => c.clinicCode).filter(Boolean));
-            const hasNewLinks = currentLinkedClinics.some((linked: any) => 
+            const hasNewLinks = currentLinkedClinics.some((linked: any) =>
               linked.clinicCode && !existingClinicCodes.has(linked.clinicCode)
             );
 
@@ -572,18 +572,18 @@ export default function ScheduleManager({
       if (!clinicSnap) {
         const allClinics = await getDocs(clinicsRef);
         console.log(`📋 Searching through ${allClinics.size} clinics for code in locations[]...`);
-        
+
         for (const clinicDoc of allClinics.docs) {
           const clinicData = clinicDoc.data();
           const mainCode = (clinicData.clinicCode || '').toUpperCase().trim();
-          
+
           // Exact match on main code
           if (mainCode === enteredCode) {
             clinicSnap = { docs: [clinicDoc], empty: false, size: 1 };
             console.log('✅ Found via main code in all clinics');
             break;
           }
-          
+
           // Search in locations[] array
           const locations = clinicData.locations || [];
           for (const loc of locations) {
@@ -594,7 +594,7 @@ export default function ScheduleManager({
               break;
             }
           }
-          
+
           if (clinicSnap) break;
         }
       }
@@ -611,7 +611,7 @@ export default function ScheduleManager({
           for (const clinicDoc of allClinics.docs) {
             const clinicData = clinicDoc.data();
             const locations = clinicData.locations || [];
-            
+
             // Look for any code with same base prefix
             for (const loc of locations) {
               const locCode = (loc.clinicCode || '').toUpperCase().trim();
@@ -621,7 +621,7 @@ export default function ScheduleManager({
                 break;
               }
             }
-            
+
             if (clinicSnap) break;
           }
         }
@@ -761,17 +761,14 @@ export default function ScheduleManager({
   };
 
   // Handle doctor-side self-restriction toggle for clinic patients
-  const handleToggleSelfRestriction = async (clinicId: string) => {
-    if (!doctorId || !db) return;
+  const handleToggleSelfRestriction = async (clinicCode: string) => {
+    if (!doctorId || !db || !clinicCode) return;
 
     try {
-      const clinic = manualClinics.find(c => c.id === clinicId);
-      if (!clinic?.clinicCode) return;
-
-      const isCurrentlyRestricted = selfRestrictedClinics.includes(clinicId);
+      const isCurrentlyRestricted = selfRestrictedClinics.includes(clinicCode);
       const updatedList = isCurrentlyRestricted
-        ? selfRestrictedClinics.filter(id => id !== clinicId)
-        : [...selfRestrictedClinics, clinicId];
+        ? selfRestrictedClinics.filter(code => code !== clinicCode)
+        : [...selfRestrictedClinics, clinicCode];
 
       setSelfRestrictedClinics(updatedList);
 
@@ -1724,56 +1721,30 @@ export default function ScheduleManager({
     }
   };
 
-  const handleToggleChamber = async (id: number) => {
+  const handleToggleChamber = async (id: number, clinicLocationId?: string) => {
     if (!doctorId || !db) {
       toast.error('Authentication error');
       return;
     }
 
-    const chamber = demoSchedules.find(s => s.id === id);
+    const chamberKey = String(id);
+    const chamber = demoSchedules.find(s => String(s.id) === chamberKey && (clinicLocationId ? String(s.clinicLocationId) === String(clinicLocationId) : true));
     if (!chamber) return;
 
-    // If turning chamber back ON, just clear the date picker state
-    if (chamber.isActive === false) {
-      const updatedSchedules = demoSchedules.map(s =>
-        s.id === id ? { ...s, isActive: true } : s
-      );
-      setDemoSchedules(updatedSchedules);
+    const isCurrentlyActive = chamber.isActive !== false;
+    const newStatus = isCurrentlyActive ? false : true;
 
-      // Clear date picker state
-      const newDates = { ...chamberInactiveDates };
-      delete newDates[id];
-      setChamberInactiveDates(newDates);
-
-      try {
-        await updateDoc(doc(db, 'doctors', doctorId), {
-          chambers: updatedSchedules,
-          updatedAt: serverTimestamp()
-        });
-        toast.success('Chamber Activated', {
-          description: `${chamber.chamberName} is now accepting bookings.`,
-        });
-      } catch (error) {
-        console.error('Error activating chamber:', error);
-        toast.error('Failed to activate chamber');
-        setDemoSchedules(demoSchedules);
-      }
-      return;
-    }
-
-    // If chamber is currently active (turning OFF), check for seen patients first
-    if (chamber.isActive !== false) {
+    // If turning chamber off, validate today's bookings (don't allow mixed seen/non-seen state)
+    if (isCurrentlyActive) {
       try {
         const { collection, query, where, getDocs } = await import('firebase/firestore');
 
-        // Get today's bookings for this chamber
         const today = new Date();
         const todayStr = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split('T')[0];
 
         const bookingsRef = collection(db, 'bookings');
         const numericChamberId = typeof chamber.id === 'string' ? parseInt(chamber.id, 10) : chamber.id;
 
-        // Query ALL bookings for this chamber (including cancelled ones for accurate count)
         const chamberBookingsQuery = query(
           bookingsRef,
           where('chamberId', '==', numericChamberId),
@@ -1781,58 +1752,18 @@ export default function ScheduleManager({
         );
 
         const allBookingsSnap = await getDocs(chamberBookingsQuery);
+        const bookingsSnap = { docs: allBookingsSnap.docs.filter(doc => !doc.data().isCancelled) };
 
-        // Filter only non-cancelled bookings for validation
-        const bookingsSnap = {
-          docs: allBookingsSnap.docs.filter(doc => !doc.data().isCancelled)
-        };
+        const seenPatients = bookingsSnap.docs.filter(doc => doc.data().isMarkedSeen === true);
+        const nonSeenPatients = bookingsSnap.docs.filter(doc => doc.data().isMarkedSeen !== true);
 
-        console.log('🔍 [ScheduleManager] Chamber Toggle Validation:', {
-          chamberId: numericChamberId,
-          chamberName: chamber.chamberName,
-          totalBookings: bookingsSnap.docs.length,
-          todayStr,
-        });
-
-        // Separate seen and non-seen patients with detailed logging
-        const seenPatients = bookingsSnap.docs.filter(doc => {
-          const isMarkedSeen = doc.data().isMarkedSeen === true;
-          return isMarkedSeen;
-        });
-
-        const nonSeenPatients = bookingsSnap.docs.filter(doc => {
-          const isMarkedSeen = doc.data().isMarkedSeen;
-          return isMarkedSeen !== true; // Not seen (false, undefined, or null)
-        });
-
-        // Log each patient's status
-        bookingsSnap.docs.forEach(doc => {
-          const data = doc.data();
-          console.log('👤 Patient:', {
-            name: data.patientName,
-            bookingId: data.bookingId,
-            isMarkedSeen: data.isMarkedSeen,
-            isCancelled: data.isCancelled,
-          });
-        });
-
-        console.log('📊 Patient Status:', {
-          seenCount: seenPatients.length,
-          nonSeenCount: nonSeenPatients.length,
-        });
-
-        // Block toggle only if MIXED state (both seen and non-seen exist)
         if (seenPatients.length > 0 && nonSeenPatients.length > 0) {
-          console.log('❌ BLOCKING: Mixed state detected');
           toast.error('Cannot Suspend Chamber', {
             description: `${seenPatients.length} SEEN + ${nonSeenPatients.length} NON-SEEN patients. Cancel non-seen individually or mark all as seen first.`,
             duration: 7000,
           });
           return;
         }
-
-        console.log('✅ ALLOWING: All patients same state');
-        // Allow if all patients are seen (no cancellations needed) or all non-seen (will cancel all)
       } catch (error) {
         console.error('Error checking chamber patients:', error);
         toast.error('Failed to check patient status');
@@ -1840,24 +1771,42 @@ export default function ScheduleManager({
       }
     }
 
-    // All patients are non-seen, proceed with turning chamber OFF
-    // Just toggle the UI - date range will be saved when user fills it and clicks save
-    const updatedSchedules = demoSchedules.map(s =>
-      s.id === id ? { ...s, isActive: false } : s
-    );
+    const chamberLocationKey = clinicLocationId ? String(clinicLocationId) : String(chamber.clinicLocationId || '001');
+    const updatedSchedules = demoSchedules.map((s) => {
+      const idMatches = String(s.id) === chamberKey;
+      const locationMatches = String(s.clinicLocationId || '001') === chamberLocationKey;
+      return idMatches && locationMatches ? { ...s, isActive: newStatus } : s;
+    });
+
+    if (newStatus) {
+      const newDates = { ...chamberInactiveDates };
+      delete newDates[chamberKey];
+      setChamberInactiveDates(newDates);
+    } else {
+      setChamberInactiveDates({
+        ...chamberInactiveDates,
+        [chamberKey]: { startDate: '', endDate: '' }
+      });
+    }
 
     setDemoSchedules(updatedSchedules);
 
-    // Initialize date picker state
-    setChamberInactiveDates({
-      ...chamberInactiveDates,
-      [id]: { startDate: '', endDate: '' }
-    });
+    try {
+      await updateDoc(doc(db, 'doctors', doctorId), {
+        chambers: updatedSchedules,
+        updatedAt: serverTimestamp()
+      });
 
-    toast.info('Chamber Toggle OFF', {
-      description: 'Please select date range to schedule chamber closure.',
-      duration: 4000,
-    });
+      toast.success(newStatus ? 'Chamber Activated' : 'Chamber Deactivated', {
+        description: newStatus
+          ? `${chamber.chamberName} is now accepting bookings.`
+          : `${chamber.chamberName} is now turned off. Please set the inactive date range.`,
+      });
+    } catch (error) {
+      console.error('Error toggling chamber status:', error);
+      toast.error('Failed to update chamber status');
+      setDemoSchedules(demoSchedules);
+    }
   };
 
   const handleSaveChamberInactivePeriod = async (chamberId: number) => {
@@ -2554,7 +2503,7 @@ export default function ScheduleManager({
               /* Schedule Cards */
               <div className="space-y-4">
                 {demoSchedules.map((schedule) => (
-                  <Card key={schedule.id} className="bg-gray-800/50 border-gray-700 p-6">
+                  <Card key={`${schedule.id}-${schedule.clinicLocationId || 'default'}`} className="bg-gray-800/50 border-gray-700 p-6">
                     <div className="space-y-4">
                       {/* Header with Days Pills and Toggle */}
                       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -2577,7 +2526,7 @@ export default function ScheduleManager({
                           </span>
                           <Switch
                             checked={schedule.isActive !== false}
-                            onCheckedChange={() => handleToggleChamber(schedule.id)}
+                            onCheckedChange={() => handleToggleChamber(schedule.id, schedule.clinicLocationId || '001')}
                             className="bg-zinc-700"
                           />
                         </div>
@@ -2909,19 +2858,19 @@ export default function ScheduleManager({
                       <div className="mt-4 pt-4 border-t border-gray-700/50">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <Eye className={`w-4 h-4 ${selfRestrictedClinics.includes(clinic.id) ? 'text-red-400' : 'text-emerald-400'}`} />
+                            <Eye className={`w-4 h-4 ${selfRestrictedClinics.includes(clinic.clinicCode!) ? 'text-red-400' : 'text-emerald-400'}`} />
                             <span className="text-xs text-gray-300">Hide my QR data from clinic</span>
                           </div>
                           <Switch
-                            checked={selfRestrictedClinics.includes(clinic.id)}
-                            onCheckedChange={() => handleToggleSelfRestriction(clinic.id)}
-                            className={selfRestrictedClinics.includes(clinic.id)
+                            checked={selfRestrictedClinics.includes(clinic.clinicCode!)}
+                            onCheckedChange={() => handleToggleSelfRestriction(clinic.clinicCode!)}
+                            className={selfRestrictedClinics.includes(clinic.clinicCode!)
                               ? 'data-[state=checked]:bg-red-500'
                               : 'data-[state=checked]:bg-emerald-500'}
                           />
                         </div>
-                        <p className={`text-[10px] mt-1 ml-6 ${selfRestrictedClinics.includes(clinic.id) ? 'text-red-400' : 'text-gray-500'}`}>
-                          {selfRestrictedClinics.includes(clinic.id)
+                        <p className={`text-[10px] mt-1 ml-6 ${selfRestrictedClinics.includes(clinic.clinicCode!) ? 'text-red-400' : 'text-gray-500'}`}>
+                          {selfRestrictedClinics.includes(clinic.clinicCode!)
                             ? '🔒 Clinic cannot see your QR booking patients'
                             : '✅ Clinic can see your QR booking patients'}
                         </p>

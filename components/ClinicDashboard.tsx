@@ -108,11 +108,11 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
     ? (() => { try { return JSON.parse(localStorage.getItem('healqr_assistant_pages') || '["dashboard"]'); } catch { return ['dashboard']; } })()
     : [];
 
-  // Resolve the clinic ID: for assistants use parent clinic's ID, for branch managers use parent clinic ID
-  const resolvedClinicId = isAssistant
-    ? localStorage.getItem('healqr_assistant_doctor_id') || auth?.currentUser?.uid || ''
-    : isLocationManager
+  // Resolve the clinic ID: branch managers (including branch assistants) use parent clinic ID
+  const resolvedClinicId = isLocationManager
     ? localStorage.getItem('healqr_parent_clinic_id') || auth?.currentUser?.uid || ''
+    : isAssistant
+    ? localStorage.getItem('healqr_assistant_doctor_id') || auth?.currentUser?.uid || ''
     : auth?.currentUser?.uid || '';
 
   // Analytics State
@@ -219,8 +219,9 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
         }
       });
 
-      // 2. Fetch scan data in parallel
+      // 2. Fetch scan data in parallel (skip for branch managers — Firestore rules restrict to clinic owner)
       const scansQueryPromise = (async () => {
+        if (isLocationManager) return null;
         try {
           const scansQuery = query(
             collection(db, 'qrScans'),
@@ -239,6 +240,30 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
         scansQueryPromise
       ]);
 
+      // For branch managers, build a set of chamberIds belonging to their branch
+      let branchChamberIds: Set<string> | null = null;
+      if (isLocationManager && locationManagerBranchId) {
+        try {
+          const allChamberIds = new Set<string>();
+          for (const doctor of (data.linkedDoctorsDetails || [])) {
+            const docId = doctor?.doctorId || (doctor as any)?.uid;
+            if (!docId) continue;
+            const doctorSnap = await getDoc(doc(db, 'doctors', docId));
+            if (doctorSnap.exists()) {
+              const chambers = doctorSnap.data().chambers || [];
+              chambers.forEach((c: any) => {
+                if (c.clinicId !== resolvedClinicId) return;
+                const cLocId = c.clinicLocationId || c.locationId || '';
+                if (cLocId === locationManagerBranchId) {
+                  allChamberIds.add(String(c.id));
+                }
+              });
+            }
+          }
+          if (allChamberIds.size > 0) branchChamberIds = allChamberIds;
+        } catch (e) { /* ignore */ }
+      }
+
       // 3. Process the results
       let qrBookings = 0;
       let clinicQRBookings = 0;
@@ -255,8 +280,13 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
           // Branch managers: only count bookings for their branch
           if (isLocationManager && locationManagerBranchId) {
             const bLocId = bookingData.clinicLocationId || bookingData.locationId || '';
-            // Exclude bookings without a locationId — they belong to main branch
-            if (!bLocId || bLocId !== locationManagerBranchId) return;
+            if (bLocId) {
+              if (bLocId !== locationManagerBranchId) return;
+            } else if (branchChamberIds && branchChamberIds.size > 0) {
+              if (!branchChamberIds.has(String(bookingData.chamberId))) return;
+            } else {
+              return;
+            }
           }
 
           const isCancelled = bookingData.status === 'cancelled' || bookingData.isCancelled === true;

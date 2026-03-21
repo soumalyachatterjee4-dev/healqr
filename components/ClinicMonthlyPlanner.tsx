@@ -58,6 +58,12 @@ export default function ClinicMonthlyPlanner({
   isSidebarCollapsed = false,
   setIsSidebarCollapsed
 }: ClinicMonthlyPlannerProps) {
+  // Branch manager resolution
+  const isLocationManager = localStorage.getItem('healqr_is_location_manager') === 'true';
+  const parentClinicId = localStorage.getItem('healqr_parent_clinic_id');
+  const locationManagerBranchId = localStorage.getItem('healqr_location_id');
+  const resolvedClinicId = isLocationManager && parentClinicId ? parentClinicId : clinicId;
+
   const [currentDate, setCurrentDate] = useState(new Date());
   const [events, setEvents] = useState<PlannerEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,27 +100,55 @@ export default function ClinicMonthlyPlanner({
   const fetchMonthEvents = async (date: Date) => {
     try {
       setLoading(true);
-      const id = clinicId || localStorage.getItem('userId');
-      if (!id) return;
+      const clinicDataId = resolvedClinicId || localStorage.getItem('userId');
+      // Use own UID for Firestore storage paths (branch manager can't write to parent's subcollections)
+      const storageId = localStorage.getItem('userId') || clinicDataId;
+      if (!clinicDataId || !storageId) return;
 
       const year = date.getFullYear();
       const month = date.getMonth() + 1;
       const monthKey = `${year}-${month.toString().padStart(2, '0')}`;
+      // Branch-aware meta key so each branch generates independently
+      const metaKey = isLocationManager && locationManagerBranchId ? `${monthKey}-${locationManagerBranchId}` : monthKey;
 
       const { db } = await import('../lib/firebase/config');
       const { collection, query, where, getDocs, doc, getDoc, writeBatch } = await import('firebase/firestore');
 
       if (!db) return;
 
-      // 1. Check if generated
-      const metaRef = doc(db, `doctors/${id}/planner_meta`, monthKey);
+      // Build branch chamber IDs set early (needed for both generation and filtering)
+      let branchChamberIds: Set<string> | null = null;
+      if (isLocationManager && locationManagerBranchId) {
+        branchChamberIds = new Set<string>();
+        try {
+          const clinicSnap0 = await getDoc(doc(db, 'clinics', clinicDataId));
+          if (clinicSnap0.exists()) {
+            const doctors = clinicSnap0.data().linkedDoctorsDetails || [];
+            for (const dr of doctors) {
+              const drId = dr.doctorId || dr.uid;
+              if (!drId) continue;
+              const drSnap = await getDoc(doc(db, 'doctors', drId));
+              if (drSnap.exists()) {
+                const chambers = drSnap.data().chambers || [];
+                for (const ch of chambers) {
+                  if (ch.clinicLocationId === locationManagerBranchId) {
+                    branchChamberIds!.add(String(ch.id));
+                  }
+                }
+              }
+            }
+          }
+        } catch (e) { /* ignore */ }
+      }
+
+      // 1. Check if generated (use storageId for planner subcollections)
+      const metaRef = doc(db, `doctors/${storageId}/planner_meta`, metaKey);
       const metaSnap = await getDoc(metaRef);
 
       if (!metaSnap.exists()) {
         setIsGenerating(true);
-        console.log(`Generating Clinic Planner for ${monthKey}...`);
 
-        const clinicSnap = await getDoc(doc(db, 'clinics', id));
+        const clinicSnap = await getDoc(doc(db, 'clinics', clinicDataId));
         const clinicData = clinicSnap.data();
         const linkedDoctors = clinicData?.linkedDoctorsDetails || [];
 
@@ -136,7 +170,11 @@ export default function ClinicMonthlyPlanner({
             const dateStr = `${year}-${month.toString().padStart(2, '0')}-${d.toString().padStart(2, '0')}`;
 
             chambers.forEach((chamber: any) => {
-              if (chamber.clinicId !== id) return;
+              if (chamber.clinicId !== clinicDataId) return;
+              // Branch filter: skip chambers not belonging to this branch
+              if (isLocationManager && locationManagerBranchId && chamber.clinicLocationId !== locationManagerBranchId) return;
+              // Main clinic filter: skip branch-specific chambers
+              if (!isLocationManager && chamber.clinicLocationId) return;
 
               let isActive = false;
               if (chamber.frequency === 'Daily') isActive = true;
@@ -162,7 +200,7 @@ export default function ClinicMonthlyPlanner({
         }
 
         const batch = writeBatch(db);
-        const eventsRef = collection(db, `doctors/${id}/planner_events`);
+        const eventsRef = collection(db, `doctors/${storageId}/planner_events`);
         newEvents.forEach(evt => {
           const ref = doc(eventsRef);
           batch.set(ref, evt);
@@ -172,11 +210,51 @@ export default function ClinicMonthlyPlanner({
         toast.success(`Schedule generated for ${monthNames[month-1]}`);
       }
 
-      // 2. Fetch
-      const eventsRef = collection(db, `doctors/${id}/planner_events`);
+      // 2. Fetch (use storageId for planner subcollections)
+      const eventsRef = collection(db, `doctors/${storageId}/planner_events`);
       const q = query(eventsRef, where('monthKey', '==', monthKey));
       const snap = await getDocs(q);
-      const loaded = snap.docs.map(d => ({ id: d.id, ...d.data() })) as PlannerEvent[];
+      let loaded = snap.docs.map(d => ({ id: d.id, ...d.data() })) as PlannerEvent[];
+
+      // Filter events for branch managers — only show branch chambers
+      if (isLocationManager && branchChamberIds) {
+        loaded = loaded.filter(ev => {
+          if (ev.type !== 'chamber') return true; // keep non-chamber events
+          return ev.chamberId && branchChamberIds!.has(String(ev.chamberId));
+        });
+      }
+
+      // Filter events for main clinic — exclude branch-specific chambers
+      if (!isLocationManager) {
+        try {
+          // Collect all chamber IDs that have a clinicLocationId (branch chambers)
+          const branchOnlyChamberIds = new Set<string>();
+          const clinicSnapMain = await getDoc(doc(db, 'clinics', clinicDataId));
+          if (clinicSnapMain.exists()) {
+            const doctors = clinicSnapMain.data().linkedDoctorsDetails || [];
+            for (const dr of doctors) {
+              const drId = dr.doctorId || dr.uid;
+              if (!drId) continue;
+              const drSnap = await getDoc(doc(db, 'doctors', drId));
+              if (drSnap.exists()) {
+                const chambers = drSnap.data().chambers || [];
+                for (const ch of chambers) {
+                  if (ch.clinicLocationId) {
+                    branchOnlyChamberIds.add(String(ch.id));
+                  }
+                }
+              }
+            }
+          }
+          if (branchOnlyChamberIds.size > 0) {
+            loaded = loaded.filter(ev => {
+              if (ev.type !== 'chamber') return true;
+              return !ev.chamberId || !branchOnlyChamberIds.has(String(ev.chamberId));
+            });
+          }
+        } catch (e) { /* ignore */ }
+      }
+
       setEvents(loaded);
 
     } catch (error) {
@@ -190,13 +268,13 @@ export default function ClinicMonthlyPlanner({
 
   useEffect(() => {
     fetchMonthEvents(currentDate);
-  }, [currentDate, clinicId]);
+  }, [currentDate, resolvedClinicId]);
 
   const handleSaveEvent = async () => {
     try {
       if (!selectedDate || !newEventData.title) return;
-      const id = clinicId || localStorage.getItem('userId');
-      if (!id) return;
+      const storageId = localStorage.getItem('userId');
+      if (!storageId) return;
 
       const { db } = await import('../lib/firebase/config');
       const { collection, addDoc } = await import('firebase/firestore');
@@ -211,7 +289,7 @@ export default function ClinicMonthlyPlanner({
         monthKey: selectedDate.substring(0, 7)
       };
 
-      const ref = await addDoc(collection(db, `doctors/${id}/planner_events`), evt);
+      const ref = await addDoc(collection(db, `doctors/${storageId}/planner_events`), evt);
       setEvents([...events, { id: ref.id, ...evt } as PlannerEvent]);
       toast.success('Event added');
       setShowAddEventForm(false);

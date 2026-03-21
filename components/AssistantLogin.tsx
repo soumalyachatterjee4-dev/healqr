@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { db } from '../lib/firebase/config';
-import { collection, query, where, getDocs, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, updateDoc, doc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { Lock, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import healqrLogo from '../assets/healqr.logo.png';
@@ -133,6 +133,37 @@ export default function AssistantLogin() {
       // Check if assistant belongs to a clinic
       if (assistantData.isClinic) {
         localStorage.setItem('healqr_is_clinic', 'true');
+      }
+
+      // If assistant was created by a branch manager, inherit branch context
+      if (assistantData.isLocationManager && assistantData.parentClinicId && assistantData.locationId) {
+        localStorage.setItem('healqr_is_location_manager', 'true');
+        localStorage.setItem('healqr_parent_clinic_id', assistantData.parentClinicId);
+        localStorage.setItem('healqr_location_id', assistantData.locationId);
+      } else if (assistantData.isClinic && db) {
+        // Auto-detect: if no clinic doc exists for doctorId, the owner is likely a branch manager
+        try {
+          const clinicDocSnap = await getDoc(doc(db, 'clinics', assistantData.doctorId));
+          if (!clinicDocSnap.exists()) {
+            // doctorId doesn't match a clinic doc — search for parent clinic
+            // Find which clinic has this assistant owner's email in locationEmails
+            const clinicsRef = collection(db, 'clinics');
+            const branchQuery = query(clinicsRef, where('locationEmails', 'array-contains', assistantData.doctorEmail));
+            const branchSnap = await getDocs(branchQuery);
+            if (!branchSnap.empty) {
+              const parentDoc = branchSnap.docs[0];
+              const parentData = parentDoc.data();
+              const matchedLocation = (parentData.locations || []).find(
+                (loc: any) => loc.email?.toLowerCase() === assistantData.doctorEmail?.toLowerCase()
+              );
+              localStorage.setItem('healqr_is_location_manager', 'true');
+              localStorage.setItem('healqr_parent_clinic_id', parentDoc.id);
+              if (matchedLocation?.id) {
+                localStorage.setItem('healqr_location_id', matchedLocation.id);
+              }
+            }
+          }
+        } catch (e) { /* ignore auto-detection failure */ }
       }
 
       // Mark that profile is loaded so App.tsx goes to dashboard

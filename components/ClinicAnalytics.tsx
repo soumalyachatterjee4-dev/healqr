@@ -73,6 +73,13 @@ export default function ClinicAnalytics({
         setLoading(true);
         const userId = propClinicId || auth?.currentUser?.uid || localStorage.getItem('userId');
 
+        // Branch manager support
+        const isLocationManager = localStorage.getItem('healqr_is_location_manager') === 'true';
+        const locationManagerBranchId = localStorage.getItem('healqr_location_id') || '';
+        const resolvedClinicId = isLocationManager
+          ? (localStorage.getItem('healqr_parent_clinic_id') || userId)
+          : userId;
+
         console.log(`📊 [ClinicAnalytics] Starting loadAnalytics for userId: ${userId} (Prop: ${propClinicId})`);
 
         if (!userId) {
@@ -89,7 +96,7 @@ export default function ClinicAnalytics({
         if (!db) return;
 
         const { doc, getDoc, collection, query, where, getDocs } = await import('firebase/firestore');
-        const clinicRef = doc(db, 'clinics', userId);
+        const clinicRef = doc(db, 'clinics', resolvedClinicId!);
         const clinicSnap = await getDoc(clinicRef);
         let linkedDoctorIds: string[] = [];
         let allDoctorsList: Array<{ id: string; name: string }> = [{ id: 'all', name: 'All Doctors' }];
@@ -145,11 +152,35 @@ export default function ClinicAnalytics({
         const bookingsRef = collection(db, 'bookings');
         const bookingsSnap = await getDocs(bookingsRef);
 
+        // Build branch chamber IDs for branch managers
+        let branchChamberIds: Set<string> | null = null;
+        if (isLocationManager && locationManagerBranchId) {
+          try {
+            const allChamberIds = new Set<string>();
+            for (const docId of linkedDoctorIds) {
+              const doctorSnap = await getDoc(doc(db, 'doctors', docId));
+              if (doctorSnap.exists()) {
+                const chambers = doctorSnap.data().chambers || [];
+                chambers.forEach((c: any) => {
+                  if (c.clinicId !== resolvedClinicId) return;
+                  const cLocId = c.clinicLocationId || c.locationId || '';
+                  if (cLocId === locationManagerBranchId) {
+                    allChamberIds.add(String(c.id));
+                  }
+                });
+              }
+            }
+            if (allChamberIds.size > 0) branchChamberIds = allChamberIds;
+          } catch (e) { /* ignore */ }
+        }
+
         let totalScan = 0;
+        // Skip qrScans for branch managers (Firestore rules restrict to clinic owner)
+        if (!isLocationManager) {
         try {
           const scansQuery = query(
             collection(db, 'qrScans'),
-            where('clinicId', '==', userId),
+            where('clinicId', '==', resolvedClinicId),
             where('scannedBy', '==', 'clinic')
           );
           const scansSnap = await getDocs(scansQuery);
@@ -165,6 +196,7 @@ export default function ClinicAnalytics({
           totalScan = filteredScans.length;
         } catch (scanError) {
           console.error('Error fetching scans:', scanError);
+        }
         }
 
         let totalBooking = 0;
@@ -183,8 +215,21 @@ export default function ClinicAnalytics({
           const data = docSnap.data();
           const bDocId = data.doctorId || data.uid;
           const bClinicId = data.clinicId;
-          const belongsToClinic = bClinicId === userId || linkedDoctorIds.includes(bDocId);
+          const belongsToClinic = bClinicId === resolvedClinicId || linkedDoctorIds.includes(bDocId);
           if (!belongsToClinic) return;
+
+          // Branch managers: only count bookings for their branch
+          if (isLocationManager && locationManagerBranchId) {
+            const bLocId = data.clinicLocationId || data.locationId || '';
+            if (bLocId) {
+              if (bLocId !== locationManagerBranchId) return;
+            } else if (branchChamberIds && branchChamberIds.size > 0) {
+              if (!branchChamberIds.has(String(data.chamberId))) return;
+            } else {
+              return;
+            }
+          }
+
           if (selectedDoctor !== 'all' && bDocId !== selectedDoctor) return;
 
           let bookingDate: Date | null = null;

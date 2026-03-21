@@ -48,6 +48,12 @@ export default function ClinicReports({
   const [reportData, setReportData] = useState<ReportData[]>([]);
   const [linkedDoctors, setLinkedDoctors] = useState<Array<{ id: string; name: string; specialty: string }>>([]);
 
+  // Branch manager resolution
+  const isLocationManager = localStorage.getItem('healqr_is_location_manager') === 'true';
+  const parentClinicId = localStorage.getItem('healqr_parent_clinic_id');
+  const locationManagerBranchId = localStorage.getItem('healqr_location_id');
+  const resolvedClinicId = isLocationManager && parentClinicId ? parentClinicId : clinicId;
+
   // Filter States
   const getDefaultDates = () => {
     const today = new Date();
@@ -83,9 +89,9 @@ export default function ClinicReports({
   // Load Linked Doctors
   useEffect(() => {
     const loadDoctors = async () => {
-      if (!clinicId || !db) return;
+      if (!resolvedClinicId || !db) return;
       try {
-        const clinicRef = doc(db, 'clinics', clinicId);
+        const clinicRef = doc(db, 'clinics', resolvedClinicId);
         const clinicSnap = await getDoc(clinicRef);
         if (clinicSnap.exists()) {
           const data = clinicSnap.data();
@@ -101,22 +107,63 @@ export default function ClinicReports({
       }
     };
     loadDoctors();
-  }, [clinicId]);
+  }, [resolvedClinicId]);
 
   // Load Report Data
   useEffect(() => {
     const loadData = async () => {
-      if (!clinicId || !db) return;
+      if (!resolvedClinicId || !db) return;
       try {
         setLoading(true);
+
+        // Build branch chamber IDs for filtering
+        let branchChamberIds: Set<string> | null = null;
+        if (isLocationManager && locationManagerBranchId) {
+          try {
+            const clinicDocRef = doc(db, 'clinics', resolvedClinicId);
+            const clinicDocSnap = await getDoc(clinicDocRef);
+            if (clinicDocSnap.exists()) {
+              const cData = clinicDocSnap.data();
+              const doctorsList = cData.linkedDoctorsDetails || [];
+              const allChamberIds = new Set<string>();
+              for (const dr of doctorsList) {
+                const drId = dr.doctorId || dr.uid;
+                if (!drId) continue;
+                const drDocRef = doc(db, 'doctors', drId);
+                const drDocSnap = await getDoc(drDocRef);
+                if (drDocSnap.exists()) {
+                  const drData = drDocSnap.data();
+                  const chambers = drData.chambers || [];
+                  for (const ch of chambers) {
+                    if (ch.clinicLocationId === locationManagerBranchId) {
+                      allChamberIds.add(String(ch.id));
+                    }
+                  }
+                }
+              }
+              if (allChamberIds.size > 0) branchChamberIds = allChamberIds;
+            }
+          } catch (e) { /* ignore */ }
+        }
+
         const bookingsRef = collection(db, 'bookings');
-        const q = query(bookingsRef, where('clinicId', '==', clinicId));
+        const q = query(bookingsRef, where('clinicId', '==', resolvedClinicId));
         const snapshot = await getDocs(q);
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        const data: ReportData[] = snapshot.docs.map(docSnap => {
+        // Filter docs for branch if needed
+        const branchFilteredDocs = branchChamberIds
+          ? snapshot.docs.filter(d => {
+              const bData = d.data();
+              if (bData.clinicLocationId === locationManagerBranchId) return true;
+              if (bData.chamberId && branchChamberIds!.has(String(bData.chamberId))) return true;
+              return false;
+            })
+          : snapshot.docs;
+
+        const data: ReportData[] = branchFilteredDocs.map(docSnap => {
           const booking = docSnap.data();
 
           // Dates
@@ -189,7 +236,7 @@ export default function ClinicReports({
       }
     };
     loadData();
-  }, [clinicId]);
+  }, [resolvedClinicId]);
 
   // Filtered Results
   const filteredData = useMemo(() => {

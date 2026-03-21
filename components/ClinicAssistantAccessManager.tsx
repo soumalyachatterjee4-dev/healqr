@@ -66,6 +66,11 @@ export default function ClinicAssistantAccessManager({
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
 
+  // Branch manager resolution
+  const isLocationManager = localStorage.getItem('healqr_is_location_manager') === 'true';
+  const parentClinicId = localStorage.getItem('healqr_parent_clinic_id');
+  const locationManagerBranchId = localStorage.getItem('healqr_location_id');
+
   // Form state
   const [assistantName, setAssistantName] = useState('');
   const [assistantEmail, setAssistantEmail] = useState('');
@@ -213,6 +218,12 @@ export default function ClinicAssistantAccessManager({
         accessPin: accessPin,
         isClinic: true, // IMPORTANT: Mark as clinic assistant
         createdAt: serverTimestamp(),
+        // Branch manager metadata — so the assistant inherits branch context
+        ...(isLocationManager && parentClinicId && locationManagerBranchId ? {
+          isLocationManager: true,
+          parentClinicId: parentClinicId,
+          locationId: locationManagerBranchId,
+        } : {}),
       });
 
       const baseUrl = window.location.origin;

@@ -91,7 +91,13 @@ export default function ClinicAdvanceBooking({
         const currentUser = currentAuth.currentUser;
         if (!currentUser) return;
 
-        const clinicRef = doc(currentDb, 'clinics', currentUser.uid);
+        // Resolve clinic ID for branch managers (use parent clinic ID)
+        const isLocationManager = localStorage.getItem('healqr_is_location_manager') === 'true';
+        const resolvedClinicId = isLocationManager
+          ? (localStorage.getItem('healqr_parent_clinic_id') || currentUser.uid)
+          : currentUser.uid;
+
+        const clinicRef = doc(currentDb, 'clinics', resolvedClinicId);
         const clinicSnap = await getDoc(clinicRef);
 
         if (clinicSnap.exists()) {
@@ -149,12 +155,39 @@ export default function ClinicAdvanceBooking({
         const currentUser = currentAuth.currentUser;
         if (!currentUser) return;
 
+        // Resolve clinic ID for branch managers (use parent clinic ID)
+        const isLocationManager = localStorage.getItem('healqr_is_location_manager') === 'true';
+        const locationManagerBranchId = localStorage.getItem('healqr_location_id') || '';
+        const resolvedClinicId = isLocationManager
+          ? (localStorage.getItem('healqr_parent_clinic_id') || currentUser.uid)
+          : currentUser.uid;
+
+        // For branch managers, build a set of chamberIds belonging to their branch
+        let branchChamberIds: Set<string> | null = null;
+        if (isLocationManager && locationManagerBranchId && selectedDoctorId) {
+          try {
+            const doctorSnap = await getDoc(doc(currentDb, 'doctors', selectedDoctorId));
+            if (doctorSnap.exists()) {
+              const chambers = doctorSnap.data().chambers || [];
+              branchChamberIds = new Set(
+                chambers
+                  .filter((c: any) => {
+                    if (c.clinicId !== resolvedClinicId) return false;
+                    const cLocId = c.clinicLocationId || c.locationId || '';
+                    return cLocId === locationManagerBranchId;
+                  })
+                  .map((c: any) => String(c.id))
+              );
+            }
+          } catch (e) { /* ignore */ }
+        }
+
         // 1. Fetch all bookings for this clinic
         // We filter by doctorId client-side to handle potential ID property mismatches
         const bookingsRef = collection(currentDb, 'bookings');
         const q = query(
           bookingsRef,
-          where('clinicId', '==', currentUser.uid)
+          where('clinicId', '==', resolvedClinicId)
         );
         const snapshot = await getDocs(q);
 
@@ -167,6 +200,18 @@ export default function ClinicAdvanceBooking({
             // Handle Doctor ID Mismatch (doctorId vs uid)
             const bDocId = data.doctorId || data.uid;
             if (bDocId !== selectedDoctorId) return null;
+
+            // Branch managers: only show bookings for their branch
+            if (isLocationManager && locationManagerBranchId) {
+              const bLocId = data.clinicLocationId || data.locationId || '';
+              if (bLocId) {
+                if (bLocId !== locationManagerBranchId) return null;
+              } else if (branchChamberIds && branchChamberIds.size > 0) {
+                if (!branchChamberIds.has(String(data.chamberId))) return null;
+              } else {
+                return null;
+              }
+            }
 
             // Robust Date Extraction
             let bDate = '';
