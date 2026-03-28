@@ -88,6 +88,8 @@ const PLACEMENT_OPTIONS = [
   { id: 'patient-notifications', label: 'Patient Notifications' },
   { id: 'patient-live-status', label: 'Patient Live Status' },
   { id: 'patient-search-dashboard', label: 'Patient Search - Dashboard' },
+  // Master Access
+  { id: 'master-access', label: 'Master Access Dashboard' },
 ];
 
 export default function AdminTemplateUploader() {

@@ -11,6 +11,7 @@ import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Toolti
 import { auth, db } from '../lib/firebase/config';
 import { doc, getDoc, collection, getDocs, updateDoc } from 'firebase/firestore';
 import { decrypt } from '../utils/encryptionService';
+import DashboardPromoDisplay from './DashboardPromoDisplay';
 
 interface MasterAccessProps {
   onBack: () => void;
@@ -646,6 +647,9 @@ export default function ClinicMasterAccess({ onBack, clinicId }: MasterAccessPro
             </div>
           </CardContent>
         </Card>
+
+        {/* Health Tip / Ad Card */}
+        <DashboardPromoDisplay category="health-tip" placement="master-access" className="mt-4" />
 
       </div>
     </div>
