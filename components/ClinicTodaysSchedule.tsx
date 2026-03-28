@@ -452,6 +452,7 @@ function ChamberPatientDetailsLoader({
           activeAddOns={[]}
           doctorLanguage="english"
           doctorId={doctorId}
+          readOnly={true}
         />
       </div>
     </div>

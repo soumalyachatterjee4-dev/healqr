@@ -71,6 +71,7 @@ interface PatientDetailsProps {
   activeAddOns?: string[]; // Active premium add-ons purchased by doctor
   doctorLanguage?: Language; // Doctor's preferred language for AI translation
   doctorId?: string; // Doctor ID for loading correct doctor info (for non-linked doctors)
+  readOnly?: boolean; // When true, hides all interactive buttons (clinic owner/manager/assistant view)
 }
 
 interface PatientButtonStates {
@@ -106,6 +107,7 @@ export default function PatientDetails({
   doctorLanguage = 'english',
   activeAddOns = [],
   doctorId,
+  readOnly = false,
 }: PatientDetailsProps) {
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [aiUploadModalOpen, setAiUploadModalOpen] = useState(false);
@@ -1757,7 +1759,19 @@ export default function PatientDetails({
               </div>
             </div>
 
-            {/* Action Buttons - Horizontal Row */}
+            {/* Read-only notice for clinic staff */}
+            {readOnly && (
+              <div className="mt-3 pt-3 border-t border-gray-800">
+                <div className="flex items-center gap-2 px-3 py-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                  <Lock className="w-4 h-4 text-yellow-400 flex-shrink-0" />
+                  <span className="text-yellow-400 text-xs">View only — Medical actions require doctor login via Temporary Access</span>
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons - Horizontal Row (Hidden for clinic owner/manager/assistant - readOnly mode) */}
+            {!readOnly && (
+            <>
             <div className="flex flex-wrap gap-4 mt-3 pt-3 border-t border-gray-800">
               {(() => {
                 const state = patientStates[patient.id];
@@ -2116,6 +2130,8 @@ export default function PatientDetails({
                 <Lock className="w-5 h-5 text-gray-400 group-hover:text-amber-400" />
               </button>
             </div>
+            </>
+            )}
           </div>
         ))}
       </div>
