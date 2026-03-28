@@ -336,7 +336,7 @@ export default function ClinicMasterAccess({ onBack, clinicId }: MasterAccessPro
               <SelectTrigger className="bg-black border-zinc-700 text-white h-10">
                 <SelectValue placeholder="Location" />
               </SelectTrigger>
-              <SelectContent className="bg-zinc-900 border-zinc-700">
+              <SelectContent className="bg-zinc-900 border-zinc-700 text-white">
                 <SelectItem value="all">All Locations</SelectItem>
                 {locations.map(loc => (
                   <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
@@ -349,7 +349,7 @@ export default function ClinicMasterAccess({ onBack, clinicId }: MasterAccessPro
               <SelectTrigger className="bg-black border-zinc-700 text-white h-10">
                 <SelectValue placeholder="Specialty" />
               </SelectTrigger>
-              <SelectContent className="bg-zinc-900 border-zinc-700">
+              <SelectContent className="bg-zinc-900 border-zinc-700 text-white">
                 <SelectItem value="all">All Specialties</SelectItem>
                 {specialties.map(s => (
                   <SelectItem key={s} value={s}>{s}</SelectItem>
@@ -362,7 +362,7 @@ export default function ClinicMasterAccess({ onBack, clinicId }: MasterAccessPro
               <SelectTrigger className="bg-black border-zinc-700 text-white h-10">
                 <SelectValue placeholder="Doctor" />
               </SelectTrigger>
-              <SelectContent className="bg-zinc-900 border-zinc-700">
+              <SelectContent className="bg-zinc-900 border-zinc-700 text-white">
                 <SelectItem value="all">All Doctors</SelectItem>
                 {filteredDoctorOptions.map(d => (
                   <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
