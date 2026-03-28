@@ -5,7 +5,7 @@ import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import {
   Crown, ArrowLeft, Building2, Users, QrCode, UserPlus, TrendingUp,
-  Calendar, Filter, BarChart3, MapPin, Stethoscope, Loader2, Lock, Pencil, Check, X, Eye, EyeOff
+  Calendar, Filter, BarChart3, MapPin, Stethoscope, Loader2, Mail, Pencil, Check, X
 } from 'lucide-react';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { auth, db } from '../lib/firebase/config';
@@ -40,14 +40,11 @@ export default function ClinicMasterAccess({ onBack, clinicId }: MasterAccessPro
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
-  // Master Access Password Settings
-  const [changingPassword, setChangingPassword] = useState(false);
-  const [currentPwInput, setCurrentPwInput] = useState('');
-  const [newPwInput, setNewPwInput] = useState('');
-  const [confirmPwInput, setConfirmPwInput] = useState('');
-  const [pwError, setPwError] = useState('');
-  const [savingPw, setSavingPw] = useState(false);
-  const [showPw, setShowPw] = useState(false);
+  // Master Access Email
+  const [masterEmail, setMasterEmail] = useState('');
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [emailInput, setEmailInput] = useState('');
+  const [savingEmail, setSavingEmail] = useState(false);
 
   const resolvedClinicId = clinicId || auth?.currentUser?.uid || '';
 
@@ -67,6 +64,7 @@ export default function ClinicMasterAccess({ onBack, clinicId }: MasterAccessPro
       const clinicData = clinicSnap.data();
       const locs: BranchLocation[] = clinicData.locations || [];
       setLocations(locs);
+      setMasterEmail(clinicData.masterAccessEmail || '');
 
       // Extract doctors from linkedDoctorsDetails
       const linkedDoctors = (clinicData.linkedDoctorsDetails || []).map((d: any) => ({
@@ -269,92 +267,58 @@ export default function ClinicMasterAccess({ onBack, clinicId }: MasterAccessPro
 
       <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
 
-        {/* Change Master Password */}
+        {/* Master Access Email */}
         <div className="bg-zinc-900/50 border border-amber-500/20 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap">
-          <Lock className="w-4 h-4 text-amber-400 flex-shrink-0" />
-          <span className="text-xs text-zinc-400">Master Password:</span>
-          {changingPassword ? (
-            <div className="flex items-center gap-2 flex-1 min-w-[200px] flex-wrap">
-              <div className="relative flex-1 min-w-[140px]">
-                <input
-                  type={showPw ? 'text' : 'password'}
-                  value={currentPwInput}
-                  onChange={e => { setCurrentPwInput(e.target.value); setPwError(''); }}
-                  className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white w-full outline-none focus:border-amber-500 pr-8"
-                  placeholder="Current password"
-                  autoFocus
-                />
-              </div>
-              <div className="relative flex-1 min-w-[140px]">
-                <input
-                  type={showPw ? 'text' : 'password'}
-                  value={newPwInput}
-                  onChange={e => { setNewPwInput(e.target.value); setPwError(''); }}
-                  className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white w-full outline-none focus:border-amber-500 pr-8"
-                  placeholder="New password (min 8)"
-                />
-              </div>
-              <div className="relative flex-1 min-w-[140px]">
-                <input
-                  type={showPw ? 'text' : 'password'}
-                  value={confirmPwInput}
-                  onChange={e => { setConfirmPwInput(e.target.value); setPwError(''); }}
-                  className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white w-full outline-none focus:border-amber-500"
-                  placeholder="Confirm new password"
-                  onKeyDown={async e => {
-                    if (e.key === 'Enter') {
-                      const clinicRef = doc(db, 'clinics', resolvedClinicId);
-                      const snap = await getDoc(clinicRef);
-                      const stored = snap.data()?.masterAccessPassword;
-                      if (currentPwInput !== stored) { setPwError('Current password is incorrect'); return; }
-                      if (newPwInput.length < 8) { setPwError('New password must be at least 8 characters'); return; }
-                      if (newPwInput !== confirmPwInput) { setPwError('Passwords do not match'); return; }
-                      setSavingPw(true);
-                      await updateDoc(clinicRef, { masterAccessPassword: newPwInput });
-                      setSavingPw(false);
-                      setChangingPassword(false);
-                      setCurrentPwInput(''); setNewPwInput(''); setConfirmPwInput('');
-                    }
-                    if (e.key === 'Escape') { setChangingPassword(false); setPwError(''); }
-                  }}
-                />
-              </div>
-              <button type="button" onClick={() => setShowPw(!showPw)} className="p-1.5 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-white">
-                {showPw ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-              </button>
+          <Mail className="w-4 h-4 text-amber-400 flex-shrink-0" />
+          <span className="text-xs text-zinc-400">Owner Email:</span>
+          {editingEmail ? (
+            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+              <input
+                type="email"
+                value={emailInput}
+                onChange={e => setEmailInput(e.target.value)}
+                className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white flex-1 outline-none focus:border-amber-500"
+                placeholder="owner@email.com"
+                autoFocus
+                onKeyDown={async e => {
+                  if (e.key === 'Enter' && emailInput.includes('@')) {
+                    setSavingEmail(true);
+                    const clinicRef = doc(db, 'clinics', resolvedClinicId);
+                    await updateDoc(clinicRef, { masterAccessEmail: emailInput.trim().toLowerCase() });
+                    setMasterEmail(emailInput.trim().toLowerCase());
+                    setEditingEmail(false);
+                    setSavingEmail(false);
+                  }
+                  if (e.key === 'Escape') setEditingEmail(false);
+                }}
+              />
               <button
-                disabled={savingPw}
+                disabled={!emailInput.includes('@') || savingEmail}
                 onClick={async () => {
+                  setSavingEmail(true);
                   const clinicRef = doc(db, 'clinics', resolvedClinicId);
-                  const snap = await getDoc(clinicRef);
-                  const stored = snap.data()?.masterAccessPassword;
-                  if (currentPwInput !== stored) { setPwError('Current password is incorrect'); return; }
-                  if (newPwInput.length < 8) { setPwError('New password must be at least 8 characters'); return; }
-                  if (newPwInput !== confirmPwInput) { setPwError('Passwords do not match'); return; }
-                  setSavingPw(true);
-                  await updateDoc(clinicRef, { masterAccessPassword: newPwInput });
-                  setSavingPw(false);
-                  setChangingPassword(false);
-                  setCurrentPwInput(''); setNewPwInput(''); setConfirmPwInput('');
+                  await updateDoc(clinicRef, { masterAccessEmail: emailInput.trim().toLowerCase() });
+                  setMasterEmail(emailInput.trim().toLowerCase());
+                  setEditingEmail(false);
+                  setSavingEmail(false);
                 }}
                 className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white"
               >
                 <Check className="w-3.5 h-3.5" />
               </button>
-              <button onClick={() => { setChangingPassword(false); setPwError(''); }} className="p-1.5 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-white">
+              <button onClick={() => setEditingEmail(false)} className="p-1.5 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-white">
                 <X className="w-3.5 h-3.5" />
               </button>
-              {pwError && <p className="text-red-400 text-xs w-full mt-1">{pwError}</p>}
             </div>
           ) : (
             <>
-              <span className="text-sm text-amber-300 font-medium">••••••••</span>
+              <span className="text-sm text-amber-300 font-medium">{masterEmail || 'Not set'}</span>
               <button
-                onClick={() => { setCurrentPwInput(''); setNewPwInput(''); setConfirmPwInput(''); setPwError(''); setShowPw(false); setChangingPassword(true); }}
+                onClick={() => { setEmailInput(masterEmail); setEditingEmail(true); }}
                 className="text-xs text-zinc-400 hover:text-amber-400 flex items-center gap-1 ml-auto"
               >
                 <Pencil className="w-3 h-3" />
-                Change Password
+                {masterEmail ? 'Change' : 'Set Email'}
               </button>
             </>
           )}

@@ -69,6 +69,7 @@ const AdminTestingPage = lazy(() => import("./components/AdminTestingPage"));
 const VerifyEmail = lazy(() => import("./components/VerifyEmail"));
 const VerifyLogin = lazy(() => import("./components/VerifyLogin"));
 const AssistantLogin = lazy(() => import("./components/AssistantLogin"));
+const MasterAccessLogin = lazy(() => import("./components/MasterAccessLogin"));
 const AdminVerifyLogin = lazy(() => import("./components/AdminVerifyLogin"));
 const VerifyWalkin = lazy(() => import("./components/VerifyWalkin"));
 const AdvertiserSignUp = lazy(() => import("./components/AdvertiserSignUp"));
@@ -134,6 +135,7 @@ export default function App() {
     | "verify-email"
     | "verify-login"
     | "assistant-login"
+    | "master-access-login"
     | "temp-doctor-login"
     | "temp-doctor-dashboard"
     | "admin-verify"
@@ -1104,6 +1106,8 @@ export default function App() {
       setCurrentPage('temp-doctor-login');
     } else if (pathname.includes('/assistant-login')) {
       setCurrentPage('assistant-login');
+    } else if (pathname.includes('/master-access-login')) {
+      setCurrentPage('master-access-login');
     } else if (pathname.includes('/verify-login')) {
       setCurrentPage('verify-login');
     } else if (pathname.includes('/verify-visit/')) {
@@ -1161,11 +1165,12 @@ export default function App() {
       const isOnVerifyLoginPage = window.location.pathname.includes('/verify-login') && currentPage !== 'clinic-dashboard';
       const isOnVerifyEmailPage = window.location.pathname.includes('/verify-email');
       const isOnAssistantLoginPage = window.location.pathname.includes('/assistant-login');
+      const isOnMasterAccessLoginPage = window.location.pathname.includes('/master-access-login');
       const isClinicPage = currentPage === 'clinic-login' || currentPage === 'clinic-signup' || pageParam === 'clinic-login' || pageParam === 'clinic-signup';
       const isAdvertiserPage = currentPage === 'advertiser-login' || currentPage === 'advertiser-signup' || pageParam === 'advertiser-login' || pageParam === 'advertiser-signup';
       const isPharmaPage = currentPage === 'pharma-login' || currentPage === 'pharma-verify' || currentPage === 'pharma-portal' || currentPage === 'pharma-signup' || pageParam === 'pharma-login' || pageParam === 'pharma-verify' || pageParam === 'pharma-portal' || pageParam === 'pharma-signup';
 
-      if (isVerificationLink || isBookingMode || hasBookingDoctorId || isNotificationPage || isVerifyVisit || isOnVerifyLoginPage || isOnVerifyEmailPage || isOnAssistantLoginPage || isClinicPage || isAdvertiserPage || isPharmaPage || currentPage === 'verify-email' || currentPage === 'verify-login' || currentPage === 'assistant-login' || currentPage === 'temp-doctor-login' || currentPage === 'temp-doctor-dashboard' || currentPage === 'admin-verify' || currentPage === 'verify-walkin' || currentPage.startsWith('booking-')) {
+      if (isVerificationLink || isBookingMode || hasBookingDoctorId || isNotificationPage || isVerifyVisit || isOnVerifyLoginPage || isOnVerifyEmailPage || isOnAssistantLoginPage || isOnMasterAccessLoginPage || isClinicPage || isAdvertiserPage || isPharmaPage || currentPage === 'verify-email' || currentPage === 'verify-login' || currentPage === 'assistant-login' || currentPage === 'master-access-login' || currentPage === 'temp-doctor-login' || currentPage === 'temp-doctor-dashboard' || currentPage === 'admin-verify' || currentPage === 'verify-walkin' || currentPage.startsWith('booking-')) {
         setIsAuthInitialized(true);
         return;
       }
@@ -2561,6 +2566,8 @@ export default function App() {
       )}
 
       {currentPage === "assistant-login" && <AssistantLogin />}
+
+      {currentPage === "master-access-login" && <MasterAccessLogin />}
 
       {currentPage === "temp-doctor-login" && <TempDoctorLogin />}
 

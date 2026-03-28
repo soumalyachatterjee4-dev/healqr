@@ -31,7 +31,6 @@ import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from 'fire
 import { toast } from 'sonner';
 import ClinicSidebar from './ClinicSidebar';
 import LocationManagerCreator from './LocationManagerCreator';
-import ClinicMasterAccess from './ClinicMasterAccess';
 import ClinicProfileManager from './ClinicProfileManager';
 import ClinicQRManager from './ClinicQRManager';
 import ClinicScheduleManager from './ClinicScheduleManager';
@@ -95,11 +94,6 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
   const [clinicData, setClinicData] = useState<ClinicData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeMenu, setActiveMenu] = useState(() => {
-    // Auto-navigate to master-access if verified via magic link
-    if (sessionStorage.getItem('healqr_master_access_pending') === 'true') {
-      sessionStorage.removeItem('healqr_master_access_pending');
-      return 'master-access';
-    }
     return 'dashboard';
   });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -520,20 +514,6 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
       setShareMenuOpen(false);
     }
   };
-
-  // Render Master Access analytics
-  if (activeMenu === 'master-access') {
-    if (isLocationManager) {
-      setActiveMenu('dashboard');
-      return null;
-    }
-    return (
-      <ClinicMasterAccess
-        onBack={() => setActiveMenu('location-manager')}
-        clinicId={resolvedClinicId}
-      />
-    );
-  }
 
   // Render Location Manager if menu is active
   if (activeMenu === 'location-manager') {

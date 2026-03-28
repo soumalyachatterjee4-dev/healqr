@@ -4,10 +4,11 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import {
   Building2, Mail, MapPin, ArrowLeft, Plus, Pencil, Trash2,
-  Crown, Copy, X, ChevronRight, Hash, Lock, Check, Eye, EyeOff, Pencil as PencilIcon
+  Crown, Copy, X, ChevronRight, Hash, Lock, Send, Check, Pencil as PencilIcon
 } from 'lucide-react';
 import { db, auth } from '../lib/firebase/config';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { sendSignInLinkToEmail } from 'firebase/auth';
 import { toast } from 'sonner';
 import { generateClinicLocationCode } from '../utils/idGenerator';
 import ClinicSidebar from './ClinicSidebar';
@@ -43,14 +44,15 @@ export default function LocationManagerCreator({ onMenuChange, onLogout }: Locat
   // Delete confirmation
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // Master Access Password Verification
+  // Master Access Magic Link
   const [showMasterModal, setShowMasterModal] = useState(false);
-  const [passwordInput, setPasswordInput] = useState('');
-  const [passwordConfirm, setPasswordConfirm] = useState('');
-  const [passwordError, setPasswordError] = useState('');
-  const [passwordMode, setPasswordMode] = useState<'set' | 'verify'>('verify');
-  const [showPassword, setShowPassword] = useState(false);
-  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [masterEmailInput, setMasterEmailInput] = useState('');
+  const [masterError, setMasterError] = useState('');
+  const [masterSending, setMasterSending] = useState(false);
+  const [masterLinkSent, setMasterLinkSent] = useState(false);
+  const [editingMasterEmail, setEditingMasterEmail] = useState(false);
+  const [newMasterEmail, setNewMasterEmail] = useState('');
+  const [savingMasterEmail, setSavingMasterEmail] = useState(false);
 
   // Sidebar
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -226,61 +228,65 @@ export default function LocationManagerCreator({ onMenuChange, onLogout }: Locat
     toast.success('Branch deleted');
   };
 
-  // Master Access Password handlers
+  // Master Access Magic Link handlers
   const handleMasterAccessClick = () => {
-    if (sessionStorage.getItem('healqr_master_access_verified') === 'true') {
-      onMenuChange?.('master-access');
-      return;
+    const storedEmail = clinicData?.masterAccessEmail;
+    if (!storedEmail) {
+      // No email set — show setup modal
+      setEditingMasterEmail(true);
+      setNewMasterEmail('');
+      setMasterError('');
+      setShowMasterModal(true);
+    } else {
+      // Email exists — show send link modal
+      setEditingMasterEmail(false);
+      setMasterLinkSent(false);
+      setMasterSending(false);
+      setMasterError('');
+      setShowMasterModal(true);
     }
-
-    const hasPassword = !!clinicData?.masterAccessPassword;
-    setPasswordInput('');
-    setPasswordConfirm('');
-    setPasswordError('');
-    setShowPassword(false);
-    setPasswordMode(hasPassword ? 'verify' : 'set');
-    setShowMasterModal(true);
   };
 
-  const handleSetPassword = async () => {
-    if (passwordInput.length < 8) {
-      setPasswordError('Password must be at least 8 characters');
+  const handleSetMasterEmail = async () => {
+    if (!newMasterEmail.trim() || !newMasterEmail.includes('@')) {
+      setMasterError('Enter a valid email address');
       return;
     }
-    if (passwordInput !== passwordConfirm) {
-      setPasswordError('Passwords do not match');
-      return;
-    }
-    setPasswordSaving(true);
+    setSavingMasterEmail(true);
     try {
       const clinicRef = doc(db, 'clinics', clinicId);
-      await updateDoc(clinicRef, { masterAccessPassword: passwordInput });
-      setClinicData((prev: any) => ({ ...prev, masterAccessPassword: passwordInput }));
-      sessionStorage.setItem('healqr_master_access_verified', 'true');
-      setShowMasterModal(false);
-      toast.success('Master password set!');
-      onMenuChange?.('master-access');
+      await updateDoc(clinicRef, { masterAccessEmail: newMasterEmail.trim().toLowerCase() });
+      setClinicData((prev: any) => ({ ...prev, masterAccessEmail: newMasterEmail.trim().toLowerCase() }));
+      setEditingMasterEmail(false);
+      setMasterError('');
+      toast.success('Master Access email saved');
     } catch {
-      setPasswordError('Failed to save password');
+      setMasterError('Failed to save email');
     } finally {
-      setPasswordSaving(false);
+      setSavingMasterEmail(false);
     }
   };
 
-  const handleVerifyPassword = () => {
-    const storedPassword = clinicData?.masterAccessPassword;
-    if (!storedPassword) {
-      setPasswordError('No password set. Please contact the clinic owner.');
-      return;
-    }
-    if (passwordInput === storedPassword) {
-      sessionStorage.setItem('healqr_master_access_verified', 'true');
-      setShowMasterModal(false);
-      toast.success('Master Access verified!');
-      onMenuChange?.('master-access');
-    } else {
-      setPasswordError('Incorrect password');
-      setPasswordInput('');
+  const handleSendMasterLink = async () => {
+    setMasterSending(true);
+    setMasterError('');
+    try {
+      if (!auth) throw new Error('Firebase not configured');
+      const email = clinicData?.masterAccessEmail;
+      if (!email) throw new Error('No master email set');
+
+      const actionCodeSettings = {
+        url: `${window.location.origin}/master-access-login?clinicId=${clinicId}`,
+        handleCodeInApp: true,
+      };
+      await sendSignInLinkToEmail(auth, email, actionCodeSettings);
+      setMasterLinkSent(true);
+      toast.success('Verification link sent!');
+    } catch (err: any) {
+      console.error('Error sending master link:', err);
+      setMasterError('Failed to send email. Try again.');
+    } finally {
+      setMasterSending(false);
     }
   };
 
@@ -421,10 +427,10 @@ export default function LocationManagerCreator({ onMenuChange, onLogout }: Locat
                 <ChevronRight className="w-4 h-4" />
               </Button>
             </div>
-            {sessionStorage.getItem('healqr_master_access_verified') === 'true' && (
+            {clinicData?.masterAccessEmail && (
               <div className="flex items-center gap-1.5 text-xs text-amber-100/70">
-                <Check className="w-3 h-3" />
-                Verified this session
+                <Mail className="w-3 h-3" />
+                Link sent to: {clinicData.masterAccessEmail}
               </div>
             )}
           </div>
@@ -635,7 +641,7 @@ export default function LocationManagerCreator({ onMenuChange, onLogout }: Locat
         </div>
       </div>
 
-      {/* Master Access Password Modal */}
+      {/* Master Access Magic Link Modal */}
       {showMasterModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-sm overflow-hidden">
@@ -647,10 +653,10 @@ export default function LocationManagerCreator({ onMenuChange, onLogout }: Locat
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-white">
-                      {passwordMode === 'set' ? 'Set Master Password' : 'Enter Master Password'}
+                      {editingMasterEmail ? (clinicData?.masterAccessEmail ? 'Update Email' : 'Set Owner Email') : masterLinkSent ? 'Check Your Email' : 'Master Access'}
                     </h3>
                     <p className="text-xs text-gray-400">
-                      {passwordMode === 'set' ? 'Create a password to protect Master Access' : 'Enter your password to unlock analytics'}
+                      {editingMasterEmail ? 'Set the email for the clinic owner' : masterLinkSent ? 'Open the link from your email' : 'Send a secure link to your email'}
                     </p>
                   </div>
                 </div>
@@ -660,72 +666,77 @@ export default function LocationManagerCreator({ onMenuChange, onLogout }: Locat
               </div>
             </div>
             <div className="p-6 space-y-4">
-              {passwordMode === 'set' ? (
+              {editingMasterEmail ? (
                 <>
                   <div>
-                    <label className="text-xs text-zinc-400 mb-1 block">New Password</label>
-                    <div className="relative">
-                      <Input
-                        type={showPassword ? 'text' : 'password'}
-                        value={passwordInput}
-                        onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(''); }}
-                        placeholder="Minimum 8 characters"
-                        className="bg-zinc-800 border-zinc-700 text-white pr-10"
-                        autoFocus
-                      />
-                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white">
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-xs text-zinc-400 mb-1 block">Confirm Password</label>
+                    <label className="text-xs text-zinc-400 mb-1 block">Owner Email Address</label>
                     <Input
-                      type={showPassword ? 'text' : 'password'}
-                      value={passwordConfirm}
-                      onChange={(e) => { setPasswordConfirm(e.target.value); setPasswordError(''); }}
-                      placeholder="Re-enter password"
+                      type="email"
+                      value={newMasterEmail}
+                      onChange={(e) => { setNewMasterEmail(e.target.value); setMasterError(''); }}
+                      placeholder="owner@email.com"
                       className="bg-zinc-800 border-zinc-700 text-white"
-                      onKeyDown={(e) => { if (e.key === 'Enter') handleSetPassword(); }}
+                      autoFocus
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleSetMasterEmail(); }}
                     />
+                    <p className="text-xs text-zinc-500 mt-1">A magic link will be sent to this email to open Master Access</p>
                   </div>
-                  {passwordError && <p className="text-red-400 text-xs">{passwordError}</p>}
+                  {masterError && <p className="text-red-400 text-xs">{masterError}</p>}
                   <div className="flex gap-3">
                     <button
-                      onClick={() => setShowMasterModal(false)}
+                      onClick={() => {
+                        if (clinicData?.masterAccessEmail) { setEditingMasterEmail(false); }
+                        else { setShowMasterModal(false); }
+                      }}
                       className="flex-1 px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-gray-300 rounded-xl text-sm font-medium transition-colors"
                     >
                       Cancel
                     </button>
                     <button
-                      onClick={handleSetPassword}
-                      disabled={passwordInput.length < 8 || passwordSaving}
+                      onClick={handleSetMasterEmail}
+                      disabled={!newMasterEmail.includes('@') || savingMasterEmail}
                       className="flex-1 px-4 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold transition-colors"
                     >
-                      {passwordSaving ? 'Saving...' : 'Set Password'}
+                      {savingMasterEmail ? 'Saving...' : 'Save Email'}
+                    </button>
+                  </div>
+                </>
+              ) : masterLinkSent ? (
+                <>
+                  <div className="text-center space-y-3">
+                    <div className="p-4 rounded-full bg-emerald-500/20 w-fit mx-auto">
+                      <Mail className="w-8 h-8 text-emerald-400" />
+                    </div>
+                    <p className="text-sm text-zinc-300">
+                      Link sent to <span className="text-amber-400 font-medium">{clinicData?.masterAccessEmail}</span>
+                    </p>
+                    <p className="text-xs text-zinc-500">Open the email and click the link to access Master Analytics. It works in any browser or device.</p>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setShowMasterModal(false)}
+                      className="flex-1 px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-gray-300 rounded-xl text-sm font-medium transition-colors"
+                    >
+                      Close
+                    </button>
+                    <button
+                      onClick={() => { setMasterLinkSent(false); }}
+                      className="flex-1 px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-sm font-bold transition-colors"
+                    >
+                      Resend
                     </button>
                   </div>
                 </>
               ) : (
                 <>
-                  <div>
-                    <label className="text-xs text-zinc-400 mb-1 block">Master Password</label>
-                    <div className="relative">
-                      <Input
-                        type={showPassword ? 'text' : 'password'}
-                        value={passwordInput}
-                        onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(''); }}
-                        placeholder="Enter master password"
-                        className="bg-zinc-800 border-zinc-700 text-white pr-10"
-                        autoFocus
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleVerifyPassword(); }}
-                      />
-                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white">
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
+                  <div className="text-center space-y-3">
+                    <p className="text-sm text-zinc-300">
+                      A secure magic link will be sent to:
+                    </p>
+                    <p className="text-amber-400 font-medium">{clinicData?.masterAccessEmail}</p>
+                    <p className="text-xs text-zinc-500">Click the link in your email to open Master Access analytics. Works on any device.</p>
                   </div>
-                  {passwordError && <p className="text-red-400 text-xs">{passwordError}</p>}
+                  {masterError && <p className="text-red-400 text-xs text-center">{masterError}</p>}
                   <div className="flex gap-3">
                     <button
                       onClick={() => setShowMasterModal(false)}
@@ -734,13 +745,19 @@ export default function LocationManagerCreator({ onMenuChange, onLogout }: Locat
                       Cancel
                     </button>
                     <button
-                      onClick={handleVerifyPassword}
-                      disabled={!passwordInput}
-                      className="flex-1 px-4 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold transition-colors"
+                      onClick={handleSendMasterLink}
+                      disabled={masterSending}
+                      className="flex-1 px-4 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2"
                     >
-                      Unlock
+                      {masterSending ? 'Sending...' : <><Send className="w-4 h-4" /> Send Link</>}
                     </button>
                   </div>
+                  <button
+                    onClick={() => { setEditingMasterEmail(true); setNewMasterEmail(clinicData?.masterAccessEmail || ''); }}
+                    className="text-xs text-zinc-500 hover:text-amber-400 text-center w-full transition-colors"
+                  >
+                    Change email address
+                  </button>
                 </>
               )}
             </div>
