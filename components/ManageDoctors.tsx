@@ -134,7 +134,13 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
   const [showAddModal, setShowAddModal] = useState(false);
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [clinicData, setClinicData] = useState<any>(null);
-  const effectiveClinicId = propClinicId || auth.currentUser?.uid;
+  const effectiveClinicId = propClinicId || (() => {
+    const isLocMgr = localStorage.getItem('healqr_is_location_manager') === 'true';
+    const isAsst = localStorage.getItem('healqr_is_assistant') === 'true';
+    if (isLocMgr) return localStorage.getItem('healqr_parent_clinic_id') || auth.currentUser?.uid;
+    if (isAsst) return localStorage.getItem('healqr_assistant_doctor_id') || auth.currentUser?.uid;
+    return auth.currentUser?.uid;
+  })();
   const NO_LOCATION_ID = '__no_locations__';
 
   const [clinicLocations, setClinicLocations] = useState<Array<{ id: string; name: string; address?: string }>>([]);
@@ -179,6 +185,11 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
   const [tempAccessData, setTempAccessData] = useState<{ [doctorId: string]: { link: string; pin: string; expiry: string } }>({});
   const [copiedTempField, setCopiedTempField] = useState<string>('');
 
+  // Legal Disclaimer Modal for Temp Access
+  const [showTempAccessDisclaimer, setShowTempAccessDisclaimer] = useState(false);
+  const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
+  const [pendingTempAccessDoctor, setPendingTempAccessDoctor] = useState<LinkedDoctor | null>(null);
+
   useEffect(() => {
     if (effectiveClinicId) {
       loadClinicData();
@@ -187,6 +198,20 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
   }, [effectiveClinicId, auth?.currentUser]);
 
   // Generate Temporary Doctor Access (link + PIN)
+  const requestTempAccess = (doctor: LinkedDoctor) => {
+    setPendingTempAccessDoctor(doctor);
+    setDisclaimerAccepted(false);
+    setShowTempAccessDisclaimer(true);
+  };
+
+  const confirmTempAccessGeneration = () => {
+    if (!disclaimerAccepted || !pendingTempAccessDoctor) return;
+    setShowTempAccessDisclaimer(false);
+    handleGenerateTempAccess(pendingTempAccessDoctor);
+    setPendingTempAccessDoctor(null);
+    setDisclaimerAccepted(false);
+  };
+
   const handleGenerateTempAccess = async (doctor: LinkedDoctor) => {
     const clinicId = effectiveClinicId;
     if (!clinicId) return;
@@ -2006,7 +2031,7 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
                         {/* Regenerate */}
                         <Button
                           size="sm"
-                          onClick={() => handleGenerateTempAccess(doctor)}
+                          onClick={() => requestTempAccess(doctor)}
                           variant="ghost"
                           className="w-full text-gray-400 hover:text-white text-xs h-7"
                           disabled={tempAccessLoading === doctor.uid}
@@ -2017,7 +2042,7 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
                     ) : (
                       <Button
                         size="sm"
-                        onClick={() => handleGenerateTempAccess(doctor)}
+                        onClick={() => requestTempAccess(doctor)}
                         disabled={tempAccessLoading === doctor.uid}
                         className="w-full bg-blue-600/20 border border-blue-600/40 text-blue-400 hover:bg-blue-600/30 text-xs h-9"
                       >
@@ -2507,6 +2532,82 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
               className="bg-emerald-600 hover:bg-emerald-700 text-white min-w-[120px]"
             >
               REACTIVATE
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Legal Disclaimer Modal for Temporary Access */}
+      <Dialog open={showTempAccessDisclaimer} onOpenChange={setShowTempAccessDisclaimer}>
+        <DialogContent className="bg-gray-900 border-gray-700 text-white max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-red-400 text-center pb-4 border-b border-gray-800 text-lg">
+              ⚠️ Medical & Legal Disclaimer
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+              <p className="text-sm text-red-300 font-medium mb-2">
+                Temporary Device Access is exclusively for licensed medical practitioners.
+              </p>
+              <p className="text-xs text-gray-400 leading-relaxed">
+                This feature generates a one-day access link that allows a doctor to view patient details,
+                write Digital Prescriptions (RX), and manage consultations on this device.
+              </p>
+            </div>
+
+            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 space-y-2">
+              <p className="text-sm text-yellow-300 font-bold">By proceeding, you acknowledge that:</p>
+              <ul className="text-xs text-gray-300 space-y-1.5 list-disc list-inside">
+                <li>This access link will be shared <strong>only with a licensed medical doctor</strong> registered with HealQR</li>
+                <li>All prescriptions (RX) generated are the <strong>sole responsibility of the prescribing doctor</strong></li>
+                <li>The clinic/organization is <strong>fully responsible</strong> for ensuring that only authorized medical personnel use this access</li>
+                <li><strong>HealQR.com bears no liability</strong> for any prescriptions, medical advice, or clinical decisions made through temporary access</li>
+                <li>Any misuse for unauthorized prescription generation may result in <strong>legal action and permanent account suspension</strong></li>
+              </ul>
+            </div>
+
+            {pendingTempAccessDoctor && (
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                <p className="text-xs text-gray-400">Generating access for:</p>
+                <p className="text-white font-medium">Dr. {pendingTempAccessDoctor.name}</p>
+              </div>
+            )}
+
+            <label className="flex items-start gap-3 cursor-pointer p-3 rounded-lg hover:bg-gray-800 transition-colors">
+              <input
+                type="checkbox"
+                checked={disclaimerAccepted}
+                onChange={(e) => setDisclaimerAccepted(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded border-gray-600 text-blue-600 focus:ring-blue-500 accent-blue-500"
+              />
+              <span className="text-xs text-gray-300 leading-relaxed">
+                I confirm that I am an authorized representative of this clinic, and I accept full responsibility
+                for ensuring this temporary access is used exclusively by the designated licensed medical practitioner.
+                I understand that HealQR is a technology platform only and bears no medical or legal liability.
+              </span>
+            </label>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-800">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowTempAccessDisclaimer(false);
+                setPendingTempAccessDoctor(null);
+                setDisclaimerAccepted(false);
+              }}
+              className="border-gray-600 text-gray-400 hover:bg-gray-800"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmTempAccessGeneration}
+              disabled={!disclaimerAccepted}
+              className={`min-w-[180px] ${disclaimerAccepted ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-700 text-gray-500 cursor-not-allowed'}`}
+            >
+              I Accept — Generate Access
             </Button>
           </div>
         </DialogContent>

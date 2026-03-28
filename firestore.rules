@@ -98,8 +98,11 @@ service cloud.firestore {
         // Allow read by anyone (temp doctors need to validate token/PIN without auth)
         allow read: if true;
 
-        // Allow create/update/delete by clinic owner only
-        allow create, update, delete: if isAuthenticated() && request.auth.uid == clinicId;
+        // Allow create/update/delete by clinic owner or branch location managers
+        allow create, update, delete: if isAuthenticated() && (
+          request.auth.uid == clinicId ||
+          (request.auth.token.email in get(/databases/$(database)/documents/clinics/$(clinicId)).data.locationEmails)
+        );
       }
     }
 

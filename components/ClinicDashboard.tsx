@@ -125,6 +125,15 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
   };
   const displayClinicName = clinicData ? getDisplayClinicName() : 'Clinic';
 
+  // Guarded menu change: enforce assistant page access restrictions
+  const handleMenuChange = (menu: string) => {
+    if (isAssistant && menu !== 'dashboard' && !assistantAllowedPages.includes(menu)) {
+      // Block navigation to pages the assistant doesn't have access to
+      return;
+    }
+    setActiveMenu(menu);
+  };
+
   // Analytics State
   const [analyticsData, setAnalyticsData] = useState({
     totalScans: 0,
@@ -523,7 +532,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
     }
     return (
       <LocationManagerCreator
-        onMenuChange={(menu) => setActiveMenu(menu)}
+        onMenuChange={handleMenuChange}
         onLogout={handleLogout}
       />
     );
@@ -533,7 +542,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
   if (activeMenu === 'profile') {
     return (
       <ClinicProfileManager
-        onMenuChange={(menu) => setActiveMenu(menu)}
+        onMenuChange={handleMenuChange}
         onLogout={handleLogout}
       />
     );
@@ -543,7 +552,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
   if (activeMenu === 'qr-manager') {
     return (
       <ClinicQRManager
-        onMenuChange={(menu) => setActiveMenu(menu)}
+        onMenuChange={handleMenuChange}
         onLogout={handleLogout}
         profileData={{
           image: clinicData?.logoUrl || null,
@@ -555,12 +564,12 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
 
   // Render Schedule Manager if menu is active
   if (activeMenu === 'schedule' || activeMenu === 'schedule-manager') {
-    return <ClinicScheduleManager onMenuChange={(menu) => setActiveMenu(menu)} onLogout={handleLogout} />;
+    return <ClinicScheduleManager onMenuChange={handleMenuChange} onLogout={handleLogout} />;
   }
 
   // Render Today's Schedule if menu is active
   if (activeMenu === 'todays-schedule') {
-    return <ClinicTodaysSchedule onMenuChange={(menu) => setActiveMenu(menu)} onLogout={handleLogout} />;
+    return <ClinicTodaysSchedule onMenuChange={handleMenuChange} onLogout={handleLogout} />;
   }
 
   // Render Manage Doctors if menu is active
@@ -568,7 +577,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
     return <ManageDoctors
       clinicId={resolvedClinicId}
       onNavigate={(view, doctorId) => {
-        setActiveMenu(view);
+        handleMenuChange(view);
         if (doctorId) {
           localStorage.setItem('selectedDoctorId', doctorId);
         }
@@ -578,14 +587,14 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
 
   // Render Advance Booking if menu is active
   if (activeMenu === 'advance-booking') {
-    return <ClinicAdvanceBooking onMenuChange={(menu) => setActiveMenu(menu)} onLogout={handleLogout} />;
+    return <ClinicAdvanceBooking onMenuChange={handleMenuChange} onLogout={handleLogout} />;
   }
 
   // Render Analytics if menu is active
   if (activeMenu === 'analytics') {
     return (
       <ClinicAnalytics
-        onMenuChange={(menu) => setActiveMenu(menu)}
+        onMenuChange={handleMenuChange}
         onLogout={handleLogout}
         isSidebarCollapsed={false}
         setIsSidebarCollapsed={() => {}}
@@ -597,7 +606,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
   if (activeMenu === 'reports') {
     return (
       <ClinicReports
-        onMenuChange={(menu) => setActiveMenu(menu)}
+        onMenuChange={handleMenuChange}
         onLogout={handleLogout}
       />
     );
@@ -612,7 +621,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
         clinicPhone={clinicData?.phone || ''}
         qrUrl={`https://healqr.com?clinicId=${resolvedClinicId}`}
         clinicLogo={clinicData?.logoUrl || null}
-        onMenuChange={(menu) => setActiveMenu(menu)}
+        onMenuChange={handleMenuChange}
         onLogout={handleLogout}
       />
     );
@@ -622,7 +631,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
   if (activeMenu === 'monthly-planner') {
     return (
       <ClinicMonthlyPlanner
-        onMenuChange={(menu) => setActiveMenu(menu)}
+        onMenuChange={handleMenuChange}
         onLogout={handleLogout}
       />
     );
@@ -632,7 +641,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
   if (activeMenu === 'preview') {
     return (
       <ClinicPreviewCenter
-        onMenuChange={(menu) => setActiveMenu(menu)}
+        onMenuChange={handleMenuChange}
         onLogout={handleLogout}
         clinicData={clinicData}
       />
@@ -651,7 +660,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
       <ClinicAssistantAccessManager
         clinicName={displayClinicName}
         email={assistantManagerEmail}
-        onMenuChange={(menu) => setActiveMenu(menu)}
+        onMenuChange={handleMenuChange}
         onLogout={handleLogout}
         activeAddOns={[]}
       />
@@ -664,7 +673,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
       <ClinicLabReferralManager
         clinicName={displayClinicName}
         clinicId={resolvedClinicId}
-        onMenuChange={(menu) => setActiveMenu(menu)}
+        onMenuChange={handleMenuChange}
         onLogout={handleLogout}
       />
     );
@@ -675,7 +684,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
     return (
       <ClinicPersonalizedTemplatesManager
         clinicId={resolvedClinicId}
-        onMenuChange={(menu) => setActiveMenu(menu)}
+        onMenuChange={handleMenuChange}
         onLogout={handleLogout}
       />
     );
@@ -686,7 +695,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
     return (
       <ClinicEmergencyButtonManager
         clinicId={resolvedClinicId}
-        onMenuChange={(menu) => setActiveMenu(menu)}
+        onMenuChange={handleMenuChange}
         onLogout={handleLogout}
       />
     );
@@ -698,7 +707,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
       <ClinicAIDietChartManager
         clinicId={resolvedClinicId}
         clinicName={displayClinicName}
-        onMenuChange={(menu) => setActiveMenu(menu)}
+        onMenuChange={handleMenuChange}
         onLogout={handleLogout}
         activeAddOns={[]}
       />
@@ -711,7 +720,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
       <ClinicAIRXReaderManager
         clinicName={displayClinicName}
         clinicId={resolvedClinicId}
-        onMenuChange={(menu) => setActiveMenu(menu)}
+        onMenuChange={handleMenuChange}
         onLogout={handleLogout}
       />
     );
@@ -728,7 +737,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
       <ClinicVideoConsultationManager
         clinicId={resolvedClinicId}
         clinicName={displayClinicName}
-        onMenuChange={(menu) => setActiveMenu(menu)}
+        onMenuChange={handleMenuChange}
         onLogout={handleLogout}
         activeAddOns={[]}
         isAssistant={isAssistant}
@@ -759,7 +768,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
       <div className="min-h-screen bg-black text-white flex flex-col lg:flex-row">
         <ClinicSidebar
           activeMenu={activeMenu}
-          onMenuChange={(menu) => setActiveMenu(menu)}
+          onMenuChange={handleMenuChange}
           onLogout={handleLogout}
           isOpen={mobileMenuOpen}
           onClose={() => setMobileMenuOpen(false)}
@@ -816,7 +825,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
       <ClinicSidebar
         activeMenu={activeMenu}
         onMenuChange={(menu) => {
-          setActiveMenu(menu);
+          handleMenuChange(menu);
           setMobileMenuOpen(false);
         }}
         onLogout={handleLogout}
@@ -864,7 +873,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
 
             {/* Video Library */}
             <button
-              onClick={() => setActiveMenu('video-library')}
+              onClick={() => handleMenuChange('video-library')}
               className="relative w-10 h-10 bg-zinc-900 hover:bg-zinc-800 rounded-lg flex items-center justify-center transition-colors"
               title="Video Library"
             >
@@ -878,7 +887,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
 
             {/* Profile */}
             <button
-              onClick={() => setActiveMenu('profile')}
+              onClick={() => handleMenuChange('profile')}
               className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center"
             >
               <User className="w-5 h-5" />
@@ -923,7 +932,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
                   {/* Full-width BrainDeck Button */}
                   <div className="w-full mb-3">
                     <button
-                      onClick={() => setActiveMenu('braindeck')}
+                      onClick={() => handleMenuChange('braindeck')}
                       className="w-full flex items-center justify-center rounded-xl bg-white text-blue-600 font-bold py-3 text-base border border-blue-200 shadow"
                       style={{ letterSpacing: '0.02em' }}
                     >
@@ -990,7 +999,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-xs text-emerald-100/80">Create branded posts for Instagram & WhatsApp.</p>
                     <button
-                      onClick={() => setActiveMenu('social-kit')}
+                      onClick={() => handleMenuChange('social-kit')}
                       className="hover:bg-slate-50 px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-1.5 transition-all shadow-lg shrink-0"
                       style={{ backgroundColor: 'white', color: '#059669' }}
                     >
@@ -1160,7 +1169,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
                       variant="ghost"
                       size="sm"
                       className="text-blue-500 hover:text-blue-400"
-                      onClick={() => setActiveMenu('todays-schedule')}
+                      onClick={() => handleMenuChange('todays-schedule')}
                     >
                       View All
                     </Button>
@@ -1239,7 +1248,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
                             variant="outline"
                             size="sm"
                             className="text-blue-500 border-blue-500/30 hover:bg-blue-500/10"
-                            onClick={() => setActiveMenu('todays-schedule')}
+                            onClick={() => handleMenuChange('todays-schedule')}
                           >
                             View All {todaysChambers.length} Chambers
                           </Button>
