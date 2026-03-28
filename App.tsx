@@ -1288,16 +1288,26 @@ export default function App() {
               const assistantData = assistantSnap.docs[0].data();
 
               // MIGRATION: Convert old page IDs to new format
-              const PAGE_ID_MIGRATION: Record<string, string> = {
-                'profile-manager': 'profile',
-                'qr-manager': 'qr',
-                'schedule-manager': 'schedule',
-                'preview-center': 'preview',
-                'personalized-template': 'personalized-templates',
-                'ai-diet-chart': 'ai-diet',
-                'ai-rx-reader': 'ai-rx',
-                'video-consultation': 'video-consult',
-              };
+              // Doctor and clinic sidebars use DIFFERENT IDs, so migration must be context-aware
+              const isClinicAssistant = assistantData.isClinic === true;
+              const PAGE_ID_MIGRATION: Record<string, string> = isClinicAssistant
+                ? {
+                    // Clinic-only migrations (clinic sidebar uses qr-manager, schedule-manager etc. as-is)
+                    'ai-diet-chart': 'ai-diet',
+                    'ai-rx-reader': 'ai-rx',
+                    'video-consultation': 'video-consult',
+                  }
+                : {
+                    // Doctor-level migrations
+                    'profile-manager': 'profile',
+                    'qr-manager': 'qr',
+                    'schedule-manager': 'schedule',
+                    'preview-center': 'preview',
+                    'personalized-template': 'personalized-templates',
+                    'ai-diet-chart': 'ai-diet',
+                    'ai-rx-reader': 'ai-rx',
+                    'video-consultation': 'video-consult',
+                  };
 
               const migratePageIds = (pages: string[]): string[] => {
                 return pages.map(pageId => PAGE_ID_MIGRATION[pageId] || pageId);
