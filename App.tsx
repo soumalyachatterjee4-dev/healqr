@@ -215,7 +215,9 @@ export default function App() {
     const isClinic = localStorage.getItem('healqr_is_clinic') === 'true';
     const isAssistant = localStorage.getItem('healqr_is_assistant') === 'true';
     const hasClinicSession = isClinic && (localStorage.getItem('userId') || localStorage.getItem('healqr_user_email'));
-    if (hasClinicSession && !isAssistant) return 'clinic-dashboard';
+    if (hasClinicSession) return 'clinic-dashboard'; // Clinic owners AND clinic assistants
+    // Doctor-level assistants should also start on dashboard
+    if (isAssistant && localStorage.getItem('healqr_assistant_doctor_id')) return 'dashboard';
     return 'landing';
   });
   const [notifData, setNotifData] = useState<{
@@ -1256,7 +1258,8 @@ export default function App() {
         if (isAssistant) {
           // Check if assistant is still active - CRITICAL for deactivation
           const assistantDoctorId = localStorage.getItem('healqr_assistant_doctor_id');
-          const assistantEmail = storedEmail || user.email;
+          // Use the assistant's OWN email (not the doctor's email stored in healqr_user_email)
+          const assistantEmail = localStorage.getItem('healqr_assistant_email') || storedEmail || user.email;
 
           if (db && assistantEmail && assistantDoctorId) {
             try {
@@ -1322,6 +1325,7 @@ export default function App() {
           localStorage.removeItem('healqr_is_assistant');
           localStorage.removeItem('healqr_assistant_pages');
           localStorage.removeItem('healqr_assistant_doctor_id');
+          localStorage.removeItem('healqr_assistant_email');
         }
 
         // ✅ CHECK FOR MAJOR BLOCKING (Payment Failure, Trial Expired, Booking Limit)
@@ -1654,12 +1658,22 @@ export default function App() {
         const storedEmail = localStorage.getItem('healqr_user_email');
         const userId = localStorage.getItem('userId');
 
-        // Check for clinic/branch manager session first
+        // Check for clinic/branch manager session first (includes clinic assistants)
         const isClinicSession = localStorage.getItem('healqr_is_clinic') === 'true';
         if (isClinicSession && (userId || storedEmail)) {
           setUserEmail(storedEmail || '');
           setUserName(localStorage.getItem('healqr_user_name') || '');
           setCurrentPage('clinic-dashboard');
+          setIsAuthInitialized(true);
+          return;
+        }
+
+        // Check for doctor-level assistant session (non-clinic assistants)
+        const isAssistantSession = localStorage.getItem('healqr_is_assistant') === 'true';
+        if (isAssistantSession && localStorage.getItem('healqr_assistant_doctor_id')) {
+          setUserEmail(storedEmail || '');
+          setUserName(localStorage.getItem('healqr_user_name') || '');
+          setCurrentPage('dashboard');
           setIsAuthInitialized(true);
           return;
         }
@@ -2344,6 +2358,7 @@ export default function App() {
       localStorage.removeItem('healqr_is_assistant');
       localStorage.removeItem('healqr_assistant_pages');
       localStorage.removeItem('healqr_assistant_doctor_id');
+      localStorage.removeItem('healqr_assistant_email');
       localStorage.removeItem('healqr_is_location_manager');
       localStorage.removeItem('healqr_location_id');
       localStorage.removeItem('healqr_parent_clinic_id');

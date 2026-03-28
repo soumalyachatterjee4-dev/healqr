@@ -124,6 +124,7 @@ export default function AssistantLogin() {
       localStorage.setItem('healqr_is_assistant', 'true');
       localStorage.setItem('healqr_assistant_pages', JSON.stringify(migratedPages)); // Use migrated pages
       localStorage.setItem('healqr_assistant_doctor_id', assistantData.doctorId);
+      localStorage.setItem('healqr_assistant_email', assistantData.assistantEmail); // Assistant's OWN email for validation
       localStorage.setItem('userId', assistantData.doctorId);
       localStorage.setItem('healqr_user_email', assistantData.doctorEmail);
       localStorage.setItem('healqr_user_name', assistantData.doctorName); // Doctor's name - FIXED
