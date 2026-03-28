@@ -84,10 +84,13 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
   onMenuChange,
   onLogout,
 }) => {
-  // Resolve clinic ID: branch managers use parent clinic ID
+  // Resolve clinic ID: branch managers use parent clinic ID, assistants use doctor's ID
   const isLocationManager = localStorage.getItem('healqr_is_location_manager') === 'true';
+  const isAssistant = localStorage.getItem('healqr_is_assistant') === 'true';
   const resolvedClinicId = isLocationManager
     ? (localStorage.getItem('healqr_parent_clinic_id') || auth?.currentUser?.uid || '')
+    : isAssistant
+    ? (localStorage.getItem('healqr_assistant_doctor_id') || auth?.currentUser?.uid || '')
     : (auth?.currentUser?.uid || '');
 
   const [doctors, setDoctors] = useState<Doctor[]>([]);

@@ -48,11 +48,16 @@ export default function ClinicReports({
   const [reportData, setReportData] = useState<ReportData[]>([]);
   const [linkedDoctors, setLinkedDoctors] = useState<Array<{ id: string; name: string; specialty: string }>>([]);
 
-  // Branch manager resolution
+  // Branch manager and assistant resolution
   const isLocationManager = localStorage.getItem('healqr_is_location_manager') === 'true';
+  const isAssistant = localStorage.getItem('healqr_is_assistant') === 'true';
   const parentClinicId = localStorage.getItem('healqr_parent_clinic_id');
   const locationManagerBranchId = localStorage.getItem('healqr_location_id');
-  const resolvedClinicId = isLocationManager && parentClinicId ? parentClinicId : clinicId;
+  const resolvedClinicId = isLocationManager && parentClinicId
+    ? parentClinicId
+    : isAssistant
+    ? (localStorage.getItem('healqr_assistant_doctor_id') || clinicId)
+    : clinicId;
 
   // Filter States
   const getDefaultDates = () => {

@@ -91,10 +91,13 @@ export default function ClinicAdvanceBooking({
         const currentUser = currentAuth.currentUser;
         if (!currentUser) return;
 
-        // Resolve clinic ID for branch managers (use parent clinic ID)
+        // Resolve clinic ID for branch managers and assistants
         const isLocationManager = localStorage.getItem('healqr_is_location_manager') === 'true';
+        const isAssistant = localStorage.getItem('healqr_is_assistant') === 'true';
         const resolvedClinicId = isLocationManager
           ? (localStorage.getItem('healqr_parent_clinic_id') || currentUser.uid)
+          : isAssistant
+          ? (localStorage.getItem('healqr_assistant_doctor_id') || currentUser.uid)
           : currentUser.uid;
 
         const clinicRef = doc(currentDb, 'clinics', resolvedClinicId);

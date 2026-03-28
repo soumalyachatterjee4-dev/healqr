@@ -73,11 +73,14 @@ export default function ClinicAnalytics({
         setLoading(true);
         const userId = propClinicId || auth?.currentUser?.uid || localStorage.getItem('userId');
 
-        // Branch manager support
+        // Branch manager and assistant support
         const isLocationManager = localStorage.getItem('healqr_is_location_manager') === 'true';
+        const isAssistant = localStorage.getItem('healqr_is_assistant') === 'true';
         const locationManagerBranchId = localStorage.getItem('healqr_location_id') || '';
         const resolvedClinicId = isLocationManager
           ? (localStorage.getItem('healqr_parent_clinic_id') || userId)
+          : isAssistant
+          ? (localStorage.getItem('healqr_assistant_doctor_id') || userId)
           : userId;
 
         console.log(`📊 [ClinicAnalytics] Starting loadAnalytics for userId: ${userId} (Prop: ${propClinicId})`);

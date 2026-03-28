@@ -71,7 +71,13 @@ function ChamberPatientDetailsLoader({
         const todayStr = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split('T')[0];
 
         const bookingsRef = collection(db, 'bookings');
-        const currentClinicId = auth?.currentUser?.uid;
+        const currentClinicId = (() => {
+          const isLocMgr = localStorage.getItem('healqr_is_location_manager') === 'true';
+          const isAsst = localStorage.getItem('healqr_is_assistant') === 'true';
+          if (isLocMgr) return localStorage.getItem('healqr_parent_clinic_id') || auth?.currentUser?.uid;
+          if (isAsst) return localStorage.getItem('healqr_assistant_doctor_id') || auth?.currentUser?.uid;
+          return auth?.currentUser?.uid;
+        })();
 
         // 🔒 Check if this doctor has restricted their QR data from this clinic
         // Read from DOCTOR's profile (not clinic doc - doctor has no write permission there)
@@ -874,11 +880,14 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
       return;
     }
 
-    // Branch manager support: resolve to parent clinic ID
+    // Branch manager / assistant support: resolve to parent clinic ID
     const isLocationManager = localStorage.getItem('healqr_is_location_manager') === 'true';
     const locationManagerBranchId = localStorage.getItem('healqr_location_id') || '';
+    const isAssistant = localStorage.getItem('healqr_is_assistant') === 'true';
     const resolvedClinicId = isLocationManager
       ? (localStorage.getItem('healqr_parent_clinic_id') || currentUser.uid)
+      : isAssistant
+      ? (localStorage.getItem('healqr_assistant_doctor_id') || currentUser.uid)
       : currentUser.uid;
 
     try {
