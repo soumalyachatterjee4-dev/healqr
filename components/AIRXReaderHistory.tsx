@@ -1,15 +1,15 @@
-import React, { useState } from 'react';
-import { Search, Calendar, FileText, Sparkles, Download, Eye, Filter, ChevronDown, ArrowLeft } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Calendar, FileText, Sparkles, Download, Eye, Filter, ChevronDown, ArrowLeft, Printer, User, Clock } from 'lucide-react';
 import { Button } from './ui/button';
-import { Input } from './ui/input';
 
 interface AIRXRecord {
   id: string;
   patientId: string;
   patientName: string;
+  doctorName?: string;
   consultationDate: string;
   uploadDate: string;
-  prescriptionImage: string;
+  prescriptionImage?: string;
   aiProcessed: boolean;
   language: 'english' | 'hindi' | 'bengali';
   viewed: boolean;
@@ -22,338 +22,249 @@ interface AIRXRecord {
 
 interface AIRXReaderHistoryProps {
   onBack?: () => void;
+  clinicId?: string;
 }
 
-export const AIRXReaderHistory: React.FC<AIRXReaderHistoryProps> = ({ onBack }) => {
+export const AIRXReaderHistory: React.FC<AIRXReaderHistoryProps> = ({ onBack, clinicId }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [doctorFilter, setDoctorFilter] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const [languageFilter, setLanguageFilter] = useState<string>('all');
   const [expandedRecord, setExpandedRecord] = useState<string | null>(null);
+  const [records, setRecords] = useState<AIRXRecord[]>([]);
 
-  // Mock data - Replace with real data from database
-  const [records] = useState<AIRXRecord[]>([
-    {
-      id: 'rx-001',
-      patientId: 'p-001',
-      patientName: 'Rahul Sharma',
-      consultationDate: '2025-11-14',
-      uploadDate: '2025-11-14 10:30 AM',
-      prescriptionImage: 'https://images.unsplash.com/photo-1584820927498-cfe5211fd8bf?w=400',
-      aiProcessed: true,
-      language: 'hindi',
-      viewed: true,
-      medicines: [
-        { name: 'Paracetamol', dosage: '500mg', frequency: '2 times daily' },
-        { name: 'Amoxicillin', dosage: '250mg', frequency: '3 times daily' },
-      ],
-    },
-    {
-      id: 'rx-002',
-      patientId: 'p-002',
-      patientName: 'Priya Banerjee',
-      consultationDate: '2025-11-13',
-      uploadDate: '2025-11-13 02:45 PM',
-      prescriptionImage: 'https://images.unsplash.com/photo-1584820927498-cfe5211fd8bf?w=400',
-      aiProcessed: true,
-      language: 'bengali',
-      viewed: false,
-      medicines: [
-        { name: 'Azithromycin', dosage: '500mg', frequency: 'Once daily' },
-      ],
-    },
-    {
-      id: 'rx-003',
-      patientId: 'p-003',
-      patientName: 'John Doe',
-      consultationDate: '2025-11-12',
-      uploadDate: '2025-11-12 11:15 AM',
-      prescriptionImage: 'https://images.unsplash.com/photo-1584820927498-cfe5211fd8bf?w=400',
-      aiProcessed: true,
-      language: 'english',
-      viewed: true,
-      medicines: [
-        { name: 'Ibuprofen', dosage: '400mg', frequency: '3 times daily' },
-        { name: 'Omeprazole', dosage: '20mg', frequency: 'Once daily before meal' },
-      ],
-    },
-  ]);
+  // Load records from localStorage
+  useEffect(() => {
+    if (clinicId) {
+      const historyJson = localStorage.getItem(`healqr_clinic_rx_history_${clinicId}`);
+      if (historyJson) {
+        try {
+          setRecords(JSON.parse(historyJson));
+        } catch (e) {
+          console.error('Failed to parse rx history', e);
+        }
+      }
+    }
+  }, [clinicId]);
 
   const filteredRecords = records.filter((record) => {
     const matchesSearch =
       record.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       record.patientId.toLowerCase().includes(searchTerm.toLowerCase());
-
+    const matchesDoctor = !doctorFilter || (record.doctorName || '').toLowerCase().includes(doctorFilter.toLowerCase());
     const matchesDate = dateFilter ? record.consultationDate === dateFilter : true;
-
     const matchesLanguage = languageFilter === 'all' || record.language === languageFilter;
-
-    return matchesSearch && matchesDate && matchesLanguage;
+    return matchesSearch && matchesDoctor && matchesDate && matchesLanguage;
   });
 
   const handleDownload = (record: AIRXRecord) => {
-    // Implement download logic
+    const text = `AI RX Reader Report\n\nPatient: ${record.patientName}\nPatient ID: ${record.patientId}\n${record.doctorName ? `Doctor: Dr. ${record.doctorName}\n` : ''}Consultation: ${record.consultationDate}\nLanguage: ${record.language}\n\nMedicines:\n${record.medicines.map((m, i) => `${i + 1}. ${m.name} - ${m.dosage} (${m.frequency})`).join('\n')}`;
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `rx_${record.patientName.replace(/\s+/g, '_')}_${record.consultationDate}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
-  const languageLabels = {
+  const languageLabels: Record<string, string> = {
     english: 'English',
     hindi: 'Hindi (हिंदी)',
     bengali: 'Bengali (বাংলা)',
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-3">
-              <Sparkles className="w-10 h-10" />
-              <h1 className="text-3xl font-bold">AI RX Reader History</h1>
-            </div>
-            {onBack && (
-              <Button
-                onClick={onBack}
-                variant="outline"
-                className="border-white/30 text-white hover:bg-white/20 hover:text-white"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
-              </Button>
-            )}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center">
+            <Sparkles className="w-6 h-6 text-emerald-400" />
           </div>
-          <p className="text-emerald-50">
-            View all AI-processed prescription records with patient history
-          </p>
+          <div>
+            <h1 className="text-white text-xl uppercase font-black tracking-tight">AI RX Reader History</h1>
+            <p className="text-zinc-400 text-sm mt-0.5">View all AI-processed prescription records</p>
+          </div>
         </div>
+        {onBack && (
+          <Button onClick={onBack} variant="ghost" className="text-gray-400 hover:text-white hover:bg-zinc-900">
+            <ArrowLeft className="w-4 h-4 mr-2" /> Back
+          </Button>
+        )}
       </div>
 
       {/* Filters */}
-      <div className="bg-white border-b shadow-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto p-6">
-          <div className="grid md:grid-cols-4 gap-4">
-            {/* Search by Patient Name */}
-            <div className="md:col-span-2">
-              <div className="relative">
-                <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <Input
-                  type="text"
-                  placeholder="Search by patient name or ID..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+      <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Filter className="w-5 h-5 text-emerald-400" />
+          <h2 className="text-white font-semibold">Filters</h2>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div>
+            <label className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 block">Patient</label>
+            <input type="text" placeholder="Search patient..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-gray-900 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-gray-600" />
+          </div>
+          <div>
+            <label className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 block">Doctor</label>
+            <input type="text" placeholder="Search doctor..." value={doctorFilter} onChange={(e) => setDoctorFilter(e.target.value)}
+              className="w-full bg-gray-900 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-gray-600" />
+          </div>
+          <div>
+            <label className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 block">Date</label>
+            <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)}
+              className="w-full bg-gray-900 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+          <div>
+            <label className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 block">Language</label>
+            <select value={languageFilter} onChange={(e) => setLanguageFilter(e.target.value)}
+              className="w-full bg-gray-900 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+              <option value="all">All Languages</option>
+              <option value="english">English</option>
+              <option value="hindi">Hindi</option>
+              <option value="bengali">Bengali</option>
+            </select>
+          </div>
+          <div className="flex flex-col justify-end gap-2">
+            <div className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/30 rounded-lg px-3 py-2">
+              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+              <span className="text-blue-400 text-xs">{filteredRecords.length} found</span>
             </div>
-
-            {/* Date Filter */}
-            <div>
-              <div className="relative">
-                <Calendar className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <Input
-                  type="date"
-                  value={dateFilter}
-                  onChange={(e) => setDateFilter(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-
-            {/* Language Filter */}
-            <div>
-              <div className="relative">
-                <Filter className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <select
-                  value={languageFilter}
-                  onChange={(e) => setLanguageFilter(e.target.value)}
-                  className="w-full pl-10 pr-8 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                >
-                  <option value="all">All Languages</option>
-                  <option value="english">English</option>
-                  <option value="hindi">Hindi</option>
-                  <option value="bengali">Bengali</option>
-                </select>
-              </div>
-            </div>
+            <Button variant="ghost" size="sm" onClick={() => { setSearchTerm(''); setDoctorFilter(''); setDateFilter(''); setLanguageFilter('all'); }}
+              className="text-xs text-gray-400 hover:text-white">Clear All</Button>
           </div>
         </div>
       </div>
 
-      {/* Records List */}
-      <div className="max-w-7xl mx-auto p-6">
-        {/* Stats */}
-        <div className="grid md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-sm text-gray-600">Total Records</div>
-            <div className="text-2xl font-bold text-gray-900 mt-1">{records.length}</div>
-          </div>
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-sm text-gray-600">AI Processed</div>
-            <div className="text-2xl font-bold text-emerald-600 mt-1">
-              {records.filter((r) => r.aiProcessed).length}
-            </div>
-          </div>
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-sm text-gray-600">Patient Viewed</div>
-            <div className="text-2xl font-bold text-blue-600 mt-1">
-              {records.filter((r) => r.viewed).length}
-            </div>
-          </div>
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-sm text-gray-600">Pending Review</div>
-            <div className="text-2xl font-bold text-amber-600 mt-1">
-              {records.filter((r) => !r.viewed).length}
-            </div>
-          </div>
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4">
+          <p className="text-zinc-400 text-[10px] font-black uppercase tracking-[0.15em]">Total Records</p>
+          <p className="text-white text-2xl font-black mt-1">{records.length}</p>
+        </div>
+        <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4">
+          <p className="text-zinc-400 text-[10px] font-black uppercase tracking-[0.15em]">AI Processed</p>
+          <p className="text-emerald-400 text-2xl font-black mt-1">{records.filter((r) => r.aiProcessed).length}</p>
+        </div>
+        <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4">
+          <p className="text-zinc-400 text-[10px] font-black uppercase tracking-[0.15em]">Patient Viewed</p>
+          <p className="text-blue-400 text-2xl font-black mt-1">{records.filter((r) => r.viewed).length}</p>
+        </div>
+        <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4">
+          <p className="text-zinc-400 text-[10px] font-black uppercase tracking-[0.15em]">Pending Review</p>
+          <p className="text-amber-400 text-2xl font-black mt-1">{records.filter((r) => !r.viewed).length}</p>
+        </div>
+      </div>
+
+      {/* Records */}
+      <div className="bg-gray-800/50 border border-gray-700 rounded-xl overflow-hidden">
+        <div className="bg-gray-900/50 border-b border-gray-700 px-6 py-4">
+          <h2 className="text-white flex items-center gap-2">
+            <Clock className="w-5 h-5 text-emerald-400" />
+            Prescription Records
+          </h2>
         </div>
 
-        {/* Records Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          {filteredRecords.length === 0 ? (
-            <div className="text-center py-12">
-              <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <div className="text-gray-500 text-lg">No records found</div>
-              <div className="text-gray-400 text-sm mt-1">
-                Try adjusting your search or filter criteria
-              </div>
-            </div>
-          ) : (
-            <div className="divide-y">
-              {filteredRecords.map((record) => (
-                <div key={record.id} className="hover:bg-gray-50 transition-colors">
-                  {/* Main Row */}
-                  <div className="p-4">
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-4 flex-1 min-w-0">
-                        {/* Patient Info */}
-                        <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-gray-900 flex items-center gap-2">
-                            {record.patientName}
-                            {record.aiProcessed && (
-                              <span className="inline-flex items-center gap-1 text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">
-                                <Sparkles className="w-3 h-3" />
-                                AI Processed
-                              </span>
-                            )}
-                            {record.viewed && (
-                              <span className="inline-flex items-center gap-1 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-                                <Eye className="w-3 h-3" />
-                                Viewed
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-sm text-gray-600 mt-1">
-                            Patient ID: {record.patientId} • {languageLabels[record.language]}
-                          </div>
+        {filteredRecords.length === 0 ? (
+          <div className="text-center py-16">
+            <FileText className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+            <h3 className="text-gray-400 text-lg mb-1">No records found</h3>
+            <p className="text-gray-500 text-sm">
+              {records.length === 0 ? 'AI RX Reader records will appear here once prescriptions are processed' : 'Try adjusting your search or filter criteria'}
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-700/50">
+            {filteredRecords.map((record) => (
+              <div key={record.id} className="hover:bg-gray-700/20 transition-colors">
+                <div className="p-4 sm:p-5">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-white flex items-center gap-2 flex-wrap">
+                          {record.patientName}
+                          {record.aiProcessed && (
+                            <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-2 py-0.5 rounded-full">
+                              <Sparkles className="w-3 h-3" /> AI Processed
+                            </span>
+                          )}
+                          {record.viewed && (
+                            <span className="inline-flex items-center gap-1 text-[10px] bg-blue-500/10 border border-blue-500/30 text-blue-400 px-2 py-0.5 rounded-full">
+                              <Eye className="w-3 h-3" /> Viewed
+                            </span>
+                          )}
                         </div>
-
-                        {/* Dates */}
-                        <div className="hidden md:block text-sm text-gray-600">
-                          <div>Consultation: {record.consultationDate}</div>
-                          <div className="text-xs text-gray-500">Uploaded: {record.uploadDate}</div>
-                        </div>
-
-                        {/* Medicines Count */}
-                        <div className="hidden lg:block">
-                          <div className="text-sm text-gray-600 text-center">
-                            <div className="font-semibold text-gray-900">
-                              {record.medicines.length}
-                            </div>
-                            <div className="text-xs">Medicine{record.medicines.length !== 1 ? 's' : ''}</div>
-                          </div>
+                        {record.doctorName && (
+                          <div className="text-xs text-blue-400 mt-0.5">Dr. {record.doctorName}</div>
+                        )}
+                        <div className="text-sm text-gray-500 mt-1">
+                          ID: {record.patientId} • {languageLabels[record.language] || record.language}
                         </div>
                       </div>
+                      <div className="hidden md:block text-sm text-gray-400">
+                        <div>Consultation: {record.consultationDate}</div>
+                        <div className="text-xs text-gray-500">Uploaded: {record.uploadDate}</div>
+                      </div>
+                      <div className="hidden lg:block text-center">
+                        <div className="font-bold text-white text-lg">{record.medicines.length}</div>
+                        <div className="text-[10px] text-gray-500 uppercase tracking-wider">Medicine{record.medicines.length !== 1 ? 's' : ''}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button onClick={() => handleDownload(record)} variant="ghost" size="sm" className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10">
+                        <Download className="w-4 h-4 mr-1.5" /><span className="hidden sm:inline">Download</span>
+                      </Button>
+                      <Button onClick={() => { setExpandedRecord(record.id); setTimeout(() => window.print(), 500); }} variant="ghost" size="sm" className="text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10">
+                        <Printer className="w-4 h-4 mr-1.5" /><span className="hidden sm:inline">Print</span>
+                      </Button>
+                      <Button onClick={() => setExpandedRecord(expandedRecord === record.id ? null : record.id)} variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+                        <ChevronDown className={`w-5 h-5 transition-transform ${expandedRecord === record.id ? 'rotate-180' : ''}`} />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
 
-                      {/* Actions */}
-                      <div className="flex items-center gap-2">
-                        <Button
-                          onClick={() => handleDownload(record)}
-                          variant="outline"
-                          size="sm"
-                        >
-                          <Download className="w-4 h-4 mr-2" />
-                          Download
-                        </Button>
-                        <Button
-                          onClick={() =>
-                            setExpandedRecord(expandedRecord === record.id ? null : record.id)
-                          }
-                          variant="ghost"
-                          size="sm"
-                        >
-                          <ChevronDown
-                            className={`w-5 h-5 transition-transform ${
-                              expandedRecord === record.id ? 'rotate-180' : ''
-                            }`}
-                          />
-                        </Button>
+                {expandedRecord === record.id && (
+                  <div className="border-t border-gray-700/50 bg-gray-900/50 p-6">
+                    <div className="grid md:grid-cols-2 gap-6">
+                      {record.prescriptionImage && (
+                        <div>
+                          <h4 className="font-semibold text-white mb-3">Original Prescription</h4>
+                          <div className="border-2 border-gray-700 rounded-lg overflow-hidden">
+                            <img src={record.prescriptionImage} alt="Prescription" className="w-full h-auto" />
+                          </div>
+                        </div>
+                      )}
+                      <div>
+                        <h4 className="font-semibold text-white mb-3 flex items-center gap-2">
+                          <Sparkles className="w-5 h-5 text-emerald-400" /> AI Decoded Medicines
+                        </h4>
+                        <div className="space-y-3">
+                          {record.medicines.map((med, index) => (
+                            <div key={index} className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                              <div className="font-medium text-white mb-2">{index + 1}. {med.name}</div>
+                              <div className="grid grid-cols-2 gap-2 text-sm text-gray-400">
+                                <div><span className="font-medium text-gray-300">Dosage:</span> {med.dosage}</div>
+                                <div><span className="font-medium text-gray-300">Frequency:</span> {med.frequency}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-4 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-sm text-amber-400">
+                          <div className="flex items-start gap-2">
+                            <Sparkles className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                            <div>AI decoded from doctor's handwriting and translated to {languageLabels[record.language] || record.language}</div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
-
-                  {/* Expanded Details */}
-                  {expandedRecord === record.id && (
-                    <div className="border-t bg-gray-50 p-6">
-                      <div className="grid md:grid-cols-2 gap-6">
-                        {/* Prescription Image */}
-                        <div>
-                          <h4 className="font-semibold text-gray-900 mb-3">
-                            Original Prescription
-                          </h4>
-                          <div className="border-2 border-gray-200 rounded-lg overflow-hidden">
-                            <img
-                              src={record.prescriptionImage}
-                              alt="Prescription"
-                              className="w-full h-auto"
-                            />
-                          </div>
-                        </div>
-
-                        {/* AI Decoded Data */}
-                        <div>
-                          <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                            <Sparkles className="w-5 h-5 text-emerald-600" />
-                            AI Decoded Medicines
-                          </h4>
-                          <div className="space-y-3">
-                            {record.medicines.map((med, index) => (
-                              <div
-                                key={index}
-                                className="bg-white rounded-lg p-4 border border-gray-200"
-                              >
-                                <div className="font-medium text-gray-900 mb-2">
-                                  {index + 1}. {med.name}
-                                </div>
-                                <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
-                                  <div>
-                                    <span className="font-medium">Dosage:</span> {med.dosage}
-                                  </div>
-                                  <div>
-                                    <span className="font-medium">Frequency:</span>{' '}
-                                    {med.frequency}
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-
-                          <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
-                            <div className="flex items-start gap-2">
-                              <Sparkles className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                              <div>
-                                AI decoded from doctor's handwriting and translated to{' '}
-                                {languageLabels[record.language]}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

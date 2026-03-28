@@ -16,6 +16,7 @@ interface ClinicAIRXReaderManagerProps {
   activeAddOns?: string[];
   isSidebarCollapsed?: boolean;
   setIsSidebarCollapsed?: (collapsed: boolean) => void;
+  historyOnly?: boolean;
 }
 
 export default function ClinicAIRXReaderManager({
@@ -25,7 +26,8 @@ export default function ClinicAIRXReaderManager({
   onMenuChange,
   activeAddOns = [],
   isSidebarCollapsed = false,
-  setIsSidebarCollapsed
+  setIsSidebarCollapsed,
+  historyOnly = false
 }: ClinicAIRXReaderManagerProps = {}) {
   // Using clinic-specific localStorage keys
   const getInitialState = (key: string, defaultValue: boolean) => {
@@ -36,7 +38,7 @@ export default function ClinicAIRXReaderManager({
 
   const [isEnabled, setIsEnabled] = useState(() => getInitialState('enabled', true));
   const [autoExtract, setAutoExtract] = useState(() => getInitialState('auto_extract', true));
-  const [showHistory, setShowHistory] = useState(false);
+  const [showHistory, setShowHistory] = useState(historyOnly);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Statistics - Start empty (will be populated from backend/localStorage)
@@ -93,12 +95,26 @@ export default function ClinicAIRXReaderManager({
 
   // If showing history, render the history component instead
   if (showHistory) {
-    // We pass a custom namespace to AIRXReaderHistory so it reads clinic data instead of doctor data
-    // AIRXReaderHistory might need to be modified to accept this prop if it relies on localStorage internally.
     return (
-      <div className="flex-1 lg:ml-64 p-8">
-        <Button onClick={() => setShowHistory(false)} variant="ghost" className="mb-4 text-blue-400">Back to Settings</Button>
-        <AIRXReaderHistory onBack={() => setShowHistory(false)} />
+      <div className="flex h-screen bg-gray-950">
+        <ClinicSidebar
+          activeMenu="ai-rx"
+          onMenuChange={onMenuChange || (() => {})}
+          onLogout={onLogout || (() => {})}
+          activeAddOns={activeAddOns}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={() => setIsSidebarCollapsed?.(!isSidebarCollapsed)}
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+        />
+        <div className={`flex-1 overflow-auto transition-all duration-300 ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`}>
+          <div className="p-4 sm:p-8">
+            {!historyOnly && (
+              <Button onClick={() => setShowHistory(false)} variant="ghost" className="mb-4 text-blue-400">Back to Settings</Button>
+            )}
+            <AIRXReaderHistory clinicId={clinicId} onBack={historyOnly ? undefined : () => setShowHistory(false)} />
+          </div>
+        </div>
       </div>
     );
   }

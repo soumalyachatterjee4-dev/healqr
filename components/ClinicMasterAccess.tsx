@@ -5,11 +5,11 @@ import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import {
   Crown, ArrowLeft, Building2, Users, QrCode, UserPlus, TrendingUp,
-  Calendar, Filter, BarChart3, MapPin, Stethoscope, Loader2
+  Calendar, Filter, BarChart3, MapPin, Stethoscope, Loader2, Lock, Pencil, Check, X, Eye, EyeOff
 } from 'lucide-react';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { auth, db } from '../lib/firebase/config';
-import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, updateDoc } from 'firebase/firestore';
 import { decrypt } from '../utils/encryptionService';
 
 interface MasterAccessProps {
@@ -39,6 +39,15 @@ export default function ClinicMasterAccess({ onBack, clinicId }: MasterAccessPro
   const [selectedDoctor, setSelectedDoctor] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+
+  // Master Access Password Settings
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [currentPwInput, setCurrentPwInput] = useState('');
+  const [newPwInput, setNewPwInput] = useState('');
+  const [confirmPwInput, setConfirmPwInput] = useState('');
+  const [pwError, setPwError] = useState('');
+  const [savingPw, setSavingPw] = useState(false);
+  const [showPw, setShowPw] = useState(false);
 
   const resolvedClinicId = clinicId || auth?.currentUser?.uid || '';
 
@@ -259,6 +268,97 @@ export default function ClinicMasterAccess({ onBack, clinicId }: MasterAccessPro
       </div>
 
       <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
+
+        {/* Change Master Password */}
+        <div className="bg-zinc-900/50 border border-amber-500/20 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap">
+          <Lock className="w-4 h-4 text-amber-400 flex-shrink-0" />
+          <span className="text-xs text-zinc-400">Master Password:</span>
+          {changingPassword ? (
+            <div className="flex items-center gap-2 flex-1 min-w-[200px] flex-wrap">
+              <div className="relative flex-1 min-w-[140px]">
+                <input
+                  type={showPw ? 'text' : 'password'}
+                  value={currentPwInput}
+                  onChange={e => { setCurrentPwInput(e.target.value); setPwError(''); }}
+                  className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white w-full outline-none focus:border-amber-500 pr-8"
+                  placeholder="Current password"
+                  autoFocus
+                />
+              </div>
+              <div className="relative flex-1 min-w-[140px]">
+                <input
+                  type={showPw ? 'text' : 'password'}
+                  value={newPwInput}
+                  onChange={e => { setNewPwInput(e.target.value); setPwError(''); }}
+                  className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white w-full outline-none focus:border-amber-500 pr-8"
+                  placeholder="New password (min 8)"
+                />
+              </div>
+              <div className="relative flex-1 min-w-[140px]">
+                <input
+                  type={showPw ? 'text' : 'password'}
+                  value={confirmPwInput}
+                  onChange={e => { setConfirmPwInput(e.target.value); setPwError(''); }}
+                  className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white w-full outline-none focus:border-amber-500"
+                  placeholder="Confirm new password"
+                  onKeyDown={async e => {
+                    if (e.key === 'Enter') {
+                      const clinicRef = doc(db, 'clinics', resolvedClinicId);
+                      const snap = await getDoc(clinicRef);
+                      const stored = snap.data()?.masterAccessPassword;
+                      if (currentPwInput !== stored) { setPwError('Current password is incorrect'); return; }
+                      if (newPwInput.length < 8) { setPwError('New password must be at least 8 characters'); return; }
+                      if (newPwInput !== confirmPwInput) { setPwError('Passwords do not match'); return; }
+                      setSavingPw(true);
+                      await updateDoc(clinicRef, { masterAccessPassword: newPwInput });
+                      setSavingPw(false);
+                      setChangingPassword(false);
+                      setCurrentPwInput(''); setNewPwInput(''); setConfirmPwInput('');
+                    }
+                    if (e.key === 'Escape') { setChangingPassword(false); setPwError(''); }
+                  }}
+                />
+              </div>
+              <button type="button" onClick={() => setShowPw(!showPw)} className="p-1.5 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-white">
+                {showPw ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
+              <button
+                disabled={savingPw}
+                onClick={async () => {
+                  const clinicRef = doc(db, 'clinics', resolvedClinicId);
+                  const snap = await getDoc(clinicRef);
+                  const stored = snap.data()?.masterAccessPassword;
+                  if (currentPwInput !== stored) { setPwError('Current password is incorrect'); return; }
+                  if (newPwInput.length < 8) { setPwError('New password must be at least 8 characters'); return; }
+                  if (newPwInput !== confirmPwInput) { setPwError('Passwords do not match'); return; }
+                  setSavingPw(true);
+                  await updateDoc(clinicRef, { masterAccessPassword: newPwInput });
+                  setSavingPw(false);
+                  setChangingPassword(false);
+                  setCurrentPwInput(''); setNewPwInput(''); setConfirmPwInput('');
+                }}
+                className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white"
+              >
+                <Check className="w-3.5 h-3.5" />
+              </button>
+              <button onClick={() => { setChangingPassword(false); setPwError(''); }} className="p-1.5 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-white">
+                <X className="w-3.5 h-3.5" />
+              </button>
+              {pwError && <p className="text-red-400 text-xs w-full mt-1">{pwError}</p>}
+            </div>
+          ) : (
+            <>
+              <span className="text-sm text-amber-300 font-medium">••••••••</span>
+              <button
+                onClick={() => { setCurrentPwInput(''); setNewPwInput(''); setConfirmPwInput(''); setPwError(''); setShowPw(false); setChangingPassword(true); }}
+                className="text-xs text-zinc-400 hover:text-amber-400 flex items-center gap-1 ml-auto"
+              >
+                <Pencil className="w-3 h-3" />
+                Change Password
+              </button>
+            </>
+          )}
+        </div>
 
         {/* Filters Bar */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
@@ -567,7 +667,7 @@ export default function ClinicMasterAccess({ onBack, clinicId }: MasterAccessPro
                           <div className="flex items-center gap-2">
                             <MapPin className="w-3 h-3 text-amber-400" />
                             <span className="text-white">{loc.name}</span>
-                            <span className="text-xs text-zinc-500">#{loc.id}</span>
+                            <span className="text-xs text-amber-400/70 font-mono">#{loc.id}</span>
                           </div>
                         </td>
                         <td className="py-2.5 pr-4 text-right text-white font-medium">{nonCancelled.length}</td>

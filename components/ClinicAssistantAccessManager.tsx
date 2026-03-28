@@ -29,6 +29,7 @@ interface ClinicAssistantAccessManagerProps {
   onLogout: () => void;
   onMenuChange: (page: string) => void;
   activeAddOns: string[];
+  managerAllowedPages?: string[];
 }
 
 // All available pages for access control (Dashboard is always accessible)
@@ -43,12 +44,10 @@ const AVAILABLE_PAGES = [
   { id: 'reports', label: 'Reports', icon: '📄' },
   { id: 'social-kit', label: 'Social Kit & Offers', icon: '📣' },
   { id: 'monthly-planner', label: 'Monthly Planner', icon: '🗓️' },
-  { id: 'preview', label: 'Preview Centre', icon: '👁️' },
   { id: 'lab-referral', label: 'Lab Referral Tracking', icon: '🔬' },
-  { id: 'templates', label: 'Personalized Templates', icon: '📝' },
-  { id: 'ai-diet', label: 'AI Diet Chart', icon: '🍎' },
-  { id: 'ai-rx', label: 'AI RX Reader', icon: '🤖' },
-  { id: 'video-consult', label: 'Video Consultation', icon: '🎥' },
+  { id: 'ai-diet', label: 'AI Diet Chart (History)', icon: '🍎' },
+  { id: 'ai-rx', label: 'AI RX Reader (History)', icon: '🤖' },
+  { id: 'video-consult', label: 'Video Consultation (History)', icon: '🎥' },
   { id: 'emergency', label: 'Emergency Button', icon: '🚨' },
 ];
 
@@ -57,9 +56,16 @@ export default function ClinicAssistantAccessManager({
   email,
   onLogout,
   onMenuChange,
-  activeAddOns
+  activeAddOns,
+  managerAllowedPages
 }: ClinicAssistantAccessManagerProps) {
-  console.log('🛡️ ClinicAssistantAccessManager: Component Initializing...');
+  console.log('\ud83d\udee1\ufe0f ClinicAssistantAccessManager: Component Initializing...');
+
+  // Filter pages to only those the manager can access (if restricted)
+  const visiblePages = managerAllowedPages
+    ? AVAILABLE_PAGES.filter(p => managerAllowedPages.includes(p.id))
+    : AVAILABLE_PAGES;
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeAssistants, setActiveAssistants] = useState<AssistantData[]>([]);
@@ -151,7 +157,7 @@ export default function ClinicAssistantAccessManager({
   };
 
   const selectAllPages = () => {
-    setSelectedPages(AVAILABLE_PAGES.map(page => page.id));
+    setSelectedPages(visiblePages.map(page => page.id));
   };
 
   const deselectAllPages = () => {
@@ -392,7 +398,7 @@ export default function ClinicAssistantAccessManager({
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {AVAILABLE_PAGES.map((page) => (
+                {visiblePages.map((page) => (
                   <div
                     key={page.id}
                     className={`flex items-center gap-3 p-3 rounded-lg border transition-colors cursor-pointer ${
@@ -535,7 +541,7 @@ export default function ClinicAssistantAccessManager({
               <p className="text-sm text-gray-400">Updating access for <strong>{editingAssistant.assistantName}</strong></p>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {AVAILABLE_PAGES.map((page) => (
+                {visiblePages.map((page) => (
                   <div
                     key={page.id}
                     className={`flex items-center gap-3 p-3 rounded-lg border transition-colors cursor-pointer ${

@@ -794,6 +794,26 @@ export default function DigitalRXMaker({
         return 0;
       };
 
+      // Helper: render standardized disclaimer box
+      const renderDisclaimer = (yPos: number) => {
+        const line1 = 'DISCLAIMER: Not valid for death certificate, fitness/leave/rest certificate, or medico-legal purposes.';
+        const line2 = 'Clinical responsibility lies with the prescribing doctor. HealQR.com bears no medical or legal liability.';
+        doc.setDrawColor(180, 160, 130);
+        doc.setLineWidth(0.3);
+        doc.setFillColor(255, 250, 235);
+        const dH = 8;
+        doc.roundedRect(margin, yPos, contentWidth, dH, 1.5, 1.5, 'FD');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(5);
+        doc.setTextColor(120, 100, 70);
+        doc.text(line1, pageWidth / 2, yPos + 3, { align: 'center' });
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(5);
+        doc.setTextColor(130, 110, 80);
+        doc.text(line2, pageWidth / 2, yPos + 6, { align: 'center' });
+        return dH + 1;
+      };
+
       if (isClinic && doctorInfo.allDoctors && doctorInfo.allDoctors.length > 0) {
         // CLINIC FOOTER: Always show specialty groups with counts (saves space)
         const doctors = doctorInfo.allDoctors;
@@ -830,6 +850,7 @@ export default function DigitalRXMaker({
         const cFL2 = doctorInfo.clinicInfo?.footerLine2 || doctorInfo.footerLine2 || '';
         let afterBox = footerTopY + footerBoxH + 2;
         afterBox += renderFooterLines(cFL1, cFL2, afterBox);
+        afterBox += renderDisclaimer(afterBox);
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(6);
         doc.setTextColor(150);
@@ -860,6 +881,7 @@ export default function DigitalRXMaker({
         const dFooterLine2 = doctorInfo.footerLine2 || '';
         let afterBox = footerTopY + footerBoxH + 2;
         afterBox += renderFooterLines(dFooterLine1, dFooterLine2, afterBox);
+        afterBox += renderDisclaimer(afterBox);
 
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(6);
@@ -872,6 +894,7 @@ export default function DigitalRXMaker({
         const fFooterLine2 = doctorInfo.clinicInfo?.footerLine2 || doctorInfo.footerLine2 || '';
         let fallbackY = 280;
         fallbackY += renderFooterLines(fFooterLine1, fFooterLine2, fallbackY);
+        fallbackY += renderDisclaimer(fallbackY);
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(6);
         doc.setTextColor(150);

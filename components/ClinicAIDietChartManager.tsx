@@ -25,6 +25,8 @@ import {
   Scale,
   Save,
   PlusCircle,
+  Download,
+  Printer,
 } from "lucide-react";
 import QRCode from "qrcode";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -50,6 +52,7 @@ interface ClinicAIDietChartManagerProps {
   setIsSidebarCollapsed?: (collapsed: boolean) => void;
   isFlowingFromRX?: boolean;
   onComplete?: (dietLink: string) => void;
+  historyOnly?: boolean;
   doctorInfo?: {
     name: string;
     degree: string;
@@ -81,6 +84,7 @@ interface DietChartHistoryItem {
   remarks?: string;
   date: string;
   timestamp: number;
+  doctorName?: string;
   plan?: {
     day: number;
     meals: {
@@ -100,14 +104,16 @@ export default function ClinicAIDietChartManager({
   setIsSidebarCollapsed,
   isFlowingFromRX,
   onComplete,
+  historyOnly = false,
   doctorInfo,
 }: ClinicAIDietChartManagerProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"create" | "history">("create");
+  const [activeTab, setActiveTab] = useState<"create" | "history">(historyOnly ? "history" : "create");
   const [isGenerating, setIsGenerating] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [doctorFilter, setDoctorFilter] = useState("");
   const [selectedChart, setSelectedChart] =
     useState<DietChartHistoryItem | null>(null);
   const [editingSection, setEditingSection] = useState<{
@@ -323,6 +329,7 @@ export default function ClinicAIDietChartManager({
       remarks: patientData.remarks,
       date: new Date().toLocaleDateString("en-GB"),
       timestamp: Date.now(),
+      doctorName: doctorInfo?.name || clinicName,
       plan: generateDetailedPlan(patientData.region),
     };
 
@@ -583,15 +590,33 @@ export default function ClinicAIDietChartManager({
       const addFooter = (pDoc: any) => {
         const pWidth = pDoc.internal.pageSize.getWidth();
         const pHeight = pDoc.internal.pageSize.getHeight();
+        const fMargin = 20;
+        const fContentW = pWidth - fMargin * 2;
         pDoc.setFont("helvetica", "bold");
         pDoc.setFontSize(10);
         pDoc.setTextColor(30, 41, 59);
         pDoc.text(
           `Guided by ${(doctorInfo?.useDrPrefix ?? true) ? "Dr. " : ""}${doctorInfo?.name || clinicName}`,
           pWidth / 2,
-          pHeight - 20,
+          pHeight - 26,
           { align: "center" },
         );
+
+        // Disclaimer box
+        const dLine1 = 'DISCLAIMER: Not valid for death certificate, fitness/leave/rest certificate, or medico-legal purposes.';
+        const dLine2 = 'Clinical responsibility lies with the prescribing doctor. HealQR.com bears no medical or legal liability.';
+        pDoc.setDrawColor(180, 160, 130);
+        pDoc.setLineWidth(0.3);
+        pDoc.setFillColor(255, 250, 235);
+        pDoc.roundedRect(fMargin, pHeight - 22, fContentW, 8, 1.5, 1.5, 'FD');
+        pDoc.setFont('helvetica', 'bold');
+        pDoc.setFontSize(5);
+        pDoc.setTextColor(120, 100, 70);
+        pDoc.text(dLine1, pWidth / 2, pHeight - 19, { align: 'center' });
+        pDoc.setFont('helvetica', 'normal');
+        pDoc.setFontSize(5);
+        pDoc.setTextColor(130, 110, 80);
+        pDoc.text(dLine2, pWidth / 2, pHeight - 16, { align: 'center' });
 
         pDoc.setFont("helvetica", "normal");
         pDoc.setFontSize(8);
@@ -726,8 +751,9 @@ export default function ClinicAIDietChartManager({
     const itemDate = new Date(item.timestamp);
     const matchesDateFrom = !dateFrom || itemDate >= new Date(dateFrom);
     const matchesDateTo = !dateTo || itemDate <= new Date(dateTo + "T23:59:59");
+    const matchesDoctor = !doctorFilter || (item.doctorName || '').toLowerCase().includes(doctorFilter.toLowerCase());
 
-    return matchesSearch && matchesDateFrom && matchesDateTo;
+    return matchesSearch && matchesDateFrom && matchesDateTo && matchesDoctor;
   });
 
   return (
@@ -778,6 +804,7 @@ export default function ClinicAIDietChartManager({
         <div className="p-4 md:p-8 max-w-5xl mx-auto w-full space-y-8">
           {/* Main Action Tabs */}
           <div className="flex p-1 bg-zinc-900 rounded-xl w-fit">
+            {!historyOnly && (
             <button
               onClick={() => setActiveTab("create")}
               className={`flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-medium transition-all ${
@@ -789,6 +816,7 @@ export default function ClinicAIDietChartManager({
               <Plus className="w-4 h-4" />
               Create New Chart
             </button>
+            )}
             <button
               onClick={() => setActiveTab("history")}
               className={`flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-medium transition-all ${
@@ -1130,8 +1158,7 @@ export default function ClinicAIDietChartManager({
             /* History Tab */
             <div className="space-y-6">
               {/* Search and Filters */}
-              {/* Search and Filters */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-zinc-900/30 p-4 rounded-2xl border border-zinc-800/50">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-zinc-900/30 p-4 rounded-2xl border border-zinc-800/50">
                 <div className="md:col-span-2 flex gap-2">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white" />
@@ -1143,9 +1170,15 @@ export default function ClinicAIDietChartManager({
                       onChange={(e) => setSearchQuery(e.target.value)}
                     />
                   </div>
-                  <Button className="bg-blue-500 hover:bg-blue-600 h-9 px-4 rounded-lg text-xs font-bold whitespace-nowrap">
-                    Search
-                  </Button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="Doctor Name..."
+                    className="w-full bg-black border border-zinc-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                    value={doctorFilter}
+                    onChange={(e) => setDoctorFilter(e.target.value)}
+                  />
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-white whitespace-nowrap">
@@ -1177,6 +1210,7 @@ export default function ClinicAIDietChartManager({
                   <p className="text-white">
                     No chart generation history found.
                   </p>
+                  {!historyOnly && (
                   <Button
                     variant="link"
                     onClick={() => setActiveTab("create")}
@@ -1184,6 +1218,7 @@ export default function ClinicAIDietChartManager({
                   >
                     Start your first generation
                   </Button>
+                  )}
                 </div>
               ) : filteredHistory.length === 0 ? (
                 <div className="text-center py-10">
@@ -1196,35 +1231,55 @@ export default function ClinicAIDietChartManager({
                   {filteredHistory.map((item) => (
                     <div
                       key={item.id}
-                      onClick={() => setSelectedChart(item)}
-                      className="bg-zinc-900 border border-zinc-800 p-5 rounded-2xl flex items-center justify-between group hover:border-blue-500/50 transition-colors cursor-pointer"
+                      className="bg-zinc-900 border border-zinc-800 p-5 rounded-2xl group hover:border-blue-500/50 transition-colors"
                     >
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center">
+                      <div className="flex items-center gap-4 cursor-pointer" onClick={() => setSelectedChart(item)}>
+                        <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center shrink-0">
                           <FileText className="w-6 h-6 text-blue-500" />
                         </div>
-                        <div>
+                        <div className="flex-1 min-w-0">
                           <h4 className="font-bold text-white">
                             {item.patientName}
                           </h4>
                           <p className="text-xs text-white">
-                            {item.phone && `${item.phone} â€¢ `}
+                            {item.phone && `${item.phone} • `}
                             {item.conditions.length > 20
                               ? `${item.conditions.substring(0, 20)}...`
                               : item.conditions}
                           </p>
-                          <p className="text-[10px] text-zinc-600 mt-1">
+                          {item.doctorName && (
+                            <p className="text-[10px] text-blue-400 mt-0.5">
+                              Dr. {item.doctorName}
+                            </p>
+                          )}
+                          <p className="text-[10px] text-zinc-600 mt-0.5">
                             Generated: {item.date}
                           </p>
                         </div>
+                        <ChevronRight className="w-5 h-5 text-zinc-600 shrink-0" />
                       </div>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="rounded-full text-white hover:text-white hover:bg-zinc-800"
-                      >
-                        <ChevronRight className="w-5 h-5" />
-                      </Button>
+                      <div className="flex gap-2 mt-3 pt-3 border-t border-zinc-800">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 text-xs border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
+                          onClick={(e) => { e.stopPropagation(); setSelectedChart(item); }}
+                        >
+                          <Download className="w-3 h-3 mr-1" /> Download PDF
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 text-xs border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedChart(item);
+                            setTimeout(() => window.print(), 500);
+                          }}
+                        >
+                          <Printer className="w-3 h-3 mr-1" /> Print
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1872,6 +1927,29 @@ export default function ClinicAIDietChartManager({
                             currentY += 5;
                           });
                         });
+
+                        // Disclaimer box on all pages
+                        const totalPages = doc.getNumberOfPages();
+                        for (let p = 1; p <= totalPages; p++) {
+                          doc.setPage(p);
+                          const pH = doc.internal.pageSize.getHeight();
+                          const pW = doc.internal.pageSize.getWidth();
+                          const dL1 = 'DISCLAIMER: Not valid for death certificate, fitness/leave/rest certificate, or medico-legal purposes.';
+                          const dL2 = 'Clinical responsibility lies with the prescribing doctor. HealQR.com bears no medical or legal liability.';
+                          doc.setDrawColor(180, 160, 130);
+                          doc.setLineWidth(0.3);
+                          doc.setFillColor(255, 250, 235);
+                          doc.roundedRect(20, pH - 16, pW - 40, 8, 1.5, 1.5, 'FD');
+                          doc.setFont('helvetica', 'bold');
+                          doc.setFontSize(5);
+                          doc.setTextColor(120, 100, 70);
+                          doc.text(dL1, pW / 2, pH - 13, { align: 'center' });
+                          doc.setFont('helvetica', 'normal');
+                          doc.setFontSize(5);
+                          doc.setTextColor(130, 110, 80);
+                          doc.text(dL2, pW / 2, pH - 10, { align: 'center' });
+                        }
+
                         doc.save(`Diet_Chart_${selectedChart.patientName}.pdf`);
                         toast.success("Diet Chart PDF downloaded successfully");
                       } catch (error) {

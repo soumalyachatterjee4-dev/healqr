@@ -473,15 +473,34 @@ export default function AIDietChartManager({
       const totalPages = doc.getNumberOfPages();
       for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i);
+        const pH = doc.internal.pageSize.getHeight();
+        const cW = pageWidth - margin * 2;
         doc.setFontSize(40);
         doc.setTextColor(240, 240, 240);
-        doc.text('HealQR', pageWidth / 2, doc.internal.pageSize.getHeight() / 2, {
+        doc.text('HealQR', pageWidth / 2, pH / 2, {
           align: 'center',
           angle: 45,
         });
+
+        // Disclaimer box
+        const dLine1 = 'DISCLAIMER: Not valid for death certificate, fitness/leave/rest certificate, or medico-legal purposes.';
+        const dLine2 = 'Clinical responsibility lies with the prescribing doctor. HealQR.com bears no medical or legal liability.';
+        doc.setDrawColor(180, 160, 130);
+        doc.setLineWidth(0.3);
+        doc.setFillColor(255, 250, 235);
+        doc.roundedRect(margin, pH - 18, cW, 8, 1.5, 1.5, 'FD');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(5);
+        doc.setTextColor(120, 100, 70);
+        doc.text(dLine1, pageWidth / 2, pH - 15, { align: 'center' });
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(5);
+        doc.setTextColor(130, 110, 80);
+        doc.text(dLine2, pageWidth / 2, pH - 12, { align: 'center' });
+
         doc.setFontSize(7);
         doc.setTextColor(180);
-        doc.text('Powered by HealQR AI • teamhealqr.web.app', pageWidth / 2, doc.internal.pageSize.getHeight() - 8, { align: 'center' });
+        doc.text('Powered by HealQR AI • teamhealqr.web.app', pageWidth / 2, pH - 8, { align: 'center' });
       }
 
     return doc;

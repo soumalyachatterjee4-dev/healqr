@@ -4,7 +4,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import {
   Building2, Mail, MapPin, ArrowLeft, Plus, Pencil, Trash2,
-  Crown, Copy, X, ChevronRight, Hash
+  Crown, Copy, X, ChevronRight, Hash, Lock, Check, Eye, EyeOff, Pencil as PencilIcon
 } from 'lucide-react';
 import { db, auth } from '../lib/firebase/config';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
@@ -42,6 +42,15 @@ export default function LocationManagerCreator({ onMenuChange, onLogout }: Locat
 
   // Delete confirmation
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Master Access Password Verification
+  const [showMasterModal, setShowMasterModal] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordMode, setPasswordMode] = useState<'set' | 'verify'>('verify');
+  const [showPassword, setShowPassword] = useState(false);
+  const [passwordSaving, setPasswordSaving] = useState(false);
 
   // Sidebar
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -217,6 +226,64 @@ export default function LocationManagerCreator({ onMenuChange, onLogout }: Locat
     toast.success('Branch deleted');
   };
 
+  // Master Access Password handlers
+  const handleMasterAccessClick = () => {
+    if (sessionStorage.getItem('healqr_master_access_verified') === 'true') {
+      onMenuChange?.('master-access');
+      return;
+    }
+
+    const hasPassword = !!clinicData?.masterAccessPassword;
+    setPasswordInput('');
+    setPasswordConfirm('');
+    setPasswordError('');
+    setShowPassword(false);
+    setPasswordMode(hasPassword ? 'verify' : 'set');
+    setShowMasterModal(true);
+  };
+
+  const handleSetPassword = async () => {
+    if (passwordInput.length < 8) {
+      setPasswordError('Password must be at least 8 characters');
+      return;
+    }
+    if (passwordInput !== passwordConfirm) {
+      setPasswordError('Passwords do not match');
+      return;
+    }
+    setPasswordSaving(true);
+    try {
+      const clinicRef = doc(db, 'clinics', clinicId);
+      await updateDoc(clinicRef, { masterAccessPassword: passwordInput });
+      setClinicData((prev: any) => ({ ...prev, masterAccessPassword: passwordInput }));
+      sessionStorage.setItem('healqr_master_access_verified', 'true');
+      setShowMasterModal(false);
+      toast.success('Master password set!');
+      onMenuChange?.('master-access');
+    } catch {
+      setPasswordError('Failed to save password');
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
+
+  const handleVerifyPassword = () => {
+    const storedPassword = clinicData?.masterAccessPassword;
+    if (!storedPassword) {
+      setPasswordError('No password set. Please contact the clinic owner.');
+      return;
+    }
+    if (passwordInput === storedPassword) {
+      sessionStorage.setItem('healqr_master_access_verified', 'true');
+      setShowMasterModal(false);
+      toast.success('Master Access verified!');
+      onMenuChange?.('master-access');
+    } else {
+      setPasswordError('Incorrect password');
+      setPasswordInput('');
+    }
+  };
+
   const resetForm = () => {
     setShowCreateForm(false);
     setEditingBranch(null);
@@ -332,23 +399,34 @@ export default function LocationManagerCreator({ onMenuChange, onLogout }: Locat
             </div>
           )}
 
-          {/* Master Access Button */}
-          <div className="bg-zinc-900 border border-amber-500/30 rounded-xl p-4 flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-bold text-amber-400 flex items-center gap-2">
-                <Crown className="w-4 h-4" />
-                Master Access
-              </h3>
-              <p className="text-xs text-zinc-500 mt-1">Owner-only cross-branch analytics</p>
+          {/* Master Access Card */}
+          <div className="bg-amber-600 rounded-xl p-4 shadow-lg space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-amber-500/50 rounded-lg">
+                  <Crown className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Master Access</h3>
+                  <p className="text-xs text-amber-100/80 mt-0.5">Owner-only cross-branch analytics</p>
+                </div>
+              </div>
+              <Button
+                onClick={handleMasterAccessClick}
+                className="bg-amber-800 hover:bg-amber-900 text-white gap-1 border border-amber-500/50"
+                size="sm"
+              >
+                <Lock className="w-3.5 h-3.5" />
+                Open
+                <ChevronRight className="w-4 h-4" />
+              </Button>
             </div>
-            <Button
-              onClick={() => onMenuChange?.('master-access')}
-              className="bg-amber-600 hover:bg-amber-700 text-white gap-1"
-              size="sm"
-            >
-              Open
-              <ChevronRight className="w-4 h-4" />
-            </Button>
+            {sessionStorage.getItem('healqr_master_access_verified') === 'true' && (
+              <div className="flex items-center gap-1.5 text-xs text-amber-100/70">
+                <Check className="w-3 h-3" />
+                Verified this session
+              </div>
+            )}
           </div>
 
           {/* Branch Locations List */}
@@ -556,6 +634,119 @@ export default function LocationManagerCreator({ onMenuChange, onLogout }: Locat
 
         </div>
       </div>
+
+      {/* Master Access Password Modal */}
+      {showMasterModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-sm overflow-hidden">
+            <div className="p-6 border-b border-zinc-800 bg-amber-600/10">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-xl bg-amber-500/20">
+                    <Lock className="w-6 h-6 text-amber-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">
+                      {passwordMode === 'set' ? 'Set Master Password' : 'Enter Master Password'}
+                    </h3>
+                    <p className="text-xs text-gray-400">
+                      {passwordMode === 'set' ? 'Create a password to protect Master Access' : 'Enter your password to unlock analytics'}
+                    </p>
+                  </div>
+                </div>
+                <button onClick={() => setShowMasterModal(false)} className="text-zinc-400 hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <div className="p-6 space-y-4">
+              {passwordMode === 'set' ? (
+                <>
+                  <div>
+                    <label className="text-xs text-zinc-400 mb-1 block">New Password</label>
+                    <div className="relative">
+                      <Input
+                        type={showPassword ? 'text' : 'password'}
+                        value={passwordInput}
+                        onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(''); }}
+                        placeholder="Minimum 8 characters"
+                        className="bg-zinc-800 border-zinc-700 text-white pr-10"
+                        autoFocus
+                      />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white">
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-zinc-400 mb-1 block">Confirm Password</label>
+                    <Input
+                      type={showPassword ? 'text' : 'password'}
+                      value={passwordConfirm}
+                      onChange={(e) => { setPasswordConfirm(e.target.value); setPasswordError(''); }}
+                      placeholder="Re-enter password"
+                      className="bg-zinc-800 border-zinc-700 text-white"
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleSetPassword(); }}
+                    />
+                  </div>
+                  {passwordError && <p className="text-red-400 text-xs">{passwordError}</p>}
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setShowMasterModal(false)}
+                      className="flex-1 px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-gray-300 rounded-xl text-sm font-medium transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSetPassword}
+                      disabled={passwordInput.length < 8 || passwordSaving}
+                      className="flex-1 px-4 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold transition-colors"
+                    >
+                      {passwordSaving ? 'Saving...' : 'Set Password'}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="text-xs text-zinc-400 mb-1 block">Master Password</label>
+                    <div className="relative">
+                      <Input
+                        type={showPassword ? 'text' : 'password'}
+                        value={passwordInput}
+                        onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(''); }}
+                        placeholder="Enter master password"
+                        className="bg-zinc-800 border-zinc-700 text-white pr-10"
+                        autoFocus
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleVerifyPassword(); }}
+                      />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white">
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  {passwordError && <p className="text-red-400 text-xs">{passwordError}</p>}
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setShowMasterModal(false)}
+                      className="flex-1 px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-gray-300 rounded-xl text-sm font-medium transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleVerifyPassword}
+                      disabled={!passwordInput}
+                      className="flex-1 px-4 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold transition-colors"
+                    >
+                      Unlock
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

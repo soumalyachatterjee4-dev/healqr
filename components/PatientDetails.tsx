@@ -204,6 +204,10 @@ export default function PatientDetails({
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
 
+  // Assistant "Consultation Complete?" confirmation modal state
+  const [assistantSeenModalOpen, setAssistantSeenModalOpen] = useState(false);
+  const [assistantSeenPatient, setAssistantSeenPatient] = useState<Patient | null>(null);
+
   // ============================================
   // 🔄 MULTI-STEP CONSULTATION COMPLETION FLOW STATE
   // Eye → "Create RX?" → RX Maker → "Add Diet Chart?" → Diet Chart → Send Notification
@@ -935,6 +939,16 @@ export default function PatientDetails({
     if (selectedPatientForFlow) {
       await finalizeConsultation(selectedPatientForFlow.id, null, null);
     }
+  };
+
+  // ============================================
+  // ✅ ASSISTANT MARK/UNMARK SEEN (Checkbox flow)
+  // ============================================
+  const handleAssistantConfirmSeen = async () => {
+    setAssistantSeenModalOpen(false);
+    if (!assistantSeenPatient) return;
+    await finalizeConsultation(assistantSeenPatient.id, null, null);
+    setAssistantSeenPatient(null);
   };
 
   // Step 2: RX Maker callbacks
@@ -1759,13 +1773,61 @@ export default function PatientDetails({
               </div>
             </div>
 
-            {/* Read-only notice for clinic staff */}
+            {/* Read-only notice for clinic staff + Assistant Seen Checkbox */}
             {readOnly && (
               <div className="mt-3 pt-3 border-t border-gray-800">
-                <div className="flex items-center gap-2 px-3 py-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-                  <Lock className="w-4 h-4 text-yellow-400 flex-shrink-0" />
-                  <span className="text-yellow-400 text-xs">View only — Medical actions require doctor login via Temporary Access</span>
-                </div>
+                {(() => {
+                  const state = patientStates[patient.id];
+                  const isSeen = state?.isMarkedSeen;
+                  const isCancelled = state?.isCancelled;
+
+                  return (
+                    <div className="space-y-2">
+                      {/* Assistant Checkbox */}
+                      <label
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
+                          isCancelled
+                            ? 'bg-gray-800/30 border border-gray-700/50 cursor-not-allowed opacity-50'
+                            : isSeen
+                              ? 'bg-emerald-500/10 border border-emerald-500/30 cursor-default'
+                              : 'bg-gray-800/50 border border-gray-700 hover:border-gray-600 cursor-pointer'
+                        }`}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (isSeen || isCancelled) return;
+                          setAssistantSeenPatient(patient);
+                          setAssistantSeenModalOpen(true);
+                        }}
+                      >
+                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${
+                          isCancelled
+                            ? 'border-gray-600 bg-transparent'
+                            : isSeen
+                              ? 'bg-emerald-500 border-emerald-500'
+                              : 'border-gray-500 bg-transparent'
+                        }`}>
+                          {isSeen && !isCancelled && <Check className="w-3 h-3 text-white" />}
+                        </div>
+                        <div className="flex-1">
+                          <span className={`text-sm font-medium ${
+                            isCancelled
+                              ? 'text-gray-500'
+                              : isSeen ? 'text-emerald-400' : 'text-gray-300'
+                          }`}>
+                            {isCancelled ? 'Booking Cancelled' : isSeen ? 'Consultation Complete' : 'Mark Consultation Complete'}
+                          </span>
+                        </div>
+                        {isSeen && !isCancelled && <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />}
+                      </label>
+
+                      {/* View only banner */}
+                      <div className="flex items-center gap-2 px-3 py-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                        <Lock className="w-4 h-4 text-yellow-400 flex-shrink-0" />
+                        <span className="text-yellow-400 text-xs">View only — Medical actions require doctor login via Temporary Access</span>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
@@ -2212,6 +2274,49 @@ export default function PatientDetails({
             }
           }}
         />
+
+        {/* ============================================ */}
+        {/* ✅ ASSISTANT "CONSULTATION COMPLETE?" MODAL */}
+        {/* ============================================ */}
+        {assistantSeenModalOpen && assistantSeenPatient && (
+          <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="w-full max-w-sm bg-[#0f172a] border border-zinc-700 rounded-2xl shadow-2xl overflow-hidden">
+              <div className="p-6 border-b border-zinc-800 bg-zinc-900/50">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-xl bg-emerald-500/20">
+                    <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Consultation Complete?</h3>
+                    <p className="text-xs text-gray-400">{assistantSeenPatient.name}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="p-6 space-y-4">
+                <p className="text-sm text-gray-300">
+                  Has the patient completed their consultation with the doctor?
+                </p>
+                <p className="text-xs text-gray-500">
+                  This will mark the patient as seen and notify them.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => { setAssistantSeenModalOpen(false); setAssistantSeenPatient(null); }}
+                    className="flex-1 px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-gray-300 rounded-xl text-sm font-medium transition-colors"
+                  >
+                    No
+                  </button>
+                  <button
+                    onClick={handleAssistantConfirmSeen}
+                    className="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-colors bg-emerald-600 hover:bg-emerald-500"
+                  >
+                    Yes, Complete
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ============================================ */}
         {/* 🔄 MULTI-STEP CONSULTATION COMPLETION MODALS */}

@@ -94,7 +94,14 @@ interface TodayChamber {
 export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | Promise<void> }) {
   const [clinicData, setClinicData] = useState<ClinicData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeMenu, setActiveMenu] = useState('dashboard');
+  const [activeMenu, setActiveMenu] = useState(() => {
+    // Auto-navigate to master-access if verified via magic link
+    if (sessionStorage.getItem('healqr_master_access_pending') === 'true') {
+      sessionStorage.removeItem('healqr_master_access_pending');
+      return 'master-access';
+    }
+    return 'dashboard';
+  });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [shareMenuOpen, setShareMenuOpen] = useState(false);
   const [todaysChambers, setTodaysChambers] = useState<TodayChamber[]>([]);
@@ -125,12 +132,17 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
   };
   const displayClinicName = clinicData ? getDisplayClinicName() : 'Clinic';
 
-  // Guarded menu change: enforce assistant page access restrictions
+  // Branch managers restricted pages
+  const branchAllowedPages = [
+    'dashboard', 'doctors', 'qr-manager', 'schedule-manager', 'todays-schedule',
+    'advance-booking', 'analytics', 'reports', 'social-kit', 'monthly-planner',
+    'assistant', 'lab-referral', 'ai-diet', 'ai-rx', 'video-consult'
+  ];
+
+  // Guarded menu change: enforce page access restrictions
   const handleMenuChange = (menu: string) => {
-    if (isAssistant && menu !== 'dashboard' && !assistantAllowedPages.includes(menu)) {
-      // Block navigation to pages the assistant doesn't have access to
-      return;
-    }
+    if (isLocationManager && !branchAllowedPages.includes(menu)) return;
+    if (isAssistant && menu !== 'dashboard' && !assistantAllowedPages.includes(menu)) return;
     setActiveMenu(menu);
   };
 
@@ -663,6 +675,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
         onMenuChange={handleMenuChange}
         onLogout={handleLogout}
         activeAddOns={[]}
+        managerAllowedPages={isLocationManager ? branchAllowedPages : undefined}
       />
     );
   }
@@ -710,6 +723,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
         onMenuChange={handleMenuChange}
         onLogout={handleLogout}
         activeAddOns={[]}
+        historyOnly={true}
       />
     );
   }
@@ -722,6 +736,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
         clinicId={resolvedClinicId}
         onMenuChange={handleMenuChange}
         onLogout={handleLogout}
+        historyOnly={true}
       />
     );
   }

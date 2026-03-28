@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Video, Calendar, Clock, User, FileText, CheckCircle2, XCircle, Menu, Filter, ArrowLeft } from 'lucide-react';
+import { Video, Calendar, Clock, User, FileText, CheckCircle2, XCircle, Menu, Filter, ArrowLeft, Download, Printer, Search } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import ClinicSidebar from './ClinicSidebar';
@@ -9,6 +9,7 @@ interface VideoConsultationHistory {
   date: string;
   time: string;
   patientName: string;
+  doctorName?: string;
   duration: string;
   rxSent: boolean;
 }
@@ -32,6 +33,7 @@ export default function ClinicVideoConsultationManager({
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<'today' | 'yesterday' | 'custom'>('today');
   const [selectedDate, setSelectedDate] = useState<string>('');
+  const [doctorFilter, setDoctorFilter] = useState<string>('');
 
   // Consultation history - Start empty (to be populated from Firestore based on clinicId)
   const [consultationHistory] = useState<VideoConsultationHistory[]>([]);
@@ -51,15 +53,21 @@ export default function ClinicVideoConsultationManager({
     const today = getTodayDate();
     const yesterday = getYesterdayDate();
 
+    let filtered = consultationHistory;
+
     if (selectedFilter === 'today') {
-      return consultationHistory.filter(item => item.date === today);
+      filtered = filtered.filter(item => item.date === today);
     } else if (selectedFilter === 'yesterday') {
-      return consultationHistory.filter(item => item.date === yesterday);
+      filtered = filtered.filter(item => item.date === yesterday);
     } else if (selectedFilter === 'custom' && selectedDate) {
-      return consultationHistory.filter(item => item.date === selectedDate);
+      filtered = filtered.filter(item => item.date === selectedDate);
     }
 
-    return consultationHistory;
+    if (doctorFilter) {
+      filtered = filtered.filter(item => (item.doctorName || '').toLowerCase().includes(doctorFilter.toLowerCase()));
+    }
+
+    return filtered;
   };
 
   const filteredData = getFilteredHistory();
@@ -133,14 +141,26 @@ export default function ClinicVideoConsultationManager({
             Back to Dashboard
           </Button>
 
-          {/* Date Filter */}
+          {/* Filters */}
           <Card className="bg-gray-800/50 border-gray-700 p-6 mb-6">
             <div className="flex items-center gap-2 mb-4">
               <Filter className="w-5 h-5 text-emerald-400" />
-              <h2 className="text-white">Filter by Date</h2>
+              <h2 className="text-white">Filters</h2>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
+              {/* Doctor Name Filter */}
+              <div>
+                <label className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 block">Doctor</label>
+                <input
+                  type="text"
+                  placeholder="Search doctor..."
+                  value={doctorFilter}
+                  onChange={(e) => setDoctorFilter(e.target.value)}
+                  className="bg-gray-900 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 w-48 placeholder:text-gray-600"
+                />
+              </div>
+
               {/* Quick Filter Buttons */}
               <Button
                 onClick={() => handleFilterChange('today')}
@@ -231,8 +251,10 @@ export default function ClinicVideoConsultationManager({
                         <th className="px-6 py-4 text-left text-xs text-white font-black uppercase tracking-[0.15em]">Date</th>
                         <th className="px-6 py-4 text-left text-xs text-white font-black uppercase tracking-[0.15em]">Time</th>
                         <th className="px-6 py-4 text-left text-xs text-white font-black uppercase tracking-[0.15em]">Patient Name</th>
+                        <th className="px-6 py-4 text-left text-xs text-white font-black uppercase tracking-[0.15em]">Doctor</th>
                         <th className="px-6 py-4 text-left text-xs text-white font-black uppercase tracking-[0.15em]">Duration</th>
                         <th className="px-6 py-4 text-left text-xs text-white font-black uppercase tracking-[0.15em]">RX Sent</th>
+                        <th className="px-6 py-4 text-left text-xs text-white font-black uppercase tracking-[0.15em]">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -267,6 +289,11 @@ export default function ClinicVideoConsultationManager({
                             </div>
                           </td>
 
+                          {/* Doctor Name */}
+                          <td className="px-6 py-4">
+                            <span className="text-blue-400 text-sm">{item.doctorName ? `Dr. ${item.doctorName}` : '—'}</span>
+                          </td>
+
                           {/* Duration */}
                           <td className="px-6 py-4">
                             <span className="inline-flex items-center gap-1.5 bg-orange-500/10 border border-orange-500/30 text-orange-400 text-sm px-3 py-1 rounded-full">
@@ -288,6 +315,38 @@ export default function ClinicVideoConsultationManager({
                                 Not Sent
                               </span>
                             )}
+                          </td>
+
+                          {/* Actions */}
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
+                                onClick={() => {
+                                  // Download consultation summary
+                                  const text = `Video Consultation Summary\n\nDate: ${formatDate(item.date)}\nTime: ${item.time}\nPatient: ${item.patientName}\n${item.doctorName ? `Doctor: Dr. ${item.doctorName}\n` : ''}Duration: ${item.duration}\nRX Sent: ${item.rxSent ? 'Yes' : 'No'}`;
+                                  const blob = new Blob([text], { type: 'text/plain' });
+                                  const url = URL.createObjectURL(blob);
+                                  const a = document.createElement('a');
+                                  a.href = url;
+                                  a.download = `vc_${item.patientName.replace(/\s+/g, '_')}_${item.date}.txt`;
+                                  a.click();
+                                  URL.revokeObjectURL(url);
+                                }}
+                              >
+                                <Download className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
+                                onClick={() => window.print()}
+                              >
+                                <Printer className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -326,6 +385,11 @@ export default function ClinicVideoConsultationManager({
                           </span>
                         </div>
                       </div>
+                      {item.doctorName && (
+                        <div className="mt-1.5 text-xs text-blue-400">
+                          Dr. {item.doctorName}
+                        </div>
+                      )}
                       <div className="flex items-center justify-between mt-2">
                         <div className="flex items-center gap-2">
                           <FileText className="w-4 h-4 text-red-400" />
@@ -344,6 +408,33 @@ export default function ClinicVideoConsultationManager({
                             </span>
                           )}
                         </div>
+                      </div>
+                      <div className="flex gap-2 mt-3 pt-3 border-t border-gray-700/50">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="flex-1 text-xs text-blue-400 hover:bg-blue-500/10"
+                          onClick={() => {
+                            const text = `Video Consultation Summary\n\nDate: ${formatDate(item.date)}\nTime: ${item.time}\nPatient: ${item.patientName}\n${item.doctorName ? `Doctor: Dr. ${item.doctorName}\n` : ''}Duration: ${item.duration}\nRX Sent: ${item.rxSent ? 'Yes' : 'No'}`;
+                            const blob = new Blob([text], { type: 'text/plain' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `vc_${item.patientName.replace(/\s+/g, '_')}_${item.date}.txt`;
+                            a.click();
+                            URL.revokeObjectURL(url);
+                          }}
+                        >
+                          <Download className="w-3 h-3 mr-1" /> Download
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="flex-1 text-xs text-emerald-400 hover:bg-emerald-500/10"
+                          onClick={() => window.print()}
+                        >
+                          <Printer className="w-3 h-3 mr-1" /> Print
+                        </Button>
                       </div>
                     </div>
                   ))}

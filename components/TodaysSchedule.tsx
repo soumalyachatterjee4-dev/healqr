@@ -361,6 +361,8 @@ function PatientDetailsLoader({
     );
   }
 
+  const isAssistantSession = localStorage.getItem('healqr_is_assistant') === 'true';
+
   return (
     <PatientDetails
       chamberName={chamber.name}
@@ -376,6 +378,7 @@ function PatientDetailsLoader({
       prepaymentActive={activeAddOns.includes('prepayment-collection')}
       activeAddOns={activeAddOns}
       doctorLanguage={doctorLanguage}
+      readOnly={isAssistantSession}
     />
   );
 }

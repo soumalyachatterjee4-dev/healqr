@@ -127,7 +127,6 @@ export default function DashboardSidebar({
 
   const generalTools = [
     { id: 'monthly-planner', label: 'Monthly Planner', icon: Calendar },
-    { id: 'preview', label: 'Preview Centre', icon: Eye },
   ];
 
   const freeAddOnPages = [

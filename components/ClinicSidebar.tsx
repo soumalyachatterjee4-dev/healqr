@@ -90,8 +90,9 @@ export default function ClinicSidebar({
 
   // Branch managers get a restricted set of pages
   const branchAllowedPages = [
-    'dashboard', 'doctors', 'schedule-manager', 'todays-schedule',
-    'advance-booking', 'analytics', 'reports'
+    'dashboard', 'doctors', 'qr-manager', 'schedule-manager', 'todays-schedule',
+    'advance-booking', 'analytics', 'reports', 'social-kit', 'monthly-planner',
+    'assistant', 'lab-referral', 'ai-diet', 'ai-rx', 'video-consult'
   ];
 
   const sections: Section[] = [
@@ -123,7 +124,6 @@ export default function ClinicSidebar({
       title: 'GENERAL TOOLS',
       items: [
         { id: 'monthly-planner', label: 'Monthly Planner', icon: CalendarPlus },
-        { id: 'preview', label: 'Preview Centre', icon: Stethoscope },
       ]
     },
     {
@@ -147,10 +147,13 @@ export default function ClinicSidebar({
     }
   ];
 
-  // Helper function to check if page is accessible to assistant
+  // Helper function to check if page is accessible
   const isPageAccessible = (pageId: string) => {
-    if (!isAssistant) return true; // Clinic owners have full access
-    return pageId === 'dashboard' || assistantAllowedPages.includes(pageId);
+    // Branch managers get a restricted set of pages
+    if (isLocationManager && !branchAllowedPages.includes(pageId)) return false;
+    // Assistants only see pages granted by their clinic
+    if (isAssistant && pageId !== 'dashboard' && !assistantAllowedPages.includes(pageId)) return false;
+    return true;
   };
 
   const renderSection = (section: typeof sections[0]) => {

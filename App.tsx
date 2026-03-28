@@ -1105,12 +1105,7 @@ export default function App() {
     } else if (pathname.includes('/assistant-login')) {
       setCurrentPage('assistant-login');
     } else if (pathname.includes('/verify-login')) {
-      // Don't override if branch manager already has valid clinic session
-      const hasClinicSession = localStorage.getItem('healqr_is_clinic') === 'true' &&
-        (localStorage.getItem('userId') || localStorage.getItem('healqr_user_email'));
-      if (!hasClinicSession) {
-        setCurrentPage('verify-login');
-      }
+      setCurrentPage('verify-login');
     } else if (pathname.includes('/verify-visit/')) {
       // Extract booking ID from path
       const pathParts = pathname.split('/verify-visit/');
@@ -2753,6 +2748,7 @@ export default function App() {
           currentPatients={0}
           totalPatients={0}
           patients={[]}
+          readOnly={localStorage.getItem('healqr_is_assistant') === 'true'}
         />
       )}
 
