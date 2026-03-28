@@ -112,6 +112,10 @@ export default function AssistantLogin() {
         'video-consultation': 'video-consult',
       };
 
+      const migratePageIds = (pages: string[]): string[] => {
+        return pages.map(pageId => PAGE_ID_MIGRATION[pageId] || pageId);
+      };
+
       // Get allowed pages and migrate them
       const rawAllowedPages = assistantData.allowedPages || [];
       const migratedPages = migratePageIds(rawAllowedPages);
