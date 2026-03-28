@@ -486,6 +486,15 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
   const [isProcessingBlockConfirm, setIsProcessingBlockConfirm] = useState(false);
   const [isProcessingRestoreConfirm, setIsProcessingRestoreConfirm] = useState(false);
 
+  // Resolve clinic ID at component level for assistants and branch managers
+  const isLocationManager = localStorage.getItem('healqr_is_location_manager') === 'true';
+  const isAssistant = localStorage.getItem('healqr_is_assistant') === 'true';
+  const resolvedClinicIdTop = (() => {
+    if (isLocationManager) return localStorage.getItem('healqr_parent_clinic_id') || auth?.currentUser?.uid || '';
+    if (isAssistant) return localStorage.getItem('healqr_assistant_doctor_id') || auth?.currentUser?.uid || '';
+    return auth?.currentUser?.uid || '';
+  })();
+
   useEffect(() => {
     loadTodaysSchedule();
   }, [refreshTrigger]);
@@ -493,13 +502,13 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
   // 🔥 REAL-TIME LISTENER: Triggers refresh via state
   useEffect(() => {
     const currentUser = auth.currentUser;
-    if (!currentUser) return;
+    if (!currentUser && !isAssistant) return;
 
     let timeoutId: NodeJS.Timeout | null = null;
 
     const bookingsQuery = query(
       collection(db, 'bookings'),
-      where('clinicId', '==', currentUser.uid)
+      where('clinicId', '==', resolvedClinicIdTop)
     );
 
     const unsubscribe = onSnapshot(bookingsQuery, (snapshot) => {
@@ -875,23 +884,18 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
 
   const loadTodaysSchedule = async () => {
     const currentUser = auth.currentUser;
-    if (!currentUser) {
+    if (!currentUser && !isAssistant) {
       setLoading(false);
       return;
     }
 
     // Branch manager / assistant support: resolve to parent clinic ID
-    const isLocationManager = localStorage.getItem('healqr_is_location_manager') === 'true';
     const locationManagerBranchId = localStorage.getItem('healqr_location_id') || '';
-    const isAssistant = localStorage.getItem('healqr_is_assistant') === 'true';
-    const resolvedClinicId = isLocationManager
-      ? (localStorage.getItem('healqr_parent_clinic_id') || currentUser.uid)
-      : isAssistant
-      ? (localStorage.getItem('healqr_assistant_doctor_id') || currentUser.uid)
-      : currentUser.uid;
+    const resolvedClinicId = resolvedClinicIdTop;
 
     try {
       setLoading(true);
+      if (!resolvedClinicId) { setLoading(false); return; }
       const clinicRef = doc(db, 'clinics', resolvedClinicId);
       const clinicSnap = await getDoc(clinicRef);
 

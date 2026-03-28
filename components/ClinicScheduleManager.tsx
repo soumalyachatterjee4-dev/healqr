@@ -156,7 +156,7 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
   useEffect(() => {
     const loadDoctors = async () => {
       const currentUser = auth!.currentUser;
-      if (!currentUser) {
+      if (!currentUser && !isAssistant) {
         console.error("No current user found");
         setLoading(false);
         return;
@@ -259,7 +259,7 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
     if (!selectedDoctorId) return;
 
     const currentUser = auth!.currentUser;
-    if (!currentUser) return;
+    if (!currentUser && !isAssistant) return;
 
     try {
       const doctorRef = doc(db!, "doctors", selectedDoctorId);
@@ -346,7 +346,7 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
     }
 
     const currentUser = auth!.currentUser;
-    if (!currentUser) return;
+    if (!currentUser && !isAssistant) return;
 
     try {
       const newPeriod: PlannedOffPeriod = {
@@ -637,7 +637,7 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
 
     try {
       const currentUser = auth!.currentUser;
-      if (!currentUser) {
+      if (!currentUser && !isAssistant) {
         toast.error("Authentication error");
         return;
       }
@@ -977,7 +977,7 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
 
     try {
       const currentUser = auth!.currentUser;
-      if (!currentUser) {
+      if (!currentUser && !isAssistant) {
         toast.error("Authentication error");
         return;
       }

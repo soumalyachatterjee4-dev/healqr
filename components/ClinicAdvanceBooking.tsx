@@ -69,6 +69,15 @@ export default function ClinicAdvanceBooking({
   const [doctorInitialLoading, setDoctorInitialLoading] = useState(true);
   const [expandedSessions, setExpandedSessions] = useState<Record<string, boolean>>({});
 
+  // Resolve clinic ID at component level for assistants and branch managers
+  const isLocationManager = localStorage.getItem('healqr_is_location_manager') === 'true';
+  const isAssistantUser = localStorage.getItem('healqr_is_assistant') === 'true';
+  const resolvedClinicIdTop = (() => {
+    if (isLocationManager) return localStorage.getItem('healqr_parent_clinic_id') || auth?.currentUser?.uid || '';
+    if (isAssistantUser) return localStorage.getItem('healqr_assistant_doctor_id') || auth?.currentUser?.uid || '';
+    return auth?.currentUser?.uid || '';
+  })();
+
   // Initialize dates
   useEffect(() => {
     const today = new Date();
@@ -89,16 +98,16 @@ export default function ClinicAdvanceBooking({
         const currentDb = db;
         if (!currentAuth || !currentDb) return;
         const currentUser = currentAuth.currentUser;
-        if (!currentUser) return;
+        if (!currentUser && !isAssistantUser) return;
 
         // Resolve clinic ID for branch managers and assistants
         const isLocationManager = localStorage.getItem('healqr_is_location_manager') === 'true';
         const isAssistant = localStorage.getItem('healqr_is_assistant') === 'true';
         const resolvedClinicId = isLocationManager
-          ? (localStorage.getItem('healqr_parent_clinic_id') || currentUser.uid)
+          ? (localStorage.getItem('healqr_parent_clinic_id') || currentUser?.uid)
           : isAssistant
-          ? (localStorage.getItem('healqr_assistant_doctor_id') || currentUser.uid)
-          : currentUser.uid;
+          ? (localStorage.getItem('healqr_assistant_doctor_id') || currentUser?.uid)
+          : currentUser?.uid;
 
         const clinicRef = doc(currentDb, 'clinics', resolvedClinicId);
         const clinicSnap = await getDoc(clinicRef);
@@ -156,14 +165,17 @@ export default function ClinicAdvanceBooking({
         const currentAuth = auth;
         if (!currentAuth) return;
         const currentUser = currentAuth.currentUser;
-        if (!currentUser) return;
+        if (!currentUser && !isAssistantUser) return;
 
-        // Resolve clinic ID for branch managers (use parent clinic ID)
+        // Resolve clinic ID for branch managers and assistants (use parent clinic ID)
         const isLocationManager = localStorage.getItem('healqr_is_location_manager') === 'true';
+        const isAssistant = localStorage.getItem('healqr_is_assistant') === 'true';
         const locationManagerBranchId = localStorage.getItem('healqr_location_id') || '';
         const resolvedClinicId = isLocationManager
-          ? (localStorage.getItem('healqr_parent_clinic_id') || currentUser.uid)
-          : currentUser.uid;
+          ? (localStorage.getItem('healqr_parent_clinic_id') || currentUser?.uid)
+          : isAssistant
+          ? (localStorage.getItem('healqr_assistant_doctor_id') || currentUser?.uid)
+          : currentUser?.uid;
 
         // For branch managers, build a set of chamberIds belonging to their branch
         let branchChamberIds: Set<string> | null = null;
