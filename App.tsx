@@ -1305,6 +1305,16 @@ export default function App() {
               const migratedPages = migratePageIds(rawAllowedPages);
               localStorage.setItem('healqr_assistant_pages', JSON.stringify(migratedPages));
 
+              // SYNC BRANCH CONTEXT: Ensure branch assistant always has correct flags
+              if (assistantData.isClinic) {
+                localStorage.setItem('healqr_is_clinic', 'true');
+              }
+              if (assistantData.isLocationManager && assistantData.parentClinicId && assistantData.locationId) {
+                localStorage.setItem('healqr_is_location_manager', 'true');
+                localStorage.setItem('healqr_parent_clinic_id', assistantData.parentClinicId);
+                localStorage.setItem('healqr_location_id', assistantData.locationId);
+              }
+
               // Update database with migrated IDs if they changed
               if (JSON.stringify(rawAllowedPages) !== JSON.stringify(migratedPages)) {
                 await updateDoc(assistantDocRef, {
@@ -1346,7 +1356,15 @@ export default function App() {
               const clinicDoc = await getDoc(doc(db, 'clinics', clinicIdToLoad));
               if (clinicDoc.exists()) {
                 const data = clinicDoc.data();
-                if (!isLocManager && data.name) {
+                if (isLocManager) {
+                  // Branch manager or branch assistant: resolve branch name
+                  const locId = localStorage.getItem('healqr_location_id');
+                  const branchLoc = (data.locations || []).find((l: any) => l.id === locId);
+                  if (branchLoc?.name) {
+                    localStorage.setItem('healqr_user_name', branchLoc.name);
+                    setUserName(branchLoc.name);
+                  }
+                } else if (data.name) {
                   localStorage.setItem('healqr_user_name', data.name);
                   setUserName(data.name);
                 }

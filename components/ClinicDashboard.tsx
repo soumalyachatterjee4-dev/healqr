@@ -115,6 +115,16 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
     ? localStorage.getItem('healqr_assistant_doctor_id') || auth?.currentUser?.uid || ''
     : auth?.currentUser?.uid || '';
 
+  // Compute display name: branch name for location managers, clinic name for owners
+  const getDisplayClinicName = () => {
+    if (isLocationManager && locationManagerBranchId && clinicData) {
+      const branchLoc = (clinicData as any).locations?.find((l: any) => l.id === locationManagerBranchId);
+      if (branchLoc?.name) return branchLoc.name;
+    }
+    return clinicData?.name || 'Clinic';
+  };
+  const displayClinicName = clinicData ? getDisplayClinicName() : 'Clinic';
+
   // Analytics State
   const [analyticsData, setAnalyticsData] = useState({
     totalScans: 0,
@@ -537,7 +547,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
         onLogout={handleLogout}
         profileData={{
           image: clinicData?.logoUrl || null,
-          name: clinicData?.name || 'Clinic Name'
+          name: displayClinicName
         }}
       />
     );
@@ -597,7 +607,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
   if (activeMenu === 'social-kit') {
     return (
       <ClinicSocialMediaKit
-        clinicName={clinicData?.name || 'Clinic'}
+        clinicName={displayClinicName}
         clinicAddress={clinicData?.address || ''}
         clinicPhone={clinicData?.phone || ''}
         qrUrl={`https://healqr.com?clinicId=${resolvedClinicId}`}
@@ -631,10 +641,16 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
 
   // Render Assistant Access if menu is active
   if (activeMenu === 'assistant') {
+    // For branch managers, use the branch's email (stored in location data)
+    let assistantManagerEmail = clinicData?.email || auth.currentUser?.email || '';
+    if (isLocationManager && locationManagerBranchId && clinicData) {
+      const branchLoc = (clinicData as any).locations?.find((l: any) => l.id === locationManagerBranchId);
+      if (branchLoc?.email) assistantManagerEmail = branchLoc.email;
+    }
     return (
       <ClinicAssistantAccessManager
-        clinicName={clinicData?.name || 'Clinic'}
-        email={clinicData?.email || auth.currentUser?.email || ''}
+        clinicName={displayClinicName}
+        email={assistantManagerEmail}
         onMenuChange={(menu) => setActiveMenu(menu)}
         onLogout={handleLogout}
         activeAddOns={[]}
@@ -646,7 +662,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
   if (activeMenu === 'lab-referral') {
     return (
       <ClinicLabReferralManager
-        clinicName={clinicData?.name || 'Clinic'}
+        clinicName={displayClinicName}
         clinicId={resolvedClinicId}
         onMenuChange={(menu) => setActiveMenu(menu)}
         onLogout={handleLogout}
@@ -681,7 +697,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
     return (
       <ClinicAIDietChartManager
         clinicId={resolvedClinicId}
-        clinicName={clinicData?.name || 'Clinic'}
+        clinicName={displayClinicName}
         onMenuChange={(menu) => setActiveMenu(menu)}
         onLogout={handleLogout}
         activeAddOns={[]}
@@ -693,7 +709,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
   if (activeMenu === 'ai-rx') {
     return (
       <ClinicAIRXReaderManager
-        clinicName={clinicData?.name || 'Clinic'}
+        clinicName={displayClinicName}
         clinicId={resolvedClinicId}
         onMenuChange={(menu) => setActiveMenu(menu)}
         onLogout={handleLogout}
@@ -703,7 +719,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
 
   // Render BrainDeck Manager if menu is active
   if (activeMenu === 'braindeck') {
-    return <BrainDeckManager onBack={() => setActiveMenu('dashboard')} doctorName={clinicData?.name || 'Clinic'} />;
+    return <BrainDeckManager onBack={() => setActiveMenu('dashboard')} doctorName={displayClinicName} />;
   }
 
   // Render Video Consultation History if menu is active
@@ -711,7 +727,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
     return (
       <ClinicVideoConsultationManager
         clinicId={resolvedClinicId}
-        clinicName={clinicData?.name || 'Clinic'}
+        clinicName={displayClinicName}
         onMenuChange={(menu) => setActiveMenu(menu)}
         onLogout={handleLogout}
         activeAddOns={[]}
@@ -882,10 +898,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
               <div className="space-y-4">
                 <div>
                   <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
-                    Welcome Back, {isLocationManager
-                      ? `${localStorage.getItem('healqr_user_name') || 'Clinic'} !`
-                      : `${clinicData?.name || 'Clinic'} !`
-                    }
+                    Welcome Back, {displayClinicName} !
                   </h1>
 
                   {/* Rating Placeholder */}
