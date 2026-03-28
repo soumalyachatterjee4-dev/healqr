@@ -662,7 +662,8 @@ export default function App() {
     }
 
     // Handle Clinic QR Scan (ONLY if no doctor selected yet)
-    if (clinicId && !doctorId) {
+    // Skip if this is a master-access-login link (also has clinicId param)
+    if (clinicId && !doctorId && !pathname.includes('/master-access-login')) {
       sessionStorage.setItem('booking_clinic_id', clinicId);
       sessionStorage.setItem('booking_source', 'clinic_qr');
       setCurrentPage('clinic-booking-flow');
