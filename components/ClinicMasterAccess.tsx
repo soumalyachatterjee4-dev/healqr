@@ -607,11 +607,11 @@ export default function ClinicMasterAccess({ onBack, clinicId }: MasterAccessPro
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-zinc-800 text-left">
-                    <th className="py-2 pr-4 text-zinc-400 font-medium">Branch</th>
-                    <th className="py-2 pr-4 text-zinc-400 font-medium text-right">Bookings</th>
-                    <th className="py-2 pr-4 text-zinc-400 font-medium text-right">QR</th>
-                    <th className="py-2 pr-4 text-zinc-400 font-medium text-right">Walk-in</th>
-                    <th className="py-2 text-zinc-400 font-medium text-right">Share</th>
+                    <th className="py-2 pr-4 text-white font-medium">Branch</th>
+                    <th className="py-2 pr-4 text-white font-medium text-right">Bookings</th>
+                    <th className="py-2 pr-4 text-white font-medium text-right">QR</th>
+                    <th className="py-2 pr-4 text-white font-medium text-right">Walk-in</th>
+                    <th className="py-2 text-white font-medium text-right">Share</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -631,13 +631,13 @@ export default function ClinicMasterAccess({ onBack, clinicId }: MasterAccessPro
                           <div className="flex items-center gap-2">
                             <MapPin className="w-3 h-3 text-amber-400" />
                             <span className="text-white">{loc.name}</span>
-                            <span className="text-xs text-amber-400/70 font-mono">#{loc.id}</span>
+                            <span className="text-xs text-amber-400 font-mono">#{loc.id}</span>
                           </div>
                         </td>
                         <td className="py-2.5 pr-4 text-right text-white font-medium">{nonCancelled.length}</td>
                         <td className="py-2.5 pr-4 text-right text-emerald-400">{qrCount}</td>
                         <td className="py-2.5 pr-4 text-right text-blue-400">{walkinCount}</td>
-                        <td className="py-2.5 text-right text-zinc-300">{share}%</td>
+                        <td className="py-2.5 text-right text-white">{share}%</td>
                       </tr>
                     );
                   })}
