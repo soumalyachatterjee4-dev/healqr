@@ -406,20 +406,20 @@ export default function LocationManagerCreator({ onMenuChange, onLogout }: Locat
           )}
 
           {/* Master Access Card */}
-          <div className="bg-amber-600 rounded-xl p-4 shadow-lg space-y-3">
+          <div className="bg-emerald-600 rounded-xl p-4 shadow-lg space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-amber-500/50 rounded-lg">
+                <div className="p-2 bg-emerald-500/50 rounded-lg">
                   <Crown className="w-5 h-5 text-white" />
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-white">Master Access</h3>
-                  <p className="text-xs text-amber-100/80 mt-0.5">Owner-only cross-branch analytics</p>
+                  <p className="text-xs text-emerald-100/80 mt-0.5">Owner-only cross-branch analytics</p>
                 </div>
               </div>
               <Button
                 onClick={handleMasterAccessClick}
-                className="bg-amber-800 hover:bg-amber-900 text-white gap-1 border border-amber-500/50"
+                className="bg-emerald-800 hover:bg-emerald-900 text-white gap-1 border border-emerald-400/50"
                 size="sm"
               >
                 <Lock className="w-3.5 h-3.5" />
@@ -428,7 +428,7 @@ export default function LocationManagerCreator({ onMenuChange, onLogout }: Locat
               </Button>
             </div>
             {clinicData?.masterAccessEmail && (
-              <div className="flex items-center gap-1.5 text-xs text-amber-100/70">
+              <div className="flex items-center gap-1.5 text-xs text-emerald-100/70">
                 <Mail className="w-3 h-3" />
                 Link sent to: {clinicData.masterAccessEmail}
               </div>
