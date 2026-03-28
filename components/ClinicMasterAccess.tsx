@@ -411,6 +411,9 @@ export default function ClinicMasterAccess({ onBack, clinicId }: MasterAccessPro
           )}
         </div>
 
+        {/* Health Tip / Ad Card */}
+        <DashboardPromoDisplay category="health-tip" placement="master-access" />
+
         {/* KPI Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card className="bg-zinc-900 border-zinc-800">
@@ -647,9 +650,6 @@ export default function ClinicMasterAccess({ onBack, clinicId }: MasterAccessPro
             </div>
           </CardContent>
         </Card>
-
-        {/* Health Tip / Ad Card */}
-        <DashboardPromoDisplay category="health-tip" placement="master-access" className="mt-4" />
 
       </div>
     </div>
