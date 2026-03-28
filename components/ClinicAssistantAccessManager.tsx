@@ -46,9 +46,9 @@ const AVAILABLE_PAGES = [
   { id: 'preview', label: 'Preview Centre', icon: '👁️' },
   { id: 'lab-referral', label: 'Lab Referral Tracking', icon: '🔬' },
   { id: 'templates', label: 'Personalized Templates', icon: '📝' },
-  { id: 'ai-diet-chart', label: 'AI Diet Chart', icon: '🍎' },
-  { id: 'ai-rx-reader', label: 'AI RX Reader', icon: '🤖' },
-  { id: 'video-consultation', label: 'Video Consultation', icon: '🎥' },
+  { id: 'ai-diet', label: 'AI Diet Chart', icon: '🍎' },
+  { id: 'ai-rx', label: 'AI RX Reader', icon: '🤖' },
+  { id: 'video-consult', label: 'Video Consultation', icon: '🎥' },
   { id: 'emergency', label: 'Emergency Button', icon: '🚨' },
 ];
 

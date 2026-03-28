@@ -1294,6 +1294,9 @@ export default function App() {
                 'schedule-manager': 'schedule',
                 'preview-center': 'preview',
                 'personalized-template': 'personalized-templates',
+                'ai-diet-chart': 'ai-diet',
+                'ai-rx-reader': 'ai-rx',
+                'video-consultation': 'video-consult',
               };
 
               const migratePageIds = (pages: string[]): string[] => {

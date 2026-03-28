@@ -107,10 +107,9 @@ export default function AssistantLogin() {
         'schedule-manager': 'schedule',
         'preview-center': 'preview',
         'personalized-template': 'personalized-templates',
-      };
-
-      const migratePageIds = (pages: string[]): string[] => {
-        return pages.map(pageId => PAGE_ID_MIGRATION[pageId] || pageId);
+        'ai-diet-chart': 'ai-diet',
+        'ai-rx-reader': 'ai-rx',
+        'video-consultation': 'video-consult',
       };
 
       // Get allowed pages and migrate them
