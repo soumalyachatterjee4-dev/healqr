@@ -399,7 +399,7 @@ export default function AdminDashboard({ adminEmail, onStartDemo, uploadedTestim
           </div>
 
           {/* Total Clinics Card - spans full row */}
-          <div className="lg:col-span-2 bg-gradient-to-br from-teal-900/40 to-teal-900/20 border-2 border-teal-600 rounded-xl p-6 md:p-8">
+          <div className="lg:col-span-2 bg-gradient-to-br from-teal-900/40 to-teal-900/20 border-2 border-zinc-500 rounded-xl p-6 md:p-8">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-8">
               <div className="flex items-center gap-4">
                 <div className="bg-teal-500/20 p-3 md:p-4 rounded-xl">

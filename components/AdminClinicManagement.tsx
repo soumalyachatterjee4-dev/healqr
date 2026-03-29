@@ -203,7 +203,7 @@ export default function AdminClinicManagement() {
         </div>
 
         {/* Stats Card */}
-        <div className="bg-gradient-to-r from-teal-900/20 to-teal-800/20 border border-teal-700/30 rounded-2xl p-4 md:p-8 mb-6 md:mb-8">
+        <div className="bg-gradient-to-r from-teal-900/20 to-teal-800/20 border-2 border-zinc-500 rounded-2xl p-4 md:p-8 mb-6 md:mb-8">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
             <div className="bg-teal-600/20 rounded-2xl p-3 md:p-4">
               <Building2 className="w-8 h-8 md:w-12 md:h-12 text-teal-400" />
