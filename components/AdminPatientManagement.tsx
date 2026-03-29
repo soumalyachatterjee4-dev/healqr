@@ -37,6 +37,14 @@ export default function AdminPatientManagement() {
         throw new Error('Firestore not initialized');
       }
 
+      // Pre-fetch all doctors once for email lookup
+      const doctorsRef = collection(db, COLLECTIONS.DOCTORS);
+      const doctorsSnapshot = await getDocs(doctorsRef);
+      const doctorEmailMap = new Map<string, string>();
+      doctorsSnapshot.docs.forEach(d => {
+        doctorEmailMap.set(d.id, d.data().email || '');
+      });
+
       const bookingsRef = collection(db, COLLECTIONS.BOOKINGS);
       const q = query(bookingsRef, orderBy('createdAt', 'desc'));
       const snapshot = await getDocs(q);
@@ -46,16 +54,10 @@ export default function AdminPatientManagement() {
       for (const doc of snapshot.docs) {
         const data = doc.data();
         
-        // Get doctor email
+        // Get doctor email from pre-fetched map
         let doctorEmail = data.doctorEmail || '';
         if (!doctorEmail && data.doctorId) {
-          // Try to fetch doctor email from doctors collection
-          const doctorsRef = collection(db, COLLECTIONS.DOCTORS);
-          const doctorsSnapshot = await getDocs(doctorsRef);
-          const doctorDoc = doctorsSnapshot.docs.find(d => d.id === data.doctorId);
-          if (doctorDoc) {
-            doctorEmail = doctorDoc.data().email || '';
-          }
+          doctorEmail = doctorEmailMap.get(data.doctorId) || '';
         }
 
         // Determine booking type
