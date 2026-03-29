@@ -203,12 +203,11 @@ export default function AdminDoctorManagement() {
       const createdDate = d.createdAt.toDate ? d.createdAt.toDate() : new Date(d.createdAt);
       return createdDate >= firstDayOfMonth;
     }).length,
-    starterPlan: doctors.filter(d => d.plan === 'Starter').length,
-    growthPlan: doctors.filter(d => d.plan === 'Growth').length,
-    scalePlan: doctors.filter(d => d.plan === 'Scale').length,
-    proPlan: doctors.filter(d => d.plan === 'Pro').length,
-    summitPlan: doctors.filter(d => d.plan === 'Summit').length,
-    dropOut: doctors.filter(d => d.qrStatus === 'Deactive').length
+    activeDoctors: doctors.filter(d => d.qrStatus === 'Active').length,
+    inactiveDoctors: doctors.filter(d => d.qrStatus === 'Deactive').length,
+    preprinted: doctors.filter(d => d.qrSource !== 'Virtual' && d.qrNumber !== '-').length,
+    virtual: doctors.filter(d => d.qrSource === 'Virtual').length,
+    noQR: doctors.filter(d => d.qrNumber === '-').length,
   };
 
   const getQRStatusColor = (status: string) => {
@@ -288,50 +287,46 @@ export default function AdminDoctorManagement() {
             <p className="text-sm md:text-base text-blue-300">+{stats.newThisMonth} new this month</p>
           </div>
 
-          {/* Plan Bifurcation - Mobile Responsive */}
+          {/* Status & QR Breakdown */}
           <div className="grid grid-cols-3 gap-3 md:gap-4">
-            {/* Row 1: First 3 Labels */}
             <div className="text-center">
-              <p className="text-xs md:text-sm text-blue-300">Starter</p>
+              <p className="text-xs md:text-sm text-blue-300">Active</p>
             </div>
             <div className="text-center">
-              <p className="text-xs md:text-sm text-blue-300">Growth</p>
+              <p className="text-xs md:text-sm text-blue-300">Inactive</p>
             </div>
             <div className="text-center">
-              <p className="text-xs md:text-sm text-blue-300">Scale</p>
+              <p className="text-xs md:text-sm text-blue-300">New This Month</p>
             </div>
             
-            {/* Row 2: First 3 Numbers */}
             <div className="text-center">
-              <p className="text-2xl md:text-4xl text-white">{stats.starterPlan}</p>
+              <p className="text-2xl md:text-4xl text-white">{stats.activeDoctors}</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl md:text-4xl text-white">{stats.growthPlan}</p>
+              <p className="text-2xl md:text-4xl text-red-400">{stats.inactiveDoctors}</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl md:text-4xl text-white">{stats.scalePlan}</p>
+              <p className="text-2xl md:text-4xl text-emerald-400">{stats.newThisMonth}</p>
             </div>
 
-            {/* Row 3: Second 3 Labels */}
             <div className="text-center">
-              <p className="text-xs md:text-sm text-blue-300">Pro</p>
+              <p className="text-xs md:text-sm text-blue-300">Pre-printed QR</p>
             </div>
             <div className="text-center">
-              <p className="text-xs md:text-sm text-blue-300">Summit</p>
+              <p className="text-xs md:text-sm text-blue-300">Virtual QR</p>
             </div>
             <div className="text-center">
-              <p className="text-xs md:text-sm text-blue-300">Drop Out</p>
+              <p className="text-xs md:text-sm text-blue-300">No QR Assigned</p>
             </div>
             
-            {/* Row 4: Second 3 Numbers */}
             <div className="text-center">
-              <p className="text-2xl md:text-4xl text-white">{stats.proPlan}</p>
+              <p className="text-2xl md:text-4xl text-white">{stats.preprinted}</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl md:text-4xl text-white">{stats.summitPlan}</p>
+              <p className="text-2xl md:text-4xl text-white">{stats.virtual}</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl md:text-4xl text-white">{stats.dropOut}</p>
+              <p className="text-2xl md:text-4xl text-white">{stats.noQR}</p>
             </div>
           </div>
         </div>

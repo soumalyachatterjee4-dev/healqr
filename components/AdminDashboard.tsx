@@ -43,9 +43,8 @@ export default function AdminDashboard({ adminEmail, onStartDemo, uploadedTestim
     totalReviews: 0,
     averageRating: 0,
     totalRevenue: 0,
-    subscriptionRevenue: 0,
-    topUpRevenue: 0,
-    premiumAddOnRevenue: 0,
+    adRevenue: 0,
+    pharmaRevenue: 0,
     totalBookings: 0,
     qrBookings: 0,
     walkinBookings: 0,
@@ -53,12 +52,8 @@ export default function AdminDashboard({ adminEmail, onStartDemo, uploadedTestim
     cancelledBookings: 0,
     totalOnboardDoctors: 0,
     lastMonthNewDoctors: 0,
-    upgradedDoctors: 0,
-    leftOutDoctors: 0,
-    growthDoctors: 0,
-    scaleDoctors: 0,
-    proDoctors: 0,
-    summitDoctors: 0,
+    activeDoctors: 0,
+    inactiveDoctors: 0,
   });
   const [recentReviews, setRecentReviews] = useState<SupportRequest[]>([]);
   const [revenueGrowth, setRevenueGrowth] = useState<number>(0);
@@ -390,11 +385,11 @@ export default function AdminDashboard({ adminEmail, onStartDemo, uploadedTestim
             <div className="grid grid-cols-2 gap-4">
               <div className="text-center">
                 <p className="text-xs text-blue-400 mb-2">Active</p>
-                <p className="text-2xl text-white">{stats.totalOnboardDoctors - stats.leftOutDoctors}</p>
+                <p className="text-2xl text-white">{stats.activeDoctors}</p>
               </div>
               <div className="text-center">
                 <p className="text-xs text-red-400 mb-2">Inactive</p>
-                <p className="text-2xl text-white">{stats.leftOutDoctors}</p>
+                <p className="text-2xl text-white">{stats.inactiveDoctors}</p>
               </div>
             </div>
           </div>
@@ -534,7 +529,7 @@ export default function AdminDashboard({ adminEmail, onStartDemo, uploadedTestim
                 <UserMinus className="w-6 h-6 text-red-500" />
               </div>
             </div>
-            <h3 className="text-3xl mb-2 text-red-500">{stats.leftOutDoctors}</h3>
+            <h3 className="text-3xl mb-2 text-red-500">{stats.inactiveDoctors}</h3>
             <p className="text-sm text-gray-400">Inactive Doctors</p>
             <div className="mt-4 pt-4 border-t border-zinc-800">
               <p className="text-xs text-gray-500">Doctors no longer active on the platform</p>

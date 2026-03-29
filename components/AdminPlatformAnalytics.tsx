@@ -1,5 +1,5 @@
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { TrendingUp, Users, Calendar, DollarSign, Package } from 'lucide-react';
+import { TrendingUp, Users, Calendar, Megaphone, QrCode } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from './ui/button';
 
@@ -7,24 +7,23 @@ export default function AdminPlatformAnalytics() {
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   // Mock data for charts
-  const monthlyRevenue = [
-    { month: 'Jan', revenue: 125000, bookings: 450 },
-    { month: 'Feb', revenue: 145000, bookings: 520 },
-    { month: 'Mar', revenue: 165000, bookings: 590 },
-    { month: 'Apr', revenue: 155000, bookings: 560 },
-    { month: 'May', revenue: 185000, bookings: 670 },
-    { month: 'Jun', revenue: 205000, bookings: 740 },
-    { month: 'Jul', revenue: 225000, bookings: 810 },
-    { month: 'Aug', revenue: 245000, bookings: 890 },
-    { month: 'Sep', revenue: 265000, bookings: 960 },
-    { month: 'Oct', revenue: 285000, bookings: 1030 },
+  const monthlyBookings = [
+    { month: 'Jan', adRevenue: 45000, bookings: 450 },
+    { month: 'Feb', adRevenue: 52000, bookings: 520 },
+    { month: 'Mar', adRevenue: 59000, bookings: 590 },
+    { month: 'Apr', adRevenue: 56000, bookings: 560 },
+    { month: 'May', adRevenue: 67000, bookings: 670 },
+    { month: 'Jun', adRevenue: 74000, bookings: 740 },
+    { month: 'Jul', adRevenue: 81000, bookings: 810 },
+    { month: 'Aug', adRevenue: 89000, bookings: 890 },
+    { month: 'Sep', adRevenue: 96000, bookings: 960 },
+    { month: 'Oct', adRevenue: 103000, bookings: 1030 },
   ];
 
-  const subscriptionPlans = [
-    { name: 'Basic', value: 45, color: '#6B7280' },
-    { name: 'Standard', value: 60, color: '#10B981' },
-    { name: 'Pro', value: 30, color: '#3B82F6' },
-    { name: 'Enterprise', value: 12, color: '#A855F7' },
+  const qrTypeDistribution = [
+    { name: 'Pre-printed QR', value: 85, color: '#10B981' },
+    { name: 'Virtual QR', value: 47, color: '#3B82F6' },
+    { name: 'No QR Assigned', value: 15, color: '#6B7280' },
   ];
 
   const specialityDistribution = [
@@ -36,11 +35,11 @@ export default function AdminPlatformAnalytics() {
     { speciality: 'Others', doctors: 47 },
   ];
 
-  const revenueBreakdown = {
-    total: 2847650,
-    companyShare: 1736959, // 61%
-    doctorShare: 825819, // 29%
-    gatewayFees: 284765, // 10%
+  const adRevenueBreakdown = {
+    total: 284765,
+    advertiserAds: 170859, // 60%
+    pharmaSponsor: 85430, // 30%
+    platformFees: 28476, // 10%
   };
 
   return (
@@ -122,36 +121,36 @@ export default function AdminPlatformAnalytics() {
           <div className="bg-gradient-to-br from-purple-900/30 to-purple-900/10 border border-purple-700/30 rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="bg-purple-500/10 p-3 rounded-lg">
-                <DollarSign className="w-6 h-6 text-purple-500" />
+                <Megaphone className="w-6 h-6 text-purple-500" />
               </div>
               <span className="text-green-500 text-sm">+15.3%</span>
             </div>
-            <p className="text-sm text-gray-400 mb-1">Monthly Revenue</p>
+            <p className="text-sm text-gray-400 mb-1">Ad Revenue</p>
             <p className="text-3xl text-purple-500">₹2.85L</p>
           </div>
 
           <div className="bg-gradient-to-br from-yellow-900/30 to-yellow-900/10 border border-yellow-700/30 rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="bg-yellow-500/10 p-3 rounded-lg">
-                <Package className="w-6 h-6 text-yellow-500" />
+                <QrCode className="w-6 h-6 text-yellow-500" />
               </div>
               <span className="text-green-500 text-sm">+5.7%</span>
             </div>
-            <p className="text-sm text-gray-400 mb-1">Active Subscriptions</p>
-            <p className="text-3xl text-yellow-500">125</p>
+            <p className="text-sm text-gray-400 mb-1">Active Advertisers</p>
+            <p className="text-3xl text-yellow-500">12</p>
           </div>
         </div>
 
         {/* Charts Row 1 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Revenue Trend */}
+          {/* Ad Revenue & Bookings Trend */}
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
             <h3 className="text-lg mb-6 flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-emerald-500" />
-              Revenue & Bookings Trend
+              Ad Revenue & Bookings Trend
             </h3>
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={monthlyRevenue}>
+              <LineChart data={monthlyBookings}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
                 <XAxis dataKey="month" stroke="#71717a" />
                 <YAxis stroke="#71717a" />
@@ -160,22 +159,22 @@ export default function AdminPlatformAnalytics() {
                   labelStyle={{ color: '#a1a1aa' }}
                 />
                 <Legend />
-                <Line type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2} name="Revenue (₹)" />
+                <Line type="monotone" dataKey="adRevenue" stroke="#10b981" strokeWidth={2} name="Ad Revenue (₹)" />
                 <Line type="monotone" dataKey="bookings" stroke="#3b82f6" strokeWidth={2} name="Bookings" />
               </LineChart>
             </ResponsiveContainer>
           </div>
 
-          {/* Subscription Distribution */}
+          {/* Doctor QR Type Distribution */}
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
             <h3 className="text-lg mb-6 flex items-center gap-2">
-              <Package className="w-5 h-5 text-emerald-500" />
-              Subscription Plan Distribution
+              <QrCode className="w-5 h-5 text-emerald-500" />
+              Doctor QR Type Distribution
             </h3>
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
-                  data={subscriptionPlans}
+                  data={qrTypeDistribution}
                   cx="50%"
                   cy="50%"
                   labelLine={false}
@@ -184,7 +183,7 @@ export default function AdminPlatformAnalytics() {
                   fill="#8884d8"
                   dataKey="value"
                 >
-                  {subscriptionPlans.map((entry, index) => (
+                  {qrTypeDistribution.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
@@ -217,37 +216,37 @@ export default function AdminPlatformAnalytics() {
             </ResponsiveContainer>
           </div>
 
-          {/* Revenue Breakdown */}
+          {/* Ad Revenue Breakdown */}
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
             <h3 className="text-lg mb-6 flex items-center gap-2">
-              <DollarSign className="w-5 h-5 text-emerald-500" />
-              Revenue Breakdown
+              <Megaphone className="w-5 h-5 text-emerald-500" />
+              Ad Revenue Breakdown
             </h3>
             <div className="space-y-6">
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-gray-400">Company Share (61%)</span>
-                  <span className="text-emerald-500">₹{revenueBreakdown.companyShare.toLocaleString()}</span>
+                  <span className="text-sm text-gray-400">Advertiser Ads (60%)</span>
+                  <span className="text-emerald-500">₹{adRevenueBreakdown.advertiserAds.toLocaleString()}</span>
                 </div>
                 <div className="w-full bg-zinc-800 rounded-full h-3">
-                  <div className="bg-emerald-500 h-3 rounded-full" style={{ width: '61%' }}></div>
+                  <div className="bg-emerald-500 h-3 rounded-full" style={{ width: '60%' }}></div>
                 </div>
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-gray-400">Doctor Share (29%)</span>
-                  <span className="text-blue-500">₹{revenueBreakdown.doctorShare.toLocaleString()}</span>
+                  <span className="text-sm text-gray-400">Pharma Sponsors (30%)</span>
+                  <span className="text-blue-500">₹{adRevenueBreakdown.pharmaSponsor.toLocaleString()}</span>
                 </div>
                 <div className="w-full bg-zinc-800 rounded-full h-3">
-                  <div className="bg-blue-500 h-3 rounded-full" style={{ width: '29%' }}></div>
+                  <div className="bg-blue-500 h-3 rounded-full" style={{ width: '30%' }}></div>
                 </div>
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-gray-400">Gateway Fees (10%)</span>
-                  <span className="text-purple-500">₹{revenueBreakdown.gatewayFees.toLocaleString()}</span>
+                  <span className="text-sm text-gray-400">Platform Fees (10%)</span>
+                  <span className="text-purple-500">₹{adRevenueBreakdown.platformFees.toLocaleString()}</span>
                 </div>
                 <div className="w-full bg-zinc-800 rounded-full h-3">
                   <div className="bg-purple-500 h-3 rounded-full" style={{ width: '10%' }}></div>
@@ -256,8 +255,8 @@ export default function AdminPlatformAnalytics() {
 
               <div className="pt-4 border-t border-zinc-800">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-white font-medium">Total Revenue</span>
-                  <span className="text-xl text-white">₹{revenueBreakdown.total.toLocaleString()}</span>
+                  <span className="text-sm text-white font-medium">Total Ad Revenue</span>
+                  <span className="text-xl text-white">₹{adRevenueBreakdown.total.toLocaleString()}</span>
                 </div>
               </div>
             </div>
@@ -274,8 +273,8 @@ export default function AdminPlatformAnalytics() {
               <p className="text-xs text-emerald-500 mt-2">↑ 18% from last month</p>
             </div>
             <div className="bg-zinc-800 rounded-lg p-4">
-              <p className="text-sm text-gray-400 mb-2">Average Revenue per Booking</p>
-              <p className="text-2xl text-white">₹276</p>
+              <p className="text-sm text-gray-400 mb-2">Ad Revenue per Booking</p>
+              <p className="text-2xl text-white">₹100</p>
               <p className="text-xs text-emerald-500 mt-2">↑ 5% from last month</p>
             </div>
             <div className="bg-zinc-800 rounded-lg p-4">

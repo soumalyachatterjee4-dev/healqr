@@ -16,10 +16,10 @@ interface Transaction {
 
 export default function AdminBalanceSheet() {
   const [transactions, setTransactions] = useState<Transaction[]>([
-    // Auto-fetched credits (from platform revenue)
-    { id: 1, date: '2025-11-01', type: 'credit', amount: 45678, description: 'Company share from subscriptions', category: 'Revenue', autoFetched: true },
-    { id: 2, date: '2025-10-31', type: 'credit', amount: 23456, description: 'Premium add-on sales', category: 'Revenue', autoFetched: true },
-    { id: 3, date: '2025-10-30', type: 'credit', amount: 34567, description: 'Company share from subscriptions', category: 'Revenue', autoFetched: true },
+    // Auto-fetched credits (from platform ad revenue)
+    { id: 1, date: '2025-11-01', type: 'credit', amount: 45678, description: 'Advertiser ad revenue', category: 'Revenue', autoFetched: true },
+    { id: 2, date: '2025-10-31', type: 'credit', amount: 23456, description: 'Pharma sponsor fee', category: 'Revenue', autoFetched: true },
+    { id: 3, date: '2025-10-30', type: 'credit', amount: 34567, description: 'Advertiser ad revenue', category: 'Revenue', autoFetched: true },
     
     // Manual debit entries
     { id: 4, date: '2025-11-01', type: 'debit', amount: 15000, description: 'Server hosting costs', category: 'Infrastructure', autoFetched: false },

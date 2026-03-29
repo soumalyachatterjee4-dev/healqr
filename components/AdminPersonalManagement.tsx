@@ -127,8 +127,9 @@ export default function AdminPersonalManagement() {
         return {
           id: doc.id,
           date: date.toISOString().split('T')[0],
-          source: data.type === 'subscription' ? 'Subscription Payment' : 
-                 data.type === 'topup' ? 'Top-up Payment' : 'Other Payment',
+          source: data.type === 'subscription' ? 'Platform Revenue' : 
+                 data.type === 'topup' ? 'Top-up Payment' : 
+                 data.type === 'ad_revenue' ? 'Ad Revenue' : 'Other Payment',
           amount: data.amount || 0,
           description: data.description || `Payment from ${data.doctorEmail || 'Doctor'}`
         };

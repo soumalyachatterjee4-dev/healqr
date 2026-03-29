@@ -1,4 +1,4 @@
-import { ClipboardList, Calendar, Users, DollarSign, TrendingUp, Activity, CheckCircle, XCircle, Clock, Download } from 'lucide-react';
+import { ClipboardList, Calendar, Users, Megaphone, TrendingUp, Activity, CheckCircle, XCircle, Clock, Download } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from './ui/button';
 
@@ -14,19 +14,17 @@ export default function AdminDailyWorkReport() {
     pendingBookings: 10,
     newDoctorRegistrations: 5,
     activeDoctors: 132,
-    totalRevenue: 125400,
-    companyShare: 76494, // 61%
-    doctorShare: 36366, // 29%
+    adRevenue: 12540,
     newPatients: 45,
     returningPatients: 44,
   };
 
   const doctorActivity = [
-    { id: 1, name: 'Dr. Rajesh Kumar', bookings: 12, revenue: 18000, status: 'Active', lastSeen: '10 mins ago' },
-    { id: 2, name: 'Dr. Priya Sharma', bookings: 10, revenue: 15000, status: 'Active', lastSeen: '25 mins ago' },
-    { id: 3, name: 'Dr. Amit Patel', bookings: 9, revenue: 13500, status: 'Active', lastSeen: '1 hour ago' },
-    { id: 4, name: 'Dr. Sneha Reddy', bookings: 8, revenue: 12000, status: 'Active', lastSeen: '2 hours ago' },
-    { id: 5, name: 'Dr. Vikram Singh', bookings: 7, revenue: 10500, status: 'Idle', lastSeen: '5 hours ago' },
+    { id: 1, name: 'Dr. Rajesh Kumar', bookings: 12, status: 'Active', lastSeen: '10 mins ago' },
+    { id: 2, name: 'Dr. Priya Sharma', bookings: 10, status: 'Active', lastSeen: '25 mins ago' },
+    { id: 3, name: 'Dr. Amit Patel', bookings: 9, status: 'Active', lastSeen: '1 hour ago' },
+    { id: 4, name: 'Dr. Sneha Reddy', bookings: 8, status: 'Active', lastSeen: '2 hours ago' },
+    { id: 5, name: 'Dr. Vikram Singh', bookings: 7, status: 'Idle', lastSeen: '5 hours ago' },
   ];
 
   const systemEvents = [
@@ -108,13 +106,12 @@ export default function AdminDailyWorkReport() {
           <div className="bg-gradient-to-br from-purple-900/30 to-purple-900/10 border border-purple-700/30 rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="bg-purple-500/10 p-3 rounded-lg">
-                <DollarSign className="w-6 h-6 text-purple-500" />
+                <Megaphone className="w-6 h-6 text-purple-500" />
               </div>
               <TrendingUp className="w-5 h-5 text-purple-500" />
             </div>
-            <h3 className="text-2xl mb-1">₹{(dailyStats.totalRevenue / 1000).toFixed(0)}k</h3>
-            <p className="text-sm text-gray-400">Revenue Today</p>
-            <p className="text-xs text-purple-500 mt-2">₹{(dailyStats.companyShare / 1000).toFixed(0)}k company</p>
+            <h3 className="text-2xl mb-1">₹{(dailyStats.adRevenue / 1000).toFixed(0)}k</h3>
+            <p className="text-sm text-gray-400">Ad Revenue Today</p>
           </div>
 
           <div className="bg-gradient-to-br from-orange-900/30 to-orange-900/10 border border-orange-700/30 rounded-xl p-6">
@@ -208,7 +205,6 @@ export default function AdminDailyWorkReport() {
                   </div>
                   <div className="text-right mr-4">
                     <p className="text-sm text-emerald-500">{doctor.bookings} bookings</p>
-                    <p className="text-xs text-gray-400">₹{doctor.revenue}</p>
                   </div>
                   <div>
                     <span

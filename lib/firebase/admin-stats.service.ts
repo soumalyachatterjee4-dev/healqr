@@ -22,9 +22,8 @@ import { COLLECTIONS } from './collections';
 export interface AdminStats {
   // Revenue Stats
   totalRevenue: number;
-  subscriptionRevenue: number;
-  topUpRevenue: number;
-  premiumAddOnRevenue: number;
+  adRevenue: number;
+  pharmaRevenue: number;
   
   // Booking Stats
   totalBookings: number;
@@ -36,14 +35,8 @@ export interface AdminStats {
   // Doctor Stats
   totalOnboardDoctors: number;
   lastMonthNewDoctors: number;
-  upgradedDoctors: number;
-  leftOutDoctors: number;
-  
-  // Doctors by Plan
-  growthDoctors: number;
-  scaleDoctors: number;
-  proDoctors: number;
-  summitDoctors: number;
+  activeDoctors: number;
+  inactiveDoctors: number;
   
   // Review Stats
   totalReviews: number;
@@ -103,9 +96,8 @@ export class AdminStatsService {
     endDate?: Date
   ): Promise<{
     totalRevenue: number;
-    subscriptionRevenue: number;
-    topUpRevenue: number;
-    premiumAddOnRevenue: number;
+    adRevenue: number;
+    pharmaRevenue: number;
   }> {
     try {
       if (!db) {
@@ -131,9 +123,8 @@ export class AdminStatsService {
       const snapshot = await getDocs(q);
 
       let totalRevenue = 0;
-      let subscriptionRevenue = 0;
-      let topUpRevenue = 0;
-      let premiumAddOnRevenue = 0;
+      let adRevenue = 0;
+      let pharmaRevenue = 0;
 
       snapshot.docs.forEach((doc) => {
         const data = doc.data();
@@ -145,29 +136,19 @@ export class AdminStatsService {
         const type = data.type || '';
         const description = (data.description || '').toLowerCase();
 
-        if (type === 'subscription' || description.includes('subscription') || description.includes('plan')) {
-          subscriptionRevenue += amount;
-        } else if (type === 'topup' || description.includes('top-up') || description.includes('topup')) {
-          topUpRevenue += amount;
-        } else if (type === 'addon' || description.includes('add-on') || description.includes('addon')) {
-          premiumAddOnRevenue += amount;
+        if (type === 'ad_revenue' || description.includes('ad') || description.includes('advertis')) {
+          adRevenue += amount;
+        } else if (type === 'pharma' || description.includes('pharma') || description.includes('sponsor')) {
+          pharmaRevenue += amount;
         } else {
-          // Default categorization based on amount ranges
-          if (amount >= 100000) {
-            subscriptionRevenue += amount;
-          } else if (amount >= 10000 && amount < 100000) {
-            topUpRevenue += amount;
-          } else {
-            premiumAddOnRevenue += amount;
-          }
+          adRevenue += amount;
         }
       });
 
       return {
         totalRevenue,
-        subscriptionRevenue,
-        topUpRevenue,
-        premiumAddOnRevenue,
+        adRevenue,
+        pharmaRevenue,
       };
     } catch (error: any) {
       // Handle permission errors gracefully
@@ -178,9 +159,8 @@ export class AdminStatsService {
       }
       return {
         totalRevenue: 0,
-        subscriptionRevenue: 0,
-        topUpRevenue: 0,
-        premiumAddOnRevenue: 0,
+        adRevenue: 0,
+        pharmaRevenue: 0,
       };
     }
   }
@@ -282,12 +262,8 @@ export class AdminStatsService {
   ): Promise<{
     totalOnboardDoctors: number;
     lastMonthNewDoctors: number;
-    upgradedDoctors: number;
-    leftOutDoctors: number;
-    growthDoctors: number;
-    scaleDoctors: number;
-    proDoctors: number;
-    summitDoctors: number;
+    activeDoctors: number;
+    inactiveDoctors: number;
     totalReviews: number;
     averageRating: number;
   }> {
@@ -301,12 +277,8 @@ export class AdminStatsService {
 
       let totalOnboardDoctors = 0;
       let lastMonthNewDoctors = 0;
-      let upgradedDoctors = 0;
-      let leftOutDoctors = 0;
-      let growthDoctors = 0;
-      let scaleDoctors = 0;
-      let proDoctors = 0;
-      let summitDoctors = 0;
+      let activeDoctors = 0;
+      let inactiveDoctors = 0;
 
       const now = new Date();
       const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -314,9 +286,7 @@ export class AdminStatsService {
       doctorsSnapshot.docs.forEach((doc) => {
         const data = doc.data();
         const createdAt = data.createdAt?.toDate();
-        const subscriptionPlan = data.subscriptionPlan || data.subscription?.plan || '';
-        const subscriptionStatus = data.subscriptionStatus || data.subscription?.status || 'trial';
-        const isActive = subscriptionStatus === 'active' || subscriptionStatus === 'trial';
+        const isActive = !data.bookingBlocked;
 
         // Filter by date range if provided
         if (startDate && createdAt && createdAt < startDate) {
@@ -334,26 +304,11 @@ export class AdminStatsService {
           lastMonthNewDoctors++;
         }
 
-        // Upgraded doctors (those who moved from trial to paid plan)
-        if (subscriptionStatus === 'active' && subscriptionPlan !== 'free' && subscriptionPlan !== 'trial') {
-          upgradedDoctors++;
-        }
-
-        // Left out doctors (inactive or expired)
-        if (subscriptionStatus === 'expired' || subscriptionStatus === 'inactive' || !isActive) {
-          leftOutDoctors++;
-        }
-
-        // Doctors by plan
-        const planLower = subscriptionPlan.toLowerCase();
-        if (planLower.includes('growth') || planLower.includes('starter')) {
-          growthDoctors++;
-        } else if (planLower.includes('scale')) {
-          scaleDoctors++;
-        } else if (planLower.includes('pro')) {
-          proDoctors++;
-        } else if (planLower.includes('summit') || planLower.includes('enterprise')) {
-          summitDoctors++;
+        // Active vs inactive
+        if (isActive) {
+          activeDoctors++;
+        } else {
+          inactiveDoctors++;
         }
       });
 
@@ -363,12 +318,8 @@ export class AdminStatsService {
       return {
         totalOnboardDoctors,
         lastMonthNewDoctors,
-        upgradedDoctors,
-        leftOutDoctors,
-        growthDoctors,
-        scaleDoctors,
-        proDoctors,
-        summitDoctors,
+        activeDoctors,
+        inactiveDoctors,
         ...reviewsData,
       };
     } catch (error: any) {
@@ -381,12 +332,8 @@ export class AdminStatsService {
       return {
         totalOnboardDoctors: 0,
         lastMonthNewDoctors: 0,
-        upgradedDoctors: 0,
-        leftOutDoctors: 0,
-        growthDoctors: 0,
-        scaleDoctors: 0,
-        proDoctors: 0,
-        summitDoctors: 0,
+        activeDoctors: 0,
+        inactiveDoctors: 0,
         totalReviews: 0,
         averageRating: 0,
       };
@@ -495,8 +442,7 @@ export class AdminStatsService {
 
         // Check if today is birthday
         if (todayMonth === birthMonth && todayDay === birthDay) {
-          const subscriptionStatus = data.subscriptionStatus || data.subscription?.status || 'trial';
-          const isActive = subscriptionStatus === 'active' || subscriptionStatus === 'trial';
+          const isActive = !data.bookingBlocked;
           const cardDelivered = data.birthdayCardDelivery && data.birthdayCardDelivery.startsWith(todayDateString);
 
           birthdayDoctors.push({
@@ -625,9 +571,8 @@ export class AdminStatsService {
 
       return {
         totalRevenue: revenueStats.totalRevenue,
-        subscriptionRevenue: revenueStats.subscriptionRevenue,
-        topUpRevenue: revenueStats.topUpRevenue,
-        premiumAddOnRevenue: revenueStats.premiumAddOnRevenue,
+        adRevenue: revenueStats.adRevenue,
+        pharmaRevenue: revenueStats.pharmaRevenue,
         totalDoctors: doctorStats.totalOnboardDoctors,
         totalTransactions: transactionCounts.total,
         subscriptionTransactions: transactionCounts.subscription,
@@ -735,9 +680,8 @@ export class AdminStatsService {
 
         monthlyData.push({
           month: `${monthName}'${year.toString().slice(-2)}`,
-          subscription: stats.subscriptionRevenue,
-          topup: stats.topUpRevenue,
-          premium: stats.premiumAddOnRevenue,
+          adRevenue: stats.adRevenue,
+          pharmaRevenue: stats.pharmaRevenue,
           total: stats.totalRevenue,
           transactions: transactionCounts.total,
         });
