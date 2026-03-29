@@ -28,6 +28,7 @@ export default function AdminClinicManagement() {
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [showAll, setShowAll] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const [searchType, setSearchType] = useState<'clinic-code' | 'pincode' | 'name'>('clinic-code');
   const [loading, setLoading] = useState(true);
   const [clinics, setClinics] = useState<Clinic[]>([]);
