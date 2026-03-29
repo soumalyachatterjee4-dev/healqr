@@ -339,7 +339,7 @@ export default function AdminDashboard({ adminEmail, onStartDemo, uploadedTestim
         </div>
 
         {/* Section 2: Big Cards - Advertisers/Pharma, Total Onboard Doctors & Clinics */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-6 md:mb-8">
           {/* Active Partners Card */}
           <div className="bg-gradient-to-br from-emerald-900/40 to-emerald-900/20 border border-emerald-700/50 rounded-xl p-6 md:p-8">
             <div className="flex items-center justify-between mb-4 md:mb-6">
