@@ -38,20 +38,25 @@ export default function AdvertiserDashboard({ onLogout }: AdvertiserDashboardPro
   useEffect(() => {
     const fetchCampaigns = async () => {
       const user = auth.currentUser;
-      if (!user) {
-        // Demo Mode Mock Data
-        setActiveCampaigns([
-          { id: '1', name: 'Summer Health Awareness', views: 1921, totalViews: 2500, status: 'active' },
-          { id: '2', name: 'Dental Checkup Promo', views: 598, totalViews: 10000, status: 'active' }
-        ]);
+      const advertiserId = localStorage.getItem('healqr_advertiser_id');
+      
+      if (!user && !advertiserId) {
+        setActiveCampaigns([]);
         setLoading(false);
         return;
       }
 
       try {
+        // Use advertiserId from localStorage (set during magic link verify)
+        const queryId = user?.uid || advertiserId;
+        if (!queryId) {
+          setLoading(false);
+          return;
+        }
+        
         const q = query(
           collection(db, 'advertiser_campaigns'),
-          where('advertiserId', '==', user.uid),
+          where('advertiserId', '==', queryId),
           where('status', '==', 'active'),
           orderBy('createdAt', 'desc')
         );
@@ -75,6 +80,11 @@ export default function AdvertiserDashboard({ onLogout }: AdvertiserDashboardPro
   }, []);
 
   const handleLogout = async () => {
+    // Clear advertiser localStorage tokens
+    localStorage.removeItem('healqr_advertiser_authenticated');
+    localStorage.removeItem('healqr_advertiser_id');
+    localStorage.removeItem('healqr_advertiser_company');
+    localStorage.removeItem('healqr_advertiser_email');
     await AuthService.signOutUser();
     onLogout();
   };

@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { ArrowLeft, CheckCircle2, Mail, Building2, Phone, MapPin, CreditCard, User, Briefcase, ArrowRight, Loader2, X } from 'lucide-react';
+import { CheckCircle2, Mail, Building2, Phone, MapPin, CreditCard, User, ArrowRight, Loader2, X, ArrowLeft, Shield } from 'lucide-react';
 import { toast } from 'sonner';
-import { AuthService } from '../lib/firebase/auth.service';
-import { doc, setDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase/config';
+import { auth, db } from '../lib/firebase/config';
+import { sendSignInLinkToEmail } from 'firebase/auth';
+import { collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import healQRAdsLogo from '../assets/healQRADS_LOGO.svg';
 
 interface AdvertiserSignUpProps {
@@ -12,10 +12,12 @@ interface AdvertiserSignUpProps {
   onSuccess: () => void;
 }
 
-export default function AdvertiserSignUp({ onBack, onLogin, onSuccess }: AdvertiserSignUpProps) {
+export default function AdvertiserSignUp({ onBack, onLogin }: AdvertiserSignUpProps) {
   const [step, setStep] = useState<'email' | 'details'>('email');
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
   
   // Detailed Form State
   const [formData, setFormData] = useState({
@@ -32,56 +34,74 @@ export default function AdvertiserSignUp({ onBack, onLogin, onSuccess }: Adverti
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) return;
-    setLoading(true);
+    if (!email.trim() || !email.includes('@')) {
+      setError('Please enter a valid email address');
+      return;
+    }
 
-    // Simulate "Verify" / Magic Link check
-    setTimeout(async () => {
-      try {
-        setStep('details');
-        toast.success("Email verified successfully!");
-      } catch (error) {
-        toast.error("Verification failed");
-      } finally {
+    setLoading(true);
+    setError('');
+
+    try {
+      if (!db) throw new Error('Database not available');
+
+      // Check if email already exists
+      const advRef = collection(db, 'advertisers');
+      const q = query(advRef, where('email', '==', email.toLowerCase().trim()));
+      const existing = await getDocs(q);
+
+      if (!existing.empty) {
+        setError('This email is already registered. Please login instead.');
         setLoading(false);
+        return;
       }
-    }, 1500);
+
+      setStep('details');
+      toast.success('Email accepted! Please complete your company details.');
+    } catch (err: any) {
+      setError(err.message || 'Failed to verify email');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDetailsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.companyName.trim()) { setError('Please enter your company name'); return; }
+    if (!formData.companyPhone.trim()) { setError('Please enter phone number'); return; }
+    if (!formData.companyAddress.trim()) { setError('Please enter company address'); return; }
+    if (!formData.gstNo.trim()) { setError('Please enter GST number'); return; }
+    if (!formData.affiliatedPersonName.trim()) { setError('Please enter contact person name'); return; }
+
     setLoading(true);
+    setError('');
 
     try {
-      const tempPassword = "HealQRAdsUser2025!"; 
-      
-      let user;
-      try {
-        const userCredential = await AuthService.signUp(email, tempPassword);
-        user = userCredential.user;
-      } catch (authError: any) {
-        if (authError.code === 'auth/email-already-in-use') {
-           toast.error("Email already registered. Please Log In.");
-           onLogin();
-           return;
-        }
-        throw authError;
-      }
+      if (!db) throw new Error('Database not available');
 
-      await setDoc(doc(db, 'advertisers', user.uid), {
-        uid: user.uid,
-        email: email,
+      // Create Firestore doc with pending_verification status (no Firebase Auth user)
+      await addDoc(collection(db, 'advertisers'), {
+        email: email.toLowerCase().trim(),
         ...formData,
         walletBalance: 0,
-        createdAt: new Date().toISOString(),
-        status: 'pending_approval'
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        status: 'pending_verification'
       });
 
-      toast.success("Registration successful!");
-      onSuccess();
-    } catch (error: any) {
-      console.error("Registration error:", error);
-      toast.error(error.message || "Failed to register");
+      // Send verification magic link
+      const actionCodeSettings = {
+        url: `${window.location.origin}/?page=advertiser-verify`,
+        handleCodeInApp: true,
+      };
+      await sendSignInLinkToEmail(auth!, email.toLowerCase().trim(), actionCodeSettings);
+      localStorage.setItem('healqr_advertiser_email_for_signin', email.toLowerCase().trim());
+
+      setSent(true);
+      toast.success('Verification link sent to your email!');
+    } catch (err: any) {
+      console.error("Registration error:", err);
+      setError(err.message || "Failed to register");
     } finally {
       setLoading(false);
     }
@@ -89,7 +109,42 @@ export default function AdvertiserSignUp({ onBack, onLogin, onSuccess }: Adverti
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    setError('');
   };
+
+  if (sent) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+          <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] bg-emerald-500/10 rounded-full blur-[120px]" />
+          <div className="absolute top-[40%] -right-[10%] w-[40%] h-[40%] bg-teal-500/10 rounded-full blur-[100px]" />
+        </div>
+        <div className="w-full max-w-md relative z-10">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden p-8 text-center">
+            <div className="w-20 h-20 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center mx-auto mb-6">
+              <CheckCircle2 className="w-10 h-10 text-emerald-500" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-3">Verify Your Email</h2>
+            <p className="text-slate-400 mb-4">
+              We've sent a verification link to <span className="text-emerald-400 font-medium">{email}</span>
+            </p>
+            <p className="text-slate-500 text-sm mb-4">
+              Click the link in your email to verify your account. Once verified, your account will be reviewed and activated by our admin team.
+            </p>
+            <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-3 mb-6">
+              <p className="text-yellow-400 text-xs">
+                ⚠️ After email verification, your account will be reviewed by HealQR admin. You'll be able to login once approved.
+              </p>
+            </div>
+            <div className="flex items-center justify-center gap-2 text-slate-500 text-sm">
+              <Mail className="w-4 h-4" />
+              <span>Check your inbox and spam folder</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
@@ -116,7 +171,7 @@ export default function AdvertiserSignUp({ onBack, onLogin, onSuccess }: Adverti
           </div>
 
           <div className="p-6">
-            <div className="flex flex-col items-center mb-8">
+            <div className="flex flex-col items-center mb-6">
               <div className="bg-slate-950/50 p-3 rounded-xl border border-slate-800 mb-4 shadow-lg">
                 <img src={healQRAdsLogo} alt="HealQR Ads" className="h-14 w-auto" />
               </div>
@@ -126,6 +181,17 @@ export default function AdvertiserSignUp({ onBack, onLogin, onSuccess }: Adverti
                   : 'Complete your profile to start running campaigns'}
               </p>
             </div>
+
+            <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 py-2.5 mb-5">
+              <Shield className="w-4 h-4 text-emerald-500 shrink-0" />
+              <span className="text-emerald-400 text-xs">Secure passwordless login via email link</span>
+            </div>
+
+            {error && (
+              <div className="bg-red-900/20 border border-red-500/50 text-red-400 rounded-lg p-3 mb-4 text-sm">
+                {error}
+              </div>
+            )}
 
             {step === 'email' ? (
               <form onSubmit={handleEmailSubmit} className="space-y-6">

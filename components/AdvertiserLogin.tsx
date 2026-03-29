@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { ArrowLeft, Mail, Lock, ArrowRight, Loader2, X } from 'lucide-react';
+import { Mail, ArrowRight, Loader2, X, CheckCircle2, Shield } from 'lucide-react';
 import { toast } from 'sonner';
-import { AuthService } from '../lib/firebase/auth.service';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase/config';
+import { auth, db } from '../lib/firebase/config';
+import { sendSignInLinkToEmail } from 'firebase/auth';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import healQRAdsLogo from '../assets/healQRADS_LOGO.svg';
 
 interface AdvertiserLoginProps {
@@ -12,49 +12,105 @@ interface AdvertiserLoginProps {
   onSuccess: () => void;
 }
 
-export default function AdvertiserLogin({ onBack, onSignUp, onSuccess }: AdvertiserLoginProps) {
+export default function AdvertiserLogin({ onBack, onSignUp }: AdvertiserLoginProps) {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email.trim() || !email.includes('@')) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
     setLoading(true);
+    setError('');
 
     try {
-      // For Prototype: We will simulate the "Magic Link" flow by using a hardcoded password
-      // or checking if the user exists.
-      // In a real production app, we would use sendSignInLinkToEmail(auth, email, actionCodeSettings)
-      
-      // Attempt to login with the "default" password we set in SignUp
-      const tempPassword = "HealQRAdsUser2025!";
-      
-      try {
-        const userCredential = await AuthService.login(email, tempPassword);
-        const user = userCredential.user;
+      if (!db) throw new Error('Database not available');
 
-        // Verify Advertiser Role
-        const advertiserDoc = await getDoc(doc(db, 'advertisers', user.uid));
-        
-        if (!advertiserDoc.exists()) {
-           // Fallback: Check if it's a legacy account or error
-           throw new Error('Advertiser account not found. Please Sign Up.');
-        }
+      // Check if advertiser exists
+      const advRef = collection(db, 'advertisers');
+      const q = query(advRef, where('email', '==', email.toLowerCase().trim()));
+      const snap = await getDocs(q);
 
-        toast.success('Welcome back!');
-        onSuccess();
-      } catch (error: any) {
-        // If password fails (maybe they changed it?), or user not found
-        console.error("Login error:", error);
-        toast.error("Login failed. Please check your email or Sign Up.");
+      if (snap.empty) {
+        setError('No advertiser account found for this email. Please sign up first.');
+        setLoading(false);
+        return;
       }
 
-    } catch (error: any) {
-      console.error('Advertiser login error:', error);
-      toast.error(error.message || 'Failed to login');
+      const advData = snap.docs[0].data();
+      if (advData.status === 'pending_verification') {
+        setError('Your email is not yet verified. Please check your inbox for the verification link we sent during sign up.');
+        setLoading(false);
+        return;
+      }
+      if (advData.status === 'pending_approval') {
+        setError('Your account is pending admin approval. You will be able to login once approved.');
+        setLoading(false);
+        return;
+      }
+      if (advData.status === 'suspended') {
+        setError('Your account has been suspended. Please contact HealQR support.');
+        setLoading(false);
+        return;
+      }
+      if (advData.status !== 'active') {
+        setError('Your account is not active. Please contact HealQR admin.');
+        setLoading(false);
+        return;
+      }
+
+      // Send magic link
+      const actionCodeSettings = {
+        url: `${window.location.origin}/?page=advertiser-verify`,
+        handleCodeInApp: true,
+      };
+
+      await sendSignInLinkToEmail(auth!, email.toLowerCase().trim(), actionCodeSettings);
+      localStorage.setItem('healqr_advertiser_email_for_signin', email.toLowerCase().trim());
+
+      setSent(true);
+      toast.success('Login link sent to your email!');
+    } catch (err: any) {
+      console.error('Advertiser login error:', err);
+      setError(err.message || 'Failed to send login link. Please try again.');
     } finally {
       setLoading(false);
     }
   };
+
+  if (sent) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+          <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] bg-emerald-500/10 rounded-full blur-[120px]" />
+          <div className="absolute top-[40%] -right-[10%] w-[40%] h-[40%] bg-teal-500/10 rounded-full blur-[100px]" />
+        </div>
+        <div className="w-full max-w-md relative z-10">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden p-8 text-center">
+            <div className="w-20 h-20 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center mx-auto mb-6">
+              <CheckCircle2 className="w-10 h-10 text-emerald-500" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-3">Check Your Email</h2>
+            <p className="text-slate-400 mb-4">
+              We've sent a secure login link to <span className="text-emerald-400 font-medium">{email}</span>
+            </p>
+            <p className="text-slate-500 text-sm mb-6">
+              Click the link in your email to access your advertiser dashboard. The link expires in 1 hour.
+            </p>
+            <div className="flex items-center justify-center gap-2 text-slate-500 text-sm">
+              <Mail className="w-4 h-4" />
+              <span>Check your inbox and spam folder</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
@@ -79,7 +135,7 @@ export default function AdvertiserLogin({ onBack, onSignUp, onSuccess }: Adverti
           </div>
 
           <div className="p-6">
-            <div className="flex flex-col items-center mb-8">
+            <div className="flex flex-col items-center mb-6">
               <div className="bg-slate-950/50 p-3 rounded-xl border border-slate-800 mb-4 shadow-lg">
                 <img src={healQRAdsLogo} alt="HealQR Ads" className="h-14 w-auto" />
               </div>
@@ -87,6 +143,17 @@ export default function AdvertiserLogin({ onBack, onSignUp, onSuccess }: Adverti
                 Log in to manage your campaigns and track performance
               </p>
             </div>
+
+            <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 py-2.5 mb-5">
+              <Shield className="w-4 h-4 text-emerald-500 shrink-0" />
+              <span className="text-emerald-400 text-xs">Secure passwordless login via email link</span>
+            </div>
+
+            {error && (
+              <div className="bg-red-900/20 border border-red-500/50 text-red-400 rounded-lg p-3 mb-4 text-sm">
+                {error}
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
@@ -98,7 +165,7 @@ export default function AdvertiserLogin({ onBack, onSignUp, onSuccess }: Adverti
                   <input
                     type="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => { setEmail(e.target.value); setError(''); }}
                     className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-lg pl-11 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all placeholder:text-slate-600"
                     placeholder="company@email.com"
                     required
@@ -114,11 +181,11 @@ export default function AdvertiserLogin({ onBack, onSignUp, onSuccess }: Adverti
                 {loading ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    <span>Signing In...</span>
+                    <span>Sending Login Link...</span>
                   </>
                 ) : (
                   <>
-                    <span>Access Dashboard</span>
+                    <span>Send Login Link</span>
                     <ArrowRight className="w-5 h-5" />
                   </>
                 )}
@@ -137,21 +204,6 @@ export default function AdvertiserLogin({ onBack, onSignUp, onSuccess }: Adverti
               </p>
             </div>
           </div>
-        </div>
-        
-        <div className="mt-6 text-center">
-          <button 
-            onClick={() => {
-              setEmail("demo@healqr.ads");
-              toast.info("Entering Developer Demo Mode...");
-              setTimeout(() => {
-                onSuccess();
-              }, 1000);
-            }}
-            className="text-xs text-slate-600 font-mono hover:text-emerald-500 transition-colors cursor-pointer"
-          >
-            [ Developer Demo Access v2.0 ]
-          </button>
         </div>
       </div>
     </div>

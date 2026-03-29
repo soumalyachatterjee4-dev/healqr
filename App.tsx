@@ -76,6 +76,7 @@ const AdvertiserSignUp = lazy(() => import("./components/AdvertiserSignUp"));
 const AdvertiserLogin = lazy(() => import("./components/AdvertiserLogin"));
 const AdvertiserDashboard = lazy(() => import("./components/AdvertiserDashboard"));
 const AdvertiserGateway = lazy(() => import("./components/AdvertiserGateway"));
+const AdvertiserVerifyLogin = lazy(() => import("./components/AdvertiserVerifyLogin"));
 const UpgradePage = lazy(() => import("./components/UpgradePage"));
 const ClinicProfile = lazy(() => import("./components/ClinicProfile"));
 const ClinicBookingFlow = lazy(() => import("./components/ClinicBookingFlow"));
@@ -187,6 +188,7 @@ export default function App() {
     | "advertiser-signup"
     | "advertiser-login"
     | "advertiser-dashboard"
+    | "advertiser-verify"
     | "pharma-login"
     | "pharma-verify"
     | "pharma-portal"
@@ -701,6 +703,9 @@ export default function App() {
     } else if (pageParam === 'pharma-verify') {
       setCurrentPage('pharma-verify');
       return;
+    } else if (pageParam === 'advertiser-verify') {
+      setCurrentPage('advertiser-verify');
+      return;
     } else if (pageParam === 'pharma-portal') {
       if (localStorage.getItem('healqr_pharma_authenticated') === 'true') {
         setCurrentPage('pharma-portal');
@@ -1168,7 +1173,7 @@ export default function App() {
       const isOnAssistantLoginPage = window.location.pathname.includes('/assistant-login');
       const isOnMasterAccessLoginPage = window.location.pathname.includes('/master-access-login');
       const isClinicPage = currentPage === 'clinic-login' || currentPage === 'clinic-signup' || pageParam === 'clinic-login' || pageParam === 'clinic-signup';
-      const isAdvertiserPage = currentPage === 'advertiser-login' || currentPage === 'advertiser-signup' || pageParam === 'advertiser-login' || pageParam === 'advertiser-signup';
+      const isAdvertiserPage = currentPage === 'advertiser-login' || currentPage === 'advertiser-signup' || currentPage === 'advertiser-verify' || pageParam === 'advertiser-login' || pageParam === 'advertiser-signup' || pageParam === 'advertiser-verify';
       const isPharmaPage = currentPage === 'pharma-login' || currentPage === 'pharma-verify' || currentPage === 'pharma-portal' || currentPage === 'pharma-signup' || pageParam === 'pharma-login' || pageParam === 'pharma-verify' || pageParam === 'pharma-portal' || pageParam === 'pharma-signup';
 
       if (isVerificationLink || isBookingMode || hasBookingDoctorId || isNotificationPage || isVerifyVisit || isOnVerifyLoginPage || isOnVerifyEmailPage || isOnAssistantLoginPage || isOnMasterAccessLoginPage || isClinicPage || isAdvertiserPage || isPharmaPage || currentPage === 'verify-email' || currentPage === 'verify-login' || currentPage === 'assistant-login' || currentPage === 'master-access-login' || currentPage === 'temp-doctor-login' || currentPage === 'temp-doctor-dashboard' || currentPage === 'admin-verify' || currentPage === 'verify-walkin' || currentPage.startsWith('booking-')) {
@@ -1232,9 +1237,16 @@ export default function App() {
           }
         }
 
-        // Check if user is an advertiser
+        // Check if user is an advertiser (by UID doc or localStorage token)
         if (db) {
           try {
+            // Check localStorage first (set during magic link verify)
+            if (localStorage.getItem('healqr_advertiser_authenticated') === 'true') {
+              setCurrentPage('advertiser-dashboard');
+              setIsAuthInitialized(true);
+              return;
+            }
+            // Fallback: check by UID doc (legacy password-based accounts)
             const advertiserDoc = await getDoc(doc(db, 'advertisers', user.uid));
             if (advertiserDoc.exists()) {
               setCurrentPage('advertiser-dashboard');
@@ -3377,6 +3389,15 @@ export default function App() {
           onSignUp={() => setCurrentPage("advertiser-signup")}
           onLogin={() => setCurrentPage("advertiser-login")}
         />
+      )}
+
+      {currentPage === "advertiser-verify" && (
+        <Suspense fallback={<PageLoader />}>
+          <AdvertiserVerifyLogin
+            onSuccess={() => setCurrentPage("advertiser-dashboard")}
+            onError={() => setCurrentPage("advertiser-gateway")}
+          />
+        </Suspense>
       )}
 
       {currentPage === "video-call" && notifData && (
