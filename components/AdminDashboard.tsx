@@ -398,31 +398,31 @@ export default function AdminDashboard({ adminEmail, onStartDemo, uploadedTestim
             </div>
           </div>
 
-          {/* Total Clinics Card */}
-          <div className="bg-gradient-to-br from-teal-900/40 to-teal-900/20 border border-teal-700/50 rounded-xl p-6 md:p-8">
-            <div className="flex items-center justify-between mb-6">
-              <div className="bg-teal-500/20 p-3 md:p-4 rounded-xl">
-                <Building2 className="w-8 h-8 md:w-10 md:h-10 text-teal-500" />
+          {/* Total Clinics Card - spans full row */}
+          <div className="lg:col-span-2 bg-gradient-to-br from-teal-900/40 to-teal-900/20 border border-teal-700/50 rounded-xl p-6 md:p-8">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-8">
+              <div className="flex items-center gap-4">
+                <div className="bg-teal-500/20 p-3 md:p-4 rounded-xl">
+                  <Building2 className="w-8 h-8 md:w-10 md:h-10 text-teal-500" />
+                </div>
+                <div>
+                  <p className="text-xs md:text-sm text-gray-400 mb-1">Total Clinics</p>
+                  <h2 className="text-3xl md:text-4xl text-teal-500">{stats.totalClinics}</h2>
+                </div>
               </div>
-              <div className="text-right">
-                <p className="text-xs text-gray-400 mb-1">Total Clinics</p>
-                <h2 className="text-4xl md:text-5xl text-teal-500">{stats.totalClinics}</h2>
+              <div className="flex items-center gap-2 text-teal-400">
+                <TrendingUp className="w-4 h-4" />
+                <span className="text-xs md:text-sm">+{stats.newClinicsThisMonth} new this month</span>
               </div>
-            </div>
-            <div className="flex items-center gap-2 text-teal-400 mb-6">
-              <TrendingUp className="w-4 h-4" />
-              <span className="text-xs">
-                +{stats.newClinicsThisMonth} new this month
-              </span>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="text-center">
-                <p className="text-xs text-teal-400 mb-2">Active</p>
-                <p className="text-2xl text-white">{stats.activeClinics}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-red-400 mb-2">Inactive</p>
-                <p className="text-2xl text-white">{stats.inactiveClinics}</p>
+              <div className="flex items-center gap-6 md:gap-10">
+                <div className="text-center">
+                  <p className="text-xs text-teal-400 mb-1">Active</p>
+                  <p className="text-2xl text-white">{stats.activeClinics}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-red-400 mb-1">Inactive</p>
+                  <p className="text-2xl text-white">{stats.inactiveClinics}</p>
+                </div>
               </div>
             </div>
           </div>
