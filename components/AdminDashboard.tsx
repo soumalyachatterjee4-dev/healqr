@@ -1,4 +1,4 @@
-import { Star, Presentation, Calendar, DollarSign, Users, TrendingUp, UserPlus, UserMinus, ChevronDown, Upload, CreditCard, Plus, Sparkles, Sprout, BarChart3, Award, Trophy, Cake, CheckCircle2, CalendarCheck, QrCode, User, CheckCircle, XCircle } from 'lucide-react';
+import { Star, Presentation, Calendar, Users, TrendingUp, UserPlus, UserMinus, ChevronDown, Upload, Megaphone, Building2, Cake, CheckCircle2, CalendarCheck, QrCode, User, CheckCircle, XCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { AdminStatsService, AdminStats, BirthdayDoctor } from '../lib/firebase/admin-stats.service';
@@ -63,6 +63,8 @@ export default function AdminDashboard({ adminEmail, onStartDemo, uploadedTestim
   const [recentReviews, setRecentReviews] = useState<SupportRequest[]>([]);
   const [revenueGrowth, setRevenueGrowth] = useState<number>(0);
   const [doctorGrowth, setDoctorGrowth] = useState<number>(0);
+  const [activeAdvertisers, setActiveAdvertisers] = useState<number>(0);
+  const [activePharmaSponsors, setActivePharmaSponsors] = useState<number>(0);
 
   // Load real-time statistics from Firestore
   useEffect(() => {
@@ -89,6 +91,20 @@ export default function AdminDashboard({ adminEmail, onStartDemo, uploadedTestim
       setRecentReviews(reviews);
       setRevenueGrowth(revGrowth);
       setDoctorGrowth(docGrowth);
+
+      // Load advertiser and pharma sponsor counts
+      try {
+        const { db: fireDb } = await import('../lib/firebase/config');
+        const { collection: col, getDocs: gDocs } = await import('firebase/firestore');
+        const [advSnap, pharmaSnap] = await Promise.all([
+          gDocs(col(fireDb, 'advertisers')),
+          gDocs(col(fireDb, 'pharmaCompanies')),
+        ]);
+        setActiveAdvertisers(advSnap.docs.filter(d => d.data().status === 'active').length);
+        setActivePharmaSponsors(pharmaSnap.docs.filter(d => d.data().status === 'active').length);
+      } catch (e) {
+        console.error('Error loading advertiser/pharma counts:', e);
+      }
       
       console.log('✅ Admin stats loaded:', adminStats);
     } catch (error) {
@@ -323,38 +339,32 @@ export default function AdminDashboard({ adminEmail, onStartDemo, uploadedTestim
           )}
         </div>
 
-        {/* Section 2: Big Cards - Total Revenue & Total Onboard Doctors */}
+        {/* Section 2: Big Cards - Advertisers/Pharma & Total Onboard Doctors */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-6 md:mb-8">
-          {/* Total Revenue Card */}
+          {/* Active Partners Card */}
           <div className="bg-gradient-to-br from-emerald-900/40 to-emerald-900/20 border border-emerald-700/50 rounded-xl p-6 md:p-8">
             <div className="flex items-center justify-between mb-4 md:mb-6">
               <div className="bg-emerald-500/20 p-3 md:p-4 rounded-xl">
-                <DollarSign className="w-8 h-8 md:w-10 md:h-10 text-emerald-500" />
+                <Building2 className="w-8 h-8 md:w-10 md:h-10 text-emerald-500" />
               </div>
               <div className="text-right">
-                <p className="text-xs md:text-sm text-gray-400 mb-1">Total Revenue</p>
-                <h2 className="text-3xl md:text-4xl text-emerald-500">₹{(stats.totalRevenue / 100000).toFixed(2)}L</h2>
+                <p className="text-xs md:text-sm text-gray-400 mb-1">Active Partners</p>
+                <h2 className="text-3xl md:text-4xl text-emerald-500">{activeAdvertisers + activePharmaSponsors}</h2>
               </div>
             </div>
             <div className="flex items-center gap-2 text-emerald-400">
               <TrendingUp className="w-4 h-4 md:w-5 md:h-5" />
-              <span className="text-xs md:text-sm">
-                {revenueGrowth > 0 ? '+' : ''}{revenueGrowth.toFixed(1)}% from last month
-              </span>
+              <span className="text-xs md:text-sm">Advertisers + Pharma Sponsors</span>
             </div>
             <div className="mt-3 md:mt-4 pt-3 md:pt-4 border-t border-emerald-700/30">
-              <div className="grid grid-cols-3 gap-2 md:gap-4">
+              <div className="grid grid-cols-2 gap-2 md:gap-4">
                 <div className="flex flex-col items-start gap-1">
-                  <CreditCard className="w-3 h-3 md:w-4 md:h-4 text-emerald-400" />
-                  <span className="text-white text-xs md:text-sm">₹{(stats.subscriptionRevenue / 100000).toFixed(2)}L</span>
+                  <Megaphone className="w-3 h-3 md:w-4 md:h-4 text-emerald-400" />
+                  <span className="text-white text-xs md:text-sm">{activeAdvertisers} Advertisers</span>
                 </div>
                 <div className="flex flex-col items-start gap-1">
-                  <Plus className="w-3 h-3 md:w-4 md:h-4 text-emerald-400" />
-                  <span className="text-white text-xs md:text-sm">₹{(stats.topUpRevenue / 100000).toFixed(2)}L</span>
-                </div>
-                <div className="flex flex-col items-start gap-1">
-                  <Sparkles className="w-3 h-3 md:w-4 md:h-4 text-emerald-400" />
-                  <span className="text-white text-xs md:text-sm">₹{(stats.premiumAddOnRevenue / 100000).toFixed(2)}L</span>
+                  <Building2 className="w-3 h-3 md:w-4 md:h-4 text-emerald-400" />
+                  <span className="text-white text-xs md:text-sm">{activePharmaSponsors} Pharma</span>
                 </div>
               </div>
             </div>
@@ -377,32 +387,14 @@ export default function AdminDashboard({ adminEmail, onStartDemo, uploadedTestim
                 {doctorGrowth > 0 ? '+' : ''}{stats.lastMonthNewDoctors} new this month
               </span>
             </div>
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="text-center">
-                <p className="text-xs text-gray-400 mb-2">Starter</p>
-                <p className="text-2xl text-white">{stats.growthDoctors}</p>
+                <p className="text-xs text-blue-400 mb-2">Active</p>
+                <p className="text-2xl text-white">{stats.totalOnboardDoctors - stats.leftOutDoctors}</p>
               </div>
               <div className="text-center">
-                <p className="text-xs text-red-400 mb-2">Drop Out</p>
+                <p className="text-xs text-red-400 mb-2">Inactive</p>
                 <p className="text-2xl text-white">{stats.leftOutDoctors}</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center">
-                <p className="text-xs text-gray-400 mb-2">Growth</p>
-                <p className="text-2xl text-white">{stats.scaleDoctors}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-gray-400 mb-2">Scale</p>
-                <p className="text-2xl text-white">{stats.proDoctors}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-gray-400 mb-2">Pro</p>
-                <p className="text-2xl text-white">{stats.summitDoctors}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-gray-400 mb-2">Summit</p>
-                <p className="text-2xl text-white">0</p>
               </div>
             </div>
           </div>
@@ -521,21 +513,21 @@ export default function AdminDashboard({ adminEmail, onStartDemo, uploadedTestim
             </div>
           </div>
 
-          {/* Upgraded Doctors */}
+          {/* Active Pharma Sponsors */}
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="bg-emerald-500/10 p-3 rounded-lg">
-                <TrendingUp className="w-6 h-6 text-emerald-500" />
+                <Building2 className="w-6 h-6 text-emerald-500" />
               </div>
             </div>
-            <h3 className="text-3xl mb-2 text-emerald-500">{stats.upgradedDoctors}</h3>
-            <p className="text-sm text-gray-400">No. of Upgraded Doctors</p>
+            <h3 className="text-3xl mb-2 text-emerald-500">{activePharmaSponsors}</h3>
+            <p className="text-sm text-gray-400">Active Pharma Sponsors</p>
             <div className="mt-4 pt-4 border-t border-zinc-800">
-              <p className="text-xs text-gray-500">Doctors who upgraded their plans</p>
+              <p className="text-xs text-gray-500">Companies sponsoring free doctor access</p>
             </div>
           </div>
 
-          {/* Left Out Doctors */}
+          {/* Inactive Doctors */}
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="bg-red-500/10 p-3 rounded-lg">
@@ -543,9 +535,9 @@ export default function AdminDashboard({ adminEmail, onStartDemo, uploadedTestim
               </div>
             </div>
             <h3 className="text-3xl mb-2 text-red-500">{stats.leftOutDoctors}</h3>
-            <p className="text-sm text-gray-400">No. of Left Out Doctors</p>
+            <p className="text-sm text-gray-400">Inactive Doctors</p>
             <div className="mt-4 pt-4 border-t border-zinc-800">
-              <p className="text-xs text-gray-500">Inactive or unsubscribed doctors</p>
+              <p className="text-xs text-gray-500">Doctors no longer active on the platform</p>
             </div>
           </div>
         </div>

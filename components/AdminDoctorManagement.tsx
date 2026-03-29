@@ -16,12 +16,8 @@ interface Doctor {
   email: string;
   baCode: string;
   qrStatus: 'Active' | 'Deactive';
-  plan: 'Starter' | 'Growth' | 'Scale' | 'Pro' | 'Summit';
-  planExpiryDate: string;
-  premiumAddOns: {
-    name: string;
-    expiryDate: string;
-  }[];
+  qrNumber: string;
+  qrSource: string; // company name or 'Virtual'
   qrBookings: number;
   walkinBookings: number;
   totalBookings: number;
@@ -112,30 +108,12 @@ export default function AdminDoctorManagement() {
           }
         });
 
-        // Normalize subscription plan to proper case
-        const rawPlan = (data.subscriptionPlan || data.plan || 'starter').toLowerCase();
-        let normalizedPlan: 'Starter' | 'Growth' | 'Scale' | 'Pro' | 'Summit' = 'Starter';
-        
-        if (rawPlan.includes('growth')) normalizedPlan = 'Growth';
-        else if (rawPlan.includes('scale')) normalizedPlan = 'Scale';
-        else if (rawPlan.includes('pro')) normalizedPlan = 'Pro';
-        else if (rawPlan.includes('summit')) normalizedPlan = 'Summit';
-
         // Determine QR status - based on bookingBlocked field
-        // bookingBlocked: true = Blocked (Dropout), false/undefined = Active
         const qrStatus = data.bookingBlocked === true ? 'Deactive' : 'Active';
 
-        // Get expiry date - check multiple possible fields
-        let expiryDate = '-';
-        if (data.trialEndDate) {
-          expiryDate = data.trialEndDate.toDate ? data.trialEndDate.toDate().toISOString().split('T')[0] : data.trialEndDate;
-        } else if (data.currentPeriodEnd) {
-          expiryDate = data.currentPeriodEnd.toDate ? data.currentPeriodEnd.toDate().toISOString().split('T')[0] : data.currentPeriodEnd;
-        } else if (data.planExpiryDate) {
-          expiryDate = data.planExpiryDate;
-        } else if (data.subscriptionEndDate) {
-          expiryDate = data.subscriptionEndDate;
-        }
+        // Determine QR source - company name or Virtual
+        const qrType = data.qrType || '';
+        const qrSource = qrType === 'virtual' ? 'Virtual' : (data.companyName || data.division || 'Pre-printed');
 
         const doctor: Doctor = {
           id: doc.id,
@@ -146,9 +124,8 @@ export default function AdminDoctorManagement() {
           email: data.email || '',
           baCode: data.baCode || data.businessAnalystCode || '-',
           qrStatus,
-          plan: normalizedPlan,
-          planExpiryDate: expiryDate,
-          premiumAddOns: data.premiumAddOns || [],
+          qrNumber: data.qrNumber || '-',
+          qrSource,
           qrBookings,
           walkinBookings,
           totalBookings: qrBookings + walkinBookings,
@@ -234,17 +211,6 @@ export default function AdminDoctorManagement() {
     dropOut: doctors.filter(d => d.qrStatus === 'Deactive').length
   };
 
-  const getPlanColor = (plan: string) => {
-    switch (plan) {
-      case 'Summit': return 'bg-purple-500/10 text-purple-500 border-purple-500/30';
-      case 'Pro': return 'bg-blue-500/10 text-blue-500 border-blue-500/30';
-      case 'Scale': return 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30';
-      case 'Growth': return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/30';
-      case 'Starter': return 'bg-gray-500/10 text-gray-500 border-gray-500/30';
-      default: return 'bg-gray-500/10 text-gray-500 border-gray-500/30';
-    }
-  };
-
   const getQRStatusColor = (status: string) => {
     return status === 'Active' 
       ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30' 
@@ -253,7 +219,7 @@ export default function AdminDoctorManagement() {
 
   // Export to CSV function
   const exportToCSV = () => {
-    const headers = ['Name', 'Doctor Code', 'DOB', 'Residential Pincode', 'Email', 'BA Code', 'QR Status', 'Plan', 'Plan Expiry Date', 'Premium Add-ons'];
+    const headers = ['Name', 'Doctor Code', 'DOB', 'Residential Pincode', 'Email', 'BA Code', 'QR Status', 'QR No', 'QR Source'];
     
     const rows = filteredDoctors.map(doctor => [
       doctor.name,
@@ -263,9 +229,8 @@ export default function AdminDoctorManagement() {
       doctor.email,
       doctor.baCode,
       doctor.qrStatus,
-      doctor.plan,
-      doctor.planExpiryDate,
-      doctor.premiumAddOns.map(addon => `${addon.name} (${addon.expiryDate})`).join('; ') || '-'
+      doctor.qrNumber,
+      doctor.qrSource,
     ]);
     
     const csvContent = [
@@ -542,13 +507,18 @@ export default function AdminDoctorManagement() {
                         <span className="text-xs text-red-400">Cancel: {doctor.cancelledCount || 0}</span>
                       </div>
                     </div>
-                    <Badge className={`${getPlanColor(doctor.plan)} border text-xs`}>
-                      {doctor.plan}
+                    <Badge className={`${getQRStatusColor(doctor.qrStatus)} border text-xs`}>
+                      {doctor.qrStatus}
                     </Badge>
                   </div>
 
                   {/* Details Grid */}
                   <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">QR No</p>
+                      <p className="text-white text-xs font-mono">{doctor.qrNumber}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{doctor.qrSource}</p>
+                    </div>
                     <div>
                       <p className="text-xs text-gray-500 mb-1">DOB</p>
                       <p className="text-white text-xs">{new Date(doctor.dob).toLocaleDateString('en-IN')}</p>
@@ -575,27 +545,6 @@ export default function AdminDoctorManagement() {
                         {doctor.qrStatus}
                       </Badge>
                     </div>
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1">Plan Expiry</p>
-                      <p className="text-white text-xs">
-                        {doctor.planExpiryDate !== '-' 
-                          ? new Date(doctor.planExpiryDate).toLocaleDateString('en-IN')
-                          : '-'}
-                      </p>
-                    </div>
-                    {doctor.premiumAddOns.length > 0 && (
-                      <div className="col-span-2">
-                        <p className="text-xs text-gray-500 mb-1">Premium Add-ons</p>
-                        <div className="space-y-1">
-                          {doctor.premiumAddOns.map((addon, index) => (
-                            <div key={index} className="text-xs">
-                              <span className="text-emerald-400">{addon.name}</span>
-                              <span className="text-gray-500"> (exp: {new Date(addon.expiryDate).toLocaleDateString('en-IN')})</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               ))
@@ -616,22 +565,20 @@ export default function AdminDoctorManagement() {
                     <th className="text-left py-3 px-4 text-sm text-gray-400 whitespace-nowrap">BA Code</th>
                     <th className="text-left py-3 px-4 text-sm text-gray-400 whitespace-nowrap">Sign Up</th>
                     <th className="text-left py-3 px-4 text-sm text-gray-400 whitespace-nowrap">QR Status</th>
-                    <th className="text-left py-3 px-4 text-sm text-gray-400 whitespace-nowrap">Plan</th>
-                    <th className="text-left py-3 px-4 text-sm text-gray-400 whitespace-nowrap">Expiry</th>
-                    <th className="text-left py-3 px-4 text-sm text-gray-400 whitespace-nowrap">Add-ons</th>
+                    <th className="text-left py-3 px-4 text-sm text-gray-400 whitespace-nowrap">QR No</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={11} className="text-center py-12">
+                      <td colSpan={9} className="text-center py-12">
                         <RefreshCw className="w-8 h-8 text-emerald-500 animate-spin mx-auto mb-3" />
                         <p className="text-gray-400">Loading doctors...</p>
                       </td>
                     </tr>
                   ) : filteredDoctors.length === 0 ? (
                     <tr>
-                      <td colSpan={11} className="text-center py-12">
+                      <td colSpan={9} className="text-center py-12">
                         <Users className="w-12 h-12 text-gray-600 mx-auto mb-3" />
                         <p className="text-gray-500">No doctors found</p>
                       </td>
@@ -683,28 +630,10 @@ export default function AdminDoctorManagement() {
                           </Badge>
                         </td>
                         <td className="py-4 px-4 whitespace-nowrap">
-                          <Badge className={`${getPlanColor(doctor.plan)} border`}>
-                            {doctor.plan}
-                          </Badge>
-                        </td>
-                        <td className="py-4 px-4 text-sm text-white whitespace-nowrap">
-                          {doctor.planExpiryDate !== '-' 
-                            ? new Date(doctor.planExpiryDate).toLocaleDateString('en-IN')
-                            : '-'}
-                        </td>
-                        <td className="py-4 px-4 whitespace-nowrap">
-                          {doctor.premiumAddOns.length > 0 ? (
-                            <div className="space-y-1">
-                              {doctor.premiumAddOns.map((addon, index) => (
-                                <div key={index} className="text-xs">
-                                  <span className="text-emerald-400">{addon.name}</span>
-                                  <span className="text-gray-500"> (exp: {new Date(addon.expiryDate).toLocaleDateString('en-IN')})</span>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="text-sm text-gray-600">-</span>
-                          )}
+                          <div>
+                            <p className="text-sm text-cyan-400 font-mono">{doctor.qrNumber}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">{doctor.qrSource}</p>
+                          </div>
                         </td>
                       </tr>
                     ))

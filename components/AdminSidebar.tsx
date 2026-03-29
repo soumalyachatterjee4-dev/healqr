@@ -1,7 +1,6 @@
 import {
   LayoutDashboard,
   User,
-  DollarSign,
   Users,
   Briefcase,
   FileText,
@@ -11,7 +10,6 @@ import {
   UserCheck,
   ChevronDown,
   ChevronRight,
-  Percent,
   Megaphone,
   Heart,
   Database,
@@ -50,7 +48,6 @@ export default function AdminSidebar({
 
   const managementTools = [
     { id: 'profile', label: 'Profile Manager', icon: User },
-    { id: 'revenue', label: 'Revenue Manager', icon: DollarSign },
     { id: 'doctors', label: 'Doctor Management', icon: Users },
     { id: 'patients', label: 'Patient Management', icon: UserCheck },
     { id: 'personal-management', label: 'Personal Management', icon: Briefcase },
@@ -59,7 +56,6 @@ export default function AdminSidebar({
   const contentTools = [
     { id: 'templates', label: 'Template Uploader', icon: FileText },
     { id: 'videos', label: 'Video Uploader', icon: Video },
-    { id: 'discount-cards', label: 'Discount Cards', icon: Percent },
     { id: 'promo-manager', label: 'Promo Manager', icon: Megaphone },
     { id: 'data-cleanup', label: 'Data Standardization', icon: Database },
   ];

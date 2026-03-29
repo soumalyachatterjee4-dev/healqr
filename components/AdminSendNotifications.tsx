@@ -46,10 +46,10 @@ export default function AdminSendNotifications() {
     },
     {
       id: 3,
-      subject: 'Subscription Renewal Reminder',
-      message: 'Your subscription is expiring soon. Renew now to continue...',
-      recipients: 'Expiring Subscriptions',
-      recipientCount: 12,
+      subject: 'Platform Update',
+      message: 'We have updated our platform with new features. Check them out!',
+      recipients: 'All Doctors',
+      recipientCount: 147,
       sentDate: '2025-10-25 09:00 AM',
       status: 'sent'
     }
@@ -94,11 +94,6 @@ export default function AdminSendNotifications() {
       case 'all': return 'All Doctors';
       case 'active': return 'Active Doctors';
       case 'inactive': return 'Inactive Doctors';
-      case 'expiring': return 'Expiring Subscriptions';
-      case 'basic': return 'Basic Plan Doctors';
-      case 'standard': return 'Standard Plan Doctors';
-      case 'pro': return 'Pro Plan Doctors';
-      case 'enterprise': return 'Enterprise Plan Doctors';
       default: return 'All Doctors';
     }
   };
@@ -109,11 +104,6 @@ export default function AdminSendNotifications() {
       all: 147,
       active: 132,
       inactive: 15,
-      expiring: 12,
-      basic: 45,
-      standard: 60,
-      pro: 30,
-      enterprise: 12
     };
     return counts[type] || 0;
   };
@@ -146,11 +136,6 @@ export default function AdminSendNotifications() {
                 <option value="all">All Doctors ({getRecipientCount('all')})</option>
                 <option value="active">Active Doctors ({getRecipientCount('active')})</option>
                 <option value="inactive">Inactive Doctors ({getRecipientCount('inactive')})</option>
-                <option value="expiring">Expiring Subscriptions ({getRecipientCount('expiring')})</option>
-                <option value="basic">Basic Plan Doctors ({getRecipientCount('basic')})</option>
-                <option value="standard">Standard Plan Doctors ({getRecipientCount('standard')})</option>
-                <option value="pro">Pro Plan Doctors ({getRecipientCount('pro')})</option>
-                <option value="enterprise">Enterprise Plan Doctors ({getRecipientCount('enterprise')})</option>
               </select>
               <p className="text-xs text-gray-500 mt-2">
                 This notification will be sent to <strong className="text-emerald-500">{getRecipientCount(formData.recipientType)}</strong> doctors

@@ -4,13 +4,11 @@ import AdminSidebar from './AdminSidebar';
 import AdminDashboard from './AdminDashboard';
 import AdminProfileManager from './AdminProfileManager';
 import AdminRolesManager from './AdminRolesManager';
-import AdminRevenueManager from './AdminRevenueManager';
 import AdminDoctorManagement from './AdminDoctorManagement';
 import AdminPatientManagement from './AdminPatientManagement';
 import AdminPersonalManagement from './AdminPersonalManagement';
 import AdminTemplateUploader from './AdminTemplateUploader';
 import AdminVideoUploader from './AdminVideoUploader';
-import AdminDiscountCards from './AdminDiscountCards';
 import AdminNotificationPanel from './AdminNotificationPanel';
 import AdminPromoManager from './AdminPromoManager';
 import AdminDataStandardization from './AdminDataStandardization';
@@ -55,7 +53,7 @@ interface AdminPanelProps {
 
 export default function AdminPanel({ adminEmail, onLogout, onStartDemo, uploadedTestimonials = [], onUploadTestimonial, supportRequests = [], onNavigateToQRGenerator, onNavigateToQRGeneration, onNavigateToQRManagement }: AdminPanelProps) {
   const [currentPage, setCurrentPage] = useState<
-    'dashboard' | 'profile' | 'revenue' | 'doctors' | 'patients' | 'personal-management' | 'templates' | 'videos' | 'discount-cards' | 'promo-manager' | 'data-cleanup' | 'pharma-management' | 'pharma-templates' | 'distribution-requests' | 'advertiser-management' | 'page-distribution' | 'ai-pm-dashboard'
+    'dashboard' | 'profile' | 'doctors' | 'patients' | 'personal-management' | 'templates' | 'videos' | 'promo-manager' | 'data-cleanup' | 'pharma-management' | 'pharma-templates' | 'distribution-requests' | 'advertiser-management' | 'page-distribution' | 'ai-pm-dashboard'
   >('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
@@ -64,13 +62,11 @@ export default function AdminPanel({ adminEmail, onLogout, onStartDemo, uploaded
   const pageTitles = {
     dashboard: 'Dashboard',
     profile: 'Profile Manager',
-    revenue: 'Revenue Manager',
     doctors: 'Doctor Management',
     patients: 'Patient Management',
     'personal-management': 'Personal Management',
     templates: 'Template Uploader',
     videos: 'Video Uploader',
-    'discount-cards': 'Discount Cards',
     'promo-manager': 'Promo Manager',
     'data-cleanup': 'Data Standardization',
     'pharma-management': 'Pharma Companies',
@@ -183,13 +179,11 @@ export default function AdminPanel({ adminEmail, onLogout, onStartDemo, uploaded
           />
         )}
         {currentPage === 'profile' && <AdminProfileManager />}
-        {currentPage === 'revenue' && <AdminRevenueManager />}
         {currentPage === 'doctors' && <AdminDoctorManagement />}
         {currentPage === 'patients' && <AdminPatientManagement />}
         {currentPage === 'personal-management' && <AdminPersonalManagement />}
         {currentPage === 'templates' && <AdminTemplateUploader />}
         {currentPage === 'videos' && <AdminVideoUploader />}
-        {currentPage === 'discount-cards' && <AdminDiscountCards />}
         {currentPage === 'promo-manager' && <AdminPromoManager />}
         {currentPage === 'data-cleanup' && <AdminDataStandardization />}
         {currentPage === 'pharma-management' && <AdminPharmaManagement />}
