@@ -49,6 +49,7 @@ export default function AdminSidebar({
   const managementTools = [
     { id: 'profile', label: 'Profile Manager', icon: User },
     { id: 'doctors', label: 'Doctor Management', icon: Users },
+    { id: 'clinics', label: 'Clinic Management', icon: Building2 },
     { id: 'patients', label: 'Patient Management', icon: UserCheck },
     { id: 'personal-management', label: 'Personal Management', icon: Briefcase },
   ];

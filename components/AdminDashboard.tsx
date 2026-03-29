@@ -54,6 +54,10 @@ export default function AdminDashboard({ adminEmail, onStartDemo, uploadedTestim
     lastMonthNewDoctors: 0,
     activeDoctors: 0,
     inactiveDoctors: 0,
+    totalClinics: 0,
+    activeClinics: 0,
+    inactiveClinics: 0,
+    newClinicsThisMonth: 0,
   });
   const [recentReviews, setRecentReviews] = useState<SupportRequest[]>([]);
   const [revenueGrowth, setRevenueGrowth] = useState<number>(0);
@@ -334,8 +338,8 @@ export default function AdminDashboard({ adminEmail, onStartDemo, uploadedTestim
           )}
         </div>
 
-        {/* Section 2: Big Cards - Advertisers/Pharma & Total Onboard Doctors */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-6 md:mb-8">
+        {/* Section 2: Big Cards - Advertisers/Pharma, Total Onboard Doctors & Clinics */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
           {/* Active Partners Card */}
           <div className="bg-gradient-to-br from-emerald-900/40 to-emerald-900/20 border border-emerald-700/50 rounded-xl p-6 md:p-8">
             <div className="flex items-center justify-between mb-4 md:mb-6">
@@ -390,6 +394,35 @@ export default function AdminDashboard({ adminEmail, onStartDemo, uploadedTestim
               <div className="text-center">
                 <p className="text-xs text-red-400 mb-2">Inactive</p>
                 <p className="text-2xl text-white">{stats.inactiveDoctors}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Total Clinics Card */}
+          <div className="bg-gradient-to-br from-teal-900/40 to-teal-900/20 border border-teal-700/50 rounded-xl p-6 md:p-8">
+            <div className="flex items-center justify-between mb-6">
+              <div className="bg-teal-500/20 p-3 md:p-4 rounded-xl">
+                <Building2 className="w-8 h-8 md:w-10 md:h-10 text-teal-500" />
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-gray-400 mb-1">Total Clinics</p>
+                <h2 className="text-4xl md:text-5xl text-teal-500">{stats.totalClinics}</h2>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-teal-400 mb-6">
+              <TrendingUp className="w-4 h-4" />
+              <span className="text-xs">
+                +{stats.newClinicsThisMonth} new this month
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="text-center">
+                <p className="text-xs text-teal-400 mb-2">Active</p>
+                <p className="text-2xl text-white">{stats.activeClinics}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-red-400 mb-2">Inactive</p>
+                <p className="text-2xl text-white">{stats.inactiveClinics}</p>
               </div>
             </div>
           </div>

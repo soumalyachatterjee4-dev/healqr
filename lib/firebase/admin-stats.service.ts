@@ -38,6 +38,12 @@ export interface AdminStats {
   activeDoctors: number;
   inactiveDoctors: number;
   
+  // Clinic Stats
+  totalClinics: number;
+  activeClinics: number;
+  inactiveClinics: number;
+  newClinicsThisMonth: number;
+  
   // Review Stats
   totalReviews: number;
   averageRating: number;
@@ -66,16 +72,18 @@ export class AdminStatsService {
     endDate?: Date
   ): Promise<AdminStats> {
     try {
-      const [revenueStats, bookingStats, doctorStats] = await Promise.all([
+      const [revenueStats, bookingStats, doctorStats, clinicStats] = await Promise.all([
         this.getRevenueStats(startDate, endDate),
         this.getBookingStats(startDate, endDate),
         this.getDoctorStats(startDate, endDate),
+        this.getClinicStats(startDate, endDate),
       ]);
 
       return {
         ...revenueStats,
         ...bookingStats,
         ...doctorStats,
+        ...clinicStats,
       };
     } catch (error: any) {
       // Handle permission errors gracefully
@@ -337,6 +345,65 @@ export class AdminStatsService {
         totalReviews: 0,
         averageRating: 0,
       };
+    }
+  }
+
+  /**
+   * Get clinic statistics
+   */
+  private static async getClinicStats(
+    startDate?: Date,
+    endDate?: Date
+  ): Promise<{
+    totalClinics: number;
+    activeClinics: number;
+    inactiveClinics: number;
+    newClinicsThisMonth: number;
+  }> {
+    try {
+      if (!db) {
+        throw new Error('Firestore not initialized');
+      }
+
+      const clinicsRef = collection(db, COLLECTIONS.CLINICS);
+      const clinicsSnapshot = await getDocs(clinicsRef);
+
+      let totalClinics = 0;
+      let activeClinics = 0;
+      let inactiveClinics = 0;
+      let newClinicsThisMonth = 0;
+
+      const now = new Date();
+      const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+      clinicsSnapshot.docs.forEach((doc) => {
+        const data = doc.data();
+        const createdAt = data.createdAt?.toDate();
+
+        if (startDate && createdAt && createdAt < startDate) return;
+        if (endDate && createdAt && createdAt > endDate) return;
+
+        totalClinics++;
+
+        if (!data.bookingBlocked) {
+          activeClinics++;
+        } else {
+          inactiveClinics++;
+        }
+
+        if (createdAt && createdAt >= oneMonthAgo) {
+          newClinicsThisMonth++;
+        }
+      });
+
+      return { totalClinics, activeClinics, inactiveClinics, newClinicsThisMonth };
+    } catch (error: any) {
+      if (error?.code === 'permission-denied' || error?.message?.includes('Missing or insufficient permissions')) {
+        console.warn('⚠️ Permission denied for clinic stats');
+      } else {
+        console.error('❌ Error calculating clinic stats:', error);
+      }
+      return { totalClinics: 0, activeClinics: 0, inactiveClinics: 0, newClinicsThisMonth: 0 };
     }
   }
 

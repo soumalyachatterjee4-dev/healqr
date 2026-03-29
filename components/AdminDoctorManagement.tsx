@@ -24,6 +24,7 @@ interface Doctor {
   totalScans: number;
   dropOuts?: number;
   cancelledCount?: number;
+  isDemo?: boolean;
   createdAt: any;
 }
 
@@ -132,6 +133,7 @@ export default function AdminDoctorManagement() {
           totalScans,
           dropOuts,
           cancelledCount,
+          isDemo: data.isDemo === true,
           createdAt: data.createdAt,
         };
 
@@ -485,7 +487,10 @@ export default function AdminDoctorManagement() {
                   {/* Name and Plan */}
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1">
-                      <h3 className="text-white font-medium">{doctor.name}</h3>
+                      <h3 className="text-white font-medium flex items-center gap-1.5">
+                        {doctor.name}
+                        {doctor.isDemo && <span className="w-2 h-2 rounded-full bg-yellow-400 inline-block flex-shrink-0" title="Demo Doctor" />}
+                      </h3>
                       <p className="text-xs text-emerald-400 mt-1 font-mono">Dr Code: {doctor.doctorCode}</p>
                       <p className="text-xs text-gray-400">BA Code: {doctor.baCode}</p>
                       <div className="flex items-center gap-2 mt-2 flex-wrap">
@@ -583,7 +588,10 @@ export default function AdminDoctorManagement() {
                       <tr key={doctor.id} className="border-b border-zinc-800 hover:bg-zinc-800/50 transition-colors">
                         <td className="py-4 px-4 whitespace-nowrap">
                           <div className="space-y-1">
-                            <p className="text-sm text-white font-medium">{doctor.name}</p>
+                            <p className="text-sm text-white font-medium flex items-center gap-1.5">
+                              {doctor.name}
+                              {doctor.isDemo && <span className="w-2 h-2 rounded-full bg-yellow-400 inline-block flex-shrink-0" title="Demo Doctor" />}
+                            </p>
                             <div className="flex items-center gap-2 text-xs">
                               <span className="text-emerald-400 font-medium">{doctor.totalBookings} bookings</span>
                               <span className="text-gray-500">|</span>

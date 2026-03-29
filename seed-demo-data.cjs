@@ -179,7 +179,7 @@ async function seedData() {
 
     const doctorData = {
       uid: docRef.id,
-      email: `${slug.replace(/-/g, '.')}@demo.healqr.com`,
+      email: `${slug.replace(/-/g, '.')}@gmail.com`,
       name: d.name,
       specialties: d.specialty,
       dob: '',
@@ -268,7 +268,7 @@ async function seedData() {
 
     const clinicData = {
       uid: clinicRef.id,
-      email: `${slug}@demo.healqr.com`,
+      email: `${slug}@gmail.com`,
       name: c.name,
       clinicName: c.name,
       address: c.address,
