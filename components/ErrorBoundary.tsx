@@ -42,15 +42,28 @@ class ErrorBoundary extends Component<Props, State> {
     const isStaleAssetError =
       error.message.includes("Unexpected token '<'") ||
       error.message.includes('ChunkLoadError') ||
-      error.message.includes('Loading chunk');
+      error.message.includes('Loading chunk') ||
+      error.message.includes('Failed to fetch dynamically imported module');
 
     if (isStaleAssetError) {
-      const reloadKey = 'healqr_forced_reload_v1';
-      if (!sessionStorage.getItem(reloadKey)) {
-        sessionStorage.setItem(reloadKey, '1');
-        const url = new URL(window.location.href);
-        url.searchParams.set('v', Date.now().toString());
-        window.location.replace(url.toString());
+      const reloadKey = 'healqr_forced_reload_v2';
+      const lastReload = sessionStorage.getItem(reloadKey);
+      const now = Date.now();
+      // Allow retry if last reload was more than 10 seconds ago (previous attempt may have used stale cache)
+      if (!lastReload || (now - parseInt(lastReload, 10)) > 10000) {
+        sessionStorage.setItem(reloadKey, now.toString());
+        // Force a clean reload bypassing cache
+        if ('caches' in window) {
+          caches.keys().then(names => {
+            Promise.all(names.map(name => caches.delete(name))).then(() => {
+              window.location.href = '/' + '?v=' + now;
+            });
+          }).catch(() => {
+            window.location.href = '/' + '?v=' + now;
+          });
+        } else {
+          window.location.href = '/' + '?v=' + now;
+        }
         return;
       }
     }
