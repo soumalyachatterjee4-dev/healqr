@@ -20,7 +20,9 @@ import {
   CalendarClock,
   AlertCircle,
   Apple,
-  Share2
+  Share2,
+  BookOpen,
+  Package
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import healqrLogo from '../assets/healqr.logo.png';
@@ -55,6 +57,7 @@ export default function DashboardSidebar({
   const [isGeneralToolsOpen, setIsGeneralToolsOpen] = useState(true);
   const [isFreeAddOnOpen, setIsFreeAddOnOpen] = useState(true);
   const [isFreemiumAddOnOpen, setIsFreemiumAddOnOpen] = useState(true);
+  const [isPharmaServicesOpen, setIsPharmaServicesOpen] = useState(true);
   const [isTodayBlocked, setIsTodayBlocked] = useState(false);
 
   // Helper function to check if page is accessible to assistant
@@ -153,6 +156,11 @@ export default function DashboardSidebar({
       icon: AlertCircle,
       addonKey: 'emergency-button'
     }
+  ];
+
+  const pharmaServiceItems = [
+    { id: 'pharma-cme', label: 'CME Content', icon: BookOpen },
+    { id: 'pharma-samples', label: 'Sample Requests', icon: Package },
   ];
 
   const freemiumAddOnPages = [
@@ -498,6 +506,42 @@ export default function DashboardSidebar({
                     </div>
                   );
                 })}
+              </div>
+            )}
+          </div>
+
+          {/* PHARMA SERVICES */}
+          <div className="border-t border-zinc-800 my-4" />
+          <div className="mb-3">
+            <button
+              onClick={() => setIsPharmaServicesOpen(!isPharmaServicesOpen)}
+              className="w-full flex items-center gap-2 px-3 py-2 text-gray-500 hover:text-gray-300 transition-colors"
+            >
+              <span className="text-xs uppercase tracking-wider flex-1 text-left">
+                Pharma Services
+              </span>
+              {isPharmaServicesOpen ? (
+                <ChevronDown className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronRight className="w-3.5 h-3.5" />
+              )}
+            </button>
+            {isPharmaServicesOpen && (
+              <div className="mt-1 space-y-0.5">
+                {pharmaServiceItems.filter(item => isPageAccessible(item.id)).map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => handleMenuClick(item.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+                      activeMenu === item.id
+                        ? 'bg-emerald-500 text-white'
+                        : 'text-gray-400 hover:bg-zinc-900 hover:text-white'
+                    }`}
+                  >
+                    <item.icon className="w-4 h-4" />
+                    <span className="text-sm">{item.label}</span>
+                  </button>
+                ))}
               </div>
             )}
           </div>

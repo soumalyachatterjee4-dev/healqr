@@ -630,6 +630,35 @@ RULES:
         deliveryMethod: 'fcm', read: false,
       });
 
+      // Fire-and-forget: Save molecule data for pharma analytics (aggregate only, no patient PII)
+      try {
+        if (analysisResult?.medicines?.length > 0) {
+          const doctorDoc = await getDoc(doc(db!, 'doctors', doctorId));
+          const drData = doctorDoc.exists() ? doctorDoc.data() : {};
+          const drCompany = drData.companyName || '';
+          const drDivision = drData.division || '';
+          const drSpecialties = drData.specialties || drData.specialities || [];
+          const drPincode = drData.pinCode || drData.residentialPinCode || '';
+          const drState = drData.state || '';
+          for (const med of analysisResult.medicines) {
+            if (med.name) {
+              addDoc(collection(db!, 'rxMoleculeData'), {
+                medicineName: med.name.trim(),
+                dosage: med.dosage || '',
+                frequency: med.frequency || '',
+                doctorId,
+                specialty: drSpecialties[0] || '',
+                state: drState,
+                pincode: drPincode,
+                companyName: drCompany,
+                division: drDivision,
+                createdAt: serverTimestamp(),
+              }).catch(() => {}); // silent fail — analytics data is non-critical
+            }
+          }
+        }
+      } catch {} // never block patient notification for analytics
+
       await sendFCMNotification(notifRef.id);
       setProcessingStep('done');
       toast.success('AI-decoded prescription sent to patient!');

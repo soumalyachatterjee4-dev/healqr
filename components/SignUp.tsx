@@ -15,6 +15,16 @@ import { MEDICAL_SPECIALTIES } from '../utils/medicalSpecialties';
 import { Badge } from './ui/badge';
 import { getStateFromPincode } from '../utils/pincodeMapping';
 
+// Company lookup cache
+interface PharmaCompanyMatch {
+  id: string;
+  companyName: string;
+  division: string;
+  specialties: string[];
+  territoryStates: string[];
+}
+
+
 interface SignUpProps {
   onNext: (data: { email: string; name: string; dob: string; specialties: string[]; pinCode: string; qrNumber: string; }) => void;
   onBack: () => void;
@@ -36,6 +46,94 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
   const [companyName, setCompanyName] = useState(""); // NEW: Company name for pre-printed QR
   const [division, setDivision] = useState(""); // NEW: Division for pre-printed QR
   const [virtualQrGenerated, setVirtualQrGenerated] = useState(false); // NEW: Track if virtual QR is generated
+
+  // Company lookup state
+  const [companyMatches, setCompanyMatches] = useState<PharmaCompanyMatch[]>([]);
+  const [selectedCompany, setSelectedCompany] = useState<PharmaCompanyMatch | null>(null);
+  const [companyLookupDone, setCompanyLookupDone] = useState(false);
+  const [companyLookupLoading, setCompanyLookupLoading] = useState(false);
+  const [availableDivisions, setAvailableDivisions] = useState<PharmaCompanyMatch[]>([]);
+  const [filteredSpecialties, setFilteredSpecialties] = useState<typeof MEDICAL_SPECIALTIES>([]);
+  const [territoryValid, setTerritoryValid] = useState<boolean | null>(null);
+
+  // Company name lookup
+  const lookupCompany = async (name: string) => {
+    if (!name.trim() || !db) return;
+    setCompanyLookupLoading(true);
+    setCompanyLookupDone(false);
+    setSelectedCompany(null);
+    setAvailableDivisions([]);
+    setDivision('');
+    setTerritoryValid(null);
+    try {
+      const pharmaRef = collection(db, 'pharmaCompanies');
+      const snap = await getDocs(pharmaRef);
+      const matches: PharmaCompanyMatch[] = [];
+      const searchLower = name.trim().toLowerCase();
+      snap.docs.forEach(d => {
+        const data = d.data();
+        if (data.status === 'active' && data.companyName?.toLowerCase().includes(searchLower)) {
+          matches.push({
+            id: d.id,
+            companyName: data.companyName,
+            division: data.division || '',
+            specialties: data.specialties || [],
+            territoryStates: data.territoryStates || [],
+          });
+        }
+      });
+      setCompanyMatches(matches);
+      setCompanyLookupDone(true);
+      if (matches.length === 0) {
+        toast.error('Company not found. Ask your distributor to sign up at HealQR Distributor portal first.');
+      } else {
+        // Group by company name to find unique divisions
+        const companyGroups = matches.filter(m => m.companyName.toLowerCase() === searchLower);
+        if (companyGroups.length > 0) {
+          setCompanyName(companyGroups[0].companyName);
+          setAvailableDivisions(companyGroups);
+          if (companyGroups.length === 1) {
+            // Auto-select if only one division
+            setDivision(companyGroups[0].division);
+            setSelectedCompany(companyGroups[0]);
+          }
+        } else {
+          // Partial match — show suggestions
+          setAvailableDivisions(matches);
+        }
+      }
+    } catch (err) {
+      console.error('Company lookup error:', err);
+    } finally {
+      setCompanyLookupLoading(false);
+    }
+  };
+
+  // Validate territory when pincode changes and company is selected
+  const validateTerritory = (pin: string, company: PharmaCompanyMatch | null) => {
+    if (!pin || pin.length !== 6 || !company) {
+      setTerritoryValid(null);
+      setFilteredSpecialties([]);
+      return;
+    }
+    const state = getStateFromPincode(pin);
+    if (state === 'Unknown') {
+      setTerritoryValid(null);
+      setFilteredSpecialties([]);
+      return;
+    }
+    const isValid = company.territoryStates.includes(state);
+    setTerritoryValid(isValid);
+    if (isValid) {
+      // Show only specialties this company/division has rights to
+      const companySpecIds = company.specialties;
+      const filtered = MEDICAL_SPECIALTIES.filter(s => companySpecIds.includes(s.id));
+      setFilteredSpecialties(filtered);
+    } else {
+      setFilteredSpecialties([]);
+      toast.error(`This company/division does not cover ${state}. Contact your distributor.`);
+    }
+  };
   const [acceptedTerms, setAcceptedTerms] = useState(true); // Pre-checked
   const [acceptedNotifications, setAcceptedNotifications] = useState(true); // Pre-checked
   const [showTerms, setShowTerms] = useState(false);
@@ -70,12 +168,16 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
 
     // QR Number validation based on type
     if (qrType === 'preprinted') {
-      if (!companyName) {
-        toast.error('Please enter the company name');
+      if (!selectedCompany) {
+        toast.error('Please verify your company name first');
         return;
       }
       if (!division) {
-        toast.error('Please enter the division');
+        toast.error('Please select your division');
+        return;
+      }
+      if (territoryValid === false) {
+        toast.error('Your pincode is not in this company/division territory');
         return;
       }
       if (!qrNumber) {
@@ -460,7 +562,10 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
                   <SelectValue placeholder="Select from preset specialties" />
                 </SelectTrigger>
                 <SelectContent className="bg-zinc-900 border-zinc-800 max-h-[300px]">
-                  {MEDICAL_SPECIALTIES.filter(spec => !specialties.includes(spec.id)).map((spec) => (
+                  {(qrType === 'preprinted' && territoryValid && filteredSpecialties.length > 0
+                    ? filteredSpecialties
+                    : MEDICAL_SPECIALTIES
+                  ).filter(spec => !specialties.includes(spec.id)).map((spec) => (
                     <SelectItem
                       key={spec.id}
                       value={spec.id}
@@ -521,7 +626,12 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
               <Input
                 type="text"
                 value={pinCode}
-                onChange={(e) => setPinCode(e.target.value)}
+                onChange={(e) => {
+                  setPinCode(e.target.value);
+                  if (e.target.value.length === 6 && selectedCompany) {
+                    validateTerritory(e.target.value, selectedCompany);
+                  }
+                }}
                 placeholder="Enter your pin code"
                 className="pl-12 bg-black border-zinc-800 text-white h-14 rounded-lg focus:border-emerald-500"
               />
@@ -614,43 +724,115 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
           {/* QR Number Field - Conditional based on QR Type */}
           {qrType === 'preprinted' && (
             <>
+              {/* Company Name — Smart Lookup */}
               <div className="mb-6">
                 <label className="block mb-3">
                   Company Name <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <Input
                     type="text"
                     value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
-                    placeholder="Enter company name (e.g., ABC Pharmaceuticals)"
-                    className="pl-12 bg-black border-zinc-800 text-white h-14 rounded-lg focus:border-emerald-500"
+                    onChange={(e) => {
+                      setCompanyName(e.target.value);
+                      setCompanyLookupDone(false);
+                      setSelectedCompany(null);
+                      setAvailableDivisions([]);
+                      setDivision('');
+                      setTerritoryValid(null);
+                      setFilteredSpecialties([]);
+                    }}
+                    placeholder="Enter company name (e.g., Mankind Pharma)"
+                    className="pl-12 pr-24 bg-black border-zinc-800 text-white h-14 rounded-lg focus:border-emerald-500"
                   />
+                  <button
+                    type="button"
+                    onClick={() => lookupCompany(companyName)}
+                    disabled={!companyName.trim() || companyLookupLoading}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-sm rounded-lg transition-colors"
+                  >
+                    {companyLookupLoading ? '...' : 'Verify'}
+                  </button>
                 </div>
+                {companyLookupDone && companyMatches.length === 0 && (
+                  <div className="mt-2 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
+                    <p className="text-red-400 text-sm">Company not registered on HealQR.</p>
+                    <p className="text-gray-500 text-xs mt-1">Ask your distributor to sign up first at the HealQR Distributor portal.</p>
+                  </div>
+                )}
+                {companyLookupDone && companyMatches.length > 0 && !selectedCompany && availableDivisions.length > 1 && (
+                  <div className="mt-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-3 py-2">
+                    <p className="text-emerald-400 text-sm">✓ Company found! Select your division below.</p>
+                  </div>
+                )}
+                {selectedCompany && (
+                  <div className="mt-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-3 py-2">
+                    <p className="text-emerald-400 text-sm">✓ {selectedCompany.companyName} — {selectedCompany.division}</p>
+                  </div>
+                )}
                 <p className="text-xs text-gray-400 mt-2">
                   Company/Organization that provided the QR standee
                 </p>
               </div>
 
-              <div className="mb-6">
-                <label className="block mb-3">
-                  Division <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <Input
-                    type="text"
-                    value={division}
-                    onChange={(e) => setDivision(e.target.value)}
-                    placeholder="Enter division (e.g., North Division)"
-                    className="pl-12 bg-black border-zinc-800 text-white h-14 rounded-lg focus:border-emerald-500"
-                  />
+              {/* Division — Dropdown (only if company has multiple divisions) */}
+              {companyLookupDone && availableDivisions.length > 0 && (
+                <div className="mb-6">
+                  <label className="block mb-3">
+                    Division <span className="text-red-500">*</span>
+                  </label>
+                  {availableDivisions.length === 1 ? (
+                    <div className="relative">
+                      <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-400" />
+                      <Input
+                        type="text"
+                        value={availableDivisions[0].division}
+                        disabled
+                        className="pl-12 bg-zinc-900 border-emerald-500/30 text-emerald-400 h-14 rounded-lg cursor-not-allowed"
+                      />
+                    </div>
+                  ) : (
+                    <select
+                      value={division}
+                      onChange={(e) => {
+                        const selected = availableDivisions.find(d => d.division === e.target.value);
+                        setDivision(e.target.value);
+                        setSelectedCompany(selected || null);
+                        if (selected) validateTerritory(pinCode, selected);
+                      }}
+                      className="w-full bg-black border border-zinc-800 text-white h-14 rounded-lg px-4 focus:border-emerald-500"
+                    >
+                      <option value="">Select division...</option>
+                      {availableDivisions.map(d => (
+                        <option key={d.id} value={d.division}>{d.division}</option>
+                      ))}
+                    </select>
+                  )}
+                  <p className="text-xs text-gray-400 mt-2">
+                    Specific division or branch of the company
+                  </p>
                 </div>
-                <p className="text-xs text-gray-400 mt-2">
-                  Specific division or branch of the company
-                </p>
-              </div>
+              )}
+
+              {/* Territory validation message */}
+              {territoryValid === false && selectedCompany && (
+                <div className="mb-6 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3">
+                  <p className="text-red-400 text-sm font-medium">⚠️ Territory Mismatch</p>
+                  <p className="text-gray-400 text-xs mt-1">
+                    Your pincode ({pinCode}) is in {getStateFromPincode(pinCode)}, which is not covered by {selectedCompany.companyName} — {selectedCompany.division}.
+                    Contact your distributor for the correct division.
+                  </p>
+                </div>
+              )}
+              {territoryValid === true && selectedCompany && (
+                <div className="mb-6 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-4 py-3">
+                  <p className="text-emerald-400 text-sm font-medium">✓ Territory Verified</p>
+                  <p className="text-gray-400 text-xs mt-1">
+                    {getStateFromPincode(pinCode)} is covered by {selectedCompany.division}. Specialties restricted to company rights.
+                  </p>
+                </div>
+              )}
 
               <div className="mb-8">
                 <label className="block mb-3">

@@ -1,13 +1,21 @@
 import { Checkbox } from './ui/checkbox';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
-import { Mail, Building2, MapPin, ArrowLeft, CheckCircle2, X, QrCode } from 'lucide-react';
+import { Mail, Building2, MapPin, ArrowLeft, CheckCircle2, X, QrCode, Loader2, Search } from 'lucide-react';
 import { useState } from 'react';
 import healqrLogo from '../assets/healqr.logo.png';
 import { auth, db } from '../lib/firebase/config';
 import { sendSignInLinkToEmail, createUserWithEmailAndPassword } from 'firebase/auth';
+import { collection, getDocs } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { getStateFromPincode } from '../utils/pincodeMapping';
+
+interface PharmaCompanyMatch {
+  id: string;
+  companyName: string;
+  division: string;
+  territoryStates: string[];
+}
 
 interface ClinicSignUpProps {
   onNext?: (data: any) => void; // Optional for now as we might redirect
@@ -25,12 +33,87 @@ export default function ClinicSignUp({ onBack, onLogin }: ClinicSignUpProps) {
   const [companyName, setCompanyName] = useState("");
   const [division, setDivision] = useState("");
 
+  // Company lookup state
+  const [companyMatches, setCompanyMatches] = useState<PharmaCompanyMatch[]>([]);
+  const [selectedCompany, setSelectedCompany] = useState<PharmaCompanyMatch | null>(null);
+  const [companyLookupDone, setCompanyLookupDone] = useState(false);
+  const [companyLookupLoading, setCompanyLookupLoading] = useState(false);
+  const [availableDivisions, setAvailableDivisions] = useState<PharmaCompanyMatch[]>([]);
+  const [territoryValid, setTerritoryValid] = useState<boolean | null>(null);
+
   // Location landmark for geocoding
   const [newLocationLandmark, setNewLocationLandmark] = useState('');
   const [virtualQrGenerated, setVirtualQrGenerated] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(true);
   const [loading, setLoading] = useState(false);
   const [linkSent, setLinkSent] = useState(false);
+
+  // Company lookup function
+  const lookupCompany = async (name: string) => {
+    if (!name.trim() || !db) return;
+    setCompanyLookupLoading(true);
+    setCompanyLookupDone(false);
+    setSelectedCompany(null);
+    setAvailableDivisions([]);
+    setDivision('');
+    setTerritoryValid(null);
+    try {
+      const pharmaRef = collection(db, 'pharmaCompanies');
+      const snap = await getDocs(pharmaRef);
+      const matches: PharmaCompanyMatch[] = [];
+      const searchLower = name.trim().toLowerCase();
+      snap.docs.forEach(d => {
+        const data = d.data();
+        if (data.status === 'active' && data.companyName?.toLowerCase().includes(searchLower)) {
+          matches.push({
+            id: d.id,
+            companyName: data.companyName,
+            division: data.division || '',
+            territoryStates: data.territoryStates || [],
+          });
+        }
+      });
+      setCompanyMatches(matches);
+      setCompanyLookupDone(true);
+      if (matches.length === 0) {
+        toast.error('Company not found. Ask your distributor to sign up at HealQR Distributor portal first.');
+      } else {
+        const companyGroups = matches.filter(m => m.companyName.toLowerCase() === searchLower);
+        if (companyGroups.length > 0) {
+          setCompanyName(companyGroups[0].companyName);
+          setAvailableDivisions(companyGroups);
+          if (companyGroups.length === 1) {
+            setDivision(companyGroups[0].division);
+            setSelectedCompany(companyGroups[0]);
+          }
+        } else {
+          setAvailableDivisions(matches);
+        }
+      }
+    } catch (err) {
+      console.error('Company lookup error:', err);
+    } finally {
+      setCompanyLookupLoading(false);
+    }
+  };
+
+  // Validate territory when pincode changes and company is selected
+  const validateTerritory = (pin: string, company: PharmaCompanyMatch | null) => {
+    if (!pin || pin.length !== 6 || !company) {
+      setTerritoryValid(null);
+      return;
+    }
+    const state = getStateFromPincode(pin);
+    if (state === 'Unknown') {
+      setTerritoryValid(null);
+      return;
+    }
+    const isValid = company.territoryStates.includes(state);
+    setTerritoryValid(isValid);
+    if (!isValid) {
+      toast.error(`This company/division does not cover ${state}. Contact your distributor.`);
+    }
+  };
 
   const handleRegister = async () => {
     // Validate required fields
@@ -40,12 +123,16 @@ export default function ClinicSignUp({ onBack, onLogin }: ClinicSignUpProps) {
     }
 
     if (qrType === 'preprinted') {
-      if (!companyName) {
-        toast.error('Please enter the company name');
+      if (!selectedCompany) {
+        toast.error('Please verify the company name first');
         return;
       }
       if (!division) {
-        toast.error('Please enter the division');
+        toast.error('Please select a division');
+        return;
+      }
+      if (territoryValid === false) {
+        toast.error('Your pincode is not in this company\'s territory');
         return;
       }
       if (!qrNumber) {
@@ -271,7 +358,12 @@ export default function ClinicSignUp({ onBack, onLogin }: ClinicSignUpProps) {
               <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <Input
                 value={pinCode}
-                onChange={(e) => setPinCode(e.target.value)}
+                onChange={(e) => {
+                  setPinCode(e.target.value);
+                  if (e.target.value.length === 6 && selectedCompany) {
+                    validateTerritory(e.target.value, selectedCompany);
+                  }
+                }}
                 className="pl-12 bg-black border-zinc-800 text-white h-14 rounded-lg focus:border-blue-500"
                 placeholder="e.g. 700001"
               />
@@ -362,48 +454,109 @@ export default function ClinicSignUp({ onBack, onLogin }: ClinicSignUpProps) {
           {/* QR Number and Company Name Fields - Conditional */}
           {qrType === 'preprinted' && (
             <>
+              {/* Company Name + Verify */}
               <div className="mb-6">
                 <label className="block mb-3">
                   Company Name <span className="text-red-500">*</span>
                 </label>
-                <div className="relative">
-                  <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <Input
-                    value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
-                    className="pl-12 bg-black border-zinc-800 text-white h-14 rounded-lg focus:border-blue-500"
-                    placeholder="e.g. ABC Pharmaceuticals"
-                  />
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <Input
+                      value={companyName}
+                      onChange={(e) => {
+                        setCompanyName(e.target.value);
+                        setCompanyLookupDone(false);
+                        setSelectedCompany(null);
+                        setAvailableDivisions([]);
+                        setDivision('');
+                        setTerritoryValid(null);
+                      }}
+                      className="pl-12 bg-black border-zinc-800 text-white h-14 rounded-lg focus:border-blue-500"
+                      placeholder="e.g. Lupin"
+                    />
+                  </div>
+                  <Button
+                    onClick={() => lookupCompany(companyName)}
+                    disabled={companyLookupLoading || !companyName.trim()}
+                    className="h-14 px-5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shrink-0"
+                  >
+                    {companyLookupLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                    <span className="ml-2">Verify</span>
+                  </Button>
                 </div>
+                {companyLookupDone && companyMatches.length === 0 && (
+                  <div className="mt-2 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
+                    <p className="text-red-400 text-sm">Company not registered. Ask your distributor to sign up at HealQR Distributor portal.</p>
+                  </div>
+                )}
+                {companyLookupDone && availableDivisions.length > 0 && (
+                  <div className="mt-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg px-3 py-2">
+                    <p className="text-emerald-400 text-sm flex items-center gap-1">
+                      <CheckCircle2 className="w-4 h-4" />
+                      Company found! {availableDivisions.length > 1 ? 'Select a division below.' : `Division: ${availableDivisions[0].division}`}
+                    </p>
+                  </div>
+                )}
               </div>
-              <div className="mb-6">
-                <label className="block mb-3">
-                  Division <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <Input
+
+              {/* Division Dropdown */}
+              {availableDivisions.length > 1 && (
+                <div className="mb-6">
+                  <label className="block mb-3">
+                    Division <span className="text-red-500">*</span>
+                  </label>
+                  <select
                     value={division}
-                    onChange={(e) => setDivision(e.target.value)}
-                    className="pl-12 bg-black border-zinc-800 text-white h-14 rounded-lg focus:border-blue-500"
-                    placeholder="e.g. North Division"
-                  />
+                    onChange={(e) => {
+                      setDivision(e.target.value);
+                      const match = availableDivisions.find(d => d.division === e.target.value) || null;
+                      setSelectedCompany(match);
+                      validateTerritory(pinCode, match);
+                    }}
+                    className="w-full h-14 px-4 bg-black border border-zinc-800 text-white rounded-lg focus:border-blue-500"
+                  >
+                    <option value="">Select Division</option>
+                    {availableDivisions.map(d => (
+                      <option key={d.id} value={d.division}>{d.division}</option>
+                    ))}
+                  </select>
                 </div>
-              </div>
-              <div className="mb-8">
-                <label className="block mb-3">
-                  Clinic QR Number <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <QrCode className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <Input
-                    value={qrNumber}
-                    onChange={(e) => setQrNumber(e.target.value.toUpperCase())}
-                    className="pl-12 bg-black border-zinc-800 text-white h-14 rounded-lg focus:border-blue-500 font-mono"
-                    placeholder="e.g. QR-CLINIC-001"
-                  />
+              )}
+
+              {/* Territory validation message */}
+              {selectedCompany && pinCode.length === 6 && territoryValid !== null && (
+                <div className={`mb-6 rounded-lg px-3 py-2 border ${
+                  territoryValid
+                    ? 'bg-emerald-500/10 border-emerald-500/30'
+                    : 'bg-red-500/10 border-red-500/30'
+                }`}>
+                  <p className={`text-sm ${territoryValid ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {territoryValid
+                      ? `✓ ${getStateFromPincode(pinCode)} is covered by this company/division`
+                      : `✗ ${getStateFromPincode(pinCode)} is NOT in this company's territory. Contact your distributor.`
+                    }
+                  </p>
                 </div>
-              </div>
+              )}
+
+              {/* QR Number */}
+              {selectedCompany && (
+                <div className="mb-8">
+                  <label className="block mb-3">
+                    Clinic QR Number <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <QrCode className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <Input
+                      value={qrNumber}
+                      onChange={(e) => setQrNumber(e.target.value.toUpperCase())}
+                      className="pl-12 bg-black border-zinc-800 text-white h-14 rounded-lg focus:border-blue-500 font-mono"
+                      placeholder="e.g. QR-CLINIC-001"
+                    />
+                  </div>
+                </div>
+              )}
             </>
           )}
           {qrType === 'virtual' && virtualQrGenerated && (

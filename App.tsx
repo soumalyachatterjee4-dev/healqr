@@ -101,6 +101,8 @@ const PharmaLogin = lazy(() => import("./components/PharmaLogin"));
 const PharmaVerifyLogin = lazy(() => import("./components/PharmaVerifyLogin"));
 const PharmaPortal = lazy(() => import("./components/PharmaPortal"));
 const PharmaSignUp = lazy(() => import("./components/PharmaSignUp"));
+const DoctorCMEViewer = lazy(() => import("./components/DoctorCMEViewer"));
+const DoctorSampleRequest = lazy(() => import("./components/DoctorSampleRequest"));
 // AIChatBot is imported directly at the top (not lazy)
 
 // Loading Component
@@ -214,6 +216,8 @@ export default function App() {
     | "purchase-history"
     | "video-call"
     | "braindeck"
+    | "pharma-cme"
+    | "pharma-samples"
   >(() => {
     // Initialize currentPage from localStorage to prevent flash/auto-logout on refresh
     const isClinic = localStorage.getItem('healqr_is_clinic') === 'true';
@@ -2399,6 +2403,10 @@ export default function App() {
       setCurrentPage("monthly-planner");
     else if (menu === "braindeck")
       setCurrentPage("braindeck");
+    else if (menu === "pharma-cme")
+      setCurrentPage("pharma-cme");
+    else if (menu === "pharma-samples")
+      setCurrentPage("pharma-samples");
   };
 
   // Proper logout handler with Firebase signOut
@@ -2662,6 +2670,26 @@ export default function App() {
         <Suspense fallback={<PageLoader />}>
           <BrainDeckManager
             onBack={() => setCurrentPage("dashboard")}
+            doctorName={userName}
+          />
+        </Suspense>
+      )}
+
+      {currentPage === "pharma-cme" && (
+        <Suspense fallback={<PageLoader />}>
+          <DoctorCMEViewer
+            onBack={() => setCurrentPage("dashboard")}
+            companyName={userCompanyName}
+            doctorName={userName}
+          />
+        </Suspense>
+      )}
+
+      {currentPage === "pharma-samples" && (
+        <Suspense fallback={<PageLoader />}>
+          <DoctorSampleRequest
+            onBack={() => setCurrentPage("dashboard")}
+            companyName={userCompanyName}
             doctorName={userName}
           />
         </Suspense>

@@ -52,6 +52,8 @@ import ClinicAIDietChartManager from './ClinicAIDietChartManager';
 import ClinicAIRXReaderManager from './ClinicAIRXReaderManager';
 import ClinicVideoConsultationManager from './ClinicVideoConsultationManager';
 import VideoLibrary from './VideoLibrary';
+import ClinicCMEViewer from './ClinicCMEViewer';
+import ClinicSampleRequest from './ClinicSampleRequest';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 
 interface ClinicData {
@@ -64,6 +66,7 @@ interface ClinicData {
   clinicCode?: string;
   phone?: string;
   logoUrl?: string;
+  companyName?: string;
   linkedDoctorCodes?: string[];
   linkedDoctorsDetails?: Array<{
     doctorId: string;
@@ -787,11 +790,33 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
     );
   }
 
+  // Render CME Content viewer
+  if (activeMenu === 'pharma-cme') {
+    return (
+      <ClinicCMEViewer
+        onBack={() => setActiveMenu('dashboard')}
+        companyName={clinicData?.companyName || ''}
+        clinicName={displayClinicName}
+      />
+    );
+  }
+
+  // Render Sample Requests
+  if (activeMenu === 'pharma-samples') {
+    return (
+      <ClinicSampleRequest
+        onBack={() => setActiveMenu('dashboard')}
+        companyName={clinicData?.companyName || ''}
+        clinicName={displayClinicName}
+      />
+    );
+  }
+
   // Handle unimplemented features
   const implementedMenus = [
     'dashboard', 'profile', 'qr-manager', 'schedule', 'schedule-manager',
     'todays-schedule', 'doctors', 'braindeck', 'video-consult', 'advance-booking', 'analytics', 'reports', 'social-kit', 'monthly-planner', 'preview', 'assistant',
-    'lab-referral', 'templates', 'emergency', 'ai-diet', 'ai-rx'
+    'lab-referral', 'templates', 'emergency', 'ai-diet', 'ai-rx', 'pharma-cme', 'pharma-samples'
   ];
 
   if (!implementedMenus.includes(activeMenu)) {

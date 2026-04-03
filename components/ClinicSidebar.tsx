@@ -20,7 +20,9 @@ import {
   Video,
   ChevronDown,
   Check,
-  LogOut
+  LogOut,
+  BookOpen,
+  Package
 } from 'lucide-react';
 import healqrLogo from '../assets/healqr.logo.png';
 import { useState, useEffect } from 'react';
@@ -92,7 +94,8 @@ export default function ClinicSidebar({
   const branchAllowedPages = [
     'dashboard', 'doctors', 'qr-manager', 'schedule-manager', 'todays-schedule',
     'advance-booking', 'analytics', 'reports', 'social-kit', 'monthly-planner',
-    'assistant', 'lab-referral', 'ai-diet', 'ai-rx', 'video-consult'
+    'assistant', 'lab-referral', 'ai-diet', 'ai-rx', 'video-consult',
+    'pharma-cme', 'pharma-samples'
   ];
 
   const sections: Section[] = [
@@ -143,6 +146,14 @@ export default function ClinicSidebar({
         { id: 'ai-diet', label: 'AI Diet Chart', icon: Apple, isAddon: true },
         { id: 'ai-rx', label: 'AI RX Reader', icon: ScanText, isAddon: true },
         { id: 'video-consult', label: 'Video Consultation', icon: Video, isAddon: true },
+      ]
+    },
+    {
+      id: 'pharma-services',
+      title: 'PHARMA SERVICES',
+      items: [
+        { id: 'pharma-cme', label: 'CME Content', icon: BookOpen },
+        { id: 'pharma-samples', label: 'Sample Requests', icon: Package },
       ]
     }
   ];

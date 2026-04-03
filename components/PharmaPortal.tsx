@@ -8,6 +8,10 @@ import PharmaAnalytics from './PharmaAnalytics';
 import PharmaDashboardTemplates from './PharmaDashboardTemplates';
 import PharmaProfileManager from './PharmaProfileManager';
 import VideoLibrary from './VideoLibrary';
+import PharmaRxTrends from './PharmaRxTrends';
+import PharmaOnboardingTracker from './PharmaOnboardingTracker';
+import PharmaCMEManager from './PharmaCMEManager';
+import PharmaSampleRequests from './PharmaSampleRequests';
 import { db } from '../lib/firebase/config';
 import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, updateDoc, getDoc } from 'firebase/firestore';
 
@@ -26,7 +30,7 @@ interface SupportMessage {
 
 export default function PharmaPortal({ onLogout }: PharmaPortalProps) {
   const [currentPage, setCurrentPage] = useState<
-    'profile' | 'dashboard' | 'my-doctors' | 'my-clinics' | 'analytics' | 'templates' | 'video-library'
+    'profile' | 'dashboard' | 'my-doctors' | 'my-clinics' | 'analytics' | 'templates' | 'video-library' | 'rx-trends' | 'onboarding' | 'cme' | 'samples'
   >('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -50,6 +54,10 @@ export default function PharmaPortal({ onLogout }: PharmaPortalProps) {
     analytics: 'Analytics',
     templates: 'Dashboard Templates',
     'video-library': 'Video Library',
+    'rx-trends': 'Rx Molecule Trends',
+    'onboarding': 'Onboarding Tracker',
+    'cme': 'CME Content',
+    'samples': 'Sample Requests',
   };
 
   // Redirect if not authenticated
@@ -355,6 +363,18 @@ export default function PharmaPortal({ onLogout }: PharmaPortalProps) {
         )}
         {currentPage === 'video-library' && (
           <VideoLibrary onBack={() => setCurrentPage('dashboard')} source="dashboard" />
+        )}
+        {currentPage === 'rx-trends' && (
+          <PharmaRxTrends companyId={companyId} />
+        )}
+        {currentPage === 'onboarding' && (
+          <PharmaOnboardingTracker companyId={companyId} />
+        )}
+        {currentPage === 'cme' && (
+          <PharmaCMEManager companyId={companyId} />
+        )}
+        {currentPage === 'samples' && (
+          <PharmaSampleRequests companyId={companyId} />
         )}
       </div>
 
