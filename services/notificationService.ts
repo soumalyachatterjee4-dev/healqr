@@ -30,11 +30,6 @@ const sendFCM = async (payload: { userId: string; title: string; body: string; d
       } catch (e) { /* fallback to English */ }
     }
 
-    console.log('ðŸ“¤ Sending FCM notification:', {
-      userId: payload.userId,
-      title: payload.title,
-      type: payload.data?.type
-    });
 
     const sendFCMNotification = httpsCallable(functions, 'sendFCMNotification');
     const result = await sendFCMNotification(payload);
@@ -46,7 +41,6 @@ const sendFCM = async (payload: { userId: string; title: string; body: string; d
       console.warn('ðŸ“‹ Patient ID:', payload.userId);
       return { success: false, error: res.error };
     } else {
-      console.log('âœ… FCM sent successfully:', res);
       return res;
     }
   } catch (error) {
@@ -227,7 +221,6 @@ export const sendConsultationCompleted = async (data: any) => {
         }
       } : {}),
     });
-    console.log('âœ… Notification stored in Firestore for patient:', phone10);
   } catch (storageError) {
     console.error('âŒ Failed to store notification in Firestore:', storageError);
     // Don't throw - notification storage failure shouldn't break the flow
@@ -355,7 +348,6 @@ export const sendRxUpdatedNotification = async (data: any) => {
         }
       } : {}),
     });
-    console.log('âœ… RX Updated notification stored for patient:', phone10);
   } catch (storageError) {
     console.error('âŒ Failed to store RX Updated notification:', storageError);
   }
@@ -591,7 +583,6 @@ export const sendFollowUp = async (data: any) => {
         language: data.language || 'english'
       }
     });
-    console.log('âœ… Follow-up notification stored in Firestore');
   } catch (error) {
     console.error('âŒ Failed to store follow-up notification:', error);
   }
@@ -707,7 +698,6 @@ export const sendAppointmentCancelled = async (data: any) => {
         language: data.language || 'english'
       }
     });
-    console.log('âœ… Cancellation notification stored in Firestore');
   } catch (error) {
     console.error('âŒ Failed to store cancellation notification:', error);
     // Don't fail the whole operation if storage fails
@@ -765,7 +755,32 @@ export const sendAppointmentRestored = async (data: any) => {
     serialNumber: data.tokenNumber,
     bookingId: data.bookingId,
     message: data.message || 'Your appointment has been restored',
-    doctorId: data.doctorId
+    doctorId: data.doctorId,
+    // 🆕 120-DAY TEMPLATE STORAGE
+    templateType: 'appointment_restored',
+    templateData: {
+      greeting: `Hello ${data.patientName || 'there'}, 👋`,
+      mainMessage: data.message || 'Your appointment has been restored and confirmed again.',
+      restorationReason: data.message || 'Restored by doctor',
+      consultationDetails: {
+        date: data.appointmentDate || '',
+        time: data.appointmentTime || '',
+        chamber: data.chamber || '',
+        serialNo: data.tokenNumber || ''
+      },
+      actionButtons: [
+        { type: 'view', label: 'View Appointment', enabled: true }
+      ]
+    },
+    doctorSpecialty: data.doctorSpecialty,
+    doctorInitials: data.doctorInitials,
+    doctorPhoto: data.doctorPhoto,
+    expiresAt: (() => { const d = new Date(); d.setDate(d.getDate() + 120); return d; })(),
+    isExpired: false,
+    readStatus: false,
+    userActions: {
+      opened: false
+    }
   });
 
   // ðŸ’¾ ALWAYS STORE IN FIRESTORE (regardless of FCM success/failure)
@@ -801,7 +816,6 @@ export const sendAppointmentRestored = async (data: any) => {
         language: data.language || 'english'
       }
     });
-    console.log('âœ… Restoration notification stored in Firestore');
   } catch (error) {
     console.error('âŒ Failed to store restoration notification:', error);
     // Don't fail the whole operation if storage fails
@@ -897,7 +911,6 @@ export const sendAppointmentReminder = async (data: any, bookingCreatedAt: Date)
     const diffMs = appointmentTime.getTime() - bookingCreatedAt.getTime();
     const diffHours = diffMs / (1000 * 60 * 60);
     if (diffHours < 6) {
-      console.log('â© Skipping reminder (booking made less than 6h before appointment)');
       return { skipped: true } as any;
     }
   }
@@ -962,7 +975,6 @@ export const scheduleBookingReminder = async (data: any) => {
     const diffMs = appointmentTime.getTime() - bookingCreatedAt.getTime();
     const diffHours = diffMs / (1000 * 60 * 60);
     if (diffHours < 6) {
-      console.log('â© Skipping reminder (booking made less than 6h before appointment)');
       return { skipped: true } as any;
     }
   }
@@ -1042,7 +1054,6 @@ export const sendVideoCallLink = async (data: any) => {
         language: data.language || 'english'
       }
     });
-    console.log('âœ… Video call notification stored in Firestore');
   } catch (error) {
     console.error('âŒ Failed to store video call notification:', error);
   }
@@ -1153,7 +1164,6 @@ export const sendAdminAlert = async (data: {
   // Send to doctor (not patient)
   const doctorUserId = `doctor_${data.doctorId}`;
 
-  console.log('ðŸš¨ Sending admin alert to doctor:', doctorUserId);
 
   const patientList = data.unmarkedPatients.map(p => p.name).join(', ');
 

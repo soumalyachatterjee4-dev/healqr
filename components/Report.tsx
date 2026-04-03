@@ -133,7 +133,6 @@ export default function Report({ onMenuChange, onLogout, activeAddOns = [] }: Re
           });
 
           if (restrictedClinicIds.length > 0) {
-            console.log('🔒 Restricted clinics for reports:', restrictedClinicIds);
           }
         } catch (error) {
           console.error('Error checking clinic access restrictions:', error);
@@ -154,10 +153,6 @@ export default function Report({ onMenuChange, onLogout, activeAddOns = [] }: Re
           // 🔒 PATIENT DATA ACCESS CONTROL: Filter out bookings from restricted clinics
           const bookingClinicId = booking.clinicId;
           if (bookingClinicId && restrictedClinicIds.includes(bookingClinicId)) {
-            console.log('🔒 Filtered out booking from restricted clinic in report:', { 
-              bookingId: doc.id, 
-              clinicId: bookingClinicId 
-            });
             return; // Skip this booking
           }
           

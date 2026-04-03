@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { X, Apple, Sparkles, Loader2, CheckCircle2, Send, Pencil, Plus, Trash2, Save, MessageCircle } from 'lucide-react';
+import { generateDietPlanWithGemini } from '../services/aiService';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -240,10 +241,19 @@ export default function InlineDietChartModal({ patient, doctorInfo, onClose, onG
     setIsGenerating(true);
 
     try {
-      // Simulate AI processing
-      await new Promise(resolve => setTimeout(resolve, 2500));
-
-      const plan = generateDetailedPlan(region);
+      const plan = await generateDietPlanWithGemini({
+        name: patient.name,
+        age: String(patient.age),
+        gender: patient.gender,
+        weight,
+        height,
+        activityLevel,
+        conditions: condStr,
+        preferences: getPreferencesString(),
+        region,
+        isSmoker,
+        isAlcoholic,
+      });
       setGeneratedPlan(plan);
       setStep('review');
       toast.success('AI Diet Chart generated!');
@@ -253,55 +263,6 @@ export default function InlineDietChartModal({ patient, doctorInfo, onClose, onG
     } finally {
       setIsGenerating(false);
     }
-  };
-
-  const generateDetailedPlan = (selectedRegion: string): DietPlanDay[] => {
-    const days: DietPlanDay[] = [];
-    for (let i = 1; i <= 7; i++) {
-      days.push({
-        day: i,
-        meals: [
-          {
-            type: 'Breakfast',
-            items: [
-              { name: 'Oats with Milk', weight: '50 GM', kcal: '180 KCAL' },
-              { name: 'Boiled Egg', weight: '1 unit', kcal: '70 KCAL' },
-            ],
-          },
-          {
-            type: 'Lunch',
-            items: selectedRegion === 'West Bengal'
-              ? [
-                  { name: 'Rice (Red/Brown)', weight: '50 GM', kcal: '100 KCAL' },
-                  { name: 'Boiled Spinach+Carrot', weight: '100 GM', kcal: '200 KCAL' },
-                  { name: 'Fish (Steamed/Grilled)', weight: '75 GM', kcal: '200 KCAL' },
-                  { name: 'Mishti (Low GI/Stevia)', weight: '20 GM', kcal: '80 KCAL' },
-                ]
-              : [
-                  { name: 'Multigrain Roti', weight: '2 units', kcal: '140 KCAL' },
-                  { name: 'Dal (Lentils)', weight: '100 GM', kcal: '120 KCAL' },
-                  { name: 'Mixed Veggies', weight: '100 GM', kcal: '150 KCAL' },
-                  { name: 'Curd', weight: '50 GM', kcal: '50 KCAL' },
-                ],
-          },
-          {
-            type: 'Snacks',
-            items: [
-              { name: 'Roasted Foxnuts (Makhana)', weight: '20 GM', kcal: '70 KCAL' },
-              { name: 'Green Tea', weight: '1 Cup', kcal: '0 KCAL' },
-            ],
-          },
-          {
-            type: 'Dinner',
-            items: [
-              { name: 'Vegetable Soup', weight: '150 ML', kcal: '90 KCAL' },
-              { name: 'Grilled Paneer/Chicken', weight: '50 GM', kcal: '130 KCAL' },
-            ],
-          },
-        ],
-      });
-    }
-    return days;
   };
 
   // Edit meal items

@@ -147,7 +147,6 @@ export default function DoctorReports({
 
             // If doctor is restricted for this clinic AND booking is from clinic QR, exclude it
             if (isClinicRestricted && booking.bookingSource !== 'doctor_qr') {
-              console.log('🚫 Filtering out clinic booking from reports:', docSnap.id);
               return false; // Exclude this booking
             }
 

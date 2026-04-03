@@ -113,9 +113,7 @@ export default function Login({ onNext, onSignUp, onClose, isDemoMode }: LoginPr
       };
 
       // Send sign-in link to email (use normalized email)
-      console.log('🔐 Attempting to send magic link to:', normalizedEmail);
       await sendSignInLinkToEmail(auth, normalizedEmail, actionCodeSettings);
-      console.log('✅ Magic link sent successfully to:', normalizedEmail);
 
       setLinkSent(true);
       toast.success('Login link sent!', {

@@ -50,16 +50,6 @@ interface SelectDateProps {
 }
 
 export default function SelectDate({ onBack, onContinue, language, maxAdvanceDays = 30, plannedOffPeriods = [], clinicPlannedOffPeriods = [], chambers = [], schedules = [], globalBookingEnabled = true, doctorName = '', doctorSpecialty = '', doctorPhoto = '', useDrPrefix = true, themeColor = 'emerald', clinicId, doctorId }: SelectDateProps) {
-  console.log('📅 SelectDate Props:', {
-    maxAdvanceDays,
-    globalBookingEnabled,
-    plannedOffPeriodsCount: plannedOffPeriods.length,
-    clinicId: clinicId || 'NOT_FROM_CLINIC',
-    doctorId: doctorId || 'NOT_SET',
-    schedulesCount: schedules.length,
-    doctorName,
-    doctorSpecialty
-  });
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
@@ -113,12 +103,6 @@ export default function SelectDate({ onBack, onContinue, language, maxAdvanceDay
     // Disable dates beyond max advance booking days
     const maxDate = new Date(today);
     maxDate.setDate(maxDate.getDate() + maxAdvanceDays);
-    console.log(`📅 Checking date ${day}:`, {
-      date: date.toDateString(),
-      maxDate: maxDate.toDateString(),
-      maxAdvanceDays,
-      isDisabled: date > maxDate
-    });
     if (date > maxDate) {
       return true;
     }
@@ -183,7 +167,6 @@ export default function SelectDate({ onBack, onContinue, language, maxAdvanceDay
       // Reason: Doctor may have personal chambers (HOME) available
       // SelectChamber will filter clinic chambers
       if (isDoctorQr) {
-        console.log(`🏥 Doctor QR: NOT blocking date for clinic off - chambers will handle filtering`);
         return false; // DON'T BLOCK date for doctor QR
       }
 
@@ -192,22 +175,8 @@ export default function SelectDate({ onBack, onContinue, language, maxAdvanceDay
 
     const allBlockingPeriods = [...activePlannedOffPeriods, ...activeClinicPeriods];
 
-    console.log('📊 Planned off summary:', {
-      activeDoctorPeriodsCount: activePlannedOffPeriods.length,
-      activeClinicPeriodsCount: activeClinicPeriods.length,
-      allBlockingPeriodsCount: allBlockingPeriods.length,
-      checkingDate: date.toDateString()
-    });
 
     allBlockingPeriods.forEach(p => {
-      console.log('  🧩 Period:', {
-        startDate: p.startDate,
-        endDate: p.endDate,
-        appliesTo: (p as any).appliesTo,
-        clinicId: p.clinicId,
-        chamberName: p.chamberName,
-        status: p.status
-      });
     });
 
     for (const period of allBlockingPeriods) {
@@ -240,19 +209,12 @@ export default function SelectDate({ onBack, onContinue, language, maxAdvanceDay
       startDate.setHours(0, 0, 0, 0);
       endDate.setHours(0, 0, 0, 0);
 
-      console.log(`  📅 Comparing with period:`, {
-        startDate: startDate.toDateString(),
-        endDate: endDate.toDateString(),
-        isInRange: date >= startDate && date <= endDate
-      });
 
       if (date >= startDate && date <= endDate) {
-        console.log(`  ❌ Date ${day} IS BLOCKED by planned off period`);
         return true;
       }
     }
 
-    console.log(`  ✅ Date ${day} is NOT blocked`);
     return false;
   };
 

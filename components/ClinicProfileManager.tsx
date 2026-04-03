@@ -115,7 +115,6 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
     try {
       const user = auth?.currentUser;
       if (!user) {
-        console.log('No authenticated user');
         setLoading(false);
         return;
       }
@@ -135,18 +134,15 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
 
       if (clinicDoc.exists()) {
         const data = clinicDoc.data();
-        console.log('✅ Loaded clinic profile:', data);
 
         // 🔄 MIGRATION: Update old clinic codes to new format
         const rawCode = data.clinicCode || '';
         if (rawCode.match(/^HQR-\d{6}-\d{4}-CLN$/)) {
           const newCode = rawCode.replace(/-CLN$/, '-001-CLN');
-          console.log(`🔄 Migrating clinic code: ${rawCode} → ${newCode}`);
           try {
             const { updateDoc } = await import('firebase/firestore');
             await updateDoc(clinicDocRef, { clinicCode: newCode });
             data.clinicCode = newCode; // Update local data
-            console.log('✅ Clinic code migrated successfully');
           } catch (migrationError) {
             console.warn('⚠️ Clinic code migration failed (non-critical):', migrationError);
           }
@@ -192,7 +188,6 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
         if (data.footerLine2) setFooterLine2(data.footerLine2);
         if (data.watermarkLogo) setWatermarkLogo(data.watermarkLogo);
       } else {
-        console.log('ℹ️ No clinic profile found');
       }
     } catch (error) {
       console.error('❌ Error loading profile:', error);
@@ -206,7 +201,6 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
       const file = e.target.files?.[0];
       if (!file) return;
 
-      console.log('📤 Starting upload for:', file.name, `(${(file.size / 1024).toFixed(1)}KB)`);
 
       if (!auth?.currentUser) {
         alert('Please login again before uploading an image.');
@@ -221,18 +215,13 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
       setIsUploadingImage(true);
 
       // Compress image before uploading
-      console.log('🔄 Compressing image...');
       const compressedFile = await compressImage(file);
-      console.log('✅ Compression complete');
 
       const filePath = `clinicProfileImages/${auth.currentUser.uid}/${Date.now()}_${file.name}`;
-      console.log('☁️ Uploading to Storage:', filePath);
       const storageRef = ref(storage, filePath);
       await uploadBytes(storageRef, compressedFile);
-      console.log('✅ Upload complete');
 
       const downloadURL = await getDownloadURL(storageRef);
-      console.log('✅ Download URL obtained:', downloadURL);
       setProfileImage(downloadURL);
       alert('Image uploaded successfully!');
     } catch (error: any) {
@@ -292,7 +281,6 @@ export default function ClinicProfileManager({ onMenuChange, onLogout }: ClinicP
                 type: 'image/jpeg',
                 lastModified: Date.now(),
               });
-              console.log(`📦 Compressed: ${(file.size / 1024).toFixed(1)}KB → ${(compressedFile.size / 1024).toFixed(1)}KB`);
               resolve(compressedFile);
             },
             'image/jpeg',

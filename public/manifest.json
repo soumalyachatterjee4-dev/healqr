@@ -2,8 +2,10 @@
   "short_name": "HealQR",
   "name": "HealQR - Doctor's e-Assistant",
   "gcm_sender_id": "739121123030",
-  "version": "1.0.1",
-  "description": "World's First QR-based e-Assistant for Doctors with instant bookings, patient management, and analytics",
+  "version": "1.1.0",
+  "description": "World's First QR-based e-Assistant for Doctors with instant bookings, patient management, analytics, and real-time 31-language translation",
+  "lang": "en",
+  "dir": "auto",
   "icons": [
     {
       "src": "/icon-192.png",

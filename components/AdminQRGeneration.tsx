@@ -170,7 +170,6 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
         }
       });
 
-      console.log("📊 Admin QR Check - Max from both collections:", maxNumber);
 
       const nextNum = maxNumber + 1;
       setNextAvailable(nextNum);
@@ -255,7 +254,6 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
         const existingSnapshot = await getDocs(existingQuery);
 
         if (!existingSnapshot.empty) {
-          console.log(`${qrNumber} already exists, skipping...`);
           continue;
         }
 
@@ -667,8 +665,8 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0f1a] text-white p-3 sm:p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-[#0a0f1a] text-white p-3 sm:p-6 overflow-x-hidden">
+      <div className="max-w-7xl mx-auto overflow-x-hidden">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 sm:mb-8 gap-3">
           <div className="flex items-center gap-3 sm:gap-4">
@@ -693,13 +691,13 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
 
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
-          <Card className="bg-zinc-900 border-zinc-800 p-6">
+          <Card className="bg-zinc-900 border-zinc-800 p-3 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-400 text-sm mb-1">Total Batches</p>
-                <p className="text-3xl font-bold">{stats.total}</p>
+                <p className="text-gray-400 text-xs sm:text-sm mb-1">Total Batches</p>
+                <p className="text-2xl sm:text-3xl font-bold">{stats.total}</p>
               </div>
-              <Package className="w-12 h-12 text-gray-500" />
+              <Package className="w-8 h-8 sm:w-12 sm:h-12 text-gray-500" />
             </div>
           </Card>
 
@@ -715,36 +713,36 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
             </div>
           </Card>
 
-          <Card className="bg-zinc-900 border-zinc-800 p-6">
+          <Card className="bg-zinc-900 border-zinc-800 p-3 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-400 text-sm mb-1">Dispatched</p>
-                <p className="text-3xl font-bold text-amber-400">
+                <p className="text-gray-400 text-xs sm:text-sm mb-1">Dispatched</p>
+                <p className="text-2xl sm:text-3xl font-bold text-amber-400">
                   {stats.dispatched}
                 </p>
               </div>
-              <Truck className="w-12 h-12 text-amber-400" />
+              <Truck className="w-8 h-8 sm:w-12 sm:h-12 text-amber-400" />
             </div>
           </Card>
 
-          <Card className="bg-zinc-900 border-zinc-800 p-6">
+          <Card className="bg-zinc-900 border-zinc-800 p-3 sm:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-400 text-sm mb-1">Deployed</p>
-                <p className="text-3xl font-bold text-emerald-400">
+                <p className="text-gray-400 text-xs sm:text-sm mb-1">Deployed</p>
+                <p className="text-2xl sm:text-3xl font-bold text-emerald-400">
                   {stats.deployed}
                 </p>
               </div>
-              <CheckCircle className="w-12 h-12 text-emerald-400" />
+              <CheckCircle className="w-8 h-8 sm:w-12 sm:h-12 text-emerald-400" />
             </div>
           </Card>
         </div>
 
         {/* Tabs */}
-        <div className="flex overflow-x-auto gap-1 sm:gap-2 mb-4 sm:mb-6 border-b border-zinc-800 -mx-3 px-3 sm:mx-0 sm:px-0">
+        <div className="flex overflow-x-auto gap-0 mb-4 sm:mb-6 border-b border-zinc-800 -mx-3 px-3 sm:mx-0 sm:px-0 scrollbar-hide" style={{scrollbarWidth: 'none', msOverflowStyle: 'none'}}>
           <button
             onClick={() => setActiveTab("create")}
-            className={`px-3 sm:px-6 py-2.5 sm:py-3 font-medium transition-all border-b-2 whitespace-nowrap text-sm sm:text-base ${
+            className={`px-3 sm:px-6 py-2.5 sm:py-3 font-medium transition-all border-b-2 whitespace-nowrap text-xs sm:text-base flex-shrink-0 ${
               activeTab === "create"
                 ? "border-emerald-500 text-emerald-400"
                 : "border-transparent text-gray-400 hover:text-gray-300"
@@ -755,7 +753,7 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
           </button>
           <button
             onClick={() => setActiveTab("inventory")}
-            className={`px-3 sm:px-6 py-2.5 sm:py-3 font-medium transition-all border-b-2 whitespace-nowrap text-sm sm:text-base ${
+            className={`px-3 sm:px-6 py-2.5 sm:py-3 font-medium transition-all border-b-2 whitespace-nowrap text-xs sm:text-base flex-shrink-0 ${
               activeTab === "inventory"
                 ? "border-emerald-500 text-emerald-400"
                 : "border-transparent text-gray-400 hover:text-gray-300"
@@ -766,7 +764,7 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
           </button>
           <button
             onClick={() => setActiveTab("display")}
-            className={`px-3 sm:px-6 py-2.5 sm:py-3 font-medium transition-all border-b-2 whitespace-nowrap text-sm sm:text-base ${
+            className={`px-3 sm:px-6 py-2.5 sm:py-3 font-medium transition-all border-b-2 whitespace-nowrap text-xs sm:text-base flex-shrink-0 ${
               activeTab === "display"
                 ? "border-emerald-500 text-emerald-400"
                 : "border-transparent text-gray-400 hover:text-gray-300"
@@ -1076,13 +1074,13 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
 
         {/* QR Display Panel Tab */}
         {activeTab === "display" && (
-          <Card className="bg-zinc-900 border-zinc-800 p-6 sm:p-8">
-            <div className="flex items-center justify-between mb-8">
+          <Card className="bg-zinc-900 border-zinc-800 p-4 sm:p-6 md:p-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 sm:mb-8 gap-4">
                <div>
-                  <h2 className="text-2xl font-bold text-white">QR Display Panel</h2>
+                  <h2 className="text-xl sm:text-2xl font-bold text-white">QR Display Panel</h2>
                   <p className="text-gray-400 text-sm mt-1">Search, calibrate, and download single QR templates</p>
                </div>
-               <div className="flex gap-2 min-w-[300px]">
+               <div className="flex gap-2 w-full sm:w-auto sm:min-w-[300px]">
                   <div className="relative flex-1">
                     <QrCode className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400" />
                     <Input

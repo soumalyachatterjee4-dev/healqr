@@ -202,7 +202,6 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
     const unsubscribe = onSnapshot(bookingsQuery, (snapshot) => {
       snapshot.docChanges().forEach((change) => {
         if (change.type === 'added' || change.type === 'modified' || change.type === 'removed') {
-          console.log('🔄 Clinic booking changed, triggering refresh...');
           // Debounce: wait 800ms to avoid rapid updates
           if (timeoutId) clearTimeout(timeoutId);
           timeoutId = setTimeout(() => {

@@ -25,13 +25,11 @@ export default function TemplateDisplay({ placement, className = '' }: TemplateD
     let timeoutId: NodeJS.Timeout;
     
     const loadTemplate = async () => {
-      console.log('🔍 TemplateDisplay loading for placement:', placement);
       
       // Add a small delay to prevent rapid mount/unmount issues
       await new Promise(resolve => { timeoutId = setTimeout(resolve, 50); });
       
       if (!isMounted) {
-        console.log('⚠️ Component unmounted before load started');
         return;
       }
       
@@ -40,7 +38,6 @@ export default function TemplateDisplay({ placement, className = '' }: TemplateD
         const { doc, getDoc } = await import('firebase/firestore');
         
         if (!isMounted) {
-          console.log('⚠️ Component unmounted during import');
           return;
         }
         
@@ -49,7 +46,6 @@ export default function TemplateDisplay({ placement, className = '' }: TemplateD
         
         // Check if component is still mounted before updating state
         if (!isMounted) {
-          console.log('⚠️ Component unmounted, skipping state update');
           return;
         }
         
@@ -57,21 +53,12 @@ export default function TemplateDisplay({ placement, className = '' }: TemplateD
           const data = adminSnap.data();
           if (data.globalTemplates && Array.isArray(data.globalTemplates)) {
             const globalTemplates = data.globalTemplates;
-            console.log('📋 Firestore templates count:', globalTemplates.length);
-            console.log('📋 All templates:', globalTemplates.map((t: any) => ({ 
-              name: t.name, 
-              category: t.category, 
-              published: t.isPublished, 
-              placements: t.placements 
-            })));
-            console.log('🎯 Looking for placement:', placement, 'of type:', typeof placement);
             
             // First, try to find any published health-tip template (fallback)
             const anyPublishedHealthTip = globalTemplates.find(
               (t: any) => t.category === 'health-tip' && t.isPublished === true
             );
             
-            console.log('🔍 Any published health tip found:', anyPublishedHealthTip?.name);
             
             const matchingTemplate = globalTemplates.find(
               (t: any) => {
@@ -83,46 +70,27 @@ export default function TemplateDisplay({ placement, className = '' }: TemplateD
                   p.trim().toLowerCase() === placement.trim().toLowerCase()
                 );
                 
-                console.log(`🔍 Template "${t.name}":`, {
-                  category: t.category,
-                  isCategoryMatch,
-                  published: t.isPublished,
-                  isPublished,
-                  placements: placementsString,
-                  placementsType: typeof t.placements,
-                  isArray: hasPlacementsArray,
-                  includesPlacement,
-                  match: isCategoryMatch && isPublished && includesPlacement
-                });
                 
                 return isCategoryMatch && isPublished && includesPlacement;
               }
             );
             
             if (matchingTemplate) {
-              console.log('✅ Found Firestore template with matching placement:', matchingTemplate.name);
               setTemplate(matchingTemplate);
               return;
             } else if (anyPublishedHealthTip) {
               // Fallback: show any published health tip if placement doesn't match
-              console.log('⚠️ No exact placement match, using fallback template:', anyPublishedHealthTip.name);
-              console.log('📋 Fallback template placements:', anyPublishedHealthTip.placements);
-              console.log('📋 Looking for:', placement);
               setTemplate(anyPublishedHealthTip);
               return;
             } else {
-              console.log('❌ No published health tips found');
             }
         } else {
-          console.log('❌ No globalTemplates array in Firestore');
         }
       } else {
-        console.log('❌ Admin document does not exist');
       }
       } catch (error: any) {
         // Ignore AbortError when component is unmounted
         if (!isMounted) {
-          console.log('⚠️ Component unmounted during fetch, ignoring error');
           return;
         }
         
@@ -130,7 +98,6 @@ export default function TemplateDisplay({ placement, className = '' }: TemplateD
         if (error?.name !== 'AbortError' && error?.code !== 'ERR_CANCELED') {
           console.error('Error loading templates from Firestore:', error);
         } else {
-          console.log('🔄 Request aborted (component unmounting)');
         }
       }
     };
@@ -138,7 +105,6 @@ export default function TemplateDisplay({ placement, className = '' }: TemplateD
     // FIREBASE LOADING CODE COMMENTED OUT - SEE ABOVE
     loadTemplate().catch((error: any) => {
       if (error?.name === 'AbortError' || error?.code === 'ERR_CANCELED') {
-        console.log('🔄 Caught unhandled abort error (suppressed)');
       } else if (isMounted) {
         console.error('Unhandled error in loadTemplate:', error);
       }
@@ -149,7 +115,6 @@ export default function TemplateDisplay({ placement, className = '' }: TemplateD
     
     // Listen for custom event from same window
     const handleCustomRefresh = () => {
-      console.log('🔄 Custom refresh event received');
       setRefreshKey(prev => prev + 1);
       loadTemplate().catch(() => {}); // Suppress errors on refresh too
     };

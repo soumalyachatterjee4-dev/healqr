@@ -145,7 +145,6 @@ export default function DoctorPatientChatManager({
       }
       // Silent log for debugging
       if (error instanceof Error && error.name === 'NotAllowedError') {
-        console.log('Microphone permission denied by user');
       } else {
         console.error('Error accessing microphone:', error);
       }
@@ -239,7 +238,6 @@ export default function DoctorPatientChatManager({
       ? `${customMessage}\n\nChat Link: ${generatedLink}`
       : `Your doctor wants to chat with you.\n\nChat Link: ${generatedLink}`;
     
-    console.log('📤 Sending notification:', fullMessage);
     toast.success('Notification sent to patient with chat link!');
     setShowChatLinkModal(false);
     setCustomMessage('');

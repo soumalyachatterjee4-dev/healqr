@@ -85,7 +85,6 @@ export default function AdminVerifyLogin({ onSuccess, onError }: AdminVerifyLogi
       // Force identity token refresh to ensure admin custom claims are recognized immediately
       try {
         await user.getIdToken(true);
-        console.log('✅ Admin token refreshed with custom claims');
       } catch (tokenError) {
         console.error('❌ Error refreshing admin token:', tokenError);
       }

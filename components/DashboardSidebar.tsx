@@ -63,7 +63,6 @@ export default function DashboardSidebar({
     // Assistants can access dashboard + their allowed pages
     const hasAccess = pageId === 'dashboard' || assistantAllowedPages.includes(pageId);
     if (isAssistant) {
-      console.log(`🔍 Checking access for "${pageId}":`, hasAccess, '| Allowed pages:', assistantAllowedPages);
     }
     return hasAccess;
   };

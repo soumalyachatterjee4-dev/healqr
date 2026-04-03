@@ -50,13 +50,6 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
     ? (profileData.specialties || profileData.specialities)!.join(', ')
     : 'General Physician';
 
-  console.log('🩺 QR Manager Profile Data:', {
-    hasImage: !!doctorImage,
-    imageSrc: doctorImage?.substring(0, 50) + '...',
-    name: doctorName,
-    degree,
-    speciality
-  });
 
   // QR Customization
   const [qrSize, setQrSize] = useState(300);
@@ -92,14 +85,12 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
       const userId = localStorage.getItem('userId');
 
       if (!userId) {
-        console.log('⚠️ No userId found in localStorage');
         return;
       }
 
       // Set personalized QR URL with doctor UID FIRST (before loading other data)
       const bookingUrl = `https://teamhealqr.web.app?doctorId=${userId}`;
       setQrUrl(bookingUrl);
-      console.log('✅ QR URL set to:', bookingUrl);
 
       const { db } = await import('../lib/firebase/config');
       if (!db) {
@@ -122,8 +113,6 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
           // daysLeft calculation can be removed if not used elsewhere
         }
 
-        console.log('✅ Loaded subscription data:', data);
-        console.log('✅ Assigned QR Code:', data.activationQrCode);
       }
     } catch (error) {
       console.error('❌ Error loading subscription data:', error);
@@ -182,7 +171,6 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
         };
         img.src = doctorImage;
       });
-      console.log('✅ Doctor image loaded successfully:', !!doctorImageElement);
     }
 
     // Gradient background - Modern emerald to teal

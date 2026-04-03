@@ -83,7 +83,6 @@ export default function ClinicAnalytics({
           ? (localStorage.getItem('healqr_assistant_doctor_id') || userId)
           : userId;
 
-        console.log(`📊 [ClinicAnalytics] Starting loadAnalytics for userId: ${userId} (Prop: ${propClinicId})`);
 
         if (!userId) {
           console.warn("⚠️ [ClinicAnalytics] Waiting for userId...");
@@ -302,11 +301,12 @@ export default function ClinicAnalytics({
               }
             } catch (e) { purposeCounts['NA']++; }
           } else {
+            const cancelType = (data.cancellationType || '').toUpperCase();
             const cancelReason = data.cancellationReason || '';
             const cancelledBy = data.cancelledBy || '';
-            if (cancelReason.includes('global toggle')) globalToggleCancellation++;
-            else if (cancelReason.includes('chamber')) chamberCancellation++;
-            else if (cancelledBy === 'patient') patientCancellation++;
+            if (cancelType === 'GLOBAL TOGGLE' || cancelType === 'GLOBAL_BLOCKED' || cancelReason.includes('global toggle') || cancelReason.includes('global_planned_off')) globalToggleCancellation++;
+            else if (cancelType === 'CHAMBER TOGGLE' || cancelType === 'CHAMBER_BLOCKED' || cancelReason.includes('chamber') || cancelReason.includes('chamber_deactivated')) chamberCancellation++;
+            else if (cancelType === 'PATIENT INDIVIDUAL TOGGLE' || cancelledBy === 'patient') patientCancellation++;
           }
 
           if (!isCancelled && (data.isMarkedSeen === false)) {

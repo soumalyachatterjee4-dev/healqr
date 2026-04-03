@@ -10,7 +10,11 @@ import {
   Info,
   Sparkles,
   Heart,
-  AlertTriangle
+  AlertTriangle,
+  Video,
+  Link,
+  ExternalLink,
+  Save
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -43,13 +47,16 @@ export default function PersonalizedTemplatesManager({
   activeAddOns = []
 }: PersonalizedTemplatesManagerProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'health-tip' | 'festival-wish'>('health-tip');
+  const [activeTab, setActiveTab] = useState<'health-tip' | 'festival-wish' | 'patient-video'>('health-tip');
   const [templates, setTemplates] = useState<Template[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [showAcknowledgement, setShowAcknowledgement] = useState(false);
   const [acknowledgedSession, setAcknowledgedSession] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [videoUrl, setVideoUrl] = useState('');
+  const [savedVideoUrl, setSavedVideoUrl] = useState('');
+  const [savingVideo, setSavingVideo] = useState(false);
 
   // Load templates from Firestore
   useEffect(() => {
@@ -71,6 +78,10 @@ export default function PersonalizedTemplatesManager({
         const data = doctorSnap.data();
         const storedTemplates = data.personalizedTemplates || [];
         setTemplates(storedTemplates);
+        if (data.patientFeedbackVideoUrl) {
+          setVideoUrl(data.patientFeedbackVideoUrl);
+          setSavedVideoUrl(data.patientFeedbackVideoUrl);
+        }
       }
     } catch (error) {
       console.error('Error loading templates:', error);
@@ -307,9 +318,172 @@ export default function PersonalizedTemplatesManager({
                 </Badge>
               )}
             </button>
+            <button
+              onClick={() => setActiveTab('patient-video')}
+              className={`flex items-center gap-2 px-6 py-3 font-medium transition-all border-b-2 ${
+                activeTab === 'patient-video'
+                  ? 'border-blue-500 text-blue-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-300'
+              }`}
+            >
+              <Video className="w-4 h-4" />
+              Patient Video
+              {savedVideoUrl && (
+                <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">
+                  1
+                </Badge>
+              )}
+            </button>
           </div>
 
+          {/* Patient Video URL Section */}
+          {activeTab === 'patient-video' && (
+            <>
+              <Card className="bg-blue-500/10 border-blue-500/30 mb-6 p-4">
+                <div className="flex items-start gap-3">
+                  <Video className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                  <div className="space-y-1">
+                    <p className="text-blue-100 text-sm font-medium">
+                      Patient Feedback Video Link
+                    </p>
+                    <p className="text-blue-200/80 text-xs">
+                      Upload your patient feedback video to <strong>Facebook, Instagram, or YouTube</strong> and paste the link here. Patients visiting your mini-website can watch the video and come back to book an appointment.
+                    </p>
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="bg-zinc-900/50 border-zinc-800 p-6 mb-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-white">Video Link</h3>
+                    <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">
+                      Social Media
+                    </Badge>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-gray-300 text-sm">Paste your video URL</Label>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Link className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <Input
+                          type="url"
+                          placeholder="https://www.facebook.com/watch/... or https://youtu.be/..."
+                          value={videoUrl}
+                          onChange={(e) => setVideoUrl(e.target.value)}
+                          className="bg-zinc-800 border-zinc-700 text-white pl-10 placeholder:text-gray-500"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500">Supported: Facebook, Instagram, YouTube links</p>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <Button
+                      onClick={async () => {
+                        if (!videoUrl.trim()) {
+                          toast.error('Please paste a video URL');
+                          return;
+                        }
+                        // Basic URL validation
+                        try {
+                          new URL(videoUrl.trim());
+                        } catch {
+                          toast.error('Please enter a valid URL');
+                          return;
+                        }
+                        setSavingVideo(true);
+                        try {
+                          const userId = localStorage.getItem('userId');
+                          if (!userId) return;
+                          const { db } = await import('../lib/firebase/config');
+                          const { doc, updateDoc } = await import('firebase/firestore');
+                          const doctorRef = doc(db, 'doctors', userId);
+                          await updateDoc(doctorRef, {
+                            patientFeedbackVideoUrl: videoUrl.trim(),
+                            updatedAt: new Date().toISOString()
+                          });
+                          setSavedVideoUrl(videoUrl.trim());
+                          toast.success('Video link saved! It will appear on your mini-website.');
+                          window.dispatchEvent(new CustomEvent('template-refresh'));
+                        } catch (error) {
+                          console.error('Error saving video URL:', error);
+                          toast.error('Failed to save video link');
+                        } finally {
+                          setSavingVideo(false);
+                        }
+                      }}
+                      disabled={savingVideo || !videoUrl.trim()}
+                      className="bg-blue-500 hover:bg-blue-600 text-white"
+                    >
+                      {savingVideo ? 'Saving...' : (
+                        <>
+                          <Save className="w-4 h-4 mr-2" />
+                          Save Link
+                        </>
+                      )}
+                    </Button>
+                    {savedVideoUrl && (
+                      <Button
+                        onClick={async () => {
+                          setSavingVideo(true);
+                          try {
+                            const userId = localStorage.getItem('userId');
+                            if (!userId) return;
+                            const { db } = await import('../lib/firebase/config');
+                            const { doc, updateDoc } = await import('firebase/firestore');
+                            const doctorRef = doc(db, 'doctors', userId);
+                            await updateDoc(doctorRef, {
+                              patientFeedbackVideoUrl: '',
+                              updatedAt: new Date().toISOString()
+                            });
+                            setVideoUrl('');
+                            setSavedVideoUrl('');
+                            toast.success('Video link removed');
+                            window.dispatchEvent(new CustomEvent('template-refresh'));
+                          } catch (error) {
+                            console.error('Error removing video URL:', error);
+                            toast.error('Failed to remove video link');
+                          } finally {
+                            setSavingVideo(false);
+                          }
+                        }}
+                        disabled={savingVideo}
+                        variant="outline"
+                        className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Current Saved Link Preview */}
+                  {savedVideoUrl && (
+                    <div className="bg-zinc-800/50 rounded-lg p-4 border border-blue-500/20">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Video className="w-4 h-4 text-blue-400" />
+                        <p className="text-sm text-gray-300 font-medium">Currently Active</p>
+                      </div>
+                      <a
+                        href={savedVideoUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-400 text-sm hover:underline break-all flex items-center gap-1"
+                      >
+                        {savedVideoUrl}
+                        <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            </>
+          )}
+
           {/* Upload Section */}
+          {activeTab !== 'patient-video' && (
           <Card className="bg-zinc-900/50 border-zinc-800 p-6 mb-6">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -420,7 +594,10 @@ export default function PersonalizedTemplatesManager({
             </div>
           </Card>
 
+          )}
+
           {/* Template History */}
+          {activeTab !== 'patient-video' && (
           <Card className="bg-zinc-900/50 border-zinc-800 p-6">
             <h3 className="text-lg font-semibold text-white mb-4">
               Template History ({templates.filter(t => t.category === activeTab).length})
@@ -466,6 +643,7 @@ export default function PersonalizedTemplatesManager({
               </div>
             )}
           </Card>
+          )}
         </div>
       </div>
 

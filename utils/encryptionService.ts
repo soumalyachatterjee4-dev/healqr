@@ -155,7 +155,4 @@ export function validateEncryptionKey(): boolean {
 
 // Log encryption status on import (only in development)
 if (import.meta.env.DEV) {
-  console.log('🔐 Encryption Service Loaded');
-  console.log('🔑 Key Length:', ENCRYPTION_KEY.length);
-  console.log('✅ Key Valid:', validateEncryptionKey());
 }

@@ -48,11 +48,6 @@ export default function ContactSupport({ open, onOpenChange, doctorName, doctorC
       const { db } = await import('../lib/firebase/config');
       const { collection, addDoc, serverTimestamp } = await import('firebase/firestore');
       
-      console.log('🔄 Attempting to save support request...');
-      console.log('Doctor Name:', doctorName);
-      console.log('Doctor Code:', doctorCode);
-      console.log('Message:', message);
-      console.log('Rating:', rating);
       
       const docRef = await addDoc(collection(db, 'supportRequests'), {
         doctorName,
@@ -65,7 +60,6 @@ export default function ContactSupport({ open, onOpenChange, doctorName, doctorC
         resolvedAt: null,
       });
       
-      console.log('✅ Support request saved to Firestore with ID:', docRef.id);
       
       // Show success message
       toast.success('Support request submitted successfully!');

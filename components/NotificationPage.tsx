@@ -62,7 +62,6 @@ export default function NotificationPage() {
   const handleAdClick = () => {
     if (notification?.adBanner?.clickUrl) {
       // Track ad click for analytics
-      console.log('Ad clicked:', notification.adBanner.title);
       window.open(notification.adBanner.clickUrl, '_blank');
     }
   };

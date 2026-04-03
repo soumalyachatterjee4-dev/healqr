@@ -59,7 +59,6 @@ export default function ClinicAssistantAccessManager({
   activeAddOns,
   managerAllowedPages
 }: ClinicAssistantAccessManagerProps) {
-  console.log('\ud83d\udee1\ufe0f ClinicAssistantAccessManager: Component Initializing...');
 
   // Filter pages to only those the manager can access (if restricted)
   const visiblePages = managerAllowedPages
@@ -95,7 +94,6 @@ export default function ClinicAssistantAccessManager({
     if (!auth) return;
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      console.log('🔐 Auth state changed:', user?.uid || 'No user');
       setCurrentUser(user);
       setAuthReady(true);
     });
@@ -114,11 +112,9 @@ export default function ClinicAssistantAccessManager({
     const clinicId = currentUser?.uid || localStorage.getItem('userId');
 
     if (!clinicId || !db) {
-      console.log('Cannot load assistants - no clinicId or db');
       return;
     }
 
-    console.log('📋 Loading assistants for clinicId:', clinicId);
 
     try {
       const assistantsRef = collection(db, 'assistants');

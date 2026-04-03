@@ -95,7 +95,6 @@ export default function AssistantAccessManager({
     if (!auth) return;
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      console.log('🔐 Auth state changed:', user?.uid || 'No user');
       setCurrentUser(user);
       setAuthReady(true);
     });
@@ -115,11 +114,9 @@ export default function AssistantAccessManager({
     const doctorId = currentUser?.uid || localStorage.getItem('userId');
 
     if (!doctorId || !db) {
-      console.log('Cannot load assistants - no doctorId or db');
       return;
     }
 
-    console.log('📋 Loading assistants for doctorId:', doctorId);
 
     try {
       const assistantsRef = collection(db, 'assistants');
@@ -173,14 +170,8 @@ export default function AssistantAccessManager({
 
   // Create assistant access
   const createAssistant = async () => {
-    console.log('🔵 createAssistant called');
-    console.log('assistantName:', assistantName);
-    console.log('assistantEmail:', assistantEmail);
-    console.log('selectedPages:', selectedPages);
-    console.log('activeAssistants.length:', activeAssistants.length);
 
     if (!assistantName.trim()) {
-      console.log('❌ Name validation failed');
       toast.error('Assistant name required', {
         description: 'Please enter the assistant\'s full name'
       });
@@ -188,7 +179,6 @@ export default function AssistantAccessManager({
     }
 
     if (!assistantEmail.trim() || !assistantEmail.includes('@')) {
-      console.log('❌ Email validation failed');
       toast.error('Valid email required', {
         description: 'Please enter a valid email address'
       });
@@ -196,7 +186,6 @@ export default function AssistantAccessManager({
     }
 
     if (selectedPages.length === 0) {
-      console.log('❌ Page selection validation failed');
       toast.error('Page access required!', {
         description: 'Please select at least ONE page. Dashboard is always accessible.'
       });
@@ -204,7 +193,6 @@ export default function AssistantAccessManager({
     }
 
     if (activeAssistants.length >= 2) {
-      console.log('❌ Max assistants reached');
       toast.error('Maximum 2 active assistants allowed', {
         description: 'Please deactivate an existing assistant first'
       });
@@ -212,14 +200,9 @@ export default function AssistantAccessManager({
     }
 
     if (!auth?.currentUser || !db) {
-      console.log('❌ Auth or DB not available');
-      console.log('auth:', auth);
-      console.log('auth.currentUser:', auth?.currentUser);
-      console.log('db:', db);
 
       // Try to get userId from localStorage as fallback
       const userId = localStorage.getItem('userId');
-      console.log('userId from localStorage:', userId);
 
       if (!db) {
         toast.error('Database not initialized', {
@@ -236,11 +219,9 @@ export default function AssistantAccessManager({
       }
     }
 
-    console.log('✅ All validations passed, creating assistant...');
     setLoading(true);
 
     try {
-      console.log('🔍 Checking if email already exists...');
 
       // Get doctor ID from currentUser state or localStorage
       const doctorId = currentUser?.uid || localStorage.getItem('userId');
@@ -253,7 +234,6 @@ export default function AssistantAccessManager({
         return;
       }
 
-      console.log('Using doctorId:', doctorId);
 
       // Check if email already exists
       const assistantsRef = collection(db, 'assistants');
@@ -261,7 +241,6 @@ export default function AssistantAccessManager({
       const existingSnap = await getDocs(emailQuery);
 
       if (!existingSnap.empty) {
-        console.log('⚠️ Email already exists');
         const existing = existingSnap.docs[0].data();
         if (existing.doctorId === doctorId) {
           toast.error('This assistant already exists', {
@@ -272,7 +251,6 @@ export default function AssistantAccessManager({
         }
       }
 
-      console.log('✅ Email available, creating record...');
 
       // Generate unique access token and 6-digit PIN
       const accessToken = `ast_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
@@ -297,7 +275,6 @@ export default function AssistantAccessManager({
         createdAt: serverTimestamp(),
       });
 
-      console.log('✅ Assistant created successfully!');
 
       // Generate the access link
       const baseUrl = window.location.origin;
@@ -338,7 +315,6 @@ export default function AssistantAccessManager({
 
     if (!confirmed) return;
 
-    console.log('🗑️ Deleting assistant:', assistantId, 'as user:', currentUser.uid);
 
     try {
       await deleteDoc(doc(db, 'assistants', assistantId));

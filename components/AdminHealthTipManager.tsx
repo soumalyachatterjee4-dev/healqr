@@ -78,7 +78,6 @@ export default function AdminHealthTipManager() {
           (t: any) => t.category === 'health-tip'
         );
         setHealthTips(healthTipTemplates);
-        console.log('✅ Loaded', healthTipTemplates.length, 'health tips');
       }
     } catch (error) {
       console.error('Error loading health tips:', error);

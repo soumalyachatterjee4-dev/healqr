@@ -47,9 +47,7 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
     // 🆕 CRITICAL: Clear all premium add-ons for fresh signup (Starter Plan Default)
     localStorage.removeItem('healqr_active_addons');
     localStorage.removeItem('healqr_demo_mode_addons');
-    console.log('✅ SIGNUP: Cleared all premium add-ons - Starting with Starter Plan');
     // Extra debug: Log QR number entered
-    console.log('🟢 SIGNUP: QR entered:', qrNumber);
 
     // In demo mode, skip all validations
     if (isDemoMode) {
@@ -142,7 +140,6 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
 
         // Generate next HQR number in universal sequence
         finalQrNumber = `HQR${String(maxNumber + 1).padStart(5, '0')}`;
-        console.log('🟢 Doctor Virtual QR - Max from both collections:', maxNumber, '→ New:', finalQrNumber);
 
         // Save Virtual QR to qrPool collection (universal pool)
         await addDoc(qrPoolCollection, {
@@ -155,7 +152,6 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
           generatedBy: 'self-signup'
         });
 
-        console.log('✅ Virtual QR Generated from Universal Pool:', finalQrNumber);
         toast.success('Virtual QR Generated: ' + finalQrNumber);
         setQrNumber(finalQrNumber);
         setVirtualQrGenerated(true);
@@ -205,7 +201,6 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
           pendingAt: new Date(),
         });
         // Extra debug: Confirm QR set to pending
-        console.log('🟢 QR set to pending for email:', email, 'QR:', qrNumber);
       }
 
       // Prepare signup data
@@ -228,7 +223,6 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
       localStorage.setItem('healqr_pending_signup', JSON.stringify(signupData));
       localStorage.setItem('healqr_email_for_signin', email);
 
-      console.log('✅ Signup data stored in localStorage:', signupData);
 
       // Firebase Email Link configuration
       // Encode signup data in URL as backup (for cross-browser/session verification)

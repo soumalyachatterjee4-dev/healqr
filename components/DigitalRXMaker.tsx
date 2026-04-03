@@ -563,7 +563,6 @@ export default function DigitalRXMaker({
           doc.restoreGraphicsState();
         } catch {
           // Skip watermark if image fails to load
-          console.log('Watermark image failed to load, skipping');
         }
       }
 

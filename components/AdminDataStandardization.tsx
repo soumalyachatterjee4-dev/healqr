@@ -45,7 +45,6 @@ export default function AdminDataStandardization() {
       const snapshot = await getDocs(bookingsRef);
       
       stats.total = snapshot.size;
-      console.log(`📊 Processing ${stats.total} bookings...`);
 
       for (const docSnapshot of snapshot.docs) {
         const data = docSnapshot.data();
@@ -107,7 +106,6 @@ export default function AdminDataStandardization() {
       }
 
       setResults(stats);
-      console.log('✅ Standardization complete:', stats);
 
     } catch (error: any) {
       console.error('❌ Standardization failed:', error);
@@ -135,7 +133,6 @@ export default function AdminDataStandardization() {
         migratedClinics: data.migratedClinics || []
       });
 
-      console.log('✅ Clinic code migration complete:', data);
     } catch (error: any) {
       console.error('❌ Clinic code migration failed:', error);
       alert(`Error: ${error.message}`);

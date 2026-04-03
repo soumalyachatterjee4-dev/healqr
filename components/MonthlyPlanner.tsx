@@ -111,7 +111,6 @@ export default function MonthlyPlanner({
       if (!metaSnap.exists()) {
         // LAZY GENERATION: Schedule not exists -> Generate from Recurring Pattern
         setIsGenerating(true);
-        console.log(`Generating schedule for ${monthKey}...`);
 
         // 1a. Load Recurring Schedule (Chambers)
         if (!db) return;

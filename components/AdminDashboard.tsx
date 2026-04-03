@@ -105,7 +105,6 @@ export default function AdminDashboard({ adminEmail, onStartDemo, uploadedTestim
         console.error('Error loading advertiser/pharma counts:', e);
       }
       
-      console.log('✅ Admin stats loaded:', adminStats);
     } catch (error) {
       console.error('❌ Error loading admin stats:', error);
     } finally {
@@ -121,7 +120,6 @@ export default function AdminDashboard({ adminEmail, onStartDemo, uploadedTestim
       try {
         const birthdayList = await AdminStatsService.getTodayBirthdayDoctors();
         setTodayBirthdayDoctors(birthdayList);
-        console.log('✅ Birthday doctors loaded:', birthdayList.length);
       } catch (error) {
         console.error('❌ Error loading birthday doctors:', error);
       }
@@ -134,7 +132,6 @@ export default function AdminDashboard({ adminEmail, onStartDemo, uploadedTestim
     if (onUploadTestimonial) {
       // Maximum 3 testimonials allowed on landing page
       onUploadTestimonial(request);
-      console.log('✅ TESTIMONIAL UPLOADED TO LANDING PAGE:', request);
     }
   };
 

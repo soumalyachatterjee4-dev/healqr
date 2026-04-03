@@ -58,7 +58,6 @@ export default function PatientSearch({ language = 'english' }: PatientSearchPro
     setGeocodingLoading(true);
     try {
       // Step 1: Use Gemini AI to resolve location → pincode (best for Indian localities)
-      console.log('🤖 Asking Gemini AI to resolve pincode for:', areaInput);
       try {
         const { getFunctions, httpsCallable } = await import('firebase/functions');
         const { app } = await import('../lib/firebase/config');
@@ -68,14 +67,11 @@ export default function PatientSearch({ language = 'english' }: PatientSearchPro
         const data = result.data as { pincode: string | null; source: string };
 
         if (data.pincode && /^\d{6}$/.test(data.pincode)) {
-          console.log('✅ Gemini resolved pincode:', data.pincode);
           setPinCode(data.pincode);
           setIsAreaLocked(true);
           return data.pincode;
         }
-        console.log('⚠️ Gemini could not resolve pincode, trying geocoding fallback...');
       } catch (geminiErr) {
-        console.log('⚠️ Gemini resolver failed, trying geocoding fallback...', geminiErr);
       }
 
       // Step 2: Fallback — Google Geocoding API
@@ -116,7 +112,6 @@ export default function PatientSearch({ language = 'english' }: PatientSearchPro
       }
 
       // Step 3: Fallback — Nominatim (free, no API key)
-      console.log('🔄 Google geocoding failed, trying Nominatim fallback...');
       const nomResponse = await fetch(
         `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(queryText)}, India&format=json&addressdetails=1&limit=1`,
         { headers: { 'Accept-Language': 'en' } }
@@ -130,7 +125,6 @@ export default function PatientSearch({ language = 'english' }: PatientSearchPro
         return postcode;
       }
 
-      console.log('⚠️ All resolvers failed for:', queryText, '— falling back to text search');
       return null;
     } catch (error) {
       console.error('Location resolve error:', error);
@@ -182,7 +176,6 @@ export default function PatientSearch({ language = 'english' }: PatientSearchPro
         // Also check the label (e.g. 'cardiology', 'orthopedics')
         if (matched || inputLower.includes(spec.label.toLowerCase().split(' ')[0].replace('(', ''))) {
           detectedSpecialty = spec.id;
-          console.log('🎯 Auto-detected specialty from input:', spec.label);
           break;
         }
       }
@@ -190,7 +183,6 @@ export default function PatientSearch({ language = 'english' }: PatientSearchPro
 
     // If no pinCode but areaInput exists (and it's not a numeric pincode), try geocoding automatically
     if (!searchPinCode && areaInput && !/^\d{6}$/.test(areaInput)) {
-      console.log('🔄 Triggering auto-geocoding for search...');
       const resolvedPin = await handleAreaSearch();
       if (resolvedPin) {
         searchPinCode = resolvedPin;

@@ -18,6 +18,7 @@ import DashboardPromoDisplay from './DashboardPromoDisplay';
 import PatientConsultationHistory from './PatientConsultationHistory';
 import PatientNotifications from './PatientNotifications';
 import PatientLiveStatus from './PatientLiveStatus';
+import { useTranslatedConfirm } from './TranslatedConfirmModal';
 
 interface PatientDashboardProps {
   initialView?: 'dashboard' | 'history' | 'notifications' | 'live-status';
@@ -32,6 +33,7 @@ export default function PatientDashboard({ initialView = 'dashboard', onLogout }
   const [notificationCount, setNotificationCount] = useState(0);
   const [activeBookingId, setActiveBookingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const { showConfirm, ConfirmModalComponent } = useTranslatedConfirm();
 
   useEffect(() => {
     // Check authentication
@@ -122,8 +124,9 @@ export default function PatientDashboard({ initialView = 'dashboard', onLogout }
     }
   };
 
-  const handleLogout = () => {
-    if (confirm('Are you sure you want to logout?')) {
+  const handleLogout = async () => {
+    const ok = await showConfirm('Are you sure you want to logout?', 'Logout');
+    if (ok) {
       onLogout();
     }
   };
@@ -141,6 +144,7 @@ export default function PatientDashboard({ initialView = 'dashboard', onLogout }
 
   return (
     <div className="min-h-screen bg-black text-white overflow-x-hidden">
+      <ConfirmModalComponent />
       {/* Header */}
       <div className="bg-zinc-900 border-b border-zinc-800 sticky top-0 z-50 overflow-x-hidden">
         <div className="max-w-6xl mx-auto px-3 py-4 sm:px-4">

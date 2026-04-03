@@ -13,7 +13,8 @@ import {
   Layout,
   Upload,
   RefreshCw,
-  Menu
+  Menu,
+  Link2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import QRCode from 'qrcode';
@@ -796,6 +797,29 @@ export default function SocialMediaKit({
                 </Button>
             </>
           )}
+
+          {/* Share Mini Website Link */}
+          <Button
+              onClick={async () => {
+                const url = qrUrl;
+                if (navigator.share) {
+                  try {
+                    await navigator.share({ title: `Book appointment with ${doctorName}`, text: 'Book your appointment online - no app needed!', url });
+                    toast.success('Link shared!');
+                  } catch { 
+                    await navigator.clipboard.writeText(url);
+                    toast.success('Mini website link copied!');
+                  }
+                } else {
+                  await navigator.clipboard.writeText(url);
+                  toast.success('Mini website link copied!');
+                }
+              }}
+              className="w-full bg-purple-600 hover:bg-purple-700 text-white h-12"
+          >
+              <Link2 className="w-5 h-5 mr-2" />
+              Share Mini Website Link
+          </Button>
       </div>
 
       {/* Preview Panel */}

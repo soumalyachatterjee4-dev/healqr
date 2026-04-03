@@ -40,12 +40,10 @@ export default function FCMTestPanel() {
     
     // Listen for foreground messages
     const unsubscribe = onForegroundMessage((payload) => {
-      console.log('📨 FCM FOREGROUND MESSAGE RECEIVED:', payload);
       setMessage(`📨 Foreground notification received: ${payload.notification?.title}`);
       
       // Show notification using service worker registration (works on all platforms)
       if (Notification.permission === 'granted' && 'serviceWorker' in navigator) {
-        console.log('🔔 Showing notification via service worker');
         navigator.serviceWorker.ready.then((registration) => {
           registration.showNotification(payload.notification?.title || 'HealQR', {
             body: payload.notification?.body || '',

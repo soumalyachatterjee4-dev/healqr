@@ -40,7 +40,7 @@ interface ChamberWithBookingCount extends Chamber {
 
 interface SelectChamberProps {
   onBack: () => void;
-  onContinue?: (chamberName: string, consultationType: 'chamber' | 'video') => void;
+  onContinue?: (chamberName: string, consultationType: 'chamber' | 'video', chamberId?: number, vcStartTime?: string, vcEndTime?: string) => void;
   onChamberSelect?: (chamberId: number, chamberName: string, startTime?: string, endTime?: string) => void; // For clinic QR flow
   selectedDate: Date;
   onLanguageChange?: () => void;
@@ -67,6 +67,7 @@ interface SelectChamberProps {
     appliesTo?: string;
   }>; // Clinic planned off periods with metadata
   language?: Language;
+  vcTimeSlots?: Array<{id: number; startTime: string; endTime: string; days: string[]; isActive: boolean}>;
 }
 
 export default function SelectChamber({
@@ -88,25 +89,11 @@ export default function SelectChamber({
   clinicId,
   clinicAddress,
   clinicPlannedOffPeriods = [],
+  vcTimeSlots = [],
 }: SelectChamberProps) {
 
   const accentColor = themeColor === 'blue' ? 'blue' : 'emerald';
-  console.log('🏥 SelectChamber received:', {
-    doctorName,
-    doctorSpecialty,
-    chamberscount: chambers.length,
-    chambersDetails: chambers.map(c => ({
-      name: c.chamberName,
-      address: c.chamberAddress,
-      hasClinicId: !!(c as any).clinicId
-    })),
-    clinicId,
-    clinicAddress,
-    doctorId: doctorId || 'NOT_SET',
-    selectedDate: selectedDate instanceof Date ? selectedDate.toDateString() : selectedDate,
-    clinicPlannedOffPeriodsCount: clinicPlannedOffPeriods.length,
-    clinicPlannedOffPeriods: clinicPlannedOffPeriods
-  });
+  const [selectedVcSlot, setSelectedVcSlot] = useState<{id: number; startTime: string; endTime: string} | null>(null);
 
   // Check if selected date falls in clinic planned off period
   // Updated to check specific chamber's clinic
@@ -115,23 +102,13 @@ export default function SelectChamber({
     const chamberAddr = (chamber.chamberAddress || '').toLowerCase().trim();
     const isHomeChamber = chamber.chamberName?.toLowerCase().includes('home');
 
-    console.log('🔍 isClinicOffForChamber CHECK:', {
-      chamberName: chamber.chamberName,
-      chamberClinicId: chamberClinicId || 'NONE',
-      chamberAddress: chamberAddr || 'NONE',
-      isHomeChamber,
-      selectedDate: selectedDate instanceof Date ? selectedDate.toDateString() : selectedDate,
-      clinicPlannedOffPeriodsCount: clinicPlannedOffPeriods.length
-    });
 
     if (!clinicPlannedOffPeriods || clinicPlannedOffPeriods.length === 0) {
-      console.log('⚠️ No clinic planned off periods provided');
       return false;
     }
 
     // Home chambers are never blocked
     if (isHomeChamber) {
-      console.log('🏠 Home chamber - never blocked');
       return false;
     }
 
@@ -139,14 +116,9 @@ export default function SelectChamber({
     date.setHours(0, 0, 0, 0);
 
     const activePlannedOffPeriods = clinicPlannedOffPeriods.filter((p: any) => p.status === 'active');
-    console.log('📋 Active clinic planned off periods (all):', activePlannedOffPeriods.length);
 
     for (const period of activePlannedOffPeriods) {
       if (period.doctorId && doctorId && period.doctorId !== doctorId) {
-        console.log('⏭️ Skipping period for other doctor:', {
-          periodDoctorId: period.doctorId,
-          currentDoctorId: doctorId
-        });
         continue;
       }
 
@@ -155,10 +127,6 @@ export default function SelectChamber({
       // Method 1: Match by clinicId (most reliable)
       if (chamberClinicId && period.clinicId) {
         isMatch = chamberClinicId === period.clinicId;
-        console.log(`🆔 ClinicId Match: ${isMatch}`, {
-          chamberClinicId,
-          periodClinicId: period.clinicId
-        });
       }
       // Method 2: Match by address (fallback for legacy chambers without clinicId)
       else if (!chamberClinicId && chamberAddr && period.clinicAddress) {
@@ -175,13 +143,6 @@ export default function SelectChamber({
         }
 
         isMatch = addressMatch || nameMatch;
-        console.log(`📍 Address/Name Match: ${isMatch}`, {
-          chamberAddr,
-          periodAddr,
-          periodName: period.clinicName || 'NONE',
-          addressMatch,
-          nameMatch
-        });
       }
 
       if (!isMatch) {
@@ -194,13 +155,8 @@ export default function SelectChamber({
         const currentChamberName = (chamber.chamberName || '').toLowerCase().trim();
 
         if (periodChamberName !== currentChamberName) {
-          console.log('🔹 Skipping period for different chamber:', {
-            currentChamber: currentChamberName,
-            periodChamber: periodChamberName
-          });
           continue; // This period targets a different chamber
         }
-        console.log('✅ Period targets this specific chamber:', currentChamberName);
       }
 
       // Period matches this chamber's clinic - check if date falls in range
@@ -228,26 +184,12 @@ export default function SelectChamber({
       startDate.setHours(0, 0, 0, 0);
       endDate.setHours(0, 0, 0, 0);
 
-      console.log('🔄 Comparing dates:', {
-        checkDate: date.toDateString(),
-        periodStart: startDate.toDateString(),
-        periodEnd: endDate.toDateString(),
-        isInRange: date >= startDate && date <= endDate
-      });
 
       if (date >= startDate && date <= endDate) {
-        console.log('❌❌❌ CHAMBER BLOCKED - Clinic is OFF on selected date:', {
-          chamberName: chamber.chamberName,
-          clinicId: chamberClinicId || 'LEGACY',
-          selectedDate: date.toDateString(),
-          clinicOffPeriod: { start: startDate.toDateString(), end: endDate.toDateString() },
-          matchMethod: chamberClinicId ? 'clinicId' : 'address/name'
-        });
         return true;
       }
     }
 
-    console.log('✅ Chamber available - Clinic is OPEN on selected date');
     return false;
   };
 
@@ -260,7 +202,6 @@ export default function SelectChamber({
 
   // Refresh counts on mount (when user navigates back to this page)
   useEffect(() => {
-    console.log('🔄 SelectChamber: Component mounted, refreshing booking counts...');
     setRefreshKey(prev => prev + 1);
   }, []); // Empty dependency - runs once on mount
 
@@ -294,7 +235,6 @@ export default function SelectChamber({
           chambersWithBlockedDates = chambers.map(chamber => {
             const firestoreChamber = doctorData.chambers?.find((c: any) => c.id === chamber.id);
             const blockedDates = firestoreChamber?.blockedDates || [];
-            console.log(`🔄 SelectChamber: Loading chamber "${chamber.chamberName}" blockedDates:`, blockedDates);
             return {
               ...chamber,
               blockedDates
@@ -305,7 +245,6 @@ export default function SelectChamber({
         // Get selected date string (YYYY-MM-DD) - Use local timezone to match booking creation
         const selectedDateStr = new Date(selectedDate.getTime() - selectedDate.getTimezoneOffset() * 60000).toISOString().split('T')[0];
 
-        console.log(`📅 SelectChamber: Loading bookings for date: ${selectedDateStr} (Local timezone)`);
 
         // Query bookings for each chamber (use chambersWithBlockedDates to get latest blocked status)
         const chambersWithBookingData = await Promise.all(
@@ -333,10 +272,6 @@ export default function SelectChamber({
                 return isMatchingDate;
               }).length;
 
-              console.log(`📊 SelectChamber: "${chamber.chamberName}" (ID: ${chamber.id}): ${bookedCount}/${chamber.maxCapacity || 0} bookings (All Status) for ${selectedDateStr}`);
-              console.log(`   Total docs for chamberId ${chamber.id}:`, allDocs.length);
-              console.log(`   Matching date (${selectedDateStr}):`, allDocs.filter((d: any) => d.appointmentDate === selectedDateStr).length);
-              console.log(`   Sample booking:`, allDocs[0]);
 
               // Convert start time to minutes for sorting
               const [startHour, startMin] = (chamber.startTime || '00:00').split(':').map(Number);
@@ -365,74 +300,50 @@ export default function SelectChamber({
         // Sort chambers by start time (earliest first)
         let sortedChambers = chambersWithBookingData.sort((a, b) => (a.startMinutes || 0) - (b.startMinutes || 0));
 
-        console.log('🔵 CHAMBER FILTERING START:', {
-          totalChambers: sortedChambers.length,
-          hasClinicId: !!clinicId,
-          clinicId: clinicId,
-          hasClinicAddress: !!clinicAddress,
-          clinicAddress: clinicAddress,
-          clinicPlannedOffPeriodsCount: clinicPlannedOffPeriods.length
-        });
 
         // 🔒 CLINIC QR FILTER: If patient scanned a clinic QR (clinicId exists),
         // ONLY show chambers belonging to THAT specific clinic
         const bookingSource = sessionStorage.getItem('booking_source');
         if (clinicId && bookingSource === 'clinic_qr') {
           const beforeFilter = sortedChambers.length;
-          console.log('🏥 CLINIC QR MODE: Filtering to show ONLY clinic chambers with ID:', clinicId);
 
           sortedChambers = sortedChambers.filter(chamber => {
             const chamberClinicId = (chamber as any).clinicId;
             const belongsToClinic = chamberClinicId === clinicId;
 
-            console.log(`🔍 Chamber "${chamber.chamberName}":`, {
-              chamberClinicId: chamberClinicId || 'NONE',
-              targetClinicId: clinicId,
-              match: belongsToClinic,
-              action: belongsToClinic ? '✅ KEEP' : '❌ REMOVE'
-            });
 
             return belongsToClinic; // Keep ONLY chambers matching clinic ID
           });
 
-          console.log(`✅ Clinic chamber filter complete: ${beforeFilter} → ${sortedChambers.length} chambers (kept only clinic chambers)`);
         }
 
         // Filter out chambers if their specific clinic is off on selected date
         const beforeClinicOffFilter = sortedChambers.length;
-        console.log('🔍 Checking each chamber for clinic planned off periods...');
 
         sortedChambers = sortedChambers.filter(chamber => {
           const isOff = isClinicOffForChamber(chamber);
 
           if (isOff) {
-            console.log(`🚫 REMOVING chamber: "${chamber.chamberName}" - Clinic is OFF on ${selectedDate.toDateString()}`);
           } else {
-            console.log(`✅ KEEPING chamber: "${chamber.chamberName}" - Clinic is OPEN`);
           }
 
           return !isOff; // Keep chambers whose clinic is NOT off
         });
 
-        console.log(`✅ Clinic off filter complete: ${beforeClinicOffFilter} → ${sortedChambers.length} chambers (removed ${beforeClinicOffFilter - sortedChambers.length} due to clinic planned off)`);
 
         // Filter out disabled chambers (isActive === false)
         const beforeIsActiveFilter = sortedChambers.length;
-        console.log('🔍 Checking each chamber for active status...');
 
         sortedChambers = sortedChambers.filter(chamber => {
           const isActive = chamber.isActive !== false; // Default to true if not specified
 
           if (!isActive) {
-            console.log(`🚫 REMOVING chamber: "${chamber.chamberName}" - Chamber is DISABLED (isActive=false)`);
           } else {
-            console.log(`✅ KEEPING chamber: "${chamber.chamberName}" - Chamber is ENABLED`);
           }
 
           return isActive;
         });
 
-        console.log(`✅ Active status filter complete: ${beforeIsActiveFilter} → ${sortedChambers.length} chambers (removed ${beforeIsActiveFilter - sortedChambers.length} due to disabled status)`);
 
         setChambersWithCounts(sortedChambers);
       } catch (error) {
@@ -466,7 +377,6 @@ export default function SelectChamber({
       const unsubscribe = onSnapshot(bookingsQuery, (snapshot) => {
         snapshot.docChanges().forEach((change) => {
           if (change.type === 'added' || change.type === 'modified' || change.type === 'removed') {
-            console.log('🔄 Booking changed, refreshing chamber counts...');
             // Debounce: wait 500ms before refreshing to avoid rapid updates
             if (timeoutId) clearTimeout(timeoutId);
             timeoutId = setTimeout(() => {
@@ -494,7 +404,6 @@ export default function SelectChamber({
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        console.log('🔄 SelectChamber: Page became visible, refreshing booking counts...');
         setRefreshKey(prev => prev + 1); // Trigger refresh
       }
     };
@@ -685,10 +594,8 @@ export default function SelectChamber({
                           // Save clinicId to sessionStorage for booking creation
                           if (chamber.clinicId) {
                             sessionStorage.setItem('booking_clinic_id', chamber.clinicId);
-                            console.log('✅ Selected chamber:', chamber.chamberName, '| chamberId:', chamber.id, '| clinicId:', chamber.clinicId);
                           } else {
                             sessionStorage.removeItem('booking_clinic_id');
-                            console.log('✅ Selected chamber:', chamber.chamberName, '| chamberId:', chamber.id, '| (Solo chamber)');
                           }
                         }}
                         disabled={isDisabled}
@@ -763,26 +670,80 @@ export default function SelectChamber({
             </>
           )}
 
-          {/* Video Consultation Message - ONLY show if video is selected */}
+          {/* Video Consultation Time Slots - show when video is selected */}
           {consultationType === 'video' && (
             <div className="mb-6">
-              <div className="bg-red-500/10 border-2 border-red-500/30 rounded-2xl p-6 text-center">
-                <div className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <h4 className="text-white mb-2">Video Consultation Selected</h4>
-                <p className="text-gray-300 text-sm mb-4">
-                  You will receive an in-app notification 30 minutes before your appointment with the video consultation link.
-                </p>
-                <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span>No physical visit required</span>
-                </div>
-              </div>
+              {(() => {
+                // Filter VC slots for the selected day
+                const dayName = selectedDate.toLocaleDateString('en-US', { weekday: 'long' });
+                const availableVcSlots = vcTimeSlots.filter(s => s.isActive && s.days.includes(dayName));
+
+                if (availableVcSlots.length === 0) {
+                  return (
+                    <div className="bg-red-500/10 border-2 border-red-500/30 rounded-2xl p-6 text-center">
+                      <div className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center mx-auto mb-4">
+                        <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                      <h4 className="text-white mb-2">No VC Slots Available</h4>
+                      <p className="text-gray-300 text-sm">
+                        Doctor has no video consultation slots for {dayName}. Please select a different date.
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <>
+                    <h3 className="text-white mb-3">Select VC Time Slot</h3>
+                    <div className="space-y-3">
+                      {availableVcSlots.map((slot) => {
+                        const formatTime = (t: string) => {
+                          const [h, m] = t.split(':').map(Number);
+                          const period = h >= 12 ? 'PM' : 'AM';
+                          const displayH = h % 12 || 12;
+                          return `${displayH}:${m.toString().padStart(2, '0')} ${period}`;
+                        };
+
+                        return (
+                          <button
+                            key={slot.id}
+                            onClick={() => setSelectedVcSlot({ id: slot.id, startTime: slot.startTime, endTime: slot.endTime })}
+                            className={`w-full text-left border-2 rounded-2xl p-4 transition-all ${
+                              selectedVcSlot?.id === slot.id
+                                ? 'border-blue-500 bg-blue-500/10'
+                                : 'border-gray-700 bg-[#0f1419] hover:border-gray-600'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                                selectedVcSlot?.id === slot.id ? 'bg-blue-500' : 'bg-gray-700'
+                              }`}>
+                                <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                              </div>
+                              <div>
+                                <span className={`font-medium ${selectedVcSlot?.id === slot.id ? 'text-blue-400' : 'text-white'}`}>
+                                  {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
+                                </span>
+                                <p className="text-xs text-gray-400 mt-0.5">Video Consultation</p>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="flex items-center justify-center gap-2 text-xs text-gray-400 mt-3">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>No physical visit required • VC link sent 30 min before</span>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           )}
 
@@ -790,18 +751,22 @@ export default function SelectChamber({
           <Button
             onClick={() => {
               if (consultationType === 'video') {
-                onContinue?.(chambers.length > 0 ? chambers[0].chamberName : 'Video Consultation', 'video');
+                if (selectedVcSlot) {
+                  onContinue?.('Video Consultation', 'video', undefined, selectedVcSlot.startTime, selectedVcSlot.endTime);
+                } else {
+                  // Fallback for doctors without VC slots configured
+                  onContinue?.(chambers.length > 0 ? chambers[0].chamberName : 'Video Consultation', 'video');
+                }
               } else if (selectedChamber) {
                 // Call onChamberSelect if provided (clinic QR flow), otherwise onContinue (doctor QR flow)
                 if (onChamberSelect) {
                   onChamberSelect(selectedChamber.id, selectedChamber.chamberName, selectedChamber.startTime, selectedChamber.endTime);
                 } else {
-                  onContinue?.(selectedChamber.chamberName, 'chamber');
+                  onContinue?.(selectedChamber.chamberName, 'chamber', selectedChamber.id);
                 }
               }
-              console.log('📤 Sending to parent:', { chamber: selectedChamber?.chamberName, chamberId: selectedChamber?.id, consultationType });
             }}
-            disabled={consultationType === 'chamber' && !selectedChamber}
+            disabled={(consultationType === 'chamber' && !selectedChamber) || (consultationType === 'video' && vcTimeSlots.length > 0 && !selectedVcSlot)}
             className={`w-full h-12 rounded-xl ${
               (consultationType === 'video' || selectedChamber)
                 ? consultationType === 'video'

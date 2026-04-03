@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   BarChart, 
   Bar, 
@@ -13,30 +13,112 @@ import {
   Pie,
   Cell
 } from 'recharts';
-import { Calendar, Download, Filter } from 'lucide-react';
+import { Calendar, Download, Filter, Loader2 } from 'lucide-react';
+import { db, auth } from '../lib/firebase/config';
+import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 
-// Mock Data
-const IMPRESSION_DATA = [
-  { name: 'Mon', views: 4000, clicks: 240 },
-  { name: 'Tue', views: 3000, clicks: 139 },
-  { name: 'Wed', views: 2000, clicks: 980 },
-  { name: 'Thu', views: 2780, clicks: 390 },
-  { name: 'Fri', views: 1890, clicks: 480 },
-  { name: 'Sat', views: 2390, clicks: 380 },
-  { name: 'Sun', views: 3490, clicks: 430 },
-];
+const COLORS = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4'];
 
-const DEMOGRAPHICS_DATA = [
-  { name: 'General Physicians', value: 400 },
-  { name: 'Cardiologists', value: 300 },
-  { name: 'Pediatricians', value: 300 },
-  { name: 'Dentists', value: 200 },
-];
+interface AdvertiserAnalyticsProps {
+  advertiserId?: string;
+}
 
-const COLORS = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b'];
-
-export default function AdvertiserAnalytics() {
+export default function AdvertiserAnalytics({ advertiserId }: AdvertiserAnalyticsProps) {
   const [timeRange, setTimeRange] = useState('7d');
+  const [loading, setLoading] = useState(true);
+  const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [metrics, setMetrics] = useState({
+    totalImpressions: 0,
+    totalClicks: 0,
+    totalSpend: 0,
+    totalReach: 0,
+    avgCTR: '0.0',
+    costPerView: '0.00',
+  });
+  const [impressionData, setImpressionData] = useState<{name: string; views: number; clicks: number}[]>([]);
+  const [specialtyData, setSpecialtyData] = useState<{name: string; value: number}[]>([]);
+
+  useEffect(() => {
+    if (!db) return;
+    const fetchAnalytics = async () => {
+      setLoading(true);
+      try {
+        const resolvedId = advertiserId || auth.currentUser?.uid || localStorage.getItem('healqr_advertiser_id');
+        const constraints = resolvedId
+          ? [where('advertiserId', '==', resolvedId)]
+          : [];
+
+        const q = query(
+          collection(db, 'advertiser_campaigns'),
+          ...constraints,
+          orderBy('createdAt', 'desc')
+        );
+        const snapshot = await getDocs(q);
+        const allCampaigns = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setCampaigns(allCampaigns);
+
+        let totalImpressions = 0;
+        let totalClicks = 0;
+        let totalSpend = 0;
+        let totalReach = 0;
+        const specialtyCounts: Record<string, number> = {};
+
+        allCampaigns.forEach((c: any) => {
+          const impressions = c.stats?.impressions || 0;
+          const clicks = c.stats?.clicks || 0;
+          totalImpressions += impressions;
+          totalClicks += clicks;
+          totalSpend += c.totalAmount || 0;
+          totalReach += c.viewBundle || 0;
+
+          // Build specialty demographics from campaign targeting
+          const specs: string[] = c.specialities || [];
+          specs.forEach((s: string) => {
+            specialtyCounts[s] = (specialtyCounts[s] || 0) + impressions;
+          });
+        });
+
+        const avgCTR = totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(1) : '0.0';
+        const costPerView = totalImpressions > 0 ? (totalSpend / totalImpressions).toFixed(2) : '0.00';
+
+        setMetrics({ totalImpressions, totalClicks, totalSpend, totalReach, avgCTR, costPerView });
+
+        // Build specialty chart data
+        const specData = Object.entries(specialtyCounts)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 6)
+          .map(([name, value]) => ({ name, value }));
+        setSpecialtyData(specData.length > 0 ? specData : [{ name: 'No targeting data', value: 1 }]);
+
+        // Build per-campaign impression chart data
+        const chartData = allCampaigns.slice(0, 10).map((c: any, i: number) => ({
+          name: `#${(c.id as string).slice(-4).toUpperCase()}`,
+          views: c.stats?.impressions || 0,
+          clicks: c.stats?.clicks || 0,
+        }));
+        setImpressionData(chartData.length > 0 ? chartData : [{ name: 'No data', views: 0, clicks: 0 }]);
+      } catch (error) {
+        console.error('Failed to load analytics:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAnalytics();
+  }, [advertiserId, timeRange]);
+
+  const formatNumber = (n: number) => {
+    if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+    if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+    return n.toString();
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 md:p-8 space-y-8">
@@ -78,7 +160,7 @@ export default function AdvertiserAnalytics() {
           <h3 className="text-lg font-semibold text-white mb-6">Impression Trends</h3>
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={IMPRESSION_DATA}>
+              <LineChart data={impressionData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
                 <XAxis dataKey="name" stroke="#71717a" fontSize={12} tickLine={false} axisLine={false} />
                 <YAxis stroke="#71717a" fontSize={12} tickLine={false} axisLine={false} />
@@ -104,7 +186,7 @@ export default function AdvertiserAnalytics() {
           <h3 className="text-lg font-semibold text-white mb-6">Engagement Metrics</h3>
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={IMPRESSION_DATA}>
+              <BarChart data={impressionData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
                 <XAxis dataKey="name" stroke="#71717a" fontSize={12} tickLine={false} axisLine={false} />
                 <YAxis stroke="#71717a" fontSize={12} tickLine={false} axisLine={false} />
@@ -128,7 +210,7 @@ export default function AdvertiserAnalytics() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={DEMOGRAPHICS_DATA}
+                    data={specialtyData}
                     cx="50%"
                     cy="50%"
                     innerRadius={60}
@@ -136,7 +218,7 @@ export default function AdvertiserAnalytics() {
                     paddingAngle={5}
                     dataKey="value"
                   >
-                    {DEMOGRAPHICS_DATA.map((entry, index) => (
+                    {specialtyData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
@@ -148,11 +230,11 @@ export default function AdvertiserAnalytics() {
               </ResponsiveContainer>
             </div>
             <div className="space-y-3">
-              {DEMOGRAPHICS_DATA.map((entry, index) => (
+              {specialtyData.map((entry, index) => (
                 <div key={entry.name} className="flex items-center gap-3">
                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
                   <span className="text-sm text-zinc-300">{entry.name}</span>
-                  <span className="text-sm font-medium text-white ml-auto">{entry.value}</span>
+                  <span className="text-sm font-medium text-white ml-auto">{formatNumber(entry.value)}</span>
                 </div>
               ))}
             </div>
@@ -163,29 +245,23 @@ export default function AdvertiserAnalytics() {
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 flex flex-col justify-center">
             <div className="text-zinc-400 text-sm mb-1">Avg. CTR</div>
-            <div className="text-3xl font-bold text-white">2.4%</div>
-            <div className="text-emerald-500 text-xs mt-2 flex items-center gap-1">
-              <span className="bg-emerald-500/10 px-1.5 py-0.5 rounded">+0.4%</span> vs last week
-            </div>
+            <div className="text-3xl font-bold text-white">{metrics.avgCTR}%</div>
+            <div className="text-zinc-500 text-xs mt-2">{formatNumber(metrics.totalClicks)} clicks / {formatNumber(metrics.totalImpressions)} views</div>
           </div>
           <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 flex flex-col justify-center">
             <div className="text-zinc-400 text-sm mb-1">Total Reach</div>
-            <div className="text-3xl font-bold text-white">12.5k</div>
-            <div className="text-emerald-500 text-xs mt-2 flex items-center gap-1">
-              <span className="bg-emerald-500/10 px-1.5 py-0.5 rounded">+12%</span> vs last week
-            </div>
+            <div className="text-3xl font-bold text-white">{formatNumber(metrics.totalReach)}</div>
+            <div className="text-zinc-500 text-xs mt-2">Purchased view bundle</div>
           </div>
           <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 flex flex-col justify-center">
             <div className="text-zinc-400 text-sm mb-1">Cost per View</div>
-            <div className="text-3xl font-bold text-white">₹0.45</div>
-            <div className="text-zinc-500 text-xs mt-2">Stable</div>
+            <div className="text-3xl font-bold text-white">₹{metrics.costPerView}</div>
+            <div className="text-zinc-500 text-xs mt-2">Total spend: ₹{formatNumber(metrics.totalSpend)}</div>
           </div>
           <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 flex flex-col justify-center">
-            <div className="text-zinc-400 text-sm mb-1">Engagement Score</div>
-            <div className="text-3xl font-bold text-white">8.9</div>
-            <div className="text-emerald-500 text-xs mt-2 flex items-center gap-1">
-              <span className="bg-emerald-500/10 px-1.5 py-0.5 rounded">High</span>
-            </div>
+            <div className="text-zinc-400 text-sm mb-1">Active Campaigns</div>
+            <div className="text-3xl font-bold text-white">{campaigns.length}</div>
+            <div className="text-zinc-500 text-xs mt-2">{campaigns.filter((c: any) => c.status === 'active').length} currently running</div>
           </div>
         </div>
 

@@ -93,7 +93,6 @@ export default function AdminPanel({ adminEmail, onLogout, onStartDemo, uploaded
         const unreadDocs = snapshot.docs.filter(doc => doc.data().status === 'unread');
 
         setUnreadCount(unreadDocs.length);
-        console.log('✅ Unread notifications:', unreadDocs.length);
       } catch (error) {
         console.error('❌ Error loading unread count:', error);
       }

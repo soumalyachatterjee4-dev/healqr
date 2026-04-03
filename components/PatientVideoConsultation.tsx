@@ -66,7 +66,6 @@ export default function PatientVideoConsultation({
             vcPatientJoined: true,
             vcPatientJoinedAt: new Date(),
           });
-          console.log('✅ Updated Firestore: Patient joined VC room');
         } else {
           console.warn('⚠️ Booking not found for ID:', bookingId);
         }
@@ -98,7 +97,6 @@ export default function PatientVideoConsultation({
             vcCompleted: true,
             vcCompletedAt: new Date(),
           });
-          console.log('✅ Updated Firestore: VC completed');
         }
       }
     } catch (err) {

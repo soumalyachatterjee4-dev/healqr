@@ -43,11 +43,6 @@ export default function ClinicQRManager({ onMenuChange, onLogout, profileData }:
   const clinicImage = profileData?.profileImage || profileData?.image || null;
   const clinicName = profileData?.name || 'Clinic Name';
 
-  console.log('🏥 QR Manager Profile Data:', {
-    hasImage: !!clinicImage,
-    imageSrc: clinicImage?.substring(0, 50) + '...',
-    name: clinicName
-  });
 
   // QR Customization
   const [qrSize, setQrSize] = useState(300);
@@ -83,7 +78,6 @@ export default function ClinicQRManager({ onMenuChange, onLogout, profileData }:
       const userId = localStorage.getItem('userId');
 
       if (!userId) {
-        console.log('⚠️ No userId found in localStorage');
         setLoadingSubscription(false);
         return;
       }
@@ -96,7 +90,6 @@ export default function ClinicQRManager({ onMenuChange, onLogout, profileData }:
       // Set personalized QR URL with clinic UID FIRST (before loading other data)
       const bookingUrl = `https://teamhealqr.web.app?clinicId=${clinicIdForQR}`;
       setQrUrl(bookingUrl);
-      console.log('✅ QR URL set to:', bookingUrl);
 
       const { db } = await import('../lib/firebase/config');
       if (!db) {
@@ -117,8 +110,6 @@ export default function ClinicQRManager({ onMenuChange, onLogout, profileData }:
           setAssignedQrCode(data.qrNumber);
         }
 
-        console.log('✅ Loaded subscription data:', data);
-        console.log('✅ Assigned QR Code:', data.qrNumber);
       }
     } catch (error) {
       console.error('❌ Error loading subscription data:', error);
@@ -182,7 +173,6 @@ export default function ClinicQRManager({ onMenuChange, onLogout, profileData }:
         };
         img.src = clinicImage;
       });
-      console.log('✅ Clinic image loaded successfully:', !!clinicImageElement);
     }
 
     // Gradient background - Modern blue tones for clinic

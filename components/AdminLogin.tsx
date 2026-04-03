@@ -41,7 +41,6 @@ export default function AdminLogin({ onSuccess, onBack }: AdminLoginProps) {
       
       if (adminDocSnapshot.exists() && adminDocSnapshot.data()?.isAuthorized === true) {
         // Admin is authorized - proceed with login
-        console.log('✅ Authorized admin email:', email);
       } else {
         // Check legacy adminProfiles collection as fallback
         const adminProfileRef = doc(db, 'adminProfiles', 'super_admin');
@@ -91,7 +90,6 @@ export default function AdminLogin({ onSuccess, onBack }: AdminLoginProps) {
         description: `Check your inbox at ${email}`,
       });
 
-      console.log('✅ Admin login link sent to:', email);
       
       // Close modal after sending link
       setTimeout(() => {

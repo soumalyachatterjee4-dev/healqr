@@ -249,7 +249,6 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
   };
 
   const handleGeneratePatientList = async (notificationId: string, metadata: any) => {
-    console.log('🔘 [DASHBOARD] Generate Patient List clicked:', { notificationId, metadata });
     if (!metadata || !metadata.chamberId) {
       console.error('❌ [DASHBOARD] Missing chamberId in metadata:', metadata);
       toast.error('Chamber information missing in notification');
@@ -301,19 +300,15 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
 
             // Check current notification permission status
             const permission = Notification.permission;
-            console.log('🔔 Current notification permission:', permission);
 
             if (permission === 'default') {
               // Not yet asked - prompt the doctor
-              console.log('📢 Prompting doctor for notification permission...');
               await requestNotificationPermission(userId, 'doctor');
             } else if (permission === 'granted') {
               // Already granted - just register token
-              console.log('✅ Permission already granted, registering FCM token...');
               await requestNotificationPermission(userId, 'doctor');
             } else {
               // Permission denied - log it
-              console.log('🚫 Notification permission denied by user');
             }
           } catch (fcmError) {
             console.error('❌ FCM auto-registration failed:', fcmError);
@@ -372,7 +367,6 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
           // Load birthday card template from adminProfiles global templates
           let templates: any[] = [];
 
-          console.log('🎂 Birthday detected! Loading birthday card template...');
 
           try {
             const { doc: firestoreDoc, getDoc: firestoreGetDoc } = await import('firebase/firestore');
@@ -385,12 +379,9 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
               const adminData = adminSnap.data();
               if (adminData.globalTemplates && Array.isArray(adminData.globalTemplates)) {
                 templates = adminData.globalTemplates;
-                console.log('✅ Loaded', templates.length, 'global templates from adminProfiles');
               } else {
-                console.log('⚠️ No globalTemplates found in adminProfiles');
               }
             } else {
-              console.log('⚠️ adminProfiles/super_admin document not found');
             }
           } catch (e) {
             console.error('❌ Error loading global templates from adminProfiles:', e);
@@ -401,7 +392,6 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
             (t: any) => t.category === 'birthday-card' && t.isPublished
           );
 
-          console.log('🔍 Birthday card search result:', birthdayCard ? 'Found!' : 'Not found');
 
           if (birthdayCard) {
             setBirthdayCardImageUrl(birthdayCard.imageUrl);
@@ -622,7 +612,6 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
         });
 
         // 🚫 FILTER OUT CLINIC CHAMBERS IF CLINIC IS OFF TODAY
-        console.log('🔵 [DASHBOARD] Checking for clinic off periods...');
         const filteredChambers = [];
 
         for (const chamber of sortedChambers) {
@@ -630,7 +619,6 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
           const clinicId = originalChamber?.clinicId;
 
           if (clinicId) {
-            console.log(`🏥 [DASHBOARD] Chamber "${chamber.name}" has clinicId: ${clinicId}`);
 
             // Load clinic schedule to check if clinic is off today
             try {
@@ -649,7 +637,6 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
 
                     if (today >= periodStart && today <= periodEnd) {
                       isClinicOff = true;
-                      console.log(`🚫 [DASHBOARD] Clinic ${clinicId} is OFF today (${todayStr}). Removing chamber "${chamber.name}"`);
                       break;
                     }
                   }
@@ -669,12 +656,10 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
             }
           } else {
             // No clinicId (home chamber), always include
-            console.log(`🏠 [DASHBOARD] Chamber "${chamber.name}" has no clinicId (home chamber) - KEEP`);
             filteredChambers.push(chamber);
           }
         }
 
-        console.log(`✅ [DASHBOARD] Filtered chambers: ${sortedChambers.length} → ${filteredChambers.length} (removed ${sortedChambers.length - filteredChambers.length} clinic chambers)`);
         setChambersList(filteredChambers);
       } catch (error) {
         console.error('Error loading chambers:', error);
@@ -699,7 +684,6 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
           const notificationKey = `healqr_notified_${chamber.manualClinicId}_${todayStr}`;
 
           if (!localStorage.getItem(notificationKey)) {
-            console.log(`🔔 Dashboard: Triggering notification for ${chamber.name}`);
 
             const { addDoctorNotification } = await import('../services/doctorNotificationService');
 
@@ -931,7 +915,6 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
 
         // SYNC CHECK: If calculated bookings > stored bookingsCount, update Firestore
         if (doctorData.bookingsCount === undefined || totalBookings > doctorData.bookingsCount) {
-          console.log(`🔄 Syncing bookingsCount: Stored (${doctorData.bookingsCount}) < Calculated (${totalBookings}). Updating...`);
           const { updateDoc } = await import('firebase/firestore');
           await updateDoc(doctorRef, {
             bookingsCount: totalBookings
@@ -959,7 +942,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
   const practiceOverviewData: Array<{ name: string; value: number; fill: string }> = [
     { name: 'Total Visitors', value: analyticsData.totalScans, fill: '#3b82f6' }, // Vibrant Blue
     { name: 'Total Bookings', value: analyticsData.totalBookings, fill: '#10b981' }, // Vibrant Green
-    { name: 'Q1 Bookings', value: analyticsData.qrBookings, fill: '#8b5cf6' }, // Vibrant Purple
+    { name: 'QR Bookings', value: analyticsData.qrBookings, fill: '#8b5cf6' }, // Vibrant Purple
     { name: 'Walk-in Bookings', value: analyticsData.walkinBookings, fill: '#6366f1' }, // Vibrant Indigo
     { name: 'Drop Outs', value: analyticsData.dropOuts, fill: '#ef4444' }, // Vibrant Red
     { name: 'Cancelled', value: analyticsData.cancelled, fill: '#374151' }, // Dark Gray
@@ -1218,7 +1201,6 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
                       <SocialMediaPromoBanner
                         compact={true}
                         onNavigate={() => {
-                          console.log('🔘 Social Kit Button Clicked! Navigating to Social Kit Designer...');
                           if (onMenuChange) {
                             onMenuChange('social-kit');
                           } else {

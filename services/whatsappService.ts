@@ -36,7 +36,6 @@ export const sendPatientListViaWhatsApp = async (
     const numericChamberId = typeof chamber.id === 'string' ? parseInt(chamber.id, 10) : chamber.id;
 
     // Log the query parameters for debugging
-    console.log(`🔍 [WHATSAPP] Fetching patients for chamber: ${chamber.name} (${numericChamberId}) on ${todayStr}`);
 
     const qrBookingsQuery = query(
       bookingsRef,

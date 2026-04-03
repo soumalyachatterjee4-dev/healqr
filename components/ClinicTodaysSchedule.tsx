@@ -104,11 +104,6 @@ function ChamberPatientDetailsLoader({
                   const matchingManualClinic = manualClinics.find((mc: any) => mc.clinicCode === clinicCode);
                   if (selfRestrictedClinics.includes(clinicCode) || (matchingManualClinic && selfRestrictedClinics.includes(matchingManualClinic.id))) {
                     isDoctorQrRestricted = true;
-                    console.log('🔒 Doctor self-restricted QR data from clinic:', {
-                      doctorId,
-                      clinicId: currentClinicId,
-                      clinicCode
-                    });
                   }
                 }
               }
@@ -403,7 +398,6 @@ function ChamberPatientDetailsLoader({
     const unsubscribe = onSnapshot(qrBookingsQuery, (snapshot) => {
       snapshot.docChanges().forEach((change) => {
         if (change.type === 'added' || change.type === 'modified' || change.type === 'removed') {
-          console.log('🔄 Chamber booking changed, triggering refresh...');
           // Debounce to prevent rapid reloads
           if (timeoutId) clearTimeout(timeoutId);
           timeoutId = setTimeout(() => {
@@ -515,7 +509,6 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
     const unsubscribe = onSnapshot(bookingsQuery, (snapshot) => {
       snapshot.docChanges().forEach((change) => {
         if (change.type === 'added' || change.type === 'modified' || change.type === 'removed') {
-          console.log('🔄 Clinic booking changed, triggering refresh...');
           // Debounce to prevent rapid reloads
           if (timeoutId) clearTimeout(timeoutId);
           timeoutId = setTimeout(() => {

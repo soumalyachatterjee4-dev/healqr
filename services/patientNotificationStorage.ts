@@ -120,20 +120,12 @@ export const storeNotification = async (
       isRead: false,
     } as Omit<StoredNotification, 'id'>;
 
-    console.log('💾 Storing notification in Firestore:', {
-      phone: normalizedPhone,
-      type: notification.type,
-      title: notification.title,
-      bookingId: notification.bookingId,
-      fcmSuccess: notification.fcmSuccess,
-    });
 
     const docRef = await addDoc(
       collection(db!, NOTIFICATIONS_COLLECTION),
       notificationData
     );
 
-    console.log('✅ Notification stored with ID:', docRef.id);
 
     // Auto-cleanup expired notifications for this patient
     await cleanupExpiredNotifications(normalizedPhone);
@@ -155,7 +147,6 @@ export const getPatientNotifications = async (
   try {
     const normalizedPhone = patientPhone.replace(/\D/g, '').slice(-10);
 
-    console.log('📥 Fetching notifications for patient:', normalizedPhone);
 
     // Simplified query to avoid composite index requirement
     const notificationsQuery = query(
@@ -175,7 +166,6 @@ export const getPatientNotifications = async (
       }))
       .filter(n => n.expiresAt.toMillis() > now.toMillis());
 
-    console.log(`✅ Found ${notifications.length} notifications for patient`);
 
     // Ensure at least last 2 consultations are included (if they exist)
     const consultationNotifs = notifications.filter(n => n.type === 'consultation_completed');
@@ -223,7 +213,6 @@ export const subscribeToPatientNotifications = (
 ): (() => void) => {
   const normalizedPhone = patientPhone.replace(/\D/g, '').slice(-10);
 
-  console.log('🔔 Setting up real-time listener for patient:', normalizedPhone);
 
   // Simple query with only where clause (no orderBy to avoid composite index)
   const notificationsQuery = query(
@@ -244,7 +233,6 @@ export const subscribeToPatientNotifications = (
         .filter(n => n.expiresAt.toMillis() > now.toMillis())
         .sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
 
-      console.log(`🔔 Real-time update: ${notifications.length} notifications`);
       callback(notifications);
     },
     (error) => {
@@ -268,7 +256,6 @@ export const markNotificationAsRead = async (notificationId: string): Promise<vo
       readAt: Timestamp.now(),
     });
 
-    console.log('✅ Notification marked as read:', notificationId);
   } catch (error) {
     console.error('❌ Error marking notification as read:', error);
   }
@@ -309,7 +296,6 @@ const cleanupExpiredNotifications = async (patientPhone: string): Promise<void> 
     await Promise.all(deletePromises);
 
     if (deletePromises.length > 0) {
-      console.log(`🗑️ Cleaned up ${deletePromises.length} expired notifications`);
     }
   } catch (error) {
     console.error('❌ Error cleaning up notifications:', error);

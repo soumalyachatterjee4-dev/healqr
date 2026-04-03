@@ -279,7 +279,7 @@
     -webkit-text-size-adjust: 100%;
     tab-size: 4;
     line-height: 1.5;
-    font-family: var(--default-font-family, ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji");
+    font-family: var(--default-font-family, "Noto Sans", ui-sans-serif, system-ui, sans-serif, "Noto Sans Devanagari", "Noto Sans Bengali", "Noto Sans Tamil", "Noto Sans Telugu", "Noto Sans Gujarati", "Noto Sans Kannada", "Noto Sans Malayalam", "Noto Sans Gurmukhi", "Noto Sans Oriya", "Noto Sans Arabic", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji");
     font-feature-settings: var(--default-font-feature-settings, normal);
     font-variation-settings: var(--default-font-variation-settings, normal);
     -webkit-tap-highlight-color: transparent;
@@ -536,6 +536,32 @@
   #root {
     background-color: #000000 !important;
     min-height: 100vh;
+  }
+
+  /* ═══ RTL Layout Support for Arabic, Urdu, Sindhi, Kashmiri ═══ */
+  [dir="rtl"] {
+    text-align: right;
+  }
+  [dir="rtl"] .flex {
+    flex-direction: row-reverse;
+  }
+  [dir="rtl"] .flex-col {
+    flex-direction: column; /* Keep vertical stacking */
+  }
+  [dir="rtl"] .gap-2, [dir="rtl"] .gap-3, [dir="rtl"] .gap-4 {
+    direction: rtl;
+  }
+  [dir="rtl"] input, [dir="rtl"] textarea, [dir="rtl"] select {
+    text-align: right;
+    direction: rtl;
+  }
+  /* Prevent RTL from reversing certain layout elements */
+  [dir="rtl"] .flex-col-reverse {
+    flex-direction: column-reverse;
+  }
+  [dir="rtl"] [data-no-rtl] {
+    direction: ltr;
+    text-align: left;
   }
 
   :where(:not(:has([class*=" text-"]), :not(:has([class^="text-"])))) h1 {

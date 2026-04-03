@@ -436,6 +436,9 @@ export default function App() {
   const [selectedChamber, setSelectedChamber] = useState<
     string | null
   >(null);
+  const [selectedChamberId, setSelectedChamberId] = useState<
+    number | null
+  >(null);
   const [consultationType, setConsultationType] = useState<
     'chamber' | 'video' | null
   >(null);
@@ -506,6 +509,8 @@ export default function App() {
     maxCapacity?: number;
     blockedDates?: Array<{ date: string; status: string }>;
   }>>([]);
+  // VC time slots for video consultation scheduling
+  const [doctorVcTimeSlots, setDoctorVcTimeSlots] = useState<Array<{id: number; startTime: string; endTime: string; days: string[]; isActive: boolean}>>([]);
   // Clinic schedule data for chamber filtering (doctor QR flow)
   const [clinicId, setClinicId] = useState(''); // Restore original state
   const [clinicAddress, setClinicAddress] = useState('');
@@ -525,7 +530,6 @@ export default function App() {
 
   // Helper: Load clinic planned off periods from clinic documents
   const loadClinicSchedules = async (chambers: any[], db: any) => {
-    console.log('🏥 [LOAD CLINICS] Loading for', chambers.length, 'chambers');
 
     const { doc: firestoreDoc, getDoc } = await import('firebase/firestore');
     const clinicIds = new Set<string>();
@@ -537,7 +541,6 @@ export default function App() {
       }
     }
 
-    console.log('🆔 [LOAD CLINICS] Unique clinic IDs:', Array.from(clinicIds));
 
     const allClinicPeriods: any[] = [];
 
@@ -568,7 +571,6 @@ export default function App() {
               }));
 
             allClinicPeriods.push(...activePeriods);
-            console.log(`✅ [LOAD CLINICS] ${clinicName}: ${activePeriods.length} periods`);
           }
         }
       } catch (e) {
@@ -576,7 +578,6 @@ export default function App() {
       }
     }
 
-    console.log(`📊 [LOAD CLINICS] Total: ${allClinicPeriods.length} periods`);
     return allClinicPeriods;
   };
 
@@ -598,9 +599,6 @@ export default function App() {
     if (urlLanguage && urlLanguage !== 'english' && urlLanguage !== 'en') {
       setBookingLanguage(urlLanguage as Language);
     }
-    console.log("🚀 App.tsx mounted. URL:", fullUrl);
-    console.log("   - page:", pageParam);
-    console.log("   - source:", urlParams.get('source'));
 
     // Handle verify visit deep link
     if (pathname.startsWith('/verify-visit/')) {
@@ -952,7 +950,6 @@ export default function App() {
                 scanSessionId: scanSessionId,
                 completed: false // Will be updated when booking is confirmed
               });
-              console.log('📊 Doctor QR scan tracked');
             } catch (error) {
               console.error('Error tracking scan:', error);
             }
@@ -967,7 +964,6 @@ export default function App() {
 
             // Load chambers
             if (data.chambers && data.chambers.length > 0) {
-              console.log('🏥 [QR PATH] LOADING CHAMBERS:', data.chambers);
               setDoctorChambers(data.chambers);
 
               // Load clinic planned off periods from clinic documents
@@ -977,6 +973,11 @@ export default function App() {
               } catch (e) {
                 console.error('❌ [QR PATH] Error loading clinic schedules:', e);
                 setClinicPlannedOffPeriods([]);
+
+            // Load VC time slots
+            if (data.vcTimeSlots && Array.isArray(data.vcTimeSlots)) {
+              setDoctorVcTimeSlots(data.vcTimeSlots);
+            }
               }
             } else {
               setClinicPlannedOffPeriods([]);
@@ -1000,7 +1001,6 @@ export default function App() {
                 doctorId: p.doctorId,
                 doctorName: p.doctorName
               }));
-              console.log('✅ Doctor solo booking - Loaded ALL planned off periods (doctor + clinic):', periods.length);
               setPlannedOffPeriods(periods);
             }
 
@@ -1009,7 +1009,21 @@ export default function App() {
               setDoctorSchedules(data.schedules);
             }
           } else {
-            console.error('No doctor found with QR number:', qrNumber);
+            // Not found in doctors — check clinics collection (pre-printed QR may belong to a clinic)
+            const clinicsRef = collection(db, 'clinics');
+            const clinicQ = query(clinicsRef, where('qrNumber', '==', qrNumber.toUpperCase()));
+            const clinicSnapshot = await getDocs(clinicQ);
+
+            if (!clinicSnapshot.empty) {
+              const actualClinicId = clinicSnapshot.docs[0].id;
+              sessionStorage.setItem('booking_clinic_id', actualClinicId);
+              sessionStorage.setItem('booking_source', 'clinic_qr');
+              setIsScanningDoctor(false);
+              setCurrentPage('clinic-booking-flow');
+              return;
+            } else {
+              console.error('No doctor or clinic found with QR number:', qrNumber);
+            }
           }
         }
       } else {
@@ -1031,7 +1045,6 @@ export default function App() {
               scanSessionId: scanSessionId,
               completed: false // Will be updated when booking is confirmed
             });
-            console.log('📊 Doctor QR scan tracked (direct ID)');
           } catch (error) {
             console.error('Error tracking scan:', error);
           }
@@ -1050,7 +1063,6 @@ export default function App() {
 
             // Load chambers
             if (data.chambers && data.chambers.length > 0) {
-              console.log('🏥 [DIRECT ID PATH] LOADING CHAMBERS:', data.chambers);
               setDoctorChambers(data.chambers);
 
               // Load clinic planned off periods from clinic documents
@@ -1063,6 +1075,11 @@ export default function App() {
               }
             } else {
               setClinicPlannedOffPeriods([]);
+            }
+
+            // Load VC time slots
+            if (data.vcTimeSlots && Array.isArray(data.vcTimeSlots)) {
+              setDoctorVcTimeSlots(data.vcTimeSlots);
             }
 
             // Load schedule settings
@@ -1083,7 +1100,6 @@ export default function App() {
                 doctorId: p.doctorId,
                 doctorName: p.doctorName
               }));
-              console.log('✅ Doctor solo booking - Loaded ALL planned off periods (doctor + clinic):', periods.length);
               setPlannedOffPeriods(periods);
             }
 
@@ -1186,7 +1202,6 @@ export default function App() {
         try {
           const idTokenResult = await user.getIdTokenResult();
           if (idTokenResult.claims.admin) {
-            console.log('? Admin user confirmed via custom claims');
             localStorage.setItem('healqr_admin_email', user.email || '');
             localStorage.setItem('healqr_admin_authenticated', 'true');
             setAdminEmail(user.email || '');
@@ -1208,7 +1223,6 @@ export default function App() {
 
         if (isClinicFromStorage && !isAssistantFromStorage) {
           // Pure clinic owner - fast route to clinic dashboard (assistants need validation below)
-          console.log('? Clinic user detected from localStorage - routing to clinic dashboard');
           setCurrentPage('clinic-dashboard');
           setIsAuthInitialized(true);
           return;
@@ -1225,7 +1239,6 @@ export default function App() {
               // Not a doctor � check if clinic
               const clinicDoc = await getDoc(doc(db, 'clinics', user.uid));
               if (clinicDoc.exists()) {
-                console.log('? Clinic user detected from Firestore - routing to clinic dashboard');
                 localStorage.setItem('healqr_is_clinic', 'true'); // Cache for next time
                 setCurrentPage('clinic-dashboard');
                 setIsAuthInitialized(true);
@@ -2007,9 +2020,14 @@ export default function App() {
     setCurrentPage("booking-select-chamber");
   };
 
-  const handleChamberSelection = (chamber: string, consultationType: 'chamber' | 'video') => {
+  const handleChamberSelection = (chamber: string, consultationType: 'chamber' | 'video', chamberId?: number, vcStartTime?: string, vcEndTime?: string) => {
     setSelectedChamber(chamber);
+    setSelectedChamberId(chamberId ?? null);
     setConsultationType(consultationType);
+    // For VC bookings with specific time slots, use the VC time
+    if (consultationType === 'video' && vcStartTime) {
+      setSelectedSlot(`${vcStartTime} - ${vcEndTime || vcStartTime}`);
+    }
     setCurrentPage("booking-patient-details");
   };
 
@@ -2545,8 +2563,6 @@ export default function App() {
             if (storedEmail) setUserEmail(storedEmail);
             if (storedName) setUserName(storedName);
 
-            console.log('✅ Verification complete, redirecting to QR success page');
-            console.log('User:', storedName, storedEmail, storedUserId);
 
             setCurrentPage("qr-success");
           }}
@@ -2898,7 +2914,6 @@ export default function App() {
           if (scannedClinicId) {
             // Only show chambers that belong to this specific clinic
             if (chamber.clinicId !== scannedClinicId) {
-              console.log('🚫 Filtering out chamber (not from scanned clinic):', chamber.chamberName, 'clinicId:', chamber.clinicId);
               return false; // Hide personal chambers and other clinics
             }
           }
@@ -2921,14 +2936,6 @@ export default function App() {
           return false;
         });
 
-        console.log('🎯 [APP.TSX] RENDERING SELECT CHAMBER WITH:');
-        console.log('  - scannedClinicId:', sessionStorage.getItem('booking_clinic_id'));
-        console.log('  - clinicAddress:', clinicAddress);
-        console.log('  - clinicPlannedOffPeriods:', clinicPlannedOffPeriods);
-        console.log('  - total chambers before filtering:', doctorChambers.length);
-        console.log('  - filteredChambers after clinic filter:', filteredChambers.length);
-        console.log('  - filteredChambers:', filteredChambers.map((c: any) => ({ name: c.chamberName, clinicId: c.clinicId })));
-        console.log('  - selectedDate:', selectedDate);
 
         return (
           <SelectChamber
@@ -2947,6 +2954,7 @@ export default function App() {
             clinicId={clinicId}
             clinicAddress={clinicAddress}
             clinicPlannedOffPeriods={clinicPlannedOffPeriods}
+            vcTimeSlots={doctorVcTimeSlots}
           />
         );
       })()}
@@ -2957,6 +2965,7 @@ export default function App() {
           selectedDate={selectedDate!}
           selectedTime={selectedSlot!}
           selectedChamber={selectedChamber!}
+          selectedChamberId={selectedChamberId ?? undefined}
           onSubmit={handlePatientDetailsSubmit}
           onBack={() =>
             setCurrentPage("booking-select-chamber")

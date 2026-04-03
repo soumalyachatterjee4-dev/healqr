@@ -120,7 +120,6 @@ export default function PatientDetails({
       try {
         const userId = localStorage.getItem('userId') || localStorage.getItem('healqr_temp_doctor_id');
         if (!userId) return;
-        console.log('🔍 [PatientDetails] Checking restrictions for doctor:', userId);
 
         const doctorRef = doc(db!, 'doctors', userId);
         const doctorSnap = await getDoc(doctorRef);
@@ -143,7 +142,6 @@ export default function PatientDetails({
         }
         // NOTE: Patient data masking is now handled PER-PATIENT via patient.isDataRestricted
         // which is set by TodaysSchedule.tsx / ClinicTodaysSchedule.tsx based on bookingSource
-        console.log('✅ [PatientDetails] Using per-patient isDataRestricted flags from parent');
       } catch (error) {
         console.error('Error checking clinic restrictions:', error);
       }
@@ -558,7 +556,6 @@ export default function PatientDetails({
             const doctorName = localStorage.getItem('healqr_user_name') || localStorage.getItem('healqr_temp_doctor_name') || 'Doctor';
             const doctorId = localStorage.getItem('userId') || localStorage.getItem('healqr_temp_doctor_id') || '';
 
-            console.log(`📹 Sending VC link to ${patient.name} via FCM...`);
 
             await sendVideoCallLink({
               patientPhone: patient.phone,
@@ -586,7 +583,6 @@ export default function PatientDetails({
             }
 
             toast.success(`📹 Video link sent to ${patient.name}`, { duration: 3000 });
-            console.log(`✅ VC link sent to ${patient.name}`);
           } catch (err) {
             console.error(`❌ Failed to send VC link to ${patient.name}:`, err);
             toast.error(`Failed to send video link to ${patient.name}`);

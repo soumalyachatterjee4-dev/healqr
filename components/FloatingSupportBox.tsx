@@ -15,8 +15,6 @@ export default function FloatingSupportBox() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    console.log('🎯 FloatingSupportBox form submitted');
-    console.log('Form values - Name:', name, 'Email:', email, 'Message length:', message.length);
 
     if (!name.trim()) {
       toast.error('Please enter your name');
@@ -40,10 +38,6 @@ export default function FloatingSupportBox() {
       const { db } = await import('../lib/firebase/config');
       const { collection, addDoc, serverTimestamp } = await import('firebase/firestore');
       
-      console.log('🔄 Attempting to save floating support request...');
-      console.log('Name:', name);
-      console.log('Email:', email);
-      console.log('Message:', message);
       
       const docRef = await addDoc(collection(db, 'supportRequests'), {
         name,
@@ -56,8 +50,6 @@ export default function FloatingSupportBox() {
         resolvedAt: null,
       });
       
-      console.log('✅✅✅ Floating support request saved to Firestore with ID:', docRef.id);
-      console.log('📍 Document path: supportRequests/' + docRef.id);
       
       // Show success message
       toast.success('Support request submitted successfully! We\'ll get back to you soon.');

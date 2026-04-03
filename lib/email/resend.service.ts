@@ -14,12 +14,6 @@ const APP_NAME = 'HealQR';
 const APP_URL = 'https://teamhealqr.web.app'; // Fixed URL
 
 // Log configuration (for debugging)
-console.log('📧 Resend Configuration:', {
-  hasApiKey: !!RESEND_API_KEY && RESEND_API_KEY !== 'YOUR_RESEND_API_KEY',
-  apiKeyPrefix: RESEND_API_KEY?.substring(0, 10) + '...',
-  senderEmail: SENDER_EMAIL,
-  appUrl: APP_URL
-});
 
 // Initialize Resend client
 const resend = new Resend(RESEND_API_KEY);
@@ -304,10 +298,6 @@ export async function sendAssistantVerificationEmail(
   verificationLink: string,
   doctorEmail: string
 ): Promise<{ success: boolean; error?: string }> {
-  console.log('🔵 Resend API Call Starting...');
-  console.log('🔵 To:', assistantEmail);
-  console.log('🔵 From:', SENDER_EMAIL);
-  console.log('🔵 Subject:', `You've been added as an Assistant on HealQR by ${doctorEmail}`);
   
   try {
     const emailPayload = {
@@ -317,7 +307,6 @@ export async function sendAssistantVerificationEmail(
       html: getAssistantVerificationEmailTemplate(assistantName, doctorEmail, verificationLink),
     };
     
-    console.log('🔵 Sending email via Resend...');
     const { data, error } = await resend.emails.send(emailPayload);
 
     if (error) {
@@ -327,9 +316,6 @@ export async function sendAssistantVerificationEmail(
       return { success: false, error: error.message };
     }
 
-    console.log('✅✅✅ EMAIL SENT SUCCESSFULLY!');
-    console.log('✅ Email ID:', data?.id);
-    console.log('✅ Recipient:', assistantEmail);
     return { success: true };
   } catch (error) {
     console.error('Failed to send assistant email:', error);

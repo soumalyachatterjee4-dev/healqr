@@ -414,7 +414,6 @@ RULES:
     }
 
     const data = await response.json();
-    console.log('🔍 Full Gemini response structure:', JSON.stringify(data).substring(0, 500));
 
     // Gemini 2.5 may return thinking + text parts
     const parts = data.candidates?.[0]?.content?.parts || [];
@@ -424,7 +423,6 @@ RULES:
     }
     if (!text) throw new Error('No response from AI');
 
-    console.log('🤖 Gemini raw response:', text);
 
     // Clean: remove markdown fences, thinking blocks, extra whitespace
     let cleanJson = text
@@ -438,7 +436,6 @@ RULES:
     if (!jsonMatch) throw new Error('Could not find JSON in AI response');
 
     const parsed = JSON.parse(jsonMatch[0]);
-    console.log('✅ Parsed result:', parsed);
     return parsed;
   };
 
@@ -491,7 +488,6 @@ RULES:
       // Always include full original images first (gives Gemini full context)
       for (let i = 0; i < selectedFiles.length; i++) {
         filesToProcess.push(selectedFiles[i]);
-        console.log(`📄 Page ${i + 1}: added full original image`);
       }
 
       // Then add cropped portions (helps Gemini focus on medicine area)
@@ -502,7 +498,6 @@ RULES:
         if (region && container && region.width > 20 && region.height > 20) {
           try {
             const cropped = await cropImageToFile(previewUrls[i], region, container);
-            console.log(`✂️ Page ${i + 1}: cropped ${Math.round(region.width)}x${Math.round(region.height)}px, file size: ${cropped.size} bytes`);
             filesToProcess.push(cropped);
           } catch (err) {
             console.warn(`⚠️ Page ${i + 1}: crop failed:`, err);
@@ -510,10 +505,8 @@ RULES:
         }
       }
 
-      console.log(`📤 Sending ${filesToProcess.length} images to Gemini (${selectedFiles.length} original + cropped portions)`);
 
       const result = await analyzeWithGemini(filesToProcess);
-      console.log('✅ Gemini analysis result:', result);
 
       setAnalysisResult(result);
       setDecodedText(formatResultToText(result));

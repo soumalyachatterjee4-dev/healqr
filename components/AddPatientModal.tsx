@@ -63,7 +63,6 @@ export default function AddPatientModal({ isOpen, onClose, onAddPatient, doctorI
 
           // 🔔 Walk-in verified via QR — Doctor will now press Eye button to start consultation flow
           // No auto 30-min notification — consultation complete notification sent after Eye → RX → Diet flow
-          console.log('✅ Walk-in verified via QR — awaiting doctor Eye button press for consultation flow');
 
           // Auto close after 2 seconds
           setTimeout(() => {
@@ -291,9 +290,7 @@ export default function AddPatientModal({ isOpen, onClose, onAddPatient, doctorI
             },
             submissionTimestamp
           );
-          console.log('✅ Review request scheduled for 24h after walk-in submission');
         } else {
-          console.log('🚫 Review request suppressed by Clinic settings');
         }
       } catch (notifError) {
         console.warn('⚠️ Review notification scheduling error (non-blocking):', notifError);
@@ -343,13 +340,6 @@ export default function AddPatientModal({ isOpen, onClose, onAddPatient, doctorI
         // Log history for manual walk-in (since no notification is sent)
         try {
           const normalizedPhone = formData.whatsappNumber.replace(/\D/g, '').slice(-10);
-          console.log('🔔 Attempting to log manual walk-in history:', {
-            normalizedPhone,
-            patientName: formData.patientName,
-            doctorId: currentDoctorId,
-            doctorName: doctorName || loadedDoctorName,
-            bookingId: bookingId // Use the generated bookingId variable (HQL-...)
-          });
 
           const now = new Date();
           await saveNotificationHistory({
@@ -372,7 +362,6 @@ export default function AddPatientModal({ isOpen, onClose, onAddPatient, doctorI
             isWalkIn: true,
             walkInVerified: true,
           });
-          console.log('✅ Manual walk-in history logged successfully!');
         } catch (histError) {
           console.error('❌ Failed to log manual walk-in history:', histError);
           // Show detailed error for debugging

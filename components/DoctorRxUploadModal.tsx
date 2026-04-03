@@ -92,8 +92,6 @@ export default function DoctorRxUploadModal({
         },
       };
 
-      console.log(`📤 UPLOADING PRESCRIPTION: ${selectedFile.name} for ${patientName} (${bookingId || patientPhone || patientId})`);
-      console.log(`📧 NOTIFICATION SENT: RXDownloadNotification sent to patient with download link`);
 
       onUploadSuccess(mockData);
       setUploading(false);

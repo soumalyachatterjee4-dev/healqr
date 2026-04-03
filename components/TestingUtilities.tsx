@@ -382,7 +382,6 @@ export default function TestingUtilities({ onClose }: TestingUtilitiesProps) {
                     const nullChamberQuery = query(bookingsRef, where('chamberId', '==', null));
                     const snapshot = await getDocs(nullChamberQuery);
                     
-                    console.log(`🔍 Found ${snapshot.size} bookings with null chamberId`);
                     
                     let updated = 0;
                     for (const docSnap of snapshot.docs) {
@@ -419,7 +418,6 @@ export default function TestingUtilities({ onClose }: TestingUtilitiesProps) {
                     const bookingsRef = collection(db, 'bookings');
                     const snapshot = await getDocs(bookingsRef);
                     
-                    console.log(`🔍 Checking ${snapshot.size} bookings for cancelled status`);
                     
                     let updated = 0;
                     for (const docSnap of snapshot.docs) {
@@ -430,7 +428,6 @@ export default function TestingUtilities({ onClose }: TestingUtilitiesProps) {
                           status: 'confirmed'
                         });
                         updated++;
-                        console.log(`✅ Fixed cancelled booking: ${data.patientName}`);
                       }
                     }
                     

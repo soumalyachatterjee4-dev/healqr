@@ -148,7 +148,6 @@ export default function LandingPage({
           averageRating: parseFloat(averageRating)
         });
 
-        console.log('✅ Landing page stats loaded:', { doctorsCount, clinicsCount, monthlyBookings, averageRating });
       } catch (error) {
         console.error('❌ Error fetching landing page stats:', error);
       }

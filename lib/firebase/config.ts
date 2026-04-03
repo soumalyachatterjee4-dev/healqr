@@ -63,14 +63,12 @@ if (isFirebaseConfigured) {
     if (auth) {
       setPersistence(auth, browserLocalPersistence)
         .then(() => {
-          console.log('✅ Auth persistence enabled (LOCAL)');
         })
         .catch((error) => {
           console.warn('⚠️ Could not set auth persistence:', error);
         });
     }
 
-    console.log('✅ Firebase initialized successfully');
   } catch (error: any) {
     // Silent fallback to DEMO MODE
     console.warn('⚠️ Firebase initialization failed, running in DEMO MODE');
@@ -78,8 +76,6 @@ if (isFirebaseConfigured) {
 } else {
   // 🚧 Waiting for Firebase credentials
   // Add your TeamHealQR Firebase config above to enable backend services
-  console.log('🚧 TeamHealQR: Firebase credentials pending.');
-  console.log('📝 Add Firebase config to src/lib/firebase/config.ts to enable backend');
 }
 
 // Export Firebase services (may be null in prototype mode)

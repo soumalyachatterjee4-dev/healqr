@@ -116,7 +116,6 @@ export default function ClinicBookingFlow() {
             scanSessionId: scanSessionId,
             completed: false // Will be updated when booking is confirmed
           });
-          console.log('📊 Clinic QR scan tracked');
         } catch (error) {
           console.error('Error tracking scan:', error);
         }
@@ -197,10 +196,6 @@ export default function ClinicBookingFlow() {
               plannedOffPeriods: plannedOffPeriodsWithMetadata,
               globalBookingEnabled: scheduleData.globalBookingEnabled ?? true
             });
-            console.log('📅 Clinic Schedule Settings:', {
-              ...scheduleData,
-              plannedOffPeriods: plannedOffPeriodsWithMetadata
-            });
           } else {
             // Default clinic schedule if not found
             setClinicSchedule({
@@ -257,15 +252,8 @@ export default function ClinicBookingFlow() {
   };
 
   const handleDoctorSelect = async (doctor: SelectedDoctor) => {
-    console.log('🔵 handleDoctorSelect CALLED with doctor:', {
-      name: doctor.name,
-      uid: doctor.uid,
-      doctorCode: doctor.doctorCode,
-      fullDoctorObject: doctor
-    });
 
     // Load doctor's schedule settings AND chambers
-    console.log('🔍 Loading doctor data for UID:', doctor.uid);
     try {
       const { db } = await import('../lib/firebase/config');
       if (!db) {
@@ -291,14 +279,6 @@ export default function ClinicBookingFlow() {
       if (doctorProfileSnap.exists()) {
         const profileData = doctorProfileSnap.data();
         doctorWithChambers.chambers = profileData.chambers || [];
-        console.log('✅ Doctor profile LOADED:', {
-          doctorUid: doctor.uid,
-          chambersCount: doctorWithChambers.chambers?.length || 0,
-          chambers: doctorWithChambers.chambers?.map((c: any) => ({
-            name: c.chamberName,
-            address: c.chamberAddress
-          })) || []
-        });
       } else {
         console.warn('⚠️ Doctor profile not found for:', doctor.uid);
         doctorWithChambers.chambers = [];
@@ -318,24 +298,11 @@ export default function ClinicBookingFlow() {
 
       // Load doctor's schedule
       const doctorScheduleRef = doc(db, 'schedules', doctor.uid);
-      console.log('📄 Firestore path:', `schedules/${doctor.uid}`);
       const doctorScheduleSnap = await getDoc(doctorScheduleRef);
-      console.log('📊 Schedule document exists?', doctorScheduleSnap.exists());
 
       if (doctorScheduleSnap.exists()) {
         const scheduleData = doctorScheduleSnap.data();
         const doctorPlannedOff = scheduleData.plannedOffPeriods || [];
-        console.log('✅ Doctor Schedule LOADED from schedules collection:', {
-          doctorUid: doctor.uid,
-          maxAdvanceDays: scheduleData.maxAdvanceDays,
-          totalPlannedOffPeriods: doctorPlannedOff.length,
-          activePeriods: doctorPlannedOff.filter((p: any) => p.status === 'active').length,
-          periods: doctorPlannedOff.map((p: any) => ({
-            startDate: p.startDate,
-            endDate: p.endDate,
-            status: p.status
-          }))
-        });
         setDoctorSchedule({
           maxAdvanceDays: scheduleData.maxAdvanceDays || 30,
           plannedOffPeriods: doctorPlannedOff,
@@ -343,7 +310,6 @@ export default function ClinicBookingFlow() {
         });
       } else {
         console.warn('⚠️ NO schedule document found in schedules collection for doctor:', doctor.uid);
-        console.log('📋 FALLBACK: Trying to load from doctors collection (legacy location)...');
 
         // FALLBACK: Read from doctors collection if schedules doesn't exist
         if (doctorProfileSnap.exists()) {
@@ -351,17 +317,6 @@ export default function ClinicBookingFlow() {
           const legacyPlannedOff = profileData.plannedOffPeriods || [];
           const legacyMaxDays = profileData.maxAdvanceBookingDays || 30;
 
-          console.log('✅ Doctor Schedule LOADED from doctors collection (LEGACY):', {
-            doctorUid: doctor.uid,
-            maxAdvanceDays: legacyMaxDays,
-            totalPlannedOffPeriods: legacyPlannedOff.length,
-            activePeriods: legacyPlannedOff.filter((p: any) => p.status === 'active').length,
-            periods: legacyPlannedOff.map((p: any) => ({
-              startDate: p.startDate,
-              endDate: p.endDate,
-              status: p.status
-            }))
-          });
 
           setDoctorSchedule({
             maxAdvanceDays: legacyMaxDays,
@@ -369,7 +324,6 @@ export default function ClinicBookingFlow() {
             globalBookingEnabled: true
           });
         } else {
-          console.log('🔴 No schedule data found in either collection, using defaults');
           // Default doctor schedule if not found
           setDoctorSchedule({
             maxAdvanceDays: 30,
@@ -412,7 +366,6 @@ export default function ClinicBookingFlow() {
   };
 
   const handleBookingComplete = (data: any) => {
-    console.log('✅ Booking completed with data:', data);
 
     // Handle both string (legacy) and object formats
     let bId = '';
@@ -561,16 +514,6 @@ export default function ClinicBookingFlow() {
       });
       const uniqueDoctors = Array.from(uniqueDoctorsMap.values());
 
-      console.log('🏷️ [BookingFlow] Branch Count Debug:', {
-        totalLinkedEntries: allDoctors.length,
-        uniqueDoctors: uniqueDoctors.length,
-        doctors: uniqueDoctors.map((d: any) => ({
-          name: d.name, uid: d.uid, locationId: d.locationId, status: d.status,
-          allLocationIds: Array.from(allLocationIdsPerDoctor.get(d.uid) || []),
-          chambers: (d.chambers || []).length,
-          chamberLocations: (d.chambers || []).map((ch: any) => ch.clinicLocationId)
-        }))
-      });
 
       // Check if a doctor belongs to a branch
       const doctorBelongsToBranch = (doc: any, branchId: string) => {
@@ -707,14 +650,6 @@ export default function ClinicBookingFlow() {
         ...(doctorSchedule?.plannedOffPeriods || []).filter((p: any) => p.clinicId)
       ];
 
-      console.log('📅 Merged Schedule Settings:', {
-        clinicMaxDays: clinicSchedule?.maxAdvanceDays,
-        doctorMaxDays: doctorSchedule?.maxAdvanceDays,
-        mergedMaxAdvanceDays,
-        clinicOffPeriods: clinicSchedule?.plannedOffPeriods?.length || 0,
-        doctorOffPeriods: doctorSchedule?.plannedOffPeriods?.length || 0,
-        totalOffPeriods: mergedPlannedOffPeriods.length
-      });
 
       return (
         <SelectDate

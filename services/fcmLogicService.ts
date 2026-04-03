@@ -38,7 +38,6 @@ export const handleAppointmentReminder = async (patient: Patient, chamberInfo: a
   const diffHours = diffMs / (1000 * 60 * 60);
 
   if (diffHours < 6) {
-    console.log(`[FCM] Skipping reminder for ${patient.name} - booking made < 6h before appointment.`);
     return { skipped: true, reason: '6h_rule' };
   }
 
@@ -155,6 +154,5 @@ export const handleunmarkedTimeouts = async (patients: any[], chamberInfo: any) 
   // 5. DROP OUT LOGIC (End of Day)
   if (now.getHours() === 23 && now.getMinutes() >= 50) {
     // This part would ideally be a Cloud Function, but here's the logic
-    console.log('[FCM] EOD Cleanup: Marking remaining patients as Dropout.');
   }
 };

@@ -28,7 +28,6 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
         throw new Error('Firebase not configured');
       }
 
-      console.log('🔍 Current URL:', window.location.href);
 
       // Check if this is an email link
       if (!isSignInWithEmailLink(auth, window.location.href)) {
@@ -38,11 +37,9 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
         return;
       }
 
-      console.log('✅ Valid email link detected');
 
       // Get email from localStorage
       let email = localStorage.getItem('healqr_email_for_signin');
-      console.log('📧 Email from localStorage:', email);
 
       if (!email) {
         // If not in localStorage, ask user to enter their email
@@ -50,20 +47,17 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
         setMessage('Please enter your email address to complete verification');
 
         email = window.prompt('Please enter the email address you used to sign up:');
-        console.log('📧 Email from prompt:', email);
 
         if (!email || !email.includes('@')) {
           throw new Error('Valid email address is required for verification');
         }
       }
 
-      console.log('🔐 Attempting to sign in with email link...');
 
       // Sign in with email link
       const result = await signInWithEmailLink(auth, email, window.location.href);
       const user = result.user;
 
-      console.log('✅ Email verified successfully:', user.uid);
 
       // Wait for auth state to fully propagate before Firestore operations
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -72,7 +66,6 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
       let signupData: any;
 
       // Try URL params first (most reliable for email links)
-      console.log('🔍 Looking for signup data in URL...');
 
       // Try query string first
       let urlParams = new URLSearchParams(window.location.search);
@@ -90,7 +83,6 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
       if (encodedData) {
         try {
           signupData = JSON.parse(atob(encodedData));
-          console.log('📦 Loaded signup data from URL:', signupData);
         } catch (e) {
           console.error('❌ Failed to decode URL data:', e);
         }
@@ -98,13 +90,11 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
 
       // Fallback to localStorage (same browser/session)
       if (!signupData) {
-        console.log('🔍 Trying localStorage as fallback...');
         const signupDataStr = localStorage.getItem('healqr_pending_clinic_signup') || localStorage.getItem('healqr_pending_signup');
 
         if (signupDataStr) {
           try {
             signupData = JSON.parse(signupDataStr);
-            console.log('📦 Loaded signup data from localStorage:', signupData);
           } catch (e) {
             console.error('❌ Failed to parse signup data:', e);
           }
@@ -130,7 +120,6 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
         throw new Error('Email is missing. Please sign up again.');
       }
 
-      console.log('✅ Signup data validated successfully');
 
       if (isClinic) {
           // Clinic Registration Logic
@@ -166,9 +155,6 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
             });
 
             // Create Clinic Doc
-            console.log('🔵 Creating clinic doc with UID:', user.uid);
-            console.log('🔵 Auth UID:', user.uid);
-            console.log('🔵 User email verified:', user.emailVerified);
 
             await setDoc(doc(db, 'clinics', user.uid), {
                 uid: user.uid,
@@ -224,7 +210,6 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
                     isActive: true,
                     distributedAt: serverTimestamp(),
                   });
-                  console.log('✅ Clinic auto-linked to pharma company:', pharmaDoc.id);
                 }
               } catch (linkErr) {
                 console.error('Clinic pharma auto-link error:', linkErr);
@@ -277,7 +262,6 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
             setStatus('success');
             setMessage('Clinic verified successfully!');
 
-            console.log('✅ Clinic verification complete');
 
             // Auto-redirect to clinic dashboard after showing QR briefly
             setTimeout(() => {
@@ -328,7 +312,6 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
           color: {dark: '#000000', light: '#FFFFFF'},
         });
         qrId = signupData.qrNumber;
-        console.log('🟢 VERIFY: Using provided QR for doctor:', qrId);
       } else {
         setStatus('error');
         setMessage('No valid QR code found. Please sign up again with a valid admin-generated QR.');
@@ -356,7 +339,6 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
 
         // Generate unique doctor code based on pincode
         const doctorCode = await generateDoctorCode(signupData.pinCode || '000000');
-        console.log('✅ Generated Doctor Code:', doctorCode);
 
         await setDoc(doctorDocRef, {
           uid: user.uid,
@@ -396,7 +378,6 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
           blockReason: null,
         });
         // Extra debug: Confirm doctor profile created with QR
-        console.log('🟢 DOCTOR PROFILE CREATED with QR:', signupData.qrNumber);
 
         // OPTIMIZE: Link QR codes in background (non-blocking)
         Promise.all([
@@ -422,7 +403,6 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
                   activatedAt: serverTimestamp()
                 });
                 await setDoc(doctorDocRef, { qrDocId: poolSnapshot.docs[0].id }, { merge: true });
-                console.log('\ud83d\udfe2 QR linked from qrPool:', signupData.qrNumber);
               } else if (!codesSnapshot.empty) {
                 await updateDoc(codesSnapshot.docs[0].ref, {
                   status: 'active',
@@ -431,7 +411,6 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
                   activatedAt: serverTimestamp()
                 });
                 await setDoc(doctorDocRef, { qrDocId: codesSnapshot.docs[0].id }, { merge: true });
-                console.log('\ud83d\udfe2 QR linked from qrCodes:', signupData.qrNumber);
               }
             }
           })(),
@@ -450,7 +429,6 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
                   doctorId: user.uid,
                   activatedAt: serverTimestamp()
                 });
-                console.log('✅ Activation code linked');
               }
             }
           })()
@@ -481,9 +459,7 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
                   totalBookingCount: 0,
                   todayBookingCount: 0,
                 });
-                console.log('✅ Doctor auto-linked to pharma company:', signupData.companyName);
               } else {
-                console.log('ℹ️ No pharma company found for:', signupData.companyName);
               }
             } catch (err) {
               console.error('Pharma auto-link error (non-critical):', err);
@@ -491,7 +467,6 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
           })();
         }
 
-        console.log('✅ Doctor profile saved to Firestore with trial subscription');
       }
 
       // Store user data in localStorage for persistence - CRITICAL for auth state
@@ -513,7 +488,6 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
       setStatus('success');
       setMessage('Email verified successfully!');
 
-      console.log('✅ Verification complete');
 
       // No auto-redirect - user will click "Login to Dashboard" button
 

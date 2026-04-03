@@ -9,7 +9,8 @@ import {
   Clock,
   Menu,
   ArrowLeft,
-  MapPin
+  MapPin,
+  Video
 } from 'lucide-react';
 import { addDoctorNotification } from '../services/doctorNotificationService';
 import { useState, useEffect } from 'react';
@@ -70,7 +71,6 @@ function PatientDetailsLoader({
 
         // 🔒 PATIENT DATA ACCESS CONTROL: Build list of restricted clinic IDs
         let restrictedClinicIds: string[] = [];
-        console.log('🔍 Checking patient data access restrictions for userId:', userId);
         try {
           const clinicsRef = collection(db!, 'clinics');
           const allClinicsSnap = await getDocs(clinicsRef);
@@ -79,45 +79,22 @@ function PatientDetailsLoader({
             const clinicData = clinicDoc.data();
             const linkedDoctors = clinicData.linkedDoctorsDetails || [];
 
-            console.log('🏥 Checking clinic:', {
-              clinicId: clinicDoc.id,
-              clinicName: clinicData.clinicName,
-              linkedDoctors: linkedDoctors.map((d: any) => ({
-                doctorId: d.doctorId,
-                uid: d.uid,
-                name: d.name,
-                restrictPatientDataAccess: d.restrictPatientDataAccess
-              }))
-            });
 
             // Check if current doctor is linked to this clinic with restricted access
             const isRestricted = linkedDoctors.some((d: any) => {
               const matches = (d.doctorId === userId || d.uid === userId) && d.restrictPatientDataAccess === true;
               if (d.doctorId === userId || d.uid === userId) {
-                console.log('✅ Found doctor match in clinic:', {
-                  clinicId: clinicDoc.id,
-                  doctorId: d.doctorId,
-                  uid: d.uid,
-                  restrictPatientDataAccess: d.restrictPatientDataAccess,
-                  isRestricted: matches
-                });
               }
               return matches;
             });
 
             if (isRestricted) {
               restrictedClinicIds.push(clinicDoc.id);
-              console.log('🔒 ⚠️ RESTRICTED CLINIC FOUND:', {
-                clinicId: clinicDoc.id,
-                clinicName: clinicData.clinicName
-              });
             }
           });
 
           if (restrictedClinicIds.length > 0) {
-            console.log('🔒 ⚠️ Patient data access restricted for clinics:', restrictedClinicIds);
           } else {
-            console.log('✅ No restricted clinics found - doctor has full access');
           }
         } catch (error) {
           console.error('Error checking clinic access restrictions:', error);
@@ -144,13 +121,23 @@ function PatientDetailsLoader({
           numericChamberId = -1;
         }
 
+        // Special handling for VC Patients (chamberId = -999)
+        const isVcView = numericChamberId === -999;
+
         // Query by BOTH chamberId AND appointmentDate (efficient with composite index)
         // IMPORTANT: This query gets QR bookings only (excludes walk-ins)
-        const qrBookingsQuery = query(
-          bookingsRef,
-          where('chamberId', '==', numericChamberId),
-          where('appointmentDate', '==', todayStr)
-        );
+        const qrBookingsQuery = isVcView
+          ? query(
+              bookingsRef,
+              where('doctorId', '==', userId),
+              where('appointmentDate', '==', todayStr),
+              where('consultationType', '==', 'video')
+            )
+          : query(
+              bookingsRef,
+              where('chamberId', '==', numericChamberId),
+              where('appointmentDate', '==', todayStr)
+            );
 
         const qrBookingsSnap = await getDocs(qrBookingsQuery);
 
@@ -248,16 +235,6 @@ function PatientDetailsLoader({
               parsedAge = isNaN(ageNum) ? 0 : ageNum;
             }
 
-            console.log('🔓 Decrypted patient data:', {
-              bookingId: data.bookingId,
-              patientName,
-              whatsappNumber,
-              age: ageDecrypted,
-              parsedAge,
-              language: data.language,
-              hasEncrypted: !!data.patientName_encrypted,
-              hasPlain: !!data.patientName
-            });
 
             // 🔒 Check if this patient's data should be restricted
             const bookingClinicId = data.clinicId;
@@ -272,14 +249,6 @@ function PatientDetailsLoader({
               (bookingSource === 'clinic_qr' || !bookingSource);
 
             if (bookingClinicId && restrictedClinicIds.length > 0) {
-              console.log('📋 Booking data:', {
-                bookingId: data.bookingId,
-                patientName: patientName.substring(0, 3) + '***',
-                clinicId: bookingClinicId,
-                bookingSource: bookingSource || 'NOT SET',
-                isInRestrictedList: restrictedClinicIds.includes(bookingClinicId),
-                willBeRestricted: isDataRestricted
-              });
             }
 
             // 🔓 Always pass REAL data — masking is handled at DISPLAY level only
@@ -396,6 +365,24 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
   // Walk-in patients - Loaded from Firestore
   const [patients, setPatients] = useState<Patient[]>([]);
   const [doctorName, setDoctorName] = useState<string>('');
+
+  // VC Patients state
+  const [vcPatients, setVcPatients] = useState<Array<{
+    id: string;
+    patientName: string;
+    whatsappNumber: string;
+    age?: string;
+    gender?: string;
+    purposeOfVisit?: string;
+    bookingId: string;
+    serialNo: number;
+    time: string; // VC slot time e.g. "05:00 - 06:00"
+    isCancelled?: boolean;
+    isMarkedSeen?: boolean;
+  }>>([]);
+  const [vcTimeSlots, setVcTimeSlots] = useState<Array<{id: number; startTime: string; endTime: string; days: string[]; isActive: boolean}>>([]);
+  const [showVcPatientDetails, setShowVcPatientDetails] = useState(false);
+  const [selectedVcSlot, setSelectedVcSlot] = useState<{startTime: string; endTime: string} | null>(null);
 
   // Chamber schedules - Loaded from Firestore
   const [chambers, setChambers] = useState<Array<{
@@ -591,7 +578,6 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
         });
 
         // 🚫 FILTER OUT CLINIC CHAMBERS IF CLINIC IS OFF TODAY
-        console.log('🔵 [TODAY\'S SCHEDULE] Checking for clinic off periods...');
         const filteredChambers = [];
 
         for (const chamber of sortedChambers) {
@@ -599,7 +585,6 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
           const clinicId = originalChamber?.clinicId;
 
           if (clinicId) {
-            console.log(`🏥 [TODAY\'S SCHEDULE] Chamber "${chamber.name}" has clinicId: ${clinicId}`);
 
             // Load clinic schedule to check if clinic is off today
             try {
@@ -618,7 +603,6 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
 
                     if (today >= periodStart && today <= periodEnd) {
                       isClinicOff = true;
-                      console.log(`🚫 [TODAY\'S SCHEDULE] Clinic ${clinicId} is OFF today (${todayStr}). Removing chamber "${chamber.name}"`);
                       break;
                     }
                   }
@@ -638,13 +622,59 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
             }
           } else {
             // No clinicId (home chamber), always include
-            console.log(`🏠 [TODAY\'S SCHEDULE] Chamber "${chamber.name}" has no clinicId (home chamber) - KEEP`);
             filteredChambers.push(chamber);
           }
         }
 
-        console.log(`✅ [TODAY\'S SCHEDULE] Filtered chambers: ${sortedChambers.length} → ${filteredChambers.length} (removed ${sortedChambers.length - filteredChambers.length} clinic chambers)`);
         setChambers(filteredChambers);
+
+        // Load VC time slots
+        if (doctorData.vcTimeSlots && Array.isArray(doctorData.vcTimeSlots)) {
+          const currentDayName = now.toLocaleDateString('en-US', { weekday: 'long' });
+          const todaysVcSlots = doctorData.vcTimeSlots.filter((s: any) => s.isActive && s.days.includes(currentDayName));
+          setVcTimeSlots(todaysVcSlots);
+
+          // Load VC bookings for today
+          if (todaysVcSlots.length > 0) {
+            const todayStr = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+            const vcBookingsQuery = query(
+              collection(db!, 'bookings'),
+              where('doctorId', '==', userId),
+              where('appointmentDate', '==', todayStr),
+              where('consultationType', '==', 'video')
+            );
+            try {
+              const vcSnap = await getDocs(vcBookingsQuery);
+              const vcPats = vcSnap.docs.map(doc => {
+                const data = doc.data();
+                let pName = data.patientName || 'N/A';
+                let pPhone = data.whatsappNumber || 'N/A';
+                try {
+                  if (pName && pName !== 'N/A') pName = decrypt(pName);
+                } catch { /* already plain */ }
+                try {
+                  if (pPhone && pPhone !== 'N/A') pPhone = decrypt(pPhone);
+                } catch { /* already plain */ }
+                return {
+                  id: doc.id,
+                  patientName: pName,
+                  whatsappNumber: pPhone,
+                  age: data.age,
+                  gender: data.gender,
+                  purposeOfVisit: data.purposeOfVisit,
+                  bookingId: data.bookingId || doc.id,
+                  serialNo: data.serialNo || 0,
+                  time: data.time || data.selectedTime || '',
+                  isCancelled: data.isCancelled || false,
+                  isMarkedSeen: data.isMarkedSeen || false,
+                };
+              }).sort((a, b) => a.serialNo - b.serialNo);
+              setVcPatients(vcPats);
+            } catch (e) {
+              console.error('Error loading VC bookings:', e);
+            }
+          }
+        }
       } catch (error) {
         console.error('Error loading today\'s schedule:', error);
         toast.error('Failed to load today\'s schedule');
@@ -680,7 +710,6 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
           const alreadyNotified = notificationKeys.some(key => localStorage.getItem(key));
 
           if (!alreadyNotified) {
-            console.log(`🔔 Triggering notification for expired clinic: ${chamber.name}`);
 
             // Send Notification to Database
             await addDoctorNotification(userId, {
@@ -709,7 +738,6 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
               }
             });
           } else {
-             console.log(`🔕 Already notified for expired clinic: ${chamber.name}`);
           }
         }
       }
@@ -792,7 +820,6 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
     const interval = setInterval(() => {
       const newDate = new Date().toDateString();
       if (newDate !== currentDate) {
-        console.log('🕐 Date changed - refreshing schedule and walk-in patients');
         setCurrentDate(newDate);
       }
     }, 60000); // Check every minute
@@ -851,12 +878,6 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
           docs: allBookingsSnap.docs.filter(doc => !doc.data().isCancelled)
         };
 
-        console.log('🔍 Chamber Toggle Validation:', {
-          chamberId: numericChamberId,
-          chamberName: chamber.name,
-          totalBookings: bookingsSnap.docs.length,
-          todayStr,
-        });
 
         // Separate seen and non-seen patients with detailed logging
         const seenPatients = bookingsSnap.docs.filter(doc => {
@@ -872,22 +893,11 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
         // Log each patient's status
         bookingsSnap.docs.forEach(doc => {
           const data = doc.data();
-          console.log('👤 Patient:', {
-            name: data.patientName,
-            bookingId: data.bookingId,
-            isMarkedSeen: data.isMarkedSeen,
-            isCancelled: data.isCancelled,
-          });
         });
 
-        console.log('📊 Patient Status:', {
-          seenCount: seenPatients.length,
-          nonSeenCount: nonSeenPatients.length,
-        });
 
         // Block toggle only if MIXED state (both seen and non-seen exist)
         if (seenPatients.length > 0 && nonSeenPatients.length > 0) {
-          console.log('❌ BLOCKING: Mixed state detected');
           toast.error('Cannot Suspend Chamber', {
             description: `${seenPatients.length} SEEN + ${nonSeenPatients.length} NON-SEEN patients. Cancel non-seen individually or mark all as seen first.`,
             duration: 7000,
@@ -895,7 +905,6 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
           return;
         }
 
-        console.log('✅ ALLOWING: All patients same state');
         // Allow if all patients are seen (no cancellations needed) or all non-seen (will cancel all)
 
         // All patients are non-seen, proceed with deactivation
@@ -1354,6 +1363,80 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
               </div>
             </div>
           </Card>
+
+          {/* VC Patients Card */}
+          {vcTimeSlots.length > 0 && (
+            <Card className="bg-gray-800/50 border-gray-700 p-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
+                      <Video className="w-5 h-5 text-blue-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-white">VC Patients</h3>
+                      <p className="text-gray-400 text-xs mt-0.5">{getCurrentDate()}</p>
+                    </div>
+                  </div>
+                  <span className="text-blue-400 font-semibold text-lg">{vcPatients.filter(p => !p.isCancelled).length}</span>
+                </div>
+
+                {/* VC Slots with patients grouped by time */}
+                {vcTimeSlots.map((slot) => {
+                  const formatTime = (t: string) => {
+                    const [h, m] = t.split(':').map(Number);
+                    const period = h >= 12 ? 'PM' : 'AM';
+                    const displayH = h % 12 || 12;
+                    return `${displayH}:${m.toString().padStart(2, '0')} ${period}`;
+                  };
+                  const slotTimeStr = `${slot.startTime} - ${slot.endTime}`;
+                  const slotPatients = vcPatients.filter(p => p.time === slotTimeStr || p.time?.includes(slot.startTime));
+                  const activePatients = slotPatients.filter(p => !p.isCancelled);
+
+                  return (
+                    <div key={slot.id} className="bg-gray-700/30 rounded-lg p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-blue-400" />
+                          <span className="text-white text-sm font-medium">{formatTime(slot.startTime)} - {formatTime(slot.endTime)}</span>
+                        </div>
+                        <span className={`text-sm font-semibold ${activePatients.length > 0 ? 'text-blue-400' : 'text-gray-500'}`}>
+                          {activePatients.length} patient{activePatients.length !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* View VC Patients Button */}
+                <div className="pt-2">
+                  <Button
+                    onClick={() => {
+                      // Reuse the chamber patient details view with VC data
+                      setSelectedChamberForDetails({
+                        id: -999, // Special ID for VC
+                        name: 'Video Consultation',
+                        address: 'Online',
+                        startTime: vcTimeSlots[0]?.startTime || '00:00',
+                        endTime: vcTimeSlots[vcTimeSlots.length - 1]?.endTime || '23:59',
+                        schedule: 'Video Consultation',
+                        booked: vcPatients.filter(p => !p.isCancelled).length,
+                        capacity: 99,
+                        isActive: true,
+                        blockedDates: [],
+                        isExpired: false,
+                        startMinutes: 0,
+                      } as any);
+                      setShowPatientDetails(true);
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+                  >
+                    VIEW PATIENTS
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          )}
 
           {/* Chamber Schedule Cards */}
           {loading ? (

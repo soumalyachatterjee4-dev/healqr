@@ -61,10 +61,6 @@ export default function AdminNotificationPanel({ isOpen, onClose, onNotification
         resolvedAt: doc.data().resolvedAt,
       }));
       
-      console.log('📊 Total documents from Firestore:', snapshot.docs.length);
-      console.log('📊 Request types:', loadedRequests.map(r => `${r.type} (${r.status})`));
-      console.log('📊 Doctor requests:', loadedRequests.filter(r => r.type === 'doctor').length);
-      console.log('📊 Landing requests:', loadedRequests.filter(r => r.type === 'landing').length);
       
       // Apply filters in memory (no composite indexes needed)
       if (filter === 'unread') {
@@ -75,7 +71,6 @@ export default function AdminNotificationPanel({ isOpen, onClose, onNotification
         loadedRequests = loadedRequests.filter(req => req.type === 'landing');
       }
       
-      console.log('📊 After filter "' + filter + '":', loadedRequests.length, 'requests');
       
       // Sort by createdAt descending (newest first)
       loadedRequests.sort((a, b) => {
@@ -85,7 +80,6 @@ export default function AdminNotificationPanel({ isOpen, onClose, onNotification
       });
       
       setRequests(loadedRequests);
-      console.log('✅ Loaded support requests:', loadedRequests.length, 'Filter:', filter);
     } catch (error) {
       console.error('❌ Error loading support requests:', error);
       toast.error('Failed to load notifications');

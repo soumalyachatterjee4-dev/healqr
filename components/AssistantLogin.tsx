@@ -129,8 +129,6 @@ export default function AssistantLogin() {
       const rawAllowedPages = assistantData.allowedPages || [];
       const migratedPages = migratePageIds(rawAllowedPages);
 
-      console.log('🔐 LOGIN - Raw pages from DB:', rawAllowedPages);
-      console.log('🔐 LOGIN - Migrated pages:', migratedPages);
 
       // Create localStorage session (compatible with App.tsx expectations)
       localStorage.setItem('healqr_is_assistant', 'true');

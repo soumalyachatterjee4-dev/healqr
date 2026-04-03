@@ -185,7 +185,6 @@ export default function ClinicQRSuccess({ name, email, onProceedToLogin }: Clini
           {/* Proceed to Login Button */}
           <Button 
             onClick={() => {
-              console.log('🔥 CLINIC PROCEED TO LOGIN CLICKED!');
               localStorage.removeItem('healqr_pending_clinic_signup');
               onProceedToLogin();
             }}

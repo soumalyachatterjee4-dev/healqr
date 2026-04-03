@@ -36,7 +36,17 @@ export default function ScheduleManager({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [doctorId, setDoctorId] = useState<string>('');
   const [, setLoading] = useState(true);
-  const [currentTab, setCurrentTab] = useState<'schedules' | 'clinics'>('clinics');
+  const [currentTab, setCurrentTab] = useState<'schedules' | 'clinics' | 'vcTime'>('clinics');
+
+  // VC Time Slots state
+  const [vcTimeSlots, setVcTimeSlots] = useState<Array<{id: number; startTime: string; endTime: string; days: string[]; isActive: boolean}>>([]);
+  const [vcSlotStartTime, setVcSlotStartTime] = useState('');
+  const [vcSlotEndTime, setVcSlotEndTime] = useState('');
+  const [vcSlotDays, setVcSlotDays] = useState<string[]>([]);
+  const [editingVcSlotId, setEditingVcSlotId] = useState<number | null>(null);
+  const [savingVcSlots, setSavingVcSlots] = useState(false);
+
+  const hasVideoConsultation = activeAddOns.includes('video-consultation');
 
   // Function to auto-populate manualClinics from linkedClinics
   const updateManualClinicsFromLinked = async (doctorId: string, linkedClinics: any[], currentManualClinics: any[]) => {
@@ -109,7 +119,6 @@ export default function ScheduleManager({
   // Load data from Firestore on mount
   useEffect(() => {
     const loadFromFirestore = async (uid: string) => {
-      console.log('🔍 ScheduleManager: Loading data for user:', uid);
 
       if (!db) {
         console.error('❌ ScheduleManager: Firestore db not initialized');
@@ -145,6 +154,11 @@ export default function ScheduleManager({
           // Load Manual Clinics
           if (data.manualClinics && Array.isArray(data.manualClinics)) {
             setManualClinics(data.manualClinics);
+          }
+
+          // Load VC Time Slots
+          if (data.vcTimeSlots && Array.isArray(data.vcTimeSlots)) {
+            setVcTimeSlots(data.vcTimeSlots);
           }
 
           // Auto-populate My Clinics from linkedClinics (added by clinic side)
@@ -192,7 +206,6 @@ export default function ScheduleManager({
 
         return unsubscribeDoc;
       } else {
-        console.log('❌ ScheduleManager: No authenticated user found via listener');
         setLoading(false);
       }
     });
@@ -557,7 +570,6 @@ export default function ScheduleManager({
       const clinicsRef = collection(db!, 'clinics');
       const enteredCode = clinicFormCode.trim().toUpperCase();
 
-      console.log('🔍 Searching for clinic code:', enteredCode);
 
       let clinicSnap: any = null;
 
@@ -565,13 +577,11 @@ export default function ScheduleManager({
       let result = await getDocs(query(clinicsRef, where('clinicCode', '==', enteredCode)));
       if (!result.empty) {
         clinicSnap = result;
-        console.log('✅ Found via exact main clinicCode match');
       }
 
       // Strategy 2: Search all clinics for the code in locations[]
       if (!clinicSnap) {
         const allClinics = await getDocs(clinicsRef);
-        console.log(`📋 Searching through ${allClinics.size} clinics for code in locations[]...`);
 
         for (const clinicDoc of allClinics.docs) {
           const clinicData = clinicDoc.data();
@@ -580,7 +590,6 @@ export default function ScheduleManager({
           // Exact match on main code
           if (mainCode === enteredCode) {
             clinicSnap = { docs: [clinicDoc], empty: false, size: 1 };
-            console.log('✅ Found via main code in all clinics');
             break;
           }
 
@@ -590,7 +599,6 @@ export default function ScheduleManager({
             const locCode = (loc.clinicCode || '').toUpperCase().trim();
             if (locCode === enteredCode) {
               clinicSnap = { docs: [clinicDoc], empty: false, size: 1 };
-              console.log('✅ Found via branch code in locations[]:', locCode);
               break;
             }
           }
@@ -605,7 +613,6 @@ export default function ScheduleManager({
         if (newFormatMatch) {
           const basePrefix = newFormatMatch[1];
           const branchNum = newFormatMatch[2];
-          console.log(`🔎 Trying new format search - base: ${basePrefix}, branch: ${branchNum}`);
 
           const allClinics = await getDocs(clinicsRef);
           for (const clinicDoc of allClinics.docs) {
@@ -617,7 +624,6 @@ export default function ScheduleManager({
               const locCode = (loc.clinicCode || '').toUpperCase().trim();
               if (locCode.startsWith(basePrefix)) {
                 clinicSnap = { docs: [clinicDoc], empty: false, size: 1 };
-                console.log('✅ Found via base prefix match:', locCode);
                 break;
               }
             }
@@ -632,14 +638,12 @@ export default function ScheduleManager({
         const oldFormatMatch = enteredCode.match(/^(HQR-\d{6}-\d{4})-CLN$/);
         if (oldFormatMatch) {
           const basePrefix = oldFormatMatch[1];
-          console.log(`🔎 Trying old format search - prefix: ${basePrefix}`);
 
           const codesToTry = [`${basePrefix}-001-CLN`, `${basePrefix}-CLN`, enteredCode];
           for (const code of codesToTry) {
             const snap = await getDocs(query(clinicsRef, where('clinicCode', '==', code)));
             if (!snap.empty) {
               clinicSnap = snap;
-              console.log('✅ Found via old format variation:', code);
               break;
             }
           }
@@ -654,7 +658,6 @@ export default function ScheduleManager({
             const prefixSnap = await getDocs(prefixQuery);
             if (!prefixSnap.empty) {
               clinicSnap = prefixSnap;
-              console.log('✅ Found via prefix lookup');
             }
           }
         }
@@ -672,11 +675,9 @@ export default function ScheduleManager({
       const clinicLocs = clinicData.locations || [];
       const matchedBranch = clinicLocs.find((l: any) => (l.clinicCode || '').toUpperCase().trim() === enteredCode);
       if (matchedBranch) {
-        console.log('✅ Resolved to branch:', matchedBranch.name);
         setClinicFormName(matchedBranch.name || clinicData.name || '');
         setClinicFormAddress(matchedBranch.landmark || clinicData.address || '');
       } else {
-        console.log('✅ Using main clinic:', clinicData.name);
         setClinicFormName(clinicData.name || '');
         setClinicFormAddress(clinicData.address || '');
       }
@@ -1000,7 +1001,6 @@ export default function ScheduleManager({
       const minutes2End = h4 * 60 + m4;
 
       const overlaps = minutes1Start < minutes2End && minutes2Start < minutes1End;
-      console.log('⏰ Time overlap check:', { start1, end1, start2, end2, overlaps });
       return overlaps;
     } catch (error) {
       console.error('Error checking time overlap:', error);
@@ -1011,15 +1011,12 @@ export default function ScheduleManager({
   // Helper function to check if two day arrays have common days
   const hasCommonDays = (days1: string[], days2: string[]) => {
     if (!Array.isArray(days1) || !Array.isArray(days2)) {
-      console.log('🚫 Invalid days arrays:', { days1, days2 });
       return false;
     }
     if (days1.length === 0 || days2.length === 0) {
-      console.log('🚫 Empty days arrays:', { days1, days2 });
       return false;
     }
     const hasCommon = days1.some(day => days2.includes(day));
-    console.log('📅 Day overlap check:', { days1, days2, hasCommon });
     return hasCommon;
   };
 
@@ -1071,7 +1068,6 @@ export default function ScheduleManager({
       // Clinic data already fetched and validated
       resolvedClinicId = clinicData.id;
       resolvedClinicName = clinicData.name;
-      console.log('✅ Using fetched clinic data:', { code: clinicCode, id: resolvedClinicId, name: resolvedClinicName });
     } else if (clinicCode && clinicCode.trim()) {
       // Fallback: Look up clinic if code is provided but data not fetched
       try {
@@ -1082,7 +1078,6 @@ export default function ScheduleManager({
         if (!clinicSnap.empty) {
           resolvedClinicId = clinicSnap.docs[0].id;
           resolvedClinicName = clinicSnap.docs[0].data().name;
-          console.log('✅ Found clinic:', { code: clinicCode, id: resolvedClinicId, name: resolvedClinicName });
         } else {
           toast.error('Clinic code not found. Please check and try again.');
           return;
@@ -1101,19 +1096,9 @@ export default function ScheduleManager({
 
     const conflicts: any[] = [];
 
-    console.log('🔍 CONFLICT DETECTION START');
-    console.log('📋 New schedule:', { selectedDays, frequency, startTime, endTime, chamberName, customDate });
-    console.log('📚 Existing chambers to check:', conflictsToCheck.length);
 
     // Check each existing chamber for conflicts
     for (const existingChamber of conflictsToCheck) {
-      console.log('🔎 Checking chamber:', {
-        name: existingChamber.chamberName,
-        days: existingChamber.days,
-        frequency: existingChamber.frequency,
-        time: `${existingChamber.startTime}-${existingChamber.endTime}`,
-        isActive: existingChamber.isActive
-      });
 
       // For Custom frequency, check date conflict
       if (frequency === 'Custom' && existingChamber.frequency === 'Custom') {
@@ -1130,14 +1115,11 @@ export default function ScheduleManager({
       }
       // For regular frequency, check day and time conflicts
       else if (frequency !== 'Custom' && existingChamber.frequency !== 'Custom') {
-        console.log('🔄 Checking regular frequency conflict');
         // Check if there are common days
         const newDays = frequency === 'Custom' ? [`Custom: ${customDate}`] : selectedDays;
         if (hasCommonDays(newDays, existingChamber.days)) {
-          console.log('✅ Found common days!');
           // Check if time ranges overlap
           if (timeRangesOverlap(startTime, endTime, existingChamber.startTime, existingChamber.endTime)) {
-            console.log('🚨 CONFLICT DETECTED!');
             const commonDays = newDays.filter(day => existingChamber.days.includes(day));
             conflicts.push({
               chamber: existingChamber,
@@ -1145,19 +1127,31 @@ export default function ScheduleManager({
               days: commonDays
             });
           } else {
-            console.log('⏰ No time overlap');
           }
         } else {
-          console.log('📅 No common days');
         }
       }
     }
 
-    console.log('🎯 Total conflicts found:', conflicts.length);
+
+    // Also check against VC time slots
+    const activeVcSlots = vcTimeSlots.filter(s => s.isActive);
+    const newDaysForVc = frequency === 'Daily'
+      ? ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+      : (frequency === 'Custom' ? [] : selectedDays);
+    for (const vcSlot of activeVcSlots) {
+      if (newDaysForVc.length > 0 && hasCommonDays(newDaysForVc, vcSlot.days) && timeRangesOverlap(startTime, endTime, vcSlot.startTime, vcSlot.endTime)) {
+        const commonDays = newDaysForVc.filter(d => vcSlot.days.includes(d));
+        conflicts.push({
+          chamber: { chamberName: 'VC Slot', startTime: vcSlot.startTime, endTime: vcSlot.endTime, days: vcSlot.days },
+          reason: 'Overlaps with Video Consultation slot',
+          days: commonDays
+        });
+      }
+    }
 
     // If conflicts found, show error and prevent saving
     if (conflicts.length > 0) {
-      console.log('⚠️ BLOCKING SAVE DUE TO CONFLICTS');
       const conflictMessages = conflicts.map(c => {
         const days = c.days ? c.days.join(', ') : c.date;
         const time = `${c.chamber.startTime}-${c.chamber.endTime}`;
@@ -1183,7 +1177,6 @@ export default function ScheduleManager({
       return;
     }
 
-    console.log('✅ No conflicts detected, proceeding to save...');
 
     // Create schedule object (remove undefined values for Firestore)
     const newSchedule: any = {
@@ -1258,12 +1251,10 @@ export default function ScheduleManager({
       // Save to Firestore
       if (doctorId && db) {
         try {
-          console.log('💾 Updating schedule in Firestore:', { doctorId, chambers: updatedSchedules });
           await updateDoc(doc(db, 'doctors', doctorId), {
             chambers: updatedSchedules,
             updatedAt: serverTimestamp()
           });
-          console.log('✅ Schedule updated successfully in Firestore');
         } catch (error) {
           console.error('❌ Error updating schedule:', error);
           toast.error('Failed to save to database');
@@ -1311,12 +1302,10 @@ export default function ScheduleManager({
       // Save to Firestore
       if (doctorId && db) {
         try {
-          console.log('💾 Saving schedule to Firestore:', { doctorId, chambers: updatedSchedules });
           await updateDoc(doc(db, 'doctors', doctorId), {
             chambers: updatedSchedules,
             updatedAt: serverTimestamp()
           });
-          console.log('✅ Schedule saved successfully to Firestore');
         } catch (error) {
           console.error('❌ Error saving schedule:', error);
           toast.error('Failed to save to database');
@@ -1451,7 +1440,6 @@ export default function ScheduleManager({
         blockedDates.push(dateStr);
       }
 
-      console.log(`📤 Global Planned Off: Blocking dates:`, blockedDates);
 
       // Query all bookings in the blocked date range
       let totalAffectedBookings = 0;
@@ -1465,7 +1453,6 @@ export default function ScheduleManager({
         );
 
         const bookingsSnap = await getDocs(dateBookingsQuery);
-        console.log(`📊 Found ${bookingsSnap.size} active bookings for ${dateStr}`);
 
         // Collect patients for batch notification
         const patientsToNotify: Array<{ phone: string; name: string }> = [];
@@ -1496,11 +1483,6 @@ export default function ScheduleManager({
               });
             }
 
-            console.log('✅ Booking cancelled for', {
-              bookingId: bookingDoc.id,
-              patient: patientName,
-              appointmentDate: dateStr
-            });
             totalAffectedBookings++;
           } catch (error) {
             console.error(`❌ Failed to cancel booking for ${booking.patientName}:`, error);
@@ -1524,7 +1506,6 @@ export default function ScheduleManager({
               'All Chambers',
               'global'
             );
-            console.log(`✅ Global cancellation notifications for ${dateStr}: ${result.sent} sent, ${result.failed} failed`);
           } catch (notifError) {
             console.warn('⚠️ Batch cancellation notification error:', notifError);
           }
@@ -1602,7 +1583,6 @@ export default function ScheduleManager({
         restoredDates.push(dateStr);
       }
 
-      console.log(`📤 Global Planned Off Deactivated: Restoring dates:`, restoredDates);
 
       // Query all bookings in the restored date range
       let totalRestorationNotices = 0;
@@ -1615,7 +1595,6 @@ export default function ScheduleManager({
         );
 
         const bookingsSnap = await getDocs(dateBookingsQuery);
-        console.log(`📊 Found ${bookingsSnap.size} bookings for ${dateStr} to restore`);
 
         // Collect patients for batch restoration notification
         const patientsToNotify: Array<{ phone: string; name: string }> = [];
@@ -1636,11 +1615,6 @@ export default function ScheduleManager({
             });
           }
 
-          console.log('✅ Booking will be restored for', {
-            bookingId: bookingDoc.id,
-            patient: patientName,
-            appointmentDate: dateStr
-          });
           totalRestorationNotices++;
         });
 
@@ -1661,7 +1635,6 @@ export default function ScheduleManager({
               'All Chambers',
               'global'
             );
-            console.log(`✅ Global restoration notifications for ${dateStr}: ${result.sent} sent, ${result.failed} failed`);
           } catch (notifError) {
             console.warn('⚠️ Batch restoration notification error:', notifError);
           }
@@ -1683,7 +1656,6 @@ export default function ScheduleManager({
   };
 
   const handleSaveMaxAdvanceDays = async () => {
-    console.log('💾 Attempting to save max advance days:', { doctorId, db: !!db, maxAdvanceDays });
 
     if (!doctorId || !db) {
       console.error('❌ Cannot save max advance days: doctorId or db missing', { doctorId, db: !!db });
@@ -1698,7 +1670,6 @@ export default function ScheduleManager({
     }
 
     try {
-      console.log('💾 Saving max advance days to Firestore:', { doctorId, days });
       await updateDoc(doc(db, 'doctors', doctorId), {
         maxAdvanceBookingDays: days,
         updatedAt: serverTimestamp()
@@ -1710,7 +1681,6 @@ export default function ScheduleManager({
         updatedAt: serverTimestamp()
       }, { merge: true });
 
-      console.log('✅ Max advance days saved successfully to both collections');
       toast.success('Settings Saved Successfully', {
         description: `Patients can now book appointments up to ${days} days in advance.`,
         duration: 5000,
@@ -1934,6 +1904,19 @@ export default function ScheduleManager({
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 rounded-t-full" />
               )}
             </button>
+            {hasVideoConsultation && (
+              <button
+                onClick={() => setCurrentTab('vcTime')}
+                className={`pb-3 px-2 text-sm font-medium transition-colors relative ${
+                  currentTab === 'vcTime' ? 'text-emerald-400' : 'text-gray-400 hover:text-gray-300'
+                }`}
+              >
+                VC Time
+                {currentTab === 'vcTime' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 rounded-t-full" />
+                )}
+              </button>
+            )}
           </div>
 
           {currentTab === 'schedules' && (
@@ -2876,6 +2859,258 @@ export default function ScheduleManager({
                         </p>
                       </div>
                     )}
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {currentTab === 'vcTime' && (
+        <div className="space-y-8">
+          <div>
+            <div className="flex items-start justify-between mb-6">
+              <h2 className="text-white">Video Consultation Schedule</h2>
+              <p className="text-gray-400 text-sm hidden md:block">Define your available time slots for video consultations</p>
+            </div>
+            <p className="text-gray-400 text-sm md:hidden mb-6">Define your available time slots for video consultations</p>
+
+            {/* Add/Edit VC Slot Form */}
+            <Card className="bg-gray-800/50 border-gray-700 p-6 mb-6">
+              <h3 className="text-white mb-4">{editingVcSlotId !== null ? 'Edit VC Slot' : 'Add VC Time Slot'}</h3>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <Label className="text-gray-300 text-sm mb-2 block">Start Time</Label>
+                  <Input
+                    type="time"
+                    value={vcSlotStartTime}
+                    onChange={(e) => setVcSlotStartTime(e.target.value)}
+                    className="bg-gray-900 border-gray-700 text-white"
+                  />
+                </div>
+                <div>
+                  <Label className="text-gray-300 text-sm mb-2 block">End Time</Label>
+                  <Input
+                    type="time"
+                    value={vcSlotEndTime}
+                    onChange={(e) => setVcSlotEndTime(e.target.value)}
+                    className="bg-gray-900 border-gray-700 text-white"
+                  />
+                </div>
+              </div>
+
+              {/* Days Selection */}
+              <div className="mb-4">
+                <Label className="text-gray-300 text-sm mb-2 block">Available Days</Label>
+                <div className="flex flex-wrap gap-2">
+                  {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
+                    <button
+                      key={day}
+                      onClick={() => {
+                        setVcSlotDays(prev =>
+                          prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
+                        );
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        vcSlotDays.includes(day)
+                          ? 'bg-emerald-500 text-white'
+                          : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                      }`}
+                    >
+                      {day.slice(0, 3)}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => {
+                      const allDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                      setVcSlotDays(vcSlotDays.length === 7 ? [] : allDays);
+                    }}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-700 text-emerald-400 hover:bg-gray-600"
+                  >
+                    {vcSlotDays.length === 7 ? 'Clear All' : 'All Days'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  onClick={async () => {
+                    if (!vcSlotStartTime || !vcSlotEndTime) {
+                      toast.error('Please set both start and end time');
+                      return;
+                    }
+                    if (vcSlotDays.length === 0) {
+                      toast.error('Please select at least one day');
+                      return;
+                    }
+                    if (vcSlotStartTime >= vcSlotEndTime) {
+                      toast.error('End time must be after start time');
+                      return;
+                    }
+
+                    // Check overlap with existing VC slots (skip self when editing)
+                    const otherVcSlots = vcTimeSlots.filter(s => s.id !== editingVcSlotId && s.isActive);
+                    for (const existing of otherVcSlots) {
+                      if (hasCommonDays(vcSlotDays, existing.days) && timeRangesOverlap(vcSlotStartTime, vcSlotEndTime, existing.startTime, existing.endTime)) {
+                        const commonDays = vcSlotDays.filter(d => existing.days.includes(d)).map(d => d.slice(0, 3)).join(', ');
+                        toast.error('VC Slot Conflict!', {
+                          description: `Overlaps with existing VC slot ${existing.startTime}-${existing.endTime} on ${commonDays}`,
+                          duration: 6000,
+                        });
+                        return;
+                      }
+                    }
+
+                    // Check overlap with chamber schedules
+                    const activeChambers = demoSchedules.filter(s => s.isActive !== false);
+                    for (const chamber of activeChambers) {
+                      const chamberDays = chamber.frequency === 'Daily'
+                        ? ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+                        : (chamber.days || []);
+                      if (chamber.startTime && chamber.endTime && hasCommonDays(vcSlotDays, chamberDays) && timeRangesOverlap(vcSlotStartTime, vcSlotEndTime, chamber.startTime, chamber.endTime)) {
+                        const commonDays = vcSlotDays.filter(d => chamberDays.includes(d)).map(d => d.slice(0, 3)).join(', ');
+                        toast.error('Schedule Conflict!', {
+                          description: `Overlaps with chamber "${chamber.chamberName}" (${chamber.startTime}-${chamber.endTime}) on ${commonDays}. A doctor cannot be in chamber and VC at the same time!`,
+                          duration: 8000,
+                        });
+                        return;
+                      }
+                    }
+
+                    let updatedSlots;
+                    if (editingVcSlotId !== null) {
+                      updatedSlots = vcTimeSlots.map(s =>
+                        s.id === editingVcSlotId
+                          ? { ...s, startTime: vcSlotStartTime, endTime: vcSlotEndTime, days: vcSlotDays }
+                          : s
+                      );
+                    } else {
+                      const newId = vcTimeSlots.length > 0 ? Math.max(...vcTimeSlots.map(s => s.id)) + 1 : 1;
+                      updatedSlots = [...vcTimeSlots, {
+                        id: newId,
+                        startTime: vcSlotStartTime,
+                        endTime: vcSlotEndTime,
+                        days: vcSlotDays,
+                        isActive: true
+                      }];
+                    }
+
+                    setSavingVcSlots(true);
+                    try {
+                      await updateDoc(doc(db!, 'doctors', doctorId), { vcTimeSlots: updatedSlots, updatedAt: serverTimestamp() });
+                      setVcTimeSlots(updatedSlots);
+                      setVcSlotStartTime('');
+                      setVcSlotEndTime('');
+                      setVcSlotDays([]);
+                      setEditingVcSlotId(null);
+                      toast.success(editingVcSlotId !== null ? 'VC slot updated' : 'VC slot added');
+                    } catch (error) {
+                      console.error('Error saving VC slots:', error);
+                      toast.error('Failed to save VC slot');
+                    } finally {
+                      setSavingVcSlots(false);
+                    }
+                  }}
+                  disabled={savingVcSlots}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  {savingVcSlots ? 'Saving...' : editingVcSlotId !== null ? 'Update Slot' : 'Add Slot'}
+                </Button>
+                {editingVcSlotId !== null && (
+                  <Button
+                    onClick={() => {
+                      setEditingVcSlotId(null);
+                      setVcSlotStartTime('');
+                      setVcSlotEndTime('');
+                      setVcSlotDays([]);
+                    }}
+                    variant="ghost"
+                    className="text-gray-400 hover:text-white"
+                  >
+                    Cancel
+                  </Button>
+                )}
+              </div>
+            </Card>
+
+            {/* Saved VC Slots List */}
+            {vcTimeSlots.length === 0 ? (
+              <Card className="bg-gray-800/50 border-gray-700 p-8 text-center">
+                <Clock className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                <p className="text-gray-400">No VC time slots added yet</p>
+                <p className="text-gray-500 text-sm mt-1">Add your available video consultation hours above</p>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {vcTimeSlots.map((slot) => (
+                  <Card key={slot.id} className={`bg-gray-800/50 border-gray-700 p-4 ${!slot.isActive ? 'opacity-50' : ''}`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <Clock className="w-4 h-4 text-blue-400" />
+                          <span className="text-white font-medium">
+                            {slot.startTime} - {slot.endTime}
+                          </span>
+                          <Switch
+                            checked={slot.isActive}
+                            onCheckedChange={async (checked) => {
+                              const updatedSlots = vcTimeSlots.map(s =>
+                                s.id === slot.id ? { ...s, isActive: checked } : s
+                              );
+                              try {
+                                await updateDoc(doc(db!, 'doctors', doctorId), { vcTimeSlots: updatedSlots, updatedAt: serverTimestamp() });
+                                setVcTimeSlots(updatedSlots);
+                                toast.success(checked ? 'Slot enabled' : 'Slot disabled');
+                              } catch {
+                                toast.error('Failed to update slot');
+                              }
+                            }}
+                            className="data-[state=checked]:bg-emerald-500"
+                          />
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 ml-7">
+                          {slot.days.map((day) => (
+                            <span key={day} className="px-2 py-0.5 rounded-md bg-gray-700 text-gray-300 text-xs">
+                              {day.slice(0, 3)}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1 ml-3">
+                        <Button
+                          onClick={() => {
+                            setEditingVcSlotId(slot.id);
+                            setVcSlotStartTime(slot.startTime);
+                            setVcSlotEndTime(slot.endTime);
+                            setVcSlotDays(slot.days);
+                          }}
+                          variant="ghost"
+                          size="sm"
+                          className="text-gray-400 hover:text-white hover:bg-gray-700"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          onClick={async () => {
+                            const updatedSlots = vcTimeSlots.filter(s => s.id !== slot.id);
+                            try {
+                              await updateDoc(doc(db!, 'doctors', doctorId), { vcTimeSlots: updatedSlots, updatedAt: serverTimestamp() });
+                              setVcTimeSlots(updatedSlots);
+                              toast.success('VC slot deleted');
+                            } catch {
+                              toast.error('Failed to delete slot');
+                            }
+                          }}
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
                   </Card>
                 ))}
               </div>

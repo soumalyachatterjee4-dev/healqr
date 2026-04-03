@@ -139,7 +139,6 @@ export default function VerifyWalkin({ bookingId }: VerifyWalkinProps) {
 
         // Walk-in verified — Doctor will press Eye button to start consultation flow
         // No auto 30-min notification anymore — flows through Eye → RX → Diet → Consultation Complete
-        console.log('✅ Walk-in verified — awaiting doctor consultation flow');
 
         // Schedule "Star" Notification (24 hours delay)
         // Check for Clinic Restrictions
@@ -160,10 +159,8 @@ export default function VerifyWalkin({ bookingId }: VerifyWalkinProps) {
         if (!isReviewRestricted) {
           await scheduleReviewRequest(notificationData, new Date());
         } else {
-          console.log('🚫 Review request suppressed by Clinic settings');
         }
 
-        console.log('✅ Notifications scheduled successfully');
       } catch (notifErr) {
         console.error('⚠️ Failed to schedule notifications:', notifErr);
         // Non-blocking error

@@ -172,7 +172,6 @@ export default function QRCodeSuccess({ name, email, onProceedToLogin }: QRCodeS
           {/* Proceed to Login Button */}
           <Button 
             onClick={() => {
-              console.log('🔥 PROCEED TO LOGIN CLICKED!');
               onProceedToLogin();
             }}
             className="w-full bg-emerald-500 hover:bg-emerald-600 text-white h-12 sm:h-14 rounded-lg mb-4 sm:mb-6"

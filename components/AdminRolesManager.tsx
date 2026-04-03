@@ -242,7 +242,6 @@ export default function AdminRolesManager() {
 
   const handleSave = () => {
     // In real app, this would save to backend
-    console.log('Saving roles and permissions:', { roles, admins });
     setHasUnsavedChanges(false);
     alert('✅ Roles & Responsibilities saved successfully!');
   };

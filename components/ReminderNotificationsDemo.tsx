@@ -114,9 +114,9 @@ export default function ReminderNotificationsDemo() {
                   isSubscriptionActive={true}
                   vaultBookings={44}
                   language={language}
-                  onDismiss={() => console.log('Dismissed')}
-                  onTopUp={() => console.log('Top-up clicked')}
-                  onUpgradePlan={() => console.log('Upgrade clicked')}
+                  onDismiss={() => {}}
+                  onTopUp={() => {}}
+                  onUpgradePlan={() => {}}
                 />
               )}
 
@@ -131,9 +131,9 @@ export default function ReminderNotificationsDemo() {
                   isSubscriptionActive={true}
                   vaultBookings={12}
                   language={language}
-                  onDismiss={() => console.log('Dismissed')}
-                  onTopUp={() => console.log('Top-up clicked')}
-                  onUpgradePlan={() => console.log('Upgrade clicked')}
+                  onDismiss={() => {}}
+                  onTopUp={() => {}}
+                  onUpgradePlan={() => {}}
                 />
               )}
 
@@ -148,9 +148,9 @@ export default function ReminderNotificationsDemo() {
                   isSubscriptionActive={false}
                   vaultBookings={25}
                   language={language}
-                  onDismiss={() => console.log('Dismissed')}
-                  onTopUp={() => console.log('Top-up clicked')}
-                  onUpgradePlan={() => console.log('Renew subscription clicked')}
+                  onDismiss={() => {}}
+                  onTopUp={() => {}}
+                  onUpgradePlan={() => {}}
                 />
               )}
             </div>
@@ -169,8 +169,8 @@ export default function ReminderNotificationsDemo() {
                   isSubscriptionActive={true}
                   vaultBookings={0}
                   language={language}
-                  onDismiss={() => console.log('Dismissed')}
-                  onUpgradePlan={() => console.log('Upgrade required')}
+                  onDismiss={() => {}}
+                  onUpgradePlan={() => {}}
                 />
               </Card>
 

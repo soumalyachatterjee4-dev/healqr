@@ -260,11 +260,9 @@ export default function BookingConfirmation({
         if (token) {
           setHasToken(true);
           setNotificationStatus('enabled');
-          console.log('✅ Patient has FCM token registered');
         } else {
           setHasToken(false);
           setNotificationStatus('disabled');
-          console.log('⚠️ Patient does not have FCM token');
         }
       } catch (error) {
         console.error('Error checking notification status:', error);
@@ -283,7 +281,6 @@ export default function BookingConfirmation({
       const phone10 = patientData.whatsappNumber.replace(/\D/g, '').slice(-10);
       const patientUserId = `patient_${phone10}`;
 
-      console.log('🔔 Manually enabling notifications for:', patientUserId);
 
       const token = await requestNotificationPermission(patientUserId, 'patient');
 
@@ -663,7 +660,6 @@ export default function BookingConfirmation({
               url.searchParams.set('page', 'my-history');
               url.searchParams.set('phone', phone);
               url.searchParams.set('name', name);
-              console.log('📜 Navigating to patient history:', url.toString());
               window.location.href = url.toString();
             }}
             className="w-full bg-emerald-600 hover:bg-emerald-700 text-white mb-4"

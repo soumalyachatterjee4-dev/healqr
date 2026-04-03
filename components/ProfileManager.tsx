@@ -70,25 +70,17 @@ interface ProfileManagerProps {
 export default function ProfileManager({ onMenuChange, onLogout, profileData, onProfileUpdate, activeAddOns = [], email = '', dob = '', qrNumber = '', residentialPinCode = '', doctorCode = '', companyName = '', division = '', qrType = '' }: ProfileManagerProps & { doctorCode?: string; companyName?: string; division?: string; qrType?: string }) {
   // Debug logging
   useEffect(() => {
-    console.log('🔥 PROFILE MANAGER RECEIVED PROPS:');
-    console.log('Email:', email);
-    console.log('Name from profileData:', profileData?.name);
-    console.log('DOB:', dob);
-    console.log('QR Number:', qrNumber);
-    console.log('Residential PIN Code:', residentialPinCode);
   }, [email, profileData, dob, qrNumber, residentialPinCode]);
 
   // Sync state with props when they change (e.g. after async fetch in parent)
   useEffect(() => {
     if (residentialPinCode) {
-      console.log('🔄 Syncing residentialPinCode from props:', residentialPinCode);
       setResidentialPincodeState(residentialPinCode);
     }
   }, [residentialPinCode]);
 
   useEffect(() => {
     if (profileData) {
-      console.log('🔄 Syncing profileData from props:', profileData);
       if (profileData.name) setName(profileData.name);
       if (profileData.image) setProfileImage(profileData.image);
       // Don't sync language from props - it's loaded directly from Firestore to avoid race conditions
@@ -107,7 +99,6 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
     try {
       const user = auth?.currentUser;
       if (!user) {
-        console.log('⚠️ No authenticated user, skipping profile load');
         return;
       }
 
@@ -120,7 +111,6 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
 
       if (doctorDoc.exists()) {
         const data = doctorDoc.data();
-        console.log('✅ Loaded profile from Firestore:', data);
 
         // Set all fields from Firestore
         if (data.name) setName(data.name);
@@ -144,7 +134,6 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
         if (data.clinicServicesLabel) setClinicServicesLabel(data.clinicServicesLabel);
         if (data.googleReviewLink) setGoogleReviewLink(data.googleReviewLink);
       } else {
-        console.log('ℹ️ No profile found in Firestore, using props/defaults');
       }
     } catch (error) {
       console.error('❌ Error loading profile from Firestore:', error);
@@ -200,7 +189,6 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
       const file = e.target.files?.[0];
       if (!file) return;
 
-      console.log('📤 Starting upload for:', file.name, `(${(file.size / 1024).toFixed(1)}KB)`);
 
       if (!auth?.currentUser) {
         alert('Please login again before uploading an image.');
@@ -215,18 +203,13 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
       setIsUploadingImage(true);
 
       // Compress image before uploading
-      console.log('🔄 Compressing image...');
       const compressedFile = await compressImage(file);
-      console.log('✅ Compression complete');
 
       const filePath = `doctorProfileImages/${auth.currentUser.uid}/${Date.now()}_${file.name}`;
-      console.log('☁️ Uploading to Storage:', filePath);
       const storageRef = ref(storage, filePath);
       await uploadBytes(storageRef, compressedFile);
-      console.log('✅ Upload complete');
 
       const downloadURL = await getDownloadURL(storageRef);
-      console.log('✅ Download URL obtained:', downloadURL);
       setProfileImage(downloadURL);
       alert('Image uploaded successfully!');
     } catch (error: any) {
@@ -286,7 +269,6 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
                 type: 'image/jpeg',
                 lastModified: Date.now(),
               });
-              console.log(`📦 Compressed: ${(file.size / 1024).toFixed(1)}KB → ${(compressedFile.size / 1024).toFixed(1)}KB`);
               resolve(compressedFile);
             },
             'image/jpeg',
@@ -420,7 +402,6 @@ export default function ProfileManager({ onMenuChange, onLogout, profileData, on
         { merge: true }
       );
 
-      console.log('✅ Profile saved to Firestore');
 
       // Update shared profile data (for App.tsx state)
       if (onProfileUpdate) {

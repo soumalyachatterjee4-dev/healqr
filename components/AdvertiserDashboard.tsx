@@ -210,7 +210,7 @@ export default function AdvertiserDashboard({ onLogout }: AdvertiserDashboardPro
       case 'campaign':
         return <AdvertiserCampaigns />;
       case 'analytics':
-        return <AdvertiserAnalytics />;
+        return <AdvertiserAnalytics advertiserId={auth.currentUser?.uid || localStorage.getItem('healqr_advertiser_id') || undefined} />;
       case 'wallet':
         return <AdvertiserWallet />;
       case 'market-research':

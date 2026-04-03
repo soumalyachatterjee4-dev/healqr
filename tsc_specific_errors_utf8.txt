@@ -1,4 +1,0 @@
-﻿components/ClinicSidebar.tsx(25,24): error TS2307: Cannot find module '../assets/healqr-logo.png' or its corresponding type declarations.
-components/DashboardSidebar.tsx(26,24): error TS2307: Cannot find module '../assets/healqr-logo.png' or its corresponding type declarations.
-utils/encryptionService.ts(12,36): error TS2339: Property 'env' does not exist on type 'ImportMeta'.
-utils/encryptionService.ts(157,17): error TS2339: Property 'env' does not exist on type 'ImportMeta'.

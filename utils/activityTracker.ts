@@ -39,7 +39,6 @@ class ActivityTracker {
 
   // Initialize activity tracking
   public init(): void {
-    console.log('🎯 Activity Tracker initialized');
 
     // Register event listeners for user activity
     const events = [
@@ -70,7 +69,6 @@ class ActivityTracker {
 
   // Cleanup and remove listeners
   public destroy(): void {
-    console.log('🛑 Activity Tracker destroyed');
 
     const events = [
       'mousedown',
@@ -115,11 +113,9 @@ class ActivityTracker {
   // Handle page visibility change
   private handleVisibilityChange(): void {
     if (document.hidden) {
-      console.log('📴 Page hidden - saving activity data');
       this.saveActivityData();
       this.stopHeartbeat();
     } else {
-      console.log('👁️ Page visible - resuming activity tracking');
       this.loadActivityData();
       this.startHeartbeat();
       this.updateActivity();
@@ -128,7 +124,6 @@ class ActivityTracker {
 
   // Handle page unload
   private handleBeforeUnload(): void {
-    console.log('💾 Saving activity data before unload');
     this.saveActivityData();
   }
 
@@ -142,10 +137,8 @@ class ActivityTracker {
       const timeSinceLastActivity = Date.now() - this.activityData.lastActivity;
 
       if (timeSinceLastActivity < this.config.inactivityTimeout) {
-        console.log('💓 Heartbeat - User active');
         this.saveActivityData();
       } else {
-        console.log('😴 Heartbeat - User inactive');
         this.activityData.isActive = false;
         this.saveActivityData();
       }
@@ -167,7 +160,6 @@ class ActivityTracker {
     }
 
     this.inactivityTimer = setTimeout(() => {
-      console.log('⏱️ Inactivity timeout reached');
       this.activityData.isActive = false;
       this.saveActivityData();
     }, this.config.inactivityTimeout);
@@ -191,7 +183,6 @@ class ActivityTracker {
       const stored = localStorage.getItem(this.config.storageKey);
       if (stored) {
         const data = JSON.parse(stored);
-        console.log('📥 Activity data loaded:', data);
         return data;
       }
     } catch (error) {

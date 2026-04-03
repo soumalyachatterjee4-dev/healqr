@@ -70,12 +70,10 @@ export default function PatientConsultationHistory({ patientPhone, language = 'e
       const currentPatientPhone = patientPhone || localStorage.getItem('patient_phone');
       
       if (!currentPatientPhone) {
-        console.log('❌ No patient phone found');
         setLoading(false);
         return;
       }
 
-      console.log('📱 Loading consultations for:', currentPatientPhone);
 
       // Load REAL booking data from Firestore
       const bookingsRef = collection(db, 'bookings');
@@ -89,7 +87,6 @@ export default function PatientConsultationHistory({ patientPhone, language = 'e
           orderBy('createdAt', 'desc')
         );
         snapshot = await getDocs(q);
-        console.log('✅ Query with orderBy successful:', snapshot.size, 'bookings');
       } catch (indexError) {
         console.warn('⚠️ Index not available, querying without orderBy:', indexError);
         // Fallback: query without orderBy
@@ -98,7 +95,6 @@ export default function PatientConsultationHistory({ patientPhone, language = 'e
           where('patientPhone', '==', currentPatientPhone)
         );
         snapshot = await getDocs(q);
-        console.log('✅ Query without orderBy successful:', snapshot.size, 'bookings');
       }
 
       const consultationData: Consultation[] = snapshot.docs.map(doc => {
@@ -114,17 +110,6 @@ export default function PatientConsultationHistory({ patientPhone, language = 'e
           status = data.status;
         }
         
-        console.log('📋 Booking data:', {
-          id: doc.id,
-          bookingId: data.bookingId,
-          patientName: data.patientName,
-          doctorName: data.doctorName,
-          date: data.bookingDate,
-          time: data.bookingTime || data.timeSlot,
-          serialNumber: data.serialNumber,
-          chamber: data.chamberName,
-          status: status
-        });
         return {
           id: doc.id,
           bookingId: data.bookingId || doc.id,
@@ -153,7 +138,6 @@ export default function PatientConsultationHistory({ patientPhone, language = 'e
         return dateB - dateA;
       });
 
-      console.log('✅ Total consultations loaded:', consultationData.length);
       setConsultations(consultationData);
 
       // Extract unique specialties

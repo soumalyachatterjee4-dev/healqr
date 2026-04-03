@@ -39,13 +39,11 @@ export default function DashboardPromoDisplay({ doctorBirthday, hideBirthday = f
   useEffect(() => {
     // Don't load templates on doctor's birthday
     if (hideBirthday) {
-      console.log('🎂 DashboardPromoDisplay: Hidden because it\'s doctor\'s birthday');
       return;
     }
 
     // Listen for template-refresh events from AdminTemplateUploader
     const handleRefresh = () => {
-      console.log('🔄 DashboardPromoDisplay: Received refresh event');
       setRefreshKey(prev => prev + 1);
     };
 
@@ -55,7 +53,6 @@ export default function DashboardPromoDisplay({ doctorBirthday, hideBirthday = f
       let templates: Template[] = [];
 
       // Load from Firestore global templates
-      console.log('🔄 DashboardPromoDisplay: Loading global templates from Firestore...');
 
       try {
         const { db } = await import('../lib/firebase/config');
@@ -68,12 +65,9 @@ export default function DashboardPromoDisplay({ doctorBirthday, hideBirthday = f
           const data = adminSnap.data();
           if (data.globalTemplates && Array.isArray(data.globalTemplates)) {
             templates = data.globalTemplates;
-            console.log('✅ DashboardPromoDisplay loaded', templates.length, 'global templates');
           } else {
-            console.log('⚠️ No globalTemplates found');
           }
         } else {
-          console.log('⚠️ Admin document does not exist');
         }
       } catch (err) {
         console.error('❌ Error loading global templates:', err);
@@ -89,10 +83,8 @@ export default function DashboardPromoDisplay({ doctorBirthday, hideBirthday = f
       );
 
       if (matchingTemplate) {
-        console.log(`✅ DashboardPromoDisplay: Showing ${category} template (placement: ${placement || 'any'}):`, matchingTemplate.name);
         setTemplate(matchingTemplate);
       } else {
-        console.log(`⚠️ DashboardPromoDisplay: No matching ${category} template found for placement: ${placement || 'any'}`);
         setTemplate(null);
       }
     };

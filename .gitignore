@@ -129,6 +129,23 @@ dist-ssr
 .DS_Store
 Thumbs.db
 
+# Vite timestamp cache files
+vite.config.ts.timestamp-*
+
+# Build/debug output files
+*.log
+build_*.txt
+tsc_*.txt
+ts_errors*.txt
+out.txt
+output.txt
+
+# Backup files
+*.bak
+*.bak.tsx
+*_old.tsx
+_backup_*/
+
 # Firebase
 .firebase/
 firebase-debug.log

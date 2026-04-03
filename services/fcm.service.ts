@@ -38,7 +38,6 @@ export const initializeFCM = async (): Promise<boolean> => {
 
     // Initialize messaging
     messaging = getMessaging(app);
-    console.log('✅ FCM initialized successfully');
     
     return true;
   } catch (error) {
@@ -55,7 +54,6 @@ export const requestNotificationPermission = async (
   userType: 'doctor' | 'patient'
 ): Promise<string | null> => {
   try {
-    console.log('🔔 [FCM] Starting permission request for:', { userId, userType });
     
     // Initialize FCM if not already done
     if (!messaging) {
@@ -68,7 +66,6 @@ export const requestNotificationPermission = async (
 
     // Request permission
     const permission = await Notification.requestPermission();
-    console.log('🔔 [FCM] Notification permission:', permission);
 
     if (permission !== 'granted') {
       console.warn('⚠️ [FCM] Notification permission denied');
@@ -76,28 +73,22 @@ export const requestNotificationPermission = async (
     }
 
     // Register service worker
-    console.log('🔧 [FCM] Registering service worker...');
     const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-    console.log('✅ [FCM] Service worker registered:', registration.scope);
 
     // Wait for service worker to be ready
     await navigator.serviceWorker.ready;
-    console.log('✅ [FCM] Service worker ready');
 
     // FORCE CLEANUP: Delete any existing token first to resolve 401 errors
     try {
       await deleteToken(messaging!);
-      console.log('🧹 [FCM] Cleared old/invalid tokens');
     } catch (e) {
       // Ignore errors here, just trying to clean up
-      console.log('ℹ️ [FCM] No token to clear or clear failed', e);
     }
 
     // Get FCM token - Try minimal config first (most reliable for auto-configuration)
     let token = '';
     
     try {
-      console.log('🔑 [FCM] Requesting new token (Auto-Config)...');
       token = await getToken(messaging!, {
         serviceWorkerRegistration: registration
       });
@@ -107,7 +98,6 @@ export const requestNotificationPermission = async (
       // Only try VAPID if auto-config fails and we have a key
       if (VAPID_KEY) {
         try {
-          console.log('🔑 [FCM] Retrying with VAPID key...');
           token = await getToken(messaging!, {
             vapidKey: VAPID_KEY,
             serviceWorkerRegistration: registration
@@ -122,7 +112,6 @@ export const requestNotificationPermission = async (
     }
 
     if (token) {
-      console.log('✅ [FCM] Token obtained:', token.substring(0, 20) + '...');
       
       // Save token to Firestore
       await saveFCMToken(userId, token, userType);
@@ -177,7 +166,6 @@ const saveFCMToken = async (
       createdAt: serverTimestamp()
     }, { merge: true });
 
-    console.log('✅ FCM token saved to Firestore');
   } catch (error) {
     console.error('❌ Error saving FCM token:', error);
   }
@@ -215,7 +203,6 @@ export const onForegroundMessage = (callback: (payload: any) => void): (() => vo
   }
 
   return onMessage(messaging, (payload) => {
-    console.log('📨 Foreground message received:', payload);
     callback(payload);
   });
 };

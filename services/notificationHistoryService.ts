@@ -119,18 +119,9 @@ export interface ConsultationHistory {
  */
 export const saveNotificationHistory = async (record: Omit<NotificationRecord, 'id'>): Promise<void> => {
   try {
-    console.log('💾 saveNotificationHistory called with:', {
-      patientPhone: record.patientPhone,
-      patientName: record.patientName,
-      doctorId: record.doctorId,
-      doctorName: record.doctorName,
-      notificationType: record.notificationType,
-      bookingStatus: record.bookingStatus
-    });
 
     // Normalize phone number
     const phone10 = record.patientPhone.replace(/\D/g, '').slice(-10);
-    console.log('📞 Normalized phone:', phone10);
 
     // Remove ALL undefined fields to prevent Firestore errors (generically)
     const cleanRecord = { ...record } as any;
@@ -147,15 +138,9 @@ export const saveNotificationHistory = async (record: Omit<NotificationRecord, '
       createdAt: Timestamp.now()
     };
 
-    console.log('📝 Document to save:', docToSave);
 
     // Save new notification
     const docRef = await addDoc(collection(db, 'notificationHistory'), docToSave);
-    console.log('✅ Notification history saved successfully!', {
-      docId: docRef.id,
-      phone: phone10,
-      doctorId: record.doctorId
-    });
 
     // Delete old records (keep last 10)
     await cleanupOldNotifications(phone10);
@@ -199,7 +184,6 @@ const cleanupOldNotifications = async (patientPhone: string): Promise<void> => {
       for (const docToDelete of toDelete) {
         await deleteDoc(doc(db, 'notificationHistory', docToDelete.id));
       }
-      console.log(`🗑️ Deleted ${toDelete.length} notifications older than ${RETENTION_DAYS} days for ${patientPhone}`);
     }
   } catch (error) {
     console.error('❌ Failed to cleanup old notifications:', error);
@@ -271,12 +255,6 @@ export const searchPatientConsultationHistory = async (patientPhone: string, doc
   try {
     const phone10 = patientPhone.replace(/\D/g, '').slice(-10);
 
-    console.log('🔍 searchPatientConsultationHistory called with:', {
-      originalPhone: patientPhone,
-      normalized: phone10,
-      doctorId: doctorId,
-      hasDoctorId: !!doctorId
-    });
 
     let q;
     if (doctorId) {
@@ -304,7 +282,6 @@ export const searchPatientConsultationHistory = async (patientPhone: string, doc
       } as NotificationRecord;
     });
 
-    console.log('📊 Raw records fetched:', records.length);
 
     // Group by bookingId with improved deduplication
     const consultationMap = new Map<string, ConsultationHistory>();
@@ -515,7 +492,6 @@ export const searchPatientConsultationHistory = async (patientPhone: string, doc
 
       // If no date, exclude it
       if (!consultationDateStr) {
-        console.log('⚠️ Consultation has no date, excluding:', consultation.patientName);
         return false;
       }
 
@@ -523,11 +499,6 @@ export const searchPatientConsultationHistory = async (patientPhone: string, doc
 
       // Debug logging for TODAY's check
       if (isTodayDate) {
-        console.log('🚫 EXCLUDING TODAY\'S appointment:', {
-          patient: consultation.patientName,
-          consultationDate: consultationDateStr,
-          today: today.toISOString().split('T')[0]
-        });
       }
 
       // EXCLUDE all today's appointments - they become history from tomorrow
@@ -536,7 +507,6 @@ export const searchPatientConsultationHistory = async (patientPhone: string, doc
     })
       .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
-    console.log('✅ Total consultations:', consultationMap.size, '| History (past only):', filteredConsultations.length);
     return filteredConsultations;
 
   } catch (error) {
@@ -553,23 +523,10 @@ export const searchPatientHistory = async (patientPhone: string, doctorId?: stri
   try {
     const phone10 = patientPhone.replace(/\D/g, '').slice(-10);
 
-    console.log('🔍 searchPatientHistory called with:', {
-      originalPhone: patientPhone,
-      normalized: phone10,
-      doctorId: doctorId,
-      hasDoctorId: !!doctorId
-    });
 
     let q;
     if (doctorId) {
       // Doctor-specific search
-      console.log('📊 Building doctor-specific query:', {
-        collection: 'notificationHistory',
-        where1: `patientPhone == ${phone10}`,
-        where2: `doctorId == ${doctorId}`,
-        orderBy: 'timestamp desc',
-        limit: 50
-      });
 
       q = query(
         collection(db, 'notificationHistory'),
@@ -580,12 +537,6 @@ export const searchPatientHistory = async (patientPhone: string, doctorId?: stri
       );
     } else {
       // Patient-side: all doctors
-      console.log('📊 Building patient-side query:', {
-        collection: 'notificationHistory',
-        where: `patientPhone == ${phone10}`,
-        orderBy: 'timestamp desc',
-        limit: 50
-      });
 
       q = query(
         collection(db, 'notificationHistory'),
@@ -595,15 +546,9 @@ export const searchPatientHistory = async (patientPhone: string, doctorId?: stri
       );
     }
 
-    console.log('⏳ Executing Firestore query...');
     const snapshot = await getDocs(q);
-    console.log('✅ Query completed:', {
-      docsFound: snapshot.docs.length,
-      empty: snapshot.empty
-    });
 
     if (snapshot.docs.length > 0) {
-      console.log('📄 First record sample:', snapshot.docs[0].data());
     }
 
     const results = snapshot.docs.map(doc => {
@@ -615,7 +560,6 @@ export const searchPatientHistory = async (patientPhone: string, doctorId?: stri
       } as NotificationRecord;
     });
 
-    console.log('✅ Returning results:', results.length);
     return results;
   } catch (error) {
     console.error('❌ Failed to search patient history:', error);

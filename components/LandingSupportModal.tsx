@@ -14,14 +14,10 @@ export default function LandingSupportModal({ open, onOpenChange }: LandingSuppo
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Debug logging
-  console.log('🔍 LandingSupportModal rendered - open:', open);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    console.log('🎯 handleSubmit called - event:', e);
     e.preventDefault();
     
-    console.log('🎯 Landing page support form submitted');
-    console.log('Form values - Name:', name, 'Email:', email, 'Message length:', message.length);
 
     if (!name.trim()) {
       toast.error('Please enter your name');
@@ -45,12 +41,6 @@ export default function LandingSupportModal({ open, onOpenChange }: LandingSuppo
       const { db } = await import('../lib/firebase/config');
       const { collection, addDoc, serverTimestamp } = await import('firebase/firestore');
       
-      console.log('🔄 Attempting to save landing page support request...');
-      console.log('Name:', name);
-      console.log('Email:', email);
-      console.log('Message:', message);
-      console.log('Type: landing');
-      console.log('Status: unread');
       
       const docRef = await addDoc(collection(db, 'supportRequests'), {
         name,
@@ -63,8 +53,6 @@ export default function LandingSupportModal({ open, onOpenChange }: LandingSuppo
         resolvedAt: null,
       });
       
-      console.log('✅✅✅ Landing page support request saved to Firestore with ID:', docRef.id);
-      console.log('📍 Document path: supportRequests/' + docRef.id);
       
       // Show success message
       toast.success('Support request submitted successfully! We\'ll get back to you soon.');
@@ -115,7 +103,6 @@ export default function LandingSupportModal({ open, onOpenChange }: LandingSuppo
 
           <form 
             onSubmit={(e) => {
-              console.log('📝 Form onSubmit event triggered');
               handleSubmit(e);
             }} 
             className="space-y-4"
@@ -177,9 +164,6 @@ export default function LandingSupportModal({ open, onOpenChange }: LandingSuppo
               type="submit"
               disabled={isSubmitting}
               onClick={(e) => {
-                console.log('🖱️ Submit button clicked directly');
-                console.log('Button type:', e.currentTarget.type);
-                console.log('isSubmitting:', isSubmitting);
               }}
               className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-500 disabled:cursor-not-allowed text-white rounded-lg py-3 flex items-center justify-center gap-2 transition-colors"
             >

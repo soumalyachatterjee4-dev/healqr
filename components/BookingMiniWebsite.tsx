@@ -1,4 +1,4 @@
-import { Star, Lightbulb, Calendar, AlertCircle, Phone, Sparkles, History as HistoryIcon } from 'lucide-react';
+import { Star, Lightbulb, Calendar, AlertCircle, Phone, Sparkles, History as HistoryIcon, Video, ExternalLink } from 'lucide-react';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import {
@@ -72,6 +72,7 @@ export default function BookingMiniWebsite({
   const [emergencyPhone, setEmergencyPhone] = useState('');
   const [showEmergencyDialog, setShowEmergencyDialog] = useState(false);
   const [personalizedTemplates, setPersonalizedTemplates] = useState<Template[]>([]);
+  const [patientFeedbackVideoUrl, setPatientFeedbackVideoUrl] = useState('');
   const [emergencyScheduling, setEmergencyScheduling] = useState<any>(null);
 
   // Booking blocked state
@@ -210,6 +211,10 @@ export default function BookingMiniWebsite({
           // Filter only active templates
           const activeTemplates = data.personalizedTemplates.filter((t: any) => t.isActive);
           setPersonalizedTemplates(activeTemplates);
+        }
+
+        if (data.patientFeedbackVideoUrl) {
+          setPatientFeedbackVideoUrl(data.patientFeedbackVideoUrl);
         }
 
         // Booking blocking removed - project is now free
@@ -630,6 +635,33 @@ export default function BookingMiniWebsite({
                   )}
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Patient Feedback Video Section */}
+        {patientFeedbackVideoUrl && (
+          <div className="px-4 sm:px-6 pb-6">
+            <div className="bg-gradient-to-br from-blue-600/10 to-purple-600/10 border border-blue-500/30 rounded-2xl p-4 sm:p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Video className="w-5 h-5 text-blue-400" />
+                <h3 className="text-white text-base sm:text-lg">
+                  Patient Feedback
+                </h3>
+              </div>
+              <p className="text-gray-400 text-sm mb-4">
+                Watch what patients say about their experience
+              </p>
+              <a
+                href={patientFeedbackVideoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-5 py-2.5 rounded-xl font-medium transition-colors text-sm"
+              >
+                <Video className="w-4 h-4" />
+                Watch Video
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
             </div>
           </div>
         )}

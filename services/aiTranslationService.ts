@@ -52,6 +52,15 @@ export const AI_SUPPORTED_LANGUAGES = {
 
 export type AILanguage = keyof typeof AI_SUPPORTED_LANGUAGES;
 
+// ======================== RTL SUPPORT ========================
+
+const RTL_LANGUAGES: Set<AILanguage> = new Set(['urdu', 'sindhi', 'kashmiri', 'arabic']);
+
+/** Returns true if the language uses right-to-left script */
+export function isRTLLanguage(lang: string): boolean {
+  return RTL_LANGUAGES.has(lang as AILanguage);
+}
+
 // ======================== CACHING LAYER ========================
 
 // In-memory cache (fast, session-scoped)

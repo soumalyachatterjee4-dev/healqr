@@ -44,6 +44,7 @@ interface PatientDetailsFormProps {
   selectedDate?: Date;
   selectedTime?: string;
   selectedChamber?: string;
+  selectedChamberId?: number;
   bookingType?: 'qr_booking' | 'walkin_booking';
   doctorDegrees?: string[];
   isTestMode?: boolean; // Skip database operations in test mode
@@ -85,6 +86,7 @@ export default function PatientDetailsForm({
   selectedDate,
   selectedTime,
   selectedChamber,
+  selectedChamberId,
   bookingType = 'qr_booking',
   doctorDegrees = [],
   isTestMode = false, // Demo mode - skip database operations
@@ -218,8 +220,17 @@ export default function PatientDetailsForm({
         const doctorData = doctorDoc.data();
 
         if (doctorData.chambers && Array.isArray(doctorData.chambers)) {
-          // Try exact match first
-          let foundChamber = doctorData.chambers.find((c: any) => c.chamberName === selectedChamber);
+          let foundChamber: any = null;
+
+          // ?? PRIORITY: Use selectedChamberId if provided (exact match by ID)
+          if (selectedChamberId !== undefined && selectedChamberId !== null) {
+            foundChamber = doctorData.chambers.find((c: any) => c.id === selectedChamberId);
+          }
+
+          // Fallback: Try exact name match
+          if (!foundChamber) {
+            foundChamber = doctorData.chambers.find((c: any) => c.chamberName === selectedChamber);
+          }
 
           // If no exact match, try case-insensitive match
           if (!foundChamber) {
@@ -246,11 +257,6 @@ export default function PatientDetailsForm({
 
           if (foundChamber) {
             chamberId = foundChamber.id;
-            console.log('? Chamber resolved:', {
-              selectedChamber,
-              foundChamber: foundChamber.chamberName,
-              chamberId
-            });
           } else {
             console.error('? Chamber not found! Selected:', selectedChamber, '| Available:', doctorData.chambers.map((c: any) => c.chamberName));
             console.error('?? Using chamberId = -1 (this booking will not appear in chamber views)');
@@ -287,15 +293,6 @@ export default function PatientDetailsForm({
         where('chamberId', 'in', uniqueChamberIds)
       );
 
-      console.log('?? Querying CHAMBER-SPECIFIC bookings for unified serial numbers:', {
-        doctorId,
-        chamberId,
-        queriedChamberIds: uniqueChamberIds,
-        chamberName: selectedChamber,
-        todayStr,
-        appointmentDate: appointmentDateToSave,
-        time: selectedTime || 'immediate'
-      });
 
       const querySnapshot = await getDocs(q);
 
@@ -320,16 +317,6 @@ export default function PatientDetailsForm({
       const serialNo = todaysBookings.length + 1;
 
 
-      console.log('? CHAMBER-SPECIFIC Serial Number (UNIFIED across all sources):', {
-        serialNo,
-        tokenNumber,
-        chamberId,
-        chamberName: selectedChamber,
-        totalChamberBookingsToday: todaysBookings.length,
-        doctorId,
-        todayStr,
-        appointmentDate: appointmentDateToSave
-      });
 
       // ============================================
       // ?? SAVE TO DATABASE IMMEDIATELY (PREVENT RACE CONDITION)
@@ -348,10 +335,6 @@ export default function PatientDetailsForm({
           const bookingDate = new Date(selectedDate);
           bookingDate.setHours(0, 0, 0, 0);
 
-          console.log('?? PatientDetailsForm: Checking planned off periods', {
-            bookingDate: bookingDate.toDateString(),
-            activePeriods: activePlannedOffPeriods.length
-          });
 
           for (const period of activePlannedOffPeriods) {
             // Parse dates as local timezone
@@ -379,11 +362,6 @@ export default function PatientDetailsForm({
             startDate.setHours(0, 0, 0, 0);
             endDate.setHours(0, 0, 0, 0);
 
-            console.log('  ?? Comparing with period:', {
-              startDate: startDate.toDateString(),
-              endDate: endDate.toDateString(),
-              isInRange: bookingDate >= startDate && bookingDate <= endDate
-            });
 
             if (bookingDate >= startDate && bookingDate <= endDate) {
               toast.error('This date is unavailable due to planned off period. Please select another date.');
@@ -473,7 +451,6 @@ export default function PatientDetailsForm({
                 bookingId: bookingId,
                 completedAt: serverTimestamp()
               });
-              console.log('? QR scan marked as completed');
             }
           } catch (error) {
             console.error('Error updating scan record:', error);

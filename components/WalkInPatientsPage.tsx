@@ -344,7 +344,6 @@ export default function WalkInPatientsPage({ patients, onBack, onMenuChange }: W
             language: selectedPatient.language || 'english',
           });
 
-          console.log('✅ Follow-up notification scheduled via FCM');
         } catch (notifError) {
           console.warn('⚠️ Follow-up notification error (non-blocking):', notifError);
         }
@@ -357,7 +356,6 @@ export default function WalkInPatientsPage({ patients, onBack, onMenuChange }: W
           }
         }));
 
-        console.log(`✅ Follow-up scheduled for ${days} days`);
       } catch (error) {
         console.error('❌ Error scheduling follow-up:', error);
       }

@@ -65,7 +65,6 @@ export async function generateDoctorCode(pincode: string): Promise<string> {
     // Generate final code: HQR-711110-0029-DR
     const doctorCode = `HQR-${pincode}-${serialFormatted}-DR`;
 
-    console.log(`✅ Generated Doctor Code: ${doctorCode} (${nextSerial}th doctor in pincode ${pincode})`);
 
     return doctorCode;
 
@@ -130,7 +129,6 @@ export async function generateBACode(pincode: string): Promise<string> {
     // Generate final code: HQR-711110-0029-BA
     const baCode = `HQR-${pincode}-${serialFormatted}-BA`;
 
-    console.log(`✅ Generated BA Code: ${baCode} (${nextSerial}th BA in pincode ${pincode})`);
 
     return baCode;
 
@@ -198,7 +196,6 @@ export async function generateClinicCode(pincode: string): Promise<string> {
     // Branch 001 = main branch (always starts with 001)
     const clinicCode = `HQR-${pincode}-${serialFormatted}-001-CLN`;
 
-    console.log(`✅ Generated Clinic Code: ${clinicCode} (${nextSerial}th clinic in pincode ${pincode})`);
 
     return clinicCode;
 
@@ -304,7 +301,6 @@ export async function generateBookingId(doctorCode: string, bookingDate?: Date):
     // Generate final ID: HQR-711110-0029-DR-251210-0523-P
     const bookingId = `${doctorCode}-${dateStr}-${serialFormatted}-P`;
 
-    console.log(`✅ Generated Booking ID: ${bookingId} (${nextSerial}th booking on ${dateStr} for doctor ${doctorCode})`);
 
     return bookingId;
 

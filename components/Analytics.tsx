@@ -243,13 +243,14 @@ export default function Analytics({ onMenuChange = () => {}, onLogout, activeAdd
 
           // Count cancellations by type
           if (isCancelled) {
+            const cancelType = (data.cancellationType || '').toUpperCase();
             const cancelReason = data.cancellationReason || '';
 
-            if (cancelReason.includes('global toggle') || cancelReason.includes('Global booking disabled')) {
+            if (cancelType === 'GLOBAL TOGGLE' || cancelType === 'GLOBAL_BLOCKED' || cancelReason.includes('global toggle') || cancelReason.includes('global_planned_off') || cancelReason.includes('Global booking disabled')) {
               globalToggleCancellation++;
-            } else if (cancelReason.includes('chamber') || cancelReason.includes('Chamber deactivated')) {
+            } else if (cancelType === 'CHAMBER TOGGLE' || cancelType === 'CHAMBER_BLOCKED' || cancelReason.includes('chamber') || cancelReason.includes('chamber_deactivated')) {
               chamberCancellation++;
-            } else if (cancelReason.includes('patient') || data.cancelledBy === 'patient') {
+            } else if (cancelType === 'PATIENT INDIVIDUAL TOGGLE' || cancelReason.includes('patient') || data.cancelledBy === 'patient') {
               patientCancellation++;
             }
           }

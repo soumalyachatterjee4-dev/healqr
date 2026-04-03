@@ -289,11 +289,6 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
           },
         );
 
-        console.log("🔒 SECURITY FILTER:", {
-          totalChambers: allChambers.length,
-          clinicChambers: clinicChambers.length,
-          clinicId: resolvedClinicId,
-        });
 
         setChambers(clinicChambers);
       }
@@ -400,7 +395,6 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
             console.error("Sync error:", e);
           }
 
-          console.log("✅ Stored in clinic document");
 
           const linkedDoctors = clinicSnap.data().linkedDoctorsDetails || [];
           let successCount = 0;
@@ -408,7 +402,6 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
 
           if (chamberSpecificClosure === "specific" && selectedDoctorId) {
             // Only apply chamber-specific off to the selected doctor
-            console.log("📋 Applying specific chamber off to selected doctor only");
             try {
               const doctorRef = doc(db!, "doctors", selectedDoctorId);
               const doctorSnap = await getDoc(doctorRef);
@@ -419,7 +412,6 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
                   plannedOffPeriods: [...existingPeriods, newPeriod],
                 });
                 successCount++;
-                console.log("✅ Applied to", selectedDoctor?.name || selectedDoctorId);
               } else {
                 console.error("❌ Selected doctor not found:", selectedDoctorId);
                 errorCount++;
@@ -430,11 +422,6 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
             }
           } else {
             // Apply to all linked doctors (legacy behavior)
-            console.log(
-              "📋 Also applying to",
-              linkedDoctors.length,
-              "linked doctors",
-            );
 
             for (const doctor of linkedDoctors) {
               try {
@@ -447,7 +434,6 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
                     plannedOffPeriods: [...existingPeriods, newPeriod],
                   });
                   successCount++;
-                  console.log("✅ Applied to", doctor.name);
                 } else {
                   console.error("❌ Doctor document not found:", doctor.uid, doctor.name);
                   errorCount++;
@@ -459,13 +445,6 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
             }
           }
 
-          console.log(
-            "📊 Results:",
-            successCount,
-            "success,",
-            errorCount,
-            "errors",
-          );
 
           toast.success(`Planned off period saved for ${clinicName}`);
 
@@ -577,13 +556,6 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
 
       const overlaps =
         minutes1Start < minutes2End && minutes2Start < minutes1End;
-      console.log("⏰ Time overlap check:", {
-        start1,
-        end1,
-        start2,
-        end2,
-        overlaps,
-      });
       return overlaps;
     } catch (error) {
       console.error("Error checking time overlap:", error);
@@ -594,15 +566,12 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
   // Helper function to check if two day arrays have common days
   const hasCommonDays = (days1: string[], days2: string[]) => {
     if (!Array.isArray(days1) || !Array.isArray(days2)) {
-      console.log("🚫 Invalid days arrays:", { days1, days2 });
       return false;
     }
     if (days1.length === 0 || days2.length === 0) {
-      console.log("🚫 Empty days arrays:", { days1, days2 });
       return false;
     }
     const hasCommon = days1.some((day) => days2.includes(day));
-    console.log("📅 Day overlap check:", { days1, days2, hasCommon });
     return hasCommon;
   };
 
@@ -659,16 +628,6 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
         ? allExistingChambers.filter((c: Chamber) => c.id !== editingChamberId)
         : allExistingChambers;
 
-      console.log("🔍 CONFLICT DETECTION START");
-      console.log("📋 New schedule:", {
-        selectedDays,
-        frequency,
-        startTime,
-        endTime,
-        chamberName,
-      });
-      console.log("📚 Existing chambers:", allExistingChambers.length);
-      console.log("✏️ Editing mode:", editingChamberId ? "YES" : "NO");
 
       // Check each existing chamber for conflicts
       for (const existingChamber of chambersToCheck) {
@@ -683,18 +642,9 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
           existingEndTime = timeParts[1];
         }
 
-        console.log("🔎 Checking chamber:", {
-          name: existingChamber.chamberName,
-          days: existingChamber.days,
-          frequency: existingChamber.frequency,
-          time: `${existingStartTime}-${existingEndTime}`,
-          status: existingChamber.status,
-          clinicId: existingChamber.clinicId,
-        });
 
         // Skip ONLY explicitly inactive chambers (undefined/missing status = active)
         if (existingChamber.status === "inactive") {
-          console.log("⏭️ Skipping inactive chamber");
           continue;
         }
 
@@ -723,7 +673,6 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
           frequency !== "Custom" &&
           existingChamber.frequency !== "Custom"
         ) {
-          console.log("🔄 Checking regular frequency conflict");
 
           // CRITICAL FIX: Handle Daily frequency conflict even with empty days arrays
           const isDailyConflict =
@@ -733,18 +682,9 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
             existingChamber.days,
           );
 
-          console.log("📅 Day conflict check:", {
-            isDailyConflict,
-            hasCommonScheduleDays,
-            newFreq: frequency,
-            existingFreq: existingChamber.frequency,
-            newDays: selectedDays,
-            existingDays: existingChamber.days,
-          });
 
           // Check if there are common days OR both are Daily frequency
           if (hasCommonScheduleDays || isDailyConflict) {
-            console.log("✅ Found common days or Daily conflict!");
             // Check if time ranges overlap
             if (
               timeRangesOverlap(
@@ -754,7 +694,6 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
                 existingEndTime,
               )
             ) {
-              console.log("🚨 CONFLICT DETECTED!");
               const commonDays = hasCommonScheduleDays
                 ? selectedDays.filter((day) =>
                     existingChamber.days.includes(day),
@@ -770,19 +709,15 @@ const ClinicScheduleManager: React.FC<ClinicScheduleManagerProps> = ({
                   existingChamber.clinicId !== resolvedClinicId,
               });
             } else {
-              console.log("⏰ No time overlap");
             }
           } else {
-            console.log("📅 No common days");
           }
         }
       }
 
-      console.log("🎯 Total conflicts found:", conflicts.length);
 
       // If conflicts found, block the save completely
       if (conflicts.length > 0) {
-        console.log("⚠️ BLOCKING SAVE DUE TO CONFLICTS");
         const conflictMessages = conflicts
           .map((c) => {
             const location = c.isPersonalChamber

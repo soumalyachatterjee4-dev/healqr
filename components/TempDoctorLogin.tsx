@@ -209,7 +209,6 @@ const TempDoctorLogin: React.FC = () => {
         });
       } catch (e) {
         // Expected for unauthenticated temp doctors — login tracking is optional
-        console.log('Login tracking update skipped (expected for temp access)');
       }
 
       // Set localStorage for temp doctor session

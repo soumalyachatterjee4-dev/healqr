@@ -63,7 +63,6 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
       const result = await signInWithEmailLink(auth, email, window.location.href);
       const user = result.user;
 
-      console.log('✅ Login successful:', user.uid);
 
       // Quick check for user type (assistant, clinic, or doctor)
       const { db } = await import('../lib/firebase/config');
@@ -96,7 +95,6 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
               localStorage.setItem('healqr_user_name', clinicData.name);
             }
 
-            console.log('✅ Clinic owner login detected:', user.uid);
           } else {
             // Not a clinic owner — check if branch location manager
             const clinicsRef = collection(db, 'clinics');
@@ -124,7 +122,6 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
                 localStorage.setItem('healqr_user_name', parentData.name);
               }
 
-              console.log('✅ Branch location manager login detected:', email, 'parent clinic:', parentClinic.id, 'location:', matchedLocation?.id);
             } else {
               // Not a branch manager either — check if clinic assistant
               const assistantsRef = collection(db, 'assistants');
@@ -157,7 +154,6 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
                 } catch (prefetchErr) {
                   console.warn('Could not pre-fetch clinic name:', prefetchErr);
                 }
-                console.log('✅ Clinic assistant login detected:', email);
               } else {
                 console.error('❌ User tried to login as clinic but no clinic, branch, or assistant found');
                 await auth.signOut();
@@ -211,7 +207,6 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
               console.warn('Could not pre-fetch profile name:', prefetchErr);
             }
 
-            console.log('✅ Assistant login detected:', email, assistantData.isClinic ? '(clinic)' : '(doctor)');
           } else {
             // ✅ Not an assistant — check doctors collection
             const doctorDocRef = doc(db, 'doctors', user.uid);
@@ -241,7 +236,6 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
                 }));
               }
 
-              console.log('✅ Doctor login detected:', user.uid);
             } else {
               // Doctor doc not found — check if they have a clinic account as fallback
               const clinicDocRef = doc(db, 'clinics', user.uid);
@@ -256,7 +250,6 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
                 if (clinicData.name) {
                   localStorage.setItem('healqr_user_name', clinicData.name);
                 }
-                console.log('✅ Clinic login detected (fallback from doctor login):', user.uid);
               } else {
                 // No doctor or clinic doc found
                 console.error('❌ No doctor or clinic account found for:', user.uid);
@@ -276,7 +269,6 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
       const isClinic = localStorage.getItem('healqr_is_clinic');
       setMessage(isAssistant ? 'Assistant access granted!' : isClinic ? 'Clinic login successful!' : 'Login successful!');
 
-      console.log('✅ Login complete, auth session established');
 
       // Immediately redirect to clean URL - App.tsx will handle routing based on localStorage
       if (onSuccess) {

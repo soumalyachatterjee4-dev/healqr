@@ -111,7 +111,6 @@ export default function LabReferralTrackingManager({
       // Save back if any were removed
       if (cleaned.length !== parsed.length) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
-        console.log(`🗑️ Cleaned ${parsed.length - cleaned.length} old entries (>90 days)`);
       }
     } catch (error) {
       console.error('Error cleaning up old entries:', error);
@@ -122,7 +121,6 @@ export default function LabReferralTrackingManager({
     try {
       const userId = localStorage.getItem('userId');
       if (!userId) {
-        console.log('No user ID found');
         setLoading(false);
         return;
       }
@@ -145,9 +143,7 @@ export default function LabReferralTrackingManager({
         where('isMarkedSeen', '==', true)
       );
 
-      console.log('🔍 Fetching consultations for Doctor:', doctorId, 'Date:', queryDate.toLocaleDateString());
       const snapshot = await getDocs(q);
-      console.log('📄 Total seen bookings found:', snapshot.size);
 
       const existingReferrals = [...referrals];
       let newCount = 0;
@@ -231,7 +227,6 @@ export default function LabReferralTrackingManager({
         saveReferralsToStorage(existingReferrals);
         toast.success(`${newCount} consultations loaded for ${queryDate.toLocaleDateString()}`);
       } else {
-        console.log('No new consultations found for date:', queryDate.toLocaleDateString());
       }
 
       setLoading(false);

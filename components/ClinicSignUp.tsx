@@ -90,7 +90,6 @@ export default function ClinicSignUp({ onBack, onLogin }: ClinicSignUpProps) {
         });
 
         finalQrNumber = `HQR${String(maxNumber + 1).padStart(5, '0')}`;
-        console.log('🔵 Clinic Virtual QR - Max from both collections:', maxNumber, '→ New:', finalQrNumber);
         // Save Virtual QR to qrPool collection
         await addDoc(qrPoolCollection, {
           qrNumber: finalQrNumber,

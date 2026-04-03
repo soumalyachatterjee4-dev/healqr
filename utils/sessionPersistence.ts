@@ -38,7 +38,6 @@ class SessionPersistence {
 
   // Initialize session persistence
   public init(): void {
-    console.log('🔐 Session Persistence initialized');
 
     // Load existing session
     this.loadSession();
@@ -54,7 +53,6 @@ class SessionPersistence {
 
   // Cleanup and remove listeners
   public destroy(): void {
-    console.log('🛑 Session Persistence destroyed');
 
     window.removeEventListener('beforeunload', this.handleBeforeUnload);
     document.removeEventListener('visibilitychange', this.handleVisibilityChange);
@@ -78,7 +76,6 @@ class SessionPersistence {
       isAuthenticated: data.isAuthenticated ?? true,
     };
 
-    console.log('✅ Session created:', this.sessionData);
     this.saveSession();
     this.startSessionMonitoring();
   }
@@ -96,7 +93,6 @@ class SessionPersistence {
       lastSeen: Date.now(),
     };
 
-    console.log('🔄 Session updated:', this.sessionData);
     this.saveSession();
   }
 
@@ -139,7 +135,6 @@ class SessionPersistence {
 
   // Clear session data
   public clearSession(): void {
-    console.log('🗑️ Session cleared');
     this.sessionData = null;
     this.stopSessionMonitoring();
 
@@ -164,7 +159,6 @@ class SessionPersistence {
         this.config.storageKey,
         JSON.stringify(this.sessionData)
       );
-      console.log('💾 Session saved');
     } catch (error) {
       console.error('❌ Failed to save session:', error);
     }
@@ -181,9 +175,7 @@ class SessionPersistence {
         const sessionAge = Date.now() - data.loginTime;
         if (sessionAge < this.config.sessionTimeout) {
           this.sessionData = data;
-          console.log('📥 Session loaded:', this.sessionData);
         } else {
-          console.log('⏰ Session expired, clearing...');
           this.clearSession();
         }
       }
@@ -194,7 +186,6 @@ class SessionPersistence {
 
   // Handle page unload
   private handleBeforeUnload(_event: BeforeUnloadEvent): void {
-    console.log('💾 Saving session before page unload');
     this.saveSession();
 
     // Don't show confirmation dialog for session save
@@ -204,10 +195,8 @@ class SessionPersistence {
   // Handle visibility change
   private handleVisibilityChange(): void {
     if (document.hidden) {
-      console.log('📴 Page hidden - saving session');
       this.saveSession();
     } else {
-      console.log('👁️ Page visible - checking session validity');
       this.loadSession();
 
       // Update last seen when page becomes visible
@@ -221,7 +210,6 @@ class SessionPersistence {
   // Handle storage changes from other tabs
   private handleStorageChange(event: StorageEvent): void {
     if (event.key === this.config.storageKey) {
-      console.log('🔄 Session updated in another tab');
       this.loadSession();
     }
   }
@@ -248,7 +236,6 @@ class SessionPersistence {
     // Set expiry timer
     if (timeUntilExpiry > 0) {
       this.expiryTimer = setTimeout(() => {
-        console.log('⏰ Session expired');
         this.clearSession();
         // You can trigger logout or redirect here
       }, timeUntilExpiry);
@@ -274,7 +261,6 @@ class SessionPersistence {
       return;
     }
 
-    console.log('⏰ Extending session');
     this.sessionData.loginTime = Date.now();
     this.saveSession();
     this.startSessionMonitoring();

@@ -31,7 +31,6 @@ export function initializeRecaptcha(containerId: string = 'recaptcha-container')
   recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
     size: 'invisible',
     callback: () => {
-      console.log('✅ reCAPTCHA verified');
     },
     'expired-callback': () => {
       console.warn('⚠️ reCAPTCHA expired');
@@ -55,7 +54,6 @@ export async function sendOTP(phoneNumber: string): Promise<void> {
     // Ensure phone number has country code
     const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+91${phoneNumber}`;
 
-    console.log('📱 Sending OTP to:', formattedPhone);
 
     // Initialize reCAPTCHA if not already done
     const appVerifier = recaptchaVerifier || initializeRecaptcha();
@@ -63,7 +61,6 @@ export async function sendOTP(phoneNumber: string): Promise<void> {
     // Send OTP
     confirmationResult = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
 
-    console.log('✅ OTP sent successfully');
   } catch (error: any) {
     console.error('❌ Error sending OTP:', error);
     
@@ -88,13 +85,10 @@ export async function verifyOTP(otpCode: string): Promise<boolean> {
   }
 
   try {
-    console.log('🔐 Verifying OTP:', otpCode);
 
     // Verify OTP
     const result = await confirmationResult.confirm(otpCode);
 
-    console.log('✅ OTP verified successfully');
-    console.log('👤 User:', result.user.phoneNumber);
 
     return true;
   } catch (error: any) {

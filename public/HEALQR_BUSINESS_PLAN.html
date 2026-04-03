@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HealQR - Corporate Business Plan 2026</title>
+    <meta name="description" content="HealQR Business Plan - World's First QR-based e-Assistant for Doctors. Corporate Presentation." />
+    <link rel="icon" type="image/png" href="/icon-192.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --primary-light: #a5b4fc;
+            --accent: #06b6d4;
+            --bg: #0f0d1a;
+            --bg2: #16132a;
+            --bg3: #1e1a35;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --text-dim: #64748b;
+            --border: rgba(255,255,255,0.08);
+            --success: #22c55e;
+            --gold: #f59e0b;
+            --red: #ef4444;
+        }
+
+        html, body { height: 100%; overflow: hidden; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        /* ===== PRESENTATION ENGINE ===== */
+        .deck { position: relative; width: 100%; height: 100vh; }
+
+        .slide {
+            position: absolute; inset: 0;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            padding: 60px 80px;
+            opacity: 0; visibility: hidden;
+            transition: opacity 0.5s ease, transform 0.5s ease;
+            transform: translateX(60px);
+            overflow-y: auto;
+        }
+        .slide.active {
+            opacity: 1; visibility: visible;
+            transform: translateX(0);
+        }
+        .slide.prev {
+            transform: translateX(-60px);
+        }
+
+        /* ===== NAV CONTROLS ===== */
+        .controls {
+            position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+            z-index: 100; display: flex; align-items: center; gap: 16px;
+            background: rgba(15,13,26,0.9); backdrop-filter: blur(12px);
+            border: 1px solid var(--border); border-radius: 16px;
+            padding: 10px 20px;
+        }
+        .controls button {
+            background: none; border: none; color: var(--text-muted);
+            font-size: 20px; cursor: pointer; padding: 6px 10px;
+            border-radius: 8px; transition: all .2s;
+        }
+        .controls button:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+        .slide-counter {
+            font-size: 13px; color: var(--text-dim); font-weight: 600;
+            min-width: 60px; text-align: center;
+        }
+        .progress-bar {
+            position: fixed; top: 0; left: 0; height: 3px; z-index: 100;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            transition: width 0.4s ease;
+        }
+
+        .top-bar {
+            position: fixed; top: 0; left: 0; right: 0;
+            padding: 16px 32px; z-index: 99;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .top-logo { height: 32px; opacity: 0.7; }
+        .top-tag {
+            font-size: 11px; color: var(--text-dim); font-weight: 600;
+            text-transform: uppercase; letter-spacing: 1.5px;
+        }
+
+        /* ===== SLIDE LAYOUTS ===== */
+        .slide-content { max-width: 1100px; width: 100%; }
+
+        /* Cover */
+        .cover { text-align: center; }
+        .cover-badge {
+            display: inline-block; background: rgba(99,102,241,0.15);
+            border: 1px solid rgba(99,102,241,0.3); color: var(--primary-light);
+            padding: 8px 24px; border-radius: 24px; font-size: 13px;
+            font-weight: 700; text-transform: uppercase; letter-spacing: 2px;
+            margin-bottom: 16px;
+        }
+        .cover h1 {
+            font-size: clamp(28px, 4vw, 48px); font-weight: 900;
+            line-height: 1.1; margin-bottom: 20px;
+        }
+        .cover h1 span { color: var(--primary-light); }
+        .cover p { font-size: 18px; color: var(--text-muted); max-width: 600px; margin: 0 auto 20px; line-height: 1.6; }
+        .cover-hero { max-height: 200px; margin-top: 12px; filter: drop-shadow(0 20px 40px rgba(0,0,0,0.4)); }
+        .cover-meta { font-size: 12px; color: var(--text-dim); margin-top: 16px; }
+
+        /* Generic Heading */
+        .sh { font-size: 14px; color: var(--primary-light); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; }
+        .st { font-size: clamp(28px, 3vw, 40px); font-weight: 800; margin-bottom: 32px; }
+
+        /* Grid cards */
+        .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+        .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+        .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+
+        .card {
+            background: var(--bg2); border: 1px solid var(--border);
+            border-radius: 16px; padding: 28px 24px;
+        }
+        .card-icon { font-size: 32px; margin-bottom: 14px; }
+        .card h4 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+        .card p { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+        .card-accent { border-left: 3px solid var(--primary); }
+        .card-success { border-left: 3px solid var(--success); }
+        .card-gold { border-left: 3px solid var(--gold); }
+
+        /* Stats row */
+        .stat-row { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; }
+        .stat-box { text-align: center; min-width: 160px; }
+        .stat-box .num {
+            font-size: 48px; font-weight: 900;
+            background: linear-gradient(135deg, var(--primary-light), var(--accent));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .stat-box .label { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+        .stat-box .sub { font-size: 11px; color: var(--text-dim); }
+
+        /* Table */
+        .stbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .stbl thead { background: var(--bg3); }
+        .stbl th { padding: 14px 16px; text-align: left; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); border-bottom: 1px solid var(--border); }
+        .stbl td { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+        .stbl tr:hover { background: rgba(255,255,255,0.02); }
+        .phase-label { font-weight: 700; color: var(--primary-light); }
+        .rev { font-weight: 700; color: var(--success); }
+        .cost { color: var(--red); }
+
+        /* Flow steps */
+        .flow-line { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+        .flow-item {
+            background: var(--bg2); border: 1px solid var(--border);
+            padding: 10px 16px; border-radius: 10px; font-size: 13px;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .flow-num {
+            background: var(--primary); color: #fff; width: 22px; height: 22px;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 11px; font-weight: 700; flex-shrink: 0;
+        }
+
+        /* Highlight box */
+        .highlight {
+            background: linear-gradient(135deg, rgba(34,197,94,0.1), rgba(6,182,212,0.1));
+            border: 1px solid rgba(34,197,94,0.2);
+            border-radius: 16px; padding: 32px; margin-top: 24px;
+        }
+        .highlight h3 { color: var(--success); font-size: 20px; margin-bottom: 16px; }
+
+        .highlight-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+        .highlight-item {
+            display: flex; justify-content: space-between; padding: 12px 16px;
+            background: rgba(0,0,0,0.2); border-radius: 10px;
+        }
+        .highlight-label { font-weight: 600; font-size: 14px; }
+        .highlight-value { font-weight: 800; color: var(--success); font-size: 14px; }
+
+        /* List */
+        .slist { list-style: none; }
+        .slist li {
+            padding: 12px 0; border-bottom: 1px solid var(--border);
+            font-size: 15px; display: flex; align-items: flex-start; gap: 12px;
+        }
+        .slist li:last-child { border-bottom: none; }
+        .slist .check { color: var(--success); font-weight: 700; flex-shrink: 0; }
+
+        /* Two-col layout */
+        .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; }
+        .two-col-img { max-width: 100%; border-radius: 16px; filter: drop-shadow(0 12px 30px rgba(0,0,0,0.3)); }
+
+        /* Badges */
+        .badge-free {
+            display: inline-block; background: rgba(34,197,94,0.15);
+            color: var(--success); font-size: 11px; font-weight: 700;
+            padding: 3px 10px; border-radius: 6px; text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .badge-emergency {
+            display: inline-block; background: rgba(239,68,68,0.15);
+            color: var(--red); font-size: 11px; font-weight: 700;
+            padding: 3px 10px; border-radius: 6px; text-transform: uppercase;
+        }
+
+        /* Language grid */
+        .lang-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+        .lang-item {
+            background: var(--bg2); border: 1px solid var(--border);
+            padding: 10px 8px; border-radius: 10px; text-align: center;
+            font-size: 12px;
+        }
+        .lang-item .native { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+        .lang-item .eng { font-size: 10px; color: var(--text-dim); }
+
+        /* Timeline */
+        .timeline { position: relative; padding-left: 40px; }
+        .timeline::before {
+            content: ''; position: absolute; left: 15px; top: 0; bottom: 0;
+            width: 2px; background: var(--border);
+        }
+        .tl-item { position: relative; margin-bottom: 28px; }
+        .tl-dot {
+            position: absolute; left: -33px; top: 4px;
+            width: 14px; height: 14px; border-radius: 50%;
+            background: var(--primary); border: 2px solid var(--bg);
+        }
+        .tl-item.done .tl-dot { background: var(--success); }
+        .tl-date { font-size: 12px; color: var(--primary-light); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+        .tl-title { font-size: 18px; font-weight: 700; margin: 4px 0; }
+        .tl-desc { font-size: 13px; color: var(--text-muted); }
+
+        /* Thank you */
+        .thankyou { text-align: center; }
+        .thankyou h2 { font-size: 52px; font-weight: 900; margin-bottom: 16px; }
+        .thankyou h2 span { color: var(--primary-light); }
+        .thankyou p { font-size: 18px; color: var(--text-muted); margin-bottom: 8px; }
+        .thankyou .email { color: var(--primary-light); font-weight: 600; text-decoration: none; font-size: 20px; }
+        .thankyou .conf { font-size: 12px; color: var(--text-dim); margin-top: 32px; text-transform: uppercase; letter-spacing: 2px; }
+
+        /* Fullscreen button */
+        .fs-btn {
+            position: fixed; top: 16px; right: 32px; z-index: 100;
+            background: rgba(255,255,255,0.06); border: 1px solid var(--border);
+            color: var(--text-muted); padding: 8px 12px; border-radius: 8px;
+            cursor: pointer; font-size: 16px; transition: all .2s;
+        }
+        .fs-btn:hover { background: rgba(255,255,255,0.12); color: var(--text); }
+
+        @media (max-width: 768px) {
+            .slide { padding: 60px 24px; }
+            .grid2, .grid3, .grid4 { grid-template-columns: 1fr; }
+            .two-col { grid-template-columns: 1fr; }
+            .highlight-grid { grid-template-columns: 1fr; }
+            .lang-grid { grid-template-columns: repeat(3, 1fr); }
+            .stat-row { flex-direction: column; align-items: center; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="progress-bar" id="progressBar"></div>
+
+<div class="top-bar">
+    <img src="/healqr-logo.png" alt="HealQR" class="top-logo" />
+    <span class="top-tag">Business Plan 2026</span>
+</div>
+
+<button class="fs-btn" onclick="toggleFS()" title="Fullscreen (F)">&#x26F6;</button>
+
+<div class="deck" id="deck">
+
+<!-- ==================== SLIDE 1: COVER ==================== -->
+<div class="slide active" data-slide="1">
+    <div class="slide-content cover">
+        <div class="cover-badge">Corporate Presentation &bull; March 2026</div>
+        <h1>World's First<br /><span>QR-based e-Assistant</span><br />for Doctors</h1>
+        <p>Instant bookings, patient management, analytics, 31-language support, and complete data ownership &mdash; through a single QR code.</p>
+        <img src="/healqr-hero.png" alt="Healthcare Team" class="cover-hero" />
+        <div class="cover-meta">CONFIDENTIAL &bull; teamhealqr.web.app &bull; support@healqr.com</div>
+    </div>
+</div>
+
+<!-- ==================== SLIDE 2: THE PROBLEM ==================== -->
+<div class="slide" data-slide="2">
+    <div class="slide-content">
+        <div class="sh">The Problem</div>
+        <h2 class="st">Healthcare Booking in India is Broken</h2>
+        <div class="grid2">
+            <div class="card card-accent">
+                <div class="card-icon">📞</div>
+                <h4>Phone-based Booking</h4>
+                <p>80% of clinics still rely on phone calls. Lines are busy, patients give up, doctors lose revenue.</p>
+            </div>
+            <div class="card card-accent">
+                <div class="card-icon">📱</div>
+                <h4>App Fatigue</h4>
+                <p>Patients don't want to download another app. Existing platforms charge doctors 20-30% per booking.</p>
+            </div>
+            <div class="card card-accent">
+                <div class="card-icon">🌐</div>
+                <h4>Language Barrier</h4>
+                <p>India has 22 official languages. Most healthcare platforms are English-only, excluding 90% of the population.</p>
+            </div>
+            <div class="card card-accent">
+                <div class="card-icon">📋</div>
+                <h4>No Data Ownership</h4>
+                <p>Doctors' patient data is locked in third-party platforms. Zero control, zero portability.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== SLIDE 3: THE SOLUTION ==================== -->
+<div class="slide" data-slide="3">
+    <div class="slide-content">
+        <div class="two-col">
+            <div>
+                <div class="sh">Our Solution</div>
+                <h2 class="st">One QR Code.<br />Unlimited Possibilities.</h2>
+                <ul class="slist">
+                    <li><span class="check">&#10003;</span> Patient scans QR &rarr; books in seconds, no app needed</li>
+                    <li><span class="check">&#10003;</span> Works in 31 languages with AI-powered real-time translation</li>
+                    <li><span class="check">&#10003;</span> Doctor gets a free mini-website, dashboard &amp; analytics</li>
+                    <li><span class="check">&#10003;</span> 100% data ownership &mdash; doctor owns all patient data</li>
+                    <li><span class="check">&#10003;</span> Multi-location, multi-doctor clinic management</li>
+                    <li><span class="check">&#10003;</span> 100% FREE for doctors, clinics &amp; patients</li>
+                </ul>
+            </div>
+            <div style="text-align:center;">
+                <img src="/healqr-hero.png" alt="HealQR Solution" class="two-col-img" style="max-height: 400px;" />
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== SLIDE 4: HOW IT WORKS ==================== -->
+<div class="slide" data-slide="4">
+    <div class="slide-content">
+        <div class="sh">How It Works</div>
+        <h2 class="st">Patient Journey &mdash; Complete Flow</h2>
+
+        <div class="sh" style="color: var(--primary-light); margin-bottom: 8px;">Solo Doctor Flow</div>
+        <div class="flow-line">
+            <div class="flow-item"><div class="flow-num">1</div> QR Scan</div>
+            <div class="flow-item"><div class="flow-num">2</div> Select Language</div>
+            <div class="flow-item"><div class="flow-num">3</div> Doctor Mini-Website</div>
+            <div class="flow-item"><div class="flow-num">4</div> Select Date</div>
+            <div class="flow-item"><div class="flow-num">5</div> Select Chamber</div>
+            <div class="flow-item"><div class="flow-num">6</div> Booking Form</div>
+            <div class="flow-item" style="border-color: rgba(34,197,94,0.4);"><div class="flow-num" style="background: var(--success);">&#10003;</div> Confirmation</div>
+        </div>
+
+        <div class="sh" style="color: var(--accent); margin-bottom: 8px; margin-top: 20px;">Clinic Flow</div>
+        <div class="flow-line">
+            <div class="flow-item"><div class="flow-num">1</div> QR Scan</div>
+            <div class="flow-item"><div class="flow-num">2</div> Select Language</div>
+            <div class="flow-item"><div class="flow-num">3</div> Clinic Mini-Website</div>
+            <div class="flow-item"><div class="flow-num">4</div> Select Location</div>
+            <div class="flow-item"><div class="flow-num">5</div> Select Doctor</div>
+            <div class="flow-item"><div class="flow-num">6</div> Select Date</div>
+            <div class="flow-item"><div class="flow-num">7</div> Select Chamber</div>
+            <div class="flow-item"><div class="flow-num">8</div> Booking Form</div>
+            <div class="flow-item" style="border-color: rgba(34,197,94,0.4);"><div class="flow-num" style="background: var(--success);">&#10003;</div> Confirmation</div>
+        </div>
+
+        <div class="sh" style="color: var(--gold); margin-bottom: 8px; margin-top: 20px;">Post-Booking Touchpoints</div>
+        <div class="flow-line">
+            <div class="flow-item" style="border-color: rgba(245,158,11,0.3);"><div class="flow-num" style="background: var(--gold);">&#9733;</div> Reminder Notification</div>
+            <div class="flow-item" style="border-color: rgba(245,158,11,0.3);"><div class="flow-num" style="background: var(--gold);">&#9733;</div> Consultation Completed</div>
+            <div class="flow-item" style="border-color: rgba(245,158,11,0.3);"><div class="flow-num" style="background: var(--gold);">&#9733;</div> Digital RX + AI Rx Reader + AI Diet Chart</div>
+            <div class="flow-item" style="border-color: rgba(245,158,11,0.3);"><div class="flow-num" style="background: var(--gold);">&#9733;</div> Review Request</div>
+            <div class="flow-item" style="border-color: rgba(245,158,11,0.3);"><div class="flow-num" style="background: var(--gold);">&#9733;</div> Followup Schedule Request</div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== SLIDE 5: FOR PATIENTS ==================== -->
+<div class="slide" data-slide="5">
+    <div class="slide-content">
+        <div class="sh">For Patients</div>
+        <h2 class="st">Book Any Doctor in Seconds</h2>
+        <div class="grid3">
+            <div class="card card-success">
+                <div class="card-icon">📱</div>
+                <h4>Scan &amp; Book</h4>
+                <p>Scan QR code, choose date, time, doctor, confirm. No app download, no login required.</p>
+            </div>
+            <div class="card card-success">
+                <div class="card-icon">🗣️</div>
+                <h4>Your Language</h4>
+                <p>Entire booking flow in your preferred language. 31 languages including all major Indian languages.</p>
+            </div>
+            <div class="card card-success">
+                <div class="card-icon">💊</div>
+                <h4>AI Rx Reader</h4>
+                <p>Upload your prescription &mdash; AI explains medicines, dosage, and timings in simple terms.</p>
+            </div>
+            <div class="card card-success">
+                <div class="card-icon">🥗</div>
+                <h4>AI Diet Charts</h4>
+                <p>Personalized AI-generated diet plans based on your condition and doctor's recommendations.</p>
+            </div>
+            <div class="card card-success">
+                <div class="card-icon">📄</div>
+                <h4>Digital Prescription</h4>
+                <p>Access your digital prescription anytime. Bilingual format &mdash; English + your language.</p>
+            </div>
+            <div class="card card-success">
+                <div class="card-icon">🔔</div>
+                <h4>Smart Notifications</h4>
+                <p>Booking confirmations, appointment reminders, and updates via push notifications.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== SLIDE 6: FOR DOCTORS ==================== -->
+<div class="slide" data-slide="6">
+    <div class="slide-content">
+        <div class="sh">For Doctors</div>
+        <h2 class="st">Your Complete Practice Platform</h2>
+        <div class="grid3">
+            <div class="card card-accent">
+                <div class="card-icon">🌐</div>
+                <h4>Free Mini-Website</h4>
+                <p>Personal shareable website with QR code, profile, specializations, and booking integration.</p>
+            </div>
+            <div class="card card-accent">
+                <div class="card-icon">📊</div>
+                <h4>Advanced Analytics</h4>
+                <p>Booking trends, patient demographics, revenue tracking, and cancellation analysis.</p>
+            </div>
+            <div class="card card-accent">
+                <div class="card-icon">📋</div>
+                <h4>Digital Prescriptions</h4>
+                <p>Write and send bilingual digital prescriptions. Full medical decisions remain exclusively with the doctor.</p>
+            </div>
+            <div class="card card-accent">
+                <div class="card-icon">👥</div>
+                <h4>Assistant Access</h4>
+                <p>Empower staff with dashboard access &amp; role-based permissions. Full medical control remains with the doctor only.</p>
+            </div>
+            <div class="card card-accent">
+                <div class="card-icon">🏥</div>
+                <h4>Multi-Location</h4>
+                <p>Manage multiple chambers and clinics from a single dashboard.</p>
+            </div>
+            <div class="card card-accent">
+                <div class="card-icon">🔒</div>
+                <h4>Data Ownership</h4>
+                <p>All patient data belongs to you. Export anytime. Complete control.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== SLIDE 7: FOR CLINICS ==================== -->
+<div class="slide" data-slide="7">
+    <div class="slide-content">
+        <div class="sh">For Clinics</div>
+        <h2 class="st">One QR, Multiple Doctors</h2>
+        <div class="two-col">
+            <div>
+                <ul class="slist">
+                    <li><span class="check">&#10003;</span> <strong>Unified Dashboard</strong> &mdash; Manage all doctors, schedules, and bookings from one place</li>
+                    <li><span class="check">&#10003;</span> <strong>Multi-Specialty Support</strong> &mdash; Handle different specialties under one clinic QR</li>
+                    <li><span class="check">&#10003;</span> <strong>Doctor Management</strong> &mdash; Add, remove, and configure doctor profiles</li>
+                    <li><span class="check">&#10003;</span> <strong>Clinic Analytics</strong> &mdash; Cross-doctor performance metrics and booking analysis</li>
+                    <li><span class="check">&#10003;</span> <strong>Schedule Management</strong> &mdash; Today's schedule view with real-time slot tracking</li>
+                    <li><span class="check">&#10003;</span> <strong>Token System</strong> &mdash; Live queue management for walk-in patients</li>
+                </ul>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:16px;">
+                <div class="card" style="background: rgba(99,102,241,0.08); border-color: rgba(99,102,241,0.2);">
+                    <div style="font-size: 32px; font-weight: 900; color: var(--primary-light);">8</div>
+                    <div style="font-size: 14px; color: var(--text-muted);">Active Multispeciality Clinics</div>
+                </div>
+                <div class="card" style="background: rgba(34,197,94,0.08); border-color: rgba(34,197,94,0.2);">
+                    <div style="font-size: 32px; font-weight: 900; color: var(--success);">100%</div>
+                    <div style="font-size: 14px; color: var(--text-muted);">FREE for all clinic features</div>
+                </div>
+                <div class="card" style="background: rgba(6,182,212,0.08); border-color: rgba(6,182,212,0.2);">
+                    <div style="font-size: 32px; font-weight: 900; color: var(--accent);">&#8734;</div>
+                    <div style="font-size: 14px; color: var(--text-muted);">Unlimited doctors per clinic</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== SLIDE 8: PLATFORM FEATURES ==================== -->
+<div class="slide" data-slide="8">
+    <div class="slide-content">
+        <div class="sh">Core Platform</div>
+        <h2 class="st">Feature Overview</h2>
+        <div class="grid4">
+            <div class="card"><div class="card-icon">📱</div><h4>QR Booking</h4><p>Instant bookings via QR scan</p></div>
+            <div class="card"><div class="card-icon">🌐</div><h4>No App Needed</h4><p>Pure web-based experience</p></div>
+            <div class="card"><div class="card-icon">🗣️</div><h4>31 Languages</h4><p>AI real-time translation</p></div>
+            <div class="card"><div class="card-icon">🔗</div><h4>Mini-Website</h4><p>Shareable doctor profile</p></div>
+            <div class="card"><div class="card-icon">🔒</div><h4>Data Vault</h4><p>Secure patient storage</p></div>
+            <div class="card"><div class="card-icon">📊</div><h4>Analytics</h4><p>Booking &amp; patient insights</p></div>
+            <div class="card"><div class="card-icon">🔔</div><h4>Push Notifications</h4><p>FCM with delivery tracking</p></div>
+            <div class="card"><div class="card-icon">🛡️</div><h4>Data Ownership</h4><p>Doctor controls all data</p></div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== SLIDE 9: AI FEATURES ==================== -->
+<div class="slide" data-slide="9">
+    <div class="slide-content">
+        <div class="sh">AI-Powered Features</div>
+        <h2 class="st">Built on Google Gemini 2.5 Flash</h2>
+        <div class="grid3">
+            <div class="card card-gold">
+                <div class="card-icon">💊</div>
+                <h4>AI Rx Reader</h4>
+                <p>Upload prescription photo &rarr; AI extracts medicine names, dosages, timings. Explains in patient's language.</p>
+                <div style="margin-top: 12px;"><span class="badge-free">100% FREE</span></div>
+            </div>
+            <div class="card card-gold">
+                <div class="card-icon">🥗</div>
+                <h4>AI Diet Chart</h4>
+                <p>Personalized diet plans generated by AI based on patient's condition, preferences, and doctor's notes.</p>
+                <div style="margin-top: 12px;"><span class="badge-free">100% FREE</span></div>
+            </div>
+            <div class="card card-gold">
+                <div class="card-icon">�</div>
+                <h4>Digital RX</h4>
+                <p>Bilingual digital prescriptions with smart formatting. Doctors retain 100% medical decision-making authority.</p>
+                <div style="margin-top: 12px;"><span class="badge-free">100% FREE</span></div>
+            </div>
+        </div>
+        <div class="card" style="margin-top: 24px; text-align: center; border-color: rgba(245,158,11,0.2); background: rgba(245,158,11,0.05);">
+            <p style="font-size: 15px;">All AI features use <strong>Gemini 2.5 Flash</strong> for high accuracy. Translation uses batched processing for cost efficiency. AI assists with information only &mdash; all medical decisions remain with the doctor.</p>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== SLIDE 10: LANGUAGE SUPPORT ==================== -->
+<div class="slide" data-slide="10">
+    <div class="slide-content">
+        <div class="sh">Multilingual Platform</div>
+        <h2 class="st">31 Languages &bull; Real-time AI Translation</h2>
+        <div class="lang-grid">
+            <div class="lang-item"><div class="native">हिन्दी</div><div class="eng">Hindi</div></div>
+            <div class="lang-item"><div class="native">বাংলা</div><div class="eng">Bengali</div></div>
+            <div class="lang-item"><div class="native">తెలుగు</div><div class="eng">Telugu</div></div>
+            <div class="lang-item"><div class="native">मराठी</div><div class="eng">Marathi</div></div>
+            <div class="lang-item"><div class="native">தமிழ்</div><div class="eng">Tamil</div></div>
+            <div class="lang-item"><div class="native">اردو</div><div class="eng">Urdu</div></div>
+            <div class="lang-item"><div class="native">ગુજરાતી</div><div class="eng">Gujarati</div></div>
+            <div class="lang-item"><div class="native">ಕನ್ನಡ</div><div class="eng">Kannada</div></div>
+            <div class="lang-item"><div class="native">മലയാളം</div><div class="eng">Malayalam</div></div>
+            <div class="lang-item"><div class="native">ਪੰਜਾਬੀ</div><div class="eng">Punjabi</div></div>
+            <div class="lang-item"><div class="native">ଓଡ଼ିଆ</div><div class="eng">Odia</div></div>
+            <div class="lang-item"><div class="native">অসমীয়া</div><div class="eng">Assamese</div></div>
+            <div class="lang-item"><div class="native">سنڌي</div><div class="eng">Sindhi</div></div>
+            <div class="lang-item"><div class="native">नेपाली</div><div class="eng">Nepali</div></div>
+            <div class="lang-item"><div class="native">संस्कृतम्</div><div class="eng">Sanskrit</div></div>
+            <div class="lang-item"><div class="native">कॉंकणी</div><div class="eng">Konkani</div></div>
+            <div class="lang-item"><div class="native">মণিপুরী</div><div class="eng">Manipuri</div></div>
+            <div class="lang-item"><div class="native">डोगरी</div><div class="eng">Dogri</div></div>
+            <div class="lang-item"><div class="native">کٲشُر</div><div class="eng">Kashmiri</div></div>
+            <div class="lang-item"><div class="native">Bodo</div><div class="eng">Bodo</div></div>
+            <div class="lang-item"><div class="native">Santali</div><div class="eng">Santali</div></div>
+            <div class="lang-item"><div class="native">Maithili</div><div class="eng">Maithili</div></div>
+            <div class="lang-item"><div class="native">日本語</div><div class="eng">Japanese</div></div>
+            <div class="lang-item"><div class="native">한국어</div><div class="eng">Korean</div></div>
+            <div class="lang-item"><div class="native">中文</div><div class="eng">Chinese</div></div>
+            <div class="lang-item"><div class="native">العربية</div><div class="eng">Arabic</div></div>
+            <div class="lang-item"><div class="native">Français</div><div class="eng">French</div></div>
+            <div class="lang-item"><div class="native">Español</div><div class="eng">Spanish</div></div>
+            <div class="lang-item"><div class="native">Deutsch</div><div class="eng">German</div></div>
+            <div class="lang-item"><div class="native">Português</div><div class="eng">Portuguese</div></div>
+        </div>
+        <div style="text-align: center; margin-top: 20px; font-size: 13px; color: var(--text-dim);">+ English (default) &bull; RTL support for Arabic, Urdu, Sindhi, Kashmiri &bull; Two-tier caching (Memory + IndexedDB)</div>
+    </div>
+</div>
+
+<!-- ==================== SLIDE 11: TECHNOLOGY STACK ==================== -->
+<div class="slide" data-slide="11">
+    <div class="slide-content">
+        <div class="sh">Technology</div>
+        <h2 class="st">Enterprise-grade Cloud Architecture</h2>
+        <div class="grid3">
+            <div class="card card-accent">
+                <h4>Frontend</h4>
+                <ul class="slist" style="margin-top: 12px;">
+                    <li><span class="check">&#10003;</span> React 18 + TypeScript</li>
+                    <li><span class="check">&#10003;</span> Vite 5 (fast builds)</li>
+                    <li><span class="check">&#10003;</span> Progressive Web App</li>
+                    <li><span class="check">&#10003;</span> Responsive design</li>
+                </ul>
+            </div>
+            <div class="card card-accent">
+                <h4>Backend / Cloud</h4>
+                <ul class="slist" style="margin-top: 12px;">
+                    <li><span class="check">&#10003;</span> Firebase (Google Cloud)</li>
+                    <li><span class="check">&#10003;</span> Firestore (NoSQL)</li>
+                    <li><span class="check">&#10003;</span> Cloud Functions</li>
+                    <li><span class="check">&#10003;</span> Firebase Auth</li>
+                </ul>
+            </div>
+            <div class="card card-accent">
+                <h4>AI &amp; Services</h4>
+                <ul class="slist" style="margin-top: 12px;">
+                    <li><span class="check">&#10003;</span> Gemini 2.5 Flash</li>
+                    <li><span class="check">&#10003;</span> Cloud Messaging (FCM)</li>
+                    <li><span class="check">&#10003;</span> Google Geocoding API</li>
+                    <li><span class="check">&#10003;</span> Cloud Storage</li>
+                </ul>
+            </div>
+        </div>
+        <div class="card" style="margin-top: 24px; text-align: center;">
+            <p style="font-size: 14px; color: var(--text-muted);">Hosted on <strong>Google Cloud (India Region)</strong> &bull; Auto-scaling &bull; 99.9% uptime SLA &bull; SOC 2 compliant infrastructure</p>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== SLIDE 12: MARKET OPPORTUNITY ==================== -->
+<div class="slide" data-slide="12">
+    <div class="slide-content">
+        <div class="sh">Market Opportunity</div>
+        <h2 class="st">India Healthcare &mdash; Massive Untapped Market</h2>
+        <div class="stat-row" style="margin-bottom: 40px;">
+            <div class="stat-box">
+                <div class="num">13L+</div>
+                <div class="label">Registered Doctors</div>
+                <div class="sub">in India (NMC 2025)</div>
+            </div>
+            <div class="stat-box">
+                <div class="num">80%</div>
+                <div class="label">Still Phone-based</div>
+                <div class="sub">No digital booking</div>
+            </div>
+            <div class="stat-box">
+                <div class="num">$50B</div>
+                <div class="label">Health-tech Market</div>
+                <div class="sub">by 2028 (projected)</div>
+            </div>
+            <div class="stat-box">
+                <div class="num">90%</div>
+                <div class="label">Non-English Speakers</div>
+                <div class="sub">Underserved by platforms</div>
+            </div>
+        </div>
+        <div class="card" style="text-align: center; border-color: rgba(99,102,241,0.3); background: rgba(99,102,241,0.05);">
+            <p style="font-size: 16px;"><strong>HealQR's Edge:</strong> Zero cost for doctors + 31-language support + QR simplicity = fastest adoption path in India's healthcare market</p>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== SLIDE 13: REVENUE MODEL ==================== -->
+<div class="slide" data-slide="13">
+    <div class="slide-content">
+        <div class="sh">Revenue Model</div>
+        <h2 class="st">Dynamic Ad Impression Scaling</h2>
+        <div class="grid2">
+            <div>
+                <div class="card card-success" style="margin-bottom: 16px;">
+                    <h4>Primary &amp; Only Revenue</h4>
+                    <p style="margin-top: 8px;">Non-medical 3rd party advertising only. Each booking creates <strong>8 ad touchpoints</strong>. Revenue scales from <strong>&#8377;1.00</strong> to <strong>&#8377;4.00</strong>/booking as network grows.</p>
+                </div>
+                <div class="card" style="margin-bottom: 16px;">
+                    <h4>Zero Hidden Charges</h4>
+                    <p style="margin-top: 8px;">No premium tiers, no commission, no subscription. Every feature including AI Rx Reader, Diet Charts &amp; Video is 100% FREE forever for everyone.</p>
+                </div>
+                <div class="card card-gold">
+                    <h4>Zero-Barrier Entry</h4>
+                    <p style="margin-top: 8px;">100% of core features are FREE forever. No subscription, no commission per booking. Hyper-adoption first, monetize via ads.</p>
+                </div>
+            </div>
+            <div>
+                <div class="sh" style="text-align: left;">Revenue Per Booking</div>
+                <table class="stbl" style="margin-top: 12px;">
+                    <thead>
+                        <tr><th>Phase</th><th>Rate/Booking</th><th>CPM Range</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td class="phase-label">Phase 1</td><td class="rev">&#8377;1.00</td><td>&#8377;0.12-0.15</td></tr>
+                        <tr><td class="phase-label">Phase 2</td><td class="rev">&#8377;1.50</td><td>&#8377;0.20-0.25</td></tr>
+                        <tr><td class="phase-label">Phase 3</td><td class="rev">&#8377;2.50</td><td>&#8377;0.30-0.40</td></tr>
+                        <tr><td class="phase-label">Phase 4</td><td class="rev">&#8377;4.00</td><td>&#8377;0.50-0.60</td></tr>
+                    </tbody>
+                </table>
+                <div style="margin-top: 12px; font-size: 12px; color: var(--text-dim);">
+                    Benchmark: WhatsApp charges &#8377;0.78 per simple notification
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== SLIDE 14: GROWTH ROADMAP ==================== -->
+<div class="slide" data-slide="14">
+    <div class="slide-content">
+        <div class="sh">Growth Roadmap</div>
+        <h2 class="st">0 &rarr; 100,000 Doctors in 12 Months</h2>
+        <div class="two-col">
+            <div class="timeline">
+                <div class="tl-item done">
+                    <div class="tl-dot"></div>
+                    <div class="tl-date">Phase 1 &bull; By June 2026</div>
+                    <div class="tl-title">10,000 Doctors</div>
+                    <div class="tl-desc">Foundation: Unified QR Manager, Clinic Dashboard, Geo-coding, Translation Service, Gemini AI</div>
+                </div>
+                <div class="tl-item">
+                    <div class="tl-dot"></div>
+                    <div class="tl-date">Phase 2 &bull; By Sep 2026</div>
+                    <div class="tl-title">30,000 Doctors</div>
+                    <div class="tl-desc">Growth: CDN Sync, Redis Caching, Ad Engine V1, Auto-Language Fallbacks</div>
+                </div>
+                <div class="tl-item">
+                    <div class="tl-dot"></div>
+                    <div class="tl-date">Phase 3 &bull; By Dec 2026</div>
+                    <div class="tl-title">60,000 Doctors</div>
+                    <div class="tl-desc">Efficiency: Regional DB Shards, AI Batching, Advanced Ad Targeting</div>
+                </div>
+                <div class="tl-item">
+                    <div class="tl-dot"></div>
+                    <div class="tl-date">Phase 4 &bull; By Mar 2027</div>
+                    <div class="tl-title">100,000 Doctors</div>
+                    <div class="tl-desc">Mastery: Predictive AI, Real-time Ad Auctioning, Microservices, Dedicated SRE</div>
+                </div>
+            </div>
+            <div>
+                <div class="card" style="margin-bottom: 16px; border-color: rgba(34,197,94,0.2); background: rgba(34,197,94,0.05);">
+                    <div style="font-size: 32px; font-weight: 900; color: var(--success);">25L &rarr; 2.5Cr</div>
+                    <div style="font-size: 14px; color: var(--text-muted);">Monthly bookings growth</div>
+                </div>
+                <div class="card" style="margin-bottom: 16px; border-color: rgba(99,102,241,0.2); background: rgba(99,102,241,0.05);">
+                    <div style="font-size: 32px; font-weight: 900; color: var(--primary-light);">4x</div>
+                    <div style="font-size: 14px; color: var(--text-muted);">Revenue per booking scaling</div>
+                </div>
+                <div class="card" style="border-color: rgba(245,158,11,0.2); background: rgba(245,158,11,0.05);">
+                    <div style="font-size: 32px; font-weight: 900; color: var(--gold);">~95%</div>
+                    <div style="font-size: 14px; color: var(--text-muted);">Net profit margin at scale</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== SLIDE 15: FINANCIAL PROJECTIONS ==================== -->
+<div class="slide" data-slide="15">
+    <div class="slide-content">
+        <div class="sh">Financial Projections</div>
+        <h2 class="st">Phase-wise Revenue &amp; Cost Breakdown</h2>
+        <table class="stbl">
+            <thead>
+                <tr>
+                    <th>Phase</th>
+                    <th>Doctors</th>
+                    <th>Bookings/mo</th>
+                    <th>Monthly Revenue</th>
+                    <th>Operating Cost</th>
+                    <th>Net Margin</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="phase-label">Phase 1 (Jun '26)</td>
+                    <td>10,000</td>
+                    <td>25 Lakh</td>
+                    <td class="rev">&#8377;25 Lakh</td>
+                    <td class="cost">&#8377;6-8 Lakh</td>
+                    <td>~72%</td>
+                </tr>
+                <tr>
+                    <td class="phase-label">Phase 2 (Sep '26)</td>
+                    <td>30,000</td>
+                    <td>75 Lakh</td>
+                    <td class="rev">&#8377;1.12 Crore</td>
+                    <td class="cost">&#8377;14-17 Lakh</td>
+                    <td>~86%</td>
+                </tr>
+                <tr>
+                    <td class="phase-label">Phase 3 (Dec '26)</td>
+                    <td>60,000</td>
+                    <td>1.5 Crore</td>
+                    <td class="rev">&#8377;3.75 Crore</td>
+                    <td class="cost">&#8377;27-32 Lakh</td>
+                    <td>~92%</td>
+                </tr>
+                <tr>
+                    <td class="phase-label">Phase 4 (Mar '27)</td>
+                    <td>1,00,000</td>
+                    <td>2.5 Crore</td>
+                    <td class="rev">&#8377;10 Crore</td>
+                    <td class="cost">&#8377;47-57 Lakh</td>
+                    <td>~95%</td>
+                </tr>
+            </tbody>
+        </table>
+        <div class="highlight">
+            <h3>Peak Projection &mdash; Phase 4 (March 2027)</h3>
+            <div class="highlight-grid">
+                <div class="highlight-item"><span class="highlight-label">Doctor Network</span><span class="highlight-value">1,00,000</span></div>
+                <div class="highlight-item"><span class="highlight-label">Monthly Bookings</span><span class="highlight-value">2.5 Crore</span></div>
+                <div class="highlight-item"><span class="highlight-label">Monthly Revenue</span><span class="highlight-value">&#8377;10 Crore</span></div>
+                <div class="highlight-item"><span class="highlight-label">Annual Revenue</span><span class="highlight-value">&#8377;80-100 Crore</span></div>
+                <div class="highlight-item"><span class="highlight-label">Monthly Profit</span><span class="highlight-value">&#8377;9.45 Crore</span></div>
+                <div class="highlight-item"><span class="highlight-label">Profit Margin</span><span class="highlight-value">~95%</span></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== SLIDE 16: CURRENT TRACTION ==================== -->
+<div class="slide" data-slide="16">
+    <div class="slide-content">
+        <div class="sh">Current Traction</div>
+        <h2 class="st">Live &amp; Growing</h2>
+        <div class="stat-row" style="margin-bottom: 40px;">
+            <div class="stat-box">
+                <div class="num">40+</div>
+                <div class="label">Active Doctors</div>
+                <div class="sub">15+ specialties</div>
+            </div>
+            <div class="stat-box">
+                <div class="num">8</div>
+                <div class="label">Clinics Onboarded</div>
+                <div class="sub">Multispeciality</div>
+            </div>
+            <div class="stat-box">
+                <div class="num">123</div>
+                <div class="label">Bookings This Month</div>
+                <div class="sub">Real-time data</div>
+            </div>
+            <div class="stat-box">
+                <div class="num">4.5/5</div>
+                <div class="label">Platform Rating</div>
+                <div class="sub">Live user reviews</div>
+            </div>
+        </div>
+        <div class="grid3">
+            <div class="card card-success">
+                <h4>Product</h4>
+                <ul class="slist" style="margin-top: 8px;">
+                    <li><span class="check">&#10003;</span> Full PWA live</li>
+                    <li><span class="check">&#10003;</span> 31 languages active</li>
+                    <li><span class="check">&#10003;</span> AI features deployed</li>
+                </ul>
+            </div>
+            <div class="card card-success">
+                <h4>Platform</h4>
+                <ul class="slist" style="margin-top: 8px;">
+                    <li><span class="check">&#10003;</span> Clinic dashboard live</li>
+                    <li><span class="check">&#10003;</span> Push notifications active</li>
+                    <li><span class="check">&#10003;</span> Analytics running</li>
+                </ul>
+            </div>
+            <div class="card card-success">
+                <h4>Operations</h4>
+                <ul class="slist" style="margin-top: 8px;">
+                    <li><span class="check">&#10003;</span> healqr.com live</li>
+                    <li><span class="check">&#10003;</span> Admin panel active</li>
+                    <li><span class="check">&#10003;</span> Advertiser gateway ready</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== SLIDE 17: PREMIUM ADD-ONS ==================== -->
+<div class="slide" data-slide="17">
+    <div class="slide-content">
+        <div class="sh">Value Proposition</div>
+        <h2 class="st">Everything Free &mdash; Forever</h2>
+        <div class="grid3">
+            <div class="card">
+                <span class="badge-free">100% Free</span>
+                <h4 style="margin-top: 12px;">QR Booking System</h4>
+                <p>Complete booking flow, patient management, scheduling</p>
+            </div>
+            <div class="card">
+                <span class="badge-free">100% Free</span>
+                <h4 style="margin-top: 12px;">Doctor Mini-Website</h4>
+                <p>Shareable profile with booking integration</p>
+            </div>
+            <div class="card">
+                <span class="badge-free">100% Free</span>
+                <h4 style="margin-top: 12px;">Analytics Dashboard</h4>
+                <p>Booking trends, patient insights, revenue tracking</p>
+            </div>
+            <div class="card">
+                <span class="badge-free">100% Free</span>
+                <h4 style="margin-top: 12px;">Assistant Access</h4>
+                <p>Multi-staff role-based permissions</p>
+            </div>
+            <div class="card">
+                <span class="badge-free">100% Free</span>
+                <h4 style="margin-top: 12px;">Clinic Management</h4>
+                <p>Multi-doctor, multi-location unified platform</p>
+            </div>
+            <div class="card">
+                <span class="badge-emergency">Emergency</span>
+                <h4 style="margin-top: 12px;">Emergency Button</h4>
+                <p>Instant phone display for patient emergencies</p>
+            </div>
+            <div class="card">
+                <span class="badge-free">100% Free</span>
+                <h4 style="margin-top: 12px;">Digital Prescriptions</h4>
+                <p>Bilingual Digital Rx with smart formatting</p>
+            </div>
+            <div class="card">
+                <span class="badge-free">100% Free</span>
+                <h4 style="margin-top: 12px;">Lab Referral Diary</h4>
+                <p>Professional referral &amp; commission tracking</p>
+            </div>
+            <div class="card">
+                <span class="badge-free">100% Free</span>
+                <h4 style="margin-top: 12px;">Push Notifications</h4>
+                <p>Rich media FCM with delivery analytics</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== SLIDE 18: COMPETITIVE ADVANTAGE ==================== -->
+<div class="slide" data-slide="18">
+    <div class="slide-content">
+        <div class="sh">Competition</div>
+        <h2 class="st">Why HealQR Wins</h2>
+        <table class="stbl">
+            <thead>
+                <tr>
+                    <th>Feature</th>
+                    <th>HealQR</th>
+                    <th>Practo</th>
+                    <th>Others</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>Cost to Doctor</td><td class="rev">FREE Forever</td><td class="cost">&#8377;5,000-25,000/yr</td><td class="cost">Varies</td></tr>
+                <tr><td>App Download Required</td><td class="rev">No &#10003;</td><td>Yes</td><td>Yes</td></tr>
+                <tr><td>QR-based Booking</td><td class="rev">Yes &#10003;</td><td>No</td><td>No</td></tr>
+                <tr><td>Language Support</td><td class="rev">31 Languages</td><td>English + Hindi</td><td>1-3</td></tr>
+                <tr><td>Doctor Data Ownership</td><td class="rev">100% &#10003;</td><td class="cost">No</td><td class="cost">No</td></tr>
+                <tr><td>AI Rx Reader</td><td class="rev">Yes &#10003;</td><td>No</td><td>No</td></tr>
+                <tr><td>AI Diet Charts</td><td class="rev">Yes &#10003;</td><td>No</td><td>No</td></tr>
+                <tr><td>Digital RX</td><td class="rev">Yes &#10003;</td><td>No</td><td>No</td></tr>
+                <tr><td>Clinic Chain Management</td><td class="rev">Yes &#10003;</td><td>Limited</td><td>Limited</td></tr>
+                <tr><td>Commission per Booking</td><td class="rev">0% &#10003;</td><td class="cost">20-30%</td><td class="cost">10-25%</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ==================== SLIDE 19: INFRASTRUCTURE COSTS ==================== -->
+<div class="slide" data-slide="19">
+    <div class="slide-content">
+        <div class="sh">Cost Structure</div>
+        <h2 class="st">Infrastructure &amp; Operational Costs</h2>
+        <table class="stbl">
+            <thead>
+                <tr>
+                    <th>Cost Category</th>
+                    <th>Phase 1</th>
+                    <th>Phase 2</th>
+                    <th>Phase 3</th>
+                    <th>Phase 4</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>DB &amp; Hosting</td><td>&#8377;1.5L</td><td>&#8377;5L</td><td>&#8377;10L</td><td>&#8377;20L</td></tr>
+                <tr><td>Geocoding API</td><td>&#8377;1L</td><td>&#8377;3L</td><td>&#8377;6L</td><td>&#8377;10L</td></tr>
+                <tr><td>Translation Service</td><td>&#8377;1L</td><td>&#8377;2L</td><td>&#8377;4L</td><td>&#8377;5L*</td></tr>
+                <tr><td>AI / Gemini Tokens</td><td>&#8377;1.5L</td><td>&#8377;4L</td><td>&#8377;8L</td><td>&#8377;15L</td></tr>
+                <tr><td>Developer Team (1 Sr + 1 Jr)</td><td>&#8377;1.5L</td><td>&#8377;1.5L</td><td>&#8377;1.5L</td><td>&#8377;1.5L</td></tr>
+                <tr><td>Security</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&#8377;5L</td></tr>
+                <tr style="font-weight:700; background: rgba(255,255,255,0.03);"><td>Total</td><td>&#8377;6-8L</td><td>&#8377;14-17L</td><td>&#8377;27-32L</td><td>&#8377;47-57L</td></tr>
+            </tbody>
+        </table>
+        <div style="margin-top: 16px; font-size: 12px; color: var(--text-dim);">* Translation costs stabilize due to aggressive caching (Memory + IndexedDB two-tier cache)</div>
+        <div class="card" style="margin-top: 24px; text-align: center; border-color: rgba(34,197,94,0.2); background: rgba(34,197,94,0.05);">
+            <p style="font-size: 15px;">Per-booking cost: <strong>&#8377;0.28</strong> (Phase 1) &rarr; <strong>&#8377;0.21</strong> (Phase 4) including all expenses &bull; Operating costs under <strong>6%</strong> of revenue at scale &mdash; <strong>~95% net profit margin</strong></p>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== SLIDE 20: TRUST & COMMITMENT ==================== -->
+<div class="slide" data-slide="20">
+    <div class="slide-content">
+        <div class="sh">Trust &amp; Ethics</div>
+        <h2 class="st">Our Unbreakable Commitments</h2>
+        <div class="grid2">
+            <div class="card" style="border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.05);">
+                <div class="card-icon">🚫</div>
+                <h4>We Will Never Interfere with Medical Treatment</h4>
+                <p>HealQR is a booking &amp; management platform only. All medical decisions, prescriptions, and treatments are 100% under the doctor's authority. We will never suggest, override, or influence any medical decision under any circumstance.</p>
+            </div>
+            <div class="card" style="border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.05);">
+                <div class="card-icon">🔐</div>
+                <h4>We Will Never Sell Patient Data</h4>
+                <p>Patient data is sacred. We will never sell, share, or monetize patient information to any third party. Doctor owns 100% of their patient data with full export capabilities.</p>
+            </div>
+            <div class="card" style="border-color: rgba(99,102,241,0.3); background: rgba(99,102,241,0.05);">
+                <div class="card-icon">👨‍⚕️</div>
+                <h4>Doctor-First Medical Control</h4>
+                <p>Assistants are empowered with dashboard access for operational efficiency, but full medical control &mdash; prescriptions, treatment plans, patient consultations &mdash; remains exclusively with the doctor.</p>
+            </div>
+            <div class="card" style="border-color: rgba(99,102,241,0.3); background: rgba(99,102,241,0.05);">
+                <div class="card-icon">📢</div>
+                <h4>Only Non-Medical Advertising</h4>
+                <p>Our sole revenue source is non-medical 3rd party advertising. We never promote medicines, treatments, or healthcare products. Ads are strictly for non-medical consumer brands only.</p>
+            </div>
+        </div>
+        <div class="highlight" style="margin-top: 24px;">
+            <p style="font-size: 16px; text-align: center; font-weight: 700;">100% FREE Forever &bull; Zero Commission &bull; Zero Data Selling &bull; Zero Medical Interference</p>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== SLIDE 21: THANK YOU ==================== -->
+<div class="slide" data-slide="21">
+    <div class="slide-content thankyou">
+        <img src="/healqr-logo.png" alt="HealQR" style="height: 64px; margin-bottom: 32px;" />
+        <h2><span>Thank You</span></h2>
+        <p style="margin-bottom: 24px;">World's First QR-based e-Assistant for Doctors</p>
+        <div class="stat-row" style="margin-bottom: 40px;">
+            <div class="stat-box">
+                <div class="num" style="font-size: 36px;">40+</div>
+                <div class="label">Doctors</div>
+            </div>
+            <div class="stat-box">
+                <div class="num" style="font-size: 36px;">31</div>
+                <div class="label">Languages</div>
+            </div>
+            <div class="stat-box">
+                <div class="num" style="font-size: 36px;">8</div>
+                <div class="label">Clinics</div>
+            </div>
+            <div class="stat-box">
+                <div class="num" style="font-size: 36px;">100%</div>
+                <div class="label">Free Forever</div>
+            </div>
+        </div>
+        <a href="mailto:support@healqr.com" class="email">support@healqr.com</a>
+        <p style="margin-top: 12px; font-size: 14px; color: var(--text-muted);">
+            <a href="https://healqr.com" style="color: var(--primary-light); text-decoration: none;">healqr.com</a> &bull;
+            <a href="https://teamhealqr.web.app" style="color: var(--primary-light); text-decoration: none;">teamhealqr.web.app</a>
+        </p>
+        <div class="conf">&copy; 2026 HealQR.com &bull; Confidential</div>
+    </div>
+</div>
+
+</div><!-- /deck -->
+
+<!-- CONTROLS -->
+<div class="controls">
+    <button onclick="prevSlide()" title="Previous (Left Arrow)">&#8592;</button>
+    <span class="slide-counter" id="slideCounter">1 / 20</span>
+    <button onclick="nextSlide()" title="Next (Right Arrow)">&#8594;</button>
+</div>
+
+<script>
+    let current = 1;
+    const total = 21;
+
+    function showSlide(n) {
+        if (n < 1 || n > total) return;
+        const slides = document.querySelectorAll('.slide');
+        slides.forEach(function(s) {
+            var num = parseInt(s.dataset.slide);
+            s.classList.remove('active', 'prev');
+            if (num === n) s.classList.add('active');
+            else if (num < n) s.classList.add('prev');
+        });
+        current = n;
+        document.getElementById('slideCounter').textContent = current + ' / ' + total;
+        document.getElementById('progressBar').style.width = ((current / total) * 100) + '%';
+    }
+
+    function nextSlide() { showSlide(current + 1); }
+    function prevSlide() { showSlide(current - 1); }
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); nextSlide(); }
+        if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); prevSlide(); }
+        if (e.key === 'Home') { e.preventDefault(); showSlide(1); }
+        if (e.key === 'End') { e.preventDefault(); showSlide(total); }
+        if (e.key === 'f' || e.key === 'F') { toggleFS(); }
+    });
+
+    // Touch swipe support for mobile
+    var touchStartX = 0;
+    document.addEventListener('touchstart', function(e) { touchStartX = e.changedTouches[0].screenX; });
+    document.addEventListener('touchend', function(e) {
+        var diff = touchStartX - e.changedTouches[0].screenX;
+        if (Math.abs(diff) > 60) { diff > 0 ? nextSlide() : prevSlide(); }
+    });
+
+    function toggleFS() {
+        if (!document.fullscreenElement) { document.documentElement.requestFullscreen(); }
+        else { document.exitFullscreen(); }
+    }
+
+    showSlide(1);
+</script>
+
+</body>
+</html>

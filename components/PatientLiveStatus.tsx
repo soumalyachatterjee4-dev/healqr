@@ -48,7 +48,6 @@ export default function PatientLiveStatus({ bookingId, language = 'english' }: P
     const checkMidnight = () => {
       const now = new Date();
       if (now.getHours() === 0 && now.getMinutes() === 0) {
-        console.log('?? Midnight refresh - clearing old appointment data');
         setQueueData(null);
         setError('No appointments scheduled for today');
         loadLiveQueueData();
@@ -78,7 +77,6 @@ export default function PatientLiveStatus({ bookingId, language = 'english' }: P
     const unsubscribe = onSnapshot(q, (snapshot) => {
       snapshot.docChanges().forEach((change) => {
         if (change.type === 'modified') {
-          console.log('?? Booking updated in real-time');
           loadLiveQueueData(); // Reload when booking changes
         }
       });
@@ -99,7 +97,6 @@ export default function PatientLiveStatus({ bookingId, language = 'english' }: P
         return;
       }
 
-      console.log('?? Loading live queue for:', patientPhone);
 
       // Get today's date in LOCAL timezone (not UTC!)
       const today = new Date();
@@ -108,7 +105,6 @@ export default function PatientLiveStatus({ bookingId, language = 'english' }: P
       const day = String(today.getDate()).padStart(2, '0');
       const todayStr = `${year}-${month}-${day}`; // YYYY-MM-DD in local timezone
       
-      console.log('?? Looking for appointments on:', todayStr);
       
       // Try both phone formats: with and without +91
       const phoneVariations = [
@@ -117,7 +113,6 @@ export default function PatientLiveStatus({ bookingId, language = 'english' }: P
         patientPhone.startsWith('91') && !patientPhone.startsWith('+') ? patientPhone.substring(2) : patientPhone
       ];
       
-      console.log('?? Searching with phone variations:', phoneVariations);
       
       // Query for bookings - try all phone variations (WITHOUT orderBy to avoid index requirement)
       const bookingsRef = collection(db, 'bookings');
@@ -130,7 +125,6 @@ export default function PatientLiveStatus({ bookingId, language = 'english' }: P
             where('patientPhone', '==', phoneVar)
           );
           const snapshot = await getDocs(q);
-          console.log(`?? Phone ${phoneVar}: Found ${snapshot.docs.length} bookings`);
           allDocs.push(...snapshot.docs);
         } catch (err) {
           console.error(`Error querying phone ${phoneVar}:`, err);
@@ -145,17 +139,13 @@ export default function PatientLiveStatus({ bookingId, language = 'english' }: P
           return bTime.getTime() - aTime.getTime();
         });
       
-      console.log(`?? Total unique bookings found: ${uniqueDocs.length}`);
       
       if (allDocs.length === 0) {
-        console.log('? No bookings found for any phone variation');
-        console.log('   Phone variations tried:', phoneVariations);
         setError('No appointments scheduled for today');
         setLoading(false);
         return;
       }
 
-      console.log(`? Found ${uniqueDocs.length} unique booking(s)`);
 
       // Find TODAY's appointment ONLY (not past, not future)
       let todaysBooking = null;
@@ -163,17 +153,6 @@ export default function PatientLiveStatus({ bookingId, language = 'english' }: P
       uniqueDocs.forEach(doc => {
         const data = doc.data();
         
-        console.log('?? Raw booking data:', {
-          id: doc.id,
-          allFields: Object.keys(data),
-          bookingDate: data.bookingDate,
-          consultationDate: data.consultationDate,
-          appointmentDate: data.appointmentDate,
-          date: data.date,
-          createdAt: data.createdAt,
-          status: data.status,
-          type: data.type
-        });
         
         // Get appointment date - check multiple possible fields
         let appointmentDateStr = '';
@@ -181,33 +160,19 @@ export default function PatientLiveStatus({ bookingId, language = 'english' }: P
         // Priority order: bookingDate > consultationDate > appointmentDate > date > createdAt
         if (data.bookingDate) {
           appointmentDateStr = data.bookingDate;
-          console.log('? Using bookingDate:', appointmentDateStr);
         } else if (data.consultationDate) {
           appointmentDateStr = data.consultationDate;
-          console.log('? Using consultationDate:', appointmentDateStr);
         } else if (data.appointmentDate) {
           appointmentDateStr = data.appointmentDate;
-          console.log('? Using appointmentDate:', appointmentDateStr);
         } else if (data.date) {
           // Handle Firestore Timestamp or string
           const dateField = data.date?.toDate ? data.date.toDate() : new Date(data.date);
           appointmentDateStr = dateField.toISOString().split('T')[0];
-          console.log('? Using date field:', appointmentDateStr);
         } else if (data.createdAt?.toDate) {
           appointmentDateStr = data.createdAt.toDate().toISOString().split('T')[0];
-          console.log('? Using createdAt:', appointmentDateStr);
         } else {
-          console.log('? No date field found!');
         }
         
-        console.log('?? Checking booking:', {
-          id: doc.id,
-          appointmentDate: appointmentDateStr,
-          todayStr,
-          type: data.type,
-          status: data.status,
-          isCancelled: data.status === 'cancelled'
-        });
 
         // Check if this is TODAY's booking (exact match only)
         const isToday = appointmentDateStr === todayStr;
@@ -219,42 +184,19 @@ export default function PatientLiveStatus({ bookingId, language = 'english' }: P
         const consultationStatus = data.consultationStatus || 'pending';
         const isCompleted = consultationStatus === 'completed' || data.isCompleted === true;
         
-        console.log('?? Booking details:', {
-          id: doc.id,
-          date: appointmentDateStr,
-          isToday,
-          isCancelled,
-          consultationStatus,
-          isCompleted,
-          serialNumber: data.serialNumber
-        });
         
         // Include cancelled bookings - they should show CANCELLED badge until midnight
         if (isToday && !todaysBooking) {
           todaysBooking = { id: doc.id, ...data, isCompleted, consultationStatus, isCancelled };
-          console.log('? Found TODAY\'s booking!', doc.id, isCancelled ? '(CANCELLED)' : '(ACTIVE)');
         }
       });
 
       if (!todaysBooking) {
-        console.log('?? No active appointment found for today');
         setError('No appointments scheduled for today');
         setLoading(false);
         return;
       }
 
-      console.log('? Final booking selected:', {
-        id: todaysBooking.id,
-        date: todaysBooking.bookingDate || todaysBooking.consultationDate,
-        status: todaysBooking.bookingStatus,
-        serialNo: todaysBooking.serialNumber,
-        tokenNo: todaysBooking.tokenNumber,
-        serialNumber: todaysBooking.serialNumber,
-        slot: todaysBooking.slot,
-        allFields: Object.keys(todaysBooking),
-        patientName: todaysBooking.patientName,
-        doctor: todaysBooking.doctorName
-      });
 
       // Extract queue data from booking - with fallbacks for different field names
       // Check all possible serial number field names
@@ -266,7 +208,6 @@ export default function PatientLiveStatus({ bookingId, language = 'english' }: P
                               todaysBooking.position ||
                               '';
       
-      console.log('?? Serial number raw value:', serialNumberRaw, 'Type:', typeof serialNumberRaw);
       
       const serialNumber = parseInt(String(serialNumberRaw).replace(/\D/g, '') || '0');
       
@@ -281,16 +222,6 @@ export default function PatientLiveStatus({ bookingId, language = 'english' }: P
       
       const timeSlot = todaysBooking.timeSlot || todaysBooking.consultationTime || todaysBooking.slot || todaysBooking.time || '16:00 - 20:00';
       
-      console.log('?? Extracted data:', { 
-        serialNumberRaw,
-        serialNumber, 
-        chamberCapacity, 
-        timeSlot,
-        isValid: !isNaN(serialNumber) && serialNumber > 0,
-        capacitySource: todaysBooking.chamberCapacity ? 'chamberCapacity' : 
-                        todaysBooking.totalSlots ? 'totalSlots' : 
-                        todaysBooking.capacity ? 'capacity' : 'default'
-      });
       
       // Validate serial number
       if (isNaN(serialNumber) || serialNumber <= 0) {
@@ -341,7 +272,6 @@ export default function PatientLiveStatus({ bookingId, language = 'english' }: P
       const isCancelled = todaysBooking.isCancelled || todaysBooking.status === 'cancelled';
       const cancelledStatus = isCancelled ? 'cancelled' : 'active';
       
-      console.log('? Setting queue data with serial:', serialNumber);
       
       const isCompleted = todaysBooking.isCompleted || false;
       const consultationStatus = todaysBooking.consultationStatus || (isCompleted ? 'completed' : 'in-queue');
@@ -387,11 +317,6 @@ export default function PatientLiveStatus({ bookingId, language = 'english' }: P
             }
           });
           
-          console.log('?? Chamber queue status:', {
-            completedSlots,
-            cancelledSlots,
-            lastConsulted: lastConsultedNumber
-          });
         } catch (err) {
           console.error('Error fetching chamber queue:', err);
         }
@@ -562,7 +487,6 @@ export default function PatientLiveStatus({ bookingId, language = 'english' }: P
     
     // You - this is your position
     if (slotNumber === queueData.yourPosition) {
-      console.log('?? Your slot:', slotNumber);
       return 'you';
     }
     
@@ -720,7 +644,7 @@ export default function PatientLiveStatus({ bookingId, language = 'english' }: P
                   </div>
                   {queueData.estimatedWaitMinutes > 0 && (
                     <span className="text-gray-400 text-sm ml-2">
-                      • Est. wait: ~{queueData.estimatedWaitMinutes} min
+                      ï¿½ Est. wait: ~{queueData.estimatedWaitMinutes} min
                     </span>
                   )}
                 </>

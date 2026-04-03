@@ -370,7 +370,6 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
   const loadClinicData = async () => {
     const clinicId = effectiveClinicId;
     if (!clinicId) {
-      console.log('No clinic ID available for loading clinic data');
       setLoading(false);
       return;
     }
@@ -414,13 +413,6 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
         setMainBranchId(resolvedMainBranchId);
         setCurrentBranchId(resolvedCurrentBranchId);
 
-        console.log('🏥 [ManageDoctors] BRANCH FILTER DEBUG:', {
-          isBranchManager,
-          branchId,
-          resolvedMainBranchId,
-          resolvedCurrentBranchId,
-          totalDoctors: doctorsData.length,
-        });
 
         // Deduplicate doctors by UID (linkedDoctorsDetails may have multiple entries per branch)
         const uniqueDoctorsMap = new Map<string, LinkedDoctor>();
@@ -439,7 +431,6 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
               return docBranch === resolvedCurrentBranchId;
             })
           : uniqueDoctors;
-        console.log(`🏥 [ManageDoctors] After filter: ${filteredDoctorsData.length} doctors`);
 
         const doctorsWithChambers = await Promise.all(
           filteredDoctorsData.map(async (doctor: LinkedDoctor) => {
@@ -458,11 +449,6 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
                   return chamberBranch === resolvedCurrentBranchId;
                 });
 
-                console.log(`🔒 SECURITY FILTER for Dr. ${doctor.name}:`, {
-                  totalChambers: allChambers.length,
-                  clinicChambers: clinicChambers.length,
-                  clinicId: clinicId
-                });
 
                 return {
                   ...doctor,
@@ -582,7 +568,6 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
         }
 
         // Doctor exists but not linked - link them to this clinic
-        console.log('🔗 Doctor found, linking to clinic...');
 
         // Update doctor's linkedClinics array (only if this branch not already linked)
         const doctorRef = doc(db, 'doctors', existingDoctorId);
@@ -599,7 +584,6 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
                 clinicCode: branchClinicCode
               }]
             });
-            console.log('✅ Updated doctor linkedClinics');
           } catch (linkErr: any) {
             console.error('⚠️ Failed to update doctor linkedClinics (permission?):', linkErr.message);
           }
@@ -635,7 +619,6 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
       }
 
       // Doctor doesn't exist - create new doctor profile
-      console.log('👤 Creating new doctor profile...');
 
       // Generate unique IDs
       const doctorId = `doc_${Date.now()}`;
@@ -695,7 +678,6 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
           });
         }
       } catch (error) {
-        console.log('QR pool update skipped:', error);
       }
 
       // Update clinic's linkedDoctorsDetails
@@ -735,12 +717,6 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
       };
 
       // Email will be sent when doctor activates account via /doctor/activate page
-      console.log('📧 Doctor activation link:', `${window.location.origin}/doctor/activate?code=${doctorCode}&email=${encodeURIComponent(newDoctor.email)}`);
-      console.log('✅ Clinic can start booking appointments immediately using QR:', qrNumber);
-      console.log('� QR Code assigned and tracked in qrPool collection for admin panel');
-      console.log('🔒 Doctor MUST verify email to access dashboard');
-      console.log('🎯 After activation, email/DOB/pinCode will be frozen');
-      console.log('🖨️ Admin can send printed QR to doctor from admin panel using QR number:', qrNumber);
 
       toast.success(`✅ Doctor added! Code: ${doctorCode}. You can book appointments immediately.`);
       toast.info('Click the copy icon to share activation link with doctor.');
@@ -778,23 +754,12 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
     }
 
     try {
-      console.log('🔗 Starting link process for doctor:', searchedDoctor.uid);
 
       // Determine the target locationId for this link
       const branchMgrLocId = localStorage.getItem('healqr_location_id') || '';
       const isBranchMgr = localStorage.getItem('healqr_is_location_manager') === 'true';
       const targetLocationId = (isBranchMgr && branchMgrLocId) ? branchMgrLocId : (selectedDoctorLocationId || defaultLocationId);
 
-      console.log('🔗 [LinkDoctor] DEBUG:', {
-        doctorUid: searchedDoctor.uid,
-        doctorName: searchedDoctor.name,
-        isBranchMgr,
-        branchMgrLocId,
-        targetLocationId,
-        effectiveClinicId,
-        selectedDoctorLocationId,
-        defaultLocationId
-      });
 
       // Check if already linked - fetch FULL list from Firestore (not branch-filtered local state)
       const clinicRef = doc(db, 'clinics', effectiveClinicId!);
@@ -806,15 +771,11 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
       const clinicDataFromDb = clinicSnap.data();
       const currentLinkedDoctors: LinkedDoctor[] = clinicDataFromDb.linkedDoctorsDetails || [];
 
-      console.log('🔗 [LinkDoctor] Existing entries:', currentLinkedDoctors.map((d: any) => ({
-        uid: d.uid, name: d.name, locationId: d.locationId
-      })));
 
       // Allow same doctor on different branches, but not duplicate on same branch
       const isDuplicateOnBranch = currentLinkedDoctors.some(
         d => d.uid === searchedDoctor.uid && ((d as any).locationId || '001') === targetLocationId
       );
-      console.log('🔗 [LinkDoctor] isDuplicateOnBranch:', isDuplicateOnBranch, 'targetLocationId:', targetLocationId);
       if (isDuplicateOnBranch) {
         toast.error('This doctor is already linked to this branch');
         return;
@@ -833,22 +794,18 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
         status: searchedDoctor.status || 'active'
       };
 
-      console.log('📝 New linked doctor data:', newLinkedDoctor);
 
       // Update clinic's linkedDoctorsDetails
-      console.log('✅ Clinic document exists');
 
       await updateDoc(clinicRef, {
         linkedDoctorsDetails: [...currentLinkedDoctors, newLinkedDoctor]
       });
-      console.log('✅ Updated clinic linkedDoctorsDetails');
 
       // Update doctor's linkedClinics
       const doctorRef = doc(db, 'doctors', searchedDoctor.uid);
       const doctorSnap = await getDoc(doctorRef);
 
       if (doctorSnap.exists()) {
-        console.log('✅ Doctor document exists');
         const existingClinics = doctorSnap.data().linkedClinics || [];
 
         // Check if this specific branch is already in doctor's linkedClinics
@@ -871,13 +828,11 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
                 clinicCode: branchCodeForCheck
               }]
             });
-            console.log('✅ Updated doctor linkedClinics');
           } catch (linkErr: any) {
             console.error('⚠️ Failed to update doctor linkedClinics (permission?):', linkErr.message);
             // Non-fatal: clinic-side link still works
           }
         } else {
-          console.log('ℹ️ Clinic already in doctor linkedClinics (branch-level link stored in linkedDoctorsDetails)');
         }
       } else {
         console.error('❌ Doctor document does not exist!');
@@ -885,7 +840,6 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
         return;
       }
 
-      console.log('🎉 Link process completed successfully');
       toast.success(`Dr. ${searchedDoctor.name} linked successfully!`);
 
       setDoctorCode('');
@@ -922,24 +876,12 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
 
       if (clinicSnap.exists()) {
         const allDoctors = clinicSnap.data().linkedDoctorsDetails || [];
-        console.log('🗑️ [UnlinkDoctor] Before remove:', {
-          totalEntries: allDoctors.length,
-          targetDoctorId: doctorId,
-          currentBranchId,
-          mainBranchId,
-          entries: allDoctors.map((d: any) => ({ uid: d.uid, name: d.name, locationId: d.locationId }))
-        });
         // Only remove the entry matching this doctor AND this branch
         const updatedDoctors = allDoctors.filter((d: any) => {
           if (d.uid !== doctorId) return true; // keep other doctors
           // For the matching doctor, only remove if locationId matches current branch
           const docBranch = d.locationId || mainBranchId;
           return docBranch !== currentBranchId;
-        });
-        console.log('🗑️ [UnlinkDoctor] After remove:', {
-          remainingEntries: updatedDoctors.length,
-          removed: allDoctors.length - updatedDoctors.length,
-          entries: updatedDoctors.map((d: any) => ({ uid: d.uid, name: d.name, locationId: d.locationId }))
         });
         await updateDoc(clinicRef, {
           linkedDoctorsDetails: updatedDoctors
@@ -983,7 +925,6 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
     try {
       // Prepare activation link
       const activationLink = `${window.location.origin}/doctor/activate?code=${doctor.doctorCode}&email=${encodeURIComponent(doctor.email)}`;
-      console.log('📧 Doctor activation link:', activationLink);
 
       // Copy link to clipboard
       await navigator.clipboard.writeText(activationLink);
@@ -1380,7 +1321,6 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
         blockedDates.push(dateStr);
       }
 
-      console.log(`📤 Clinic Toggle Off: Blocking dates for doctor ${doctorId}:`, blockedDates);
 
       // Query bookings for this doctor in the affected date range
       const bookingsQuery = fbQuery(
@@ -1405,7 +1345,6 @@ const ManageDoctors: React.FC<ManageDoctorsProps> = ({ onNavigate, clinicId: pro
             cancelledBy: 'clinic'
           });
           cancelledCount++;
-          console.log(`❌ Cancelled booking ${bookingDoc.id} for date ${bookingData.appointmentDate}`);
         }
       }
 

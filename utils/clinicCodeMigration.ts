@@ -13,7 +13,6 @@ export async function migrateClinicCodes() {
   }
 
   try {
-    console.log('🔄 Starting clinic code migration...');
 
     const clinicsRef = collection(db, 'clinics');
     const snapshot = await getDocs(clinicsRef);
@@ -28,7 +27,6 @@ export async function migrateClinicCodes() {
         // Old format: HQR-xxxxxx-xxxx-CLN
         const newCode = currentCode.replace(/-CLN$/, '-001-CLN');
 
-        console.log(`📝 Updating clinic ${clinicDoc.id}: ${currentCode} → ${newCode}`);
 
         await updateDoc(doc(db, 'clinics', clinicDoc.id), {
           clinicCode: newCode
@@ -38,7 +36,6 @@ export async function migrateClinicCodes() {
       }
     }
 
-    console.log(`✅ Migration complete. Updated ${updatedCount} clinic codes.`);
 
   } catch (error) {
     console.error('❌ Migration failed:', error);
@@ -48,5 +45,4 @@ export async function migrateClinicCodes() {
 // Auto-run in Node.js environment
 if (typeof window === 'undefined') {
   migrateClinicCodes();
-}</content>
-<parameter name="filePath">c:\Projects\healqr 3\utils\clinicCodeMigration.ts
+}

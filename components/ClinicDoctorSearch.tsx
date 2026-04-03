@@ -143,18 +143,6 @@ export default function ClinicDoctorSearch({
         });
         const uniqueDoctors = Array.from(uniqueDoctorsMap.values());
 
-        console.log('🔍 [DoctorSearch] Debug:', {
-          selectedLocationId,
-          mainBranchId,
-          totalEntries: allDoctorsData.length,
-          uniqueDoctors: uniqueDoctors.length,
-          doctors: uniqueDoctors.map(d => ({
-            name: d.name, uid: d.uid, status: d.status,
-            locationId: (d as any).locationId,
-            allLocationIds: Array.from(allLocationIdsPerDoctor.get(d.uid) || []),
-            chambers: ((d as any).chambers || []).length
-          }))
-        });
 
         // Filter doctors by branch using chambers + ALL locationIds across all entries
         const locationFilteredDoctors = selectedLocationId
@@ -179,7 +167,6 @@ export default function ClinicDoctorSearch({
             })
           : uniqueDoctors;
 
-        console.log('🔍 [DoctorSearch] After branch filter:', locationFilteredDoctors.length, 'doctors');
 
         setDoctors(locationFilteredDoctors);
         setFilteredDoctors(locationFilteredDoctors);

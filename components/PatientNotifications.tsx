@@ -38,13 +38,11 @@ export default function PatientNotifications({ patientPhone }: PatientNotificati
       return;
     }
 
-    console.log('📡 Setting up real-time notification listener for:', currentPatientPhone);
 
     // Set up real-time listener for notifications
     const unsubscribe = subscribeToPatientNotifications(
       currentPatientPhone,
       (newNotifications) => {
-        console.log('🔔 Received notification update:', newNotifications.length);
         setNotifications(newNotifications);
         setLoading(false);
       }
@@ -52,7 +50,6 @@ export default function PatientNotifications({ patientPhone }: PatientNotificati
 
     // Cleanup on unmount
     return () => {
-      console.log('🔌 Unsubscribing from notification listener');
       unsubscribe();
     };
   }, [patientPhone]);
@@ -74,7 +71,6 @@ export default function PatientNotifications({ patientPhone }: PatientNotificati
 
     try {
       await markNotificationAsRead(notificationId);
-      console.log('✅ Notification marked as read:', notificationId);
     } catch (error) {
       console.error('❌ Error marking notification as read:', error);
     }

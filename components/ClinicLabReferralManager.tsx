@@ -119,7 +119,6 @@ export default function ClinicLabReferralManager({
       // Save back if any were removed
       if (cleaned.length !== parsed.length) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
-        console.log(`🗑️ Cleaned ${parsed.length - cleaned.length} old entries (>90 days)`);
       }
     } catch (error) {
       console.error('Error cleaning up old entries:', error);
@@ -147,9 +146,7 @@ export default function ClinicLabReferralManager({
         where('isMarkedSeen', '==', true)
       );
 
-      console.log('🔍 Fetching Clinic consultations:', clinicId, 'Date:', queryDate.toLocaleDateString());
       const snapshot = await getDocs(q);
-      console.log('📄 Total seen bookings found for clinic:', snapshot.size);
 
       const existingReferrals = [...referrals];
       let newCount = 0;

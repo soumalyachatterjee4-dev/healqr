@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { generateDietPlanWithGemini } from '../services/aiService';
 import {
   Apple,
   Plus,
@@ -217,75 +218,44 @@ export default function AIDietChartManager({
 
     setIsGenerating(true);
 
-    // Simulate AI thinking process
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    try {
+      const plan = await generateDietPlanWithGemini({
+        name: patientData.name,
+        age: patientData.age,
+        gender: patientData.gender,
+        weight: patientData.weight,
+        height: patientData.height,
+        activityLevel: patientData.activityLevel,
+        conditions: condStr,
+        preferences: patientData.preferences,
+        region: patientData.region,
+        isSmoker: patientData.isSmoker,
+        isAlcoholic: patientData.isAlcoholic,
+      });
 
-    // Generate a structured 7-day plan (Mock logic for now, but detailed as requested)
-    const generateDetailedPlan = (region: string) => {
-      const days = [];
-      for (let i = 1; i <= 7; i++) {
-        days.push({
-          day: i,
-          meals: [
-            {
-              type: 'Breakfast' as const,
-              items: [
-                { name: 'Oats with Milk', weight: '50 GM', kcal: '180 KCAL' },
-                { name: 'Boiled Egg', weight: '1 unit', kcal: '70 KCAL' }
-              ]
-            },
-            {
-              type: 'Lunch' as const,
-              items: region === 'West Bengal' ? [
-                { name: 'Rice (Red/Brown)', weight: '50 GM', kcal: '100 KCAL' },
-                { name: 'Boiled Spinach+Carrot', weight: '100 GM', kcal: '200 KCAL' },
-                { name: 'Fish (Steamed/Grilled)', weight: '75 GM', kcal: '200 KCAL' },
-                { name: 'Mishti (Low GI/Stevia)', weight: '20 GM', kcal: '80 KCAL' }
-              ] : [
-                { name: 'Multigrain Roti', weight: '2 units', kcal: '140 KCAL' },
-                { name: 'Dal (Lentils)', weight: '100 GM', kcal: '120 KCAL' },
-                { name: 'Mixed Veggies', weight: '100 GM', kcal: '150 KCAL' },
-                { name: 'Curd', weight: '50 GM', kcal: '50 KCAL' }
-              ]
-            },
-            {
-              type: 'Snacks' as const,
-              items: [
-                { name: 'Roasted Foxnuts (Makhana)', weight: '20 GM', kcal: '70 KCAL' },
-                { name: 'Green Tea', weight: '1 Cup', kcal: '0 KCAL' }
-              ]
-            },
-            {
-              type: 'Dinner' as const,
-              items: [
-                { name: 'Vegetable Soup', weight: '150 ML', kcal: '90 KCAL' },
-                { name: 'Grilled Paneer/Chicken', weight: '50 GM', kcal: '130 KCAL' }
-              ]
-            }
-          ]
-        });
-      }
-      return days;
-    };
+      const newChart: DietChartHistoryItem = {
+        id: Math.random().toString(36).substr(2, 9),
+        patientName: patientData.name,
+        phone: patientData.phone,
+        age: patientData.age,
+        gender: patientData.gender,
+        conditions: condStr,
+        region: patientData.region,
+        isSmoker: patientData.isSmoker,
+        isAlcoholic: patientData.isAlcoholic,
+        date: new Date().toLocaleDateString('en-GB'),
+        timestamp: Date.now(),
+        plan,
+      };
 
-    const newChart: DietChartHistoryItem = {
-      id: Math.random().toString(36).substr(2, 9),
-      patientName: patientData.name,
-      phone: patientData.phone,
-      age: patientData.age,
-      gender: patientData.gender,
-      conditions: getConditionsString(),
-      region: patientData.region,
-      isSmoker: patientData.isSmoker,
-      isAlcoholic: patientData.isAlcoholic,
-      date: new Date().toLocaleDateString('en-GB'),
-      timestamp: Date.now(),
-      plan: generateDetailedPlan(patientData.region)
-    };
-
-    setHistoryItems(prev => [newChart, ...prev]);
-    setIsGenerating(false);
-    toast.success('AI Diet Chart generated successfully!');
+      setHistoryItems(prev => [newChart, ...prev]);
+      toast.success('AI Diet Chart generated successfully!');
+    } catch (error) {
+      console.error('Diet chart generation failed:', error);
+      toast.error('Failed to generate diet chart. Please try again.');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleCloseReport = () => {

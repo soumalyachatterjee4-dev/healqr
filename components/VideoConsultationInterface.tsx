@@ -2,6 +2,7 @@ import { Video, VideoOff, Mic, MicOff, Upload, X, PhoneOff, Clock, User, FileTex
 import { Button } from './ui/button';
 import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
+import { useTranslatedConfirm } from './TranslatedConfirmModal';
 
 interface VideoConsultationInterfaceProps {
   patientName: string;
@@ -94,8 +95,10 @@ export default function VideoConsultationInterface({
     toast.info('Prescription removed');
   };
 
-  const handleEndCall = () => {
-    const confirmEnd = window.confirm('Are you sure you want to end the consultation?');
+  const { showConfirm, ConfirmModalComponent } = useTranslatedConfirm();
+
+  const handleEndCall = async () => {
+    const confirmEnd = await showConfirm('Are you sure you want to end the consultation?', 'End Consultation');
     if (confirmEnd) {
       onEndConsultation(duration);
       toast.success('Consultation ended successfully');
@@ -105,6 +108,7 @@ export default function VideoConsultationInterface({
 
   return (
     <div className="fixed inset-0 bg-black z-50 flex flex-col">
+      <ConfirmModalComponent />
       {/* Header */}
       <div className="bg-gray-900 border-b border-gray-700 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">

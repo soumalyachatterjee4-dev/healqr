@@ -17,7 +17,7 @@
  */
 
 import React, { useEffect, useRef, useCallback } from 'react';
-import { aiTranslateBatch, type AILanguage } from '../services/aiTranslationService';
+import { aiTranslateBatch, type AILanguage, isRTLLanguage, AI_SUPPORTED_LANGUAGES } from '../services/aiTranslationService';
 
 interface TranslationProviderProps {
   language: string;
@@ -232,6 +232,20 @@ export function TranslationProvider({ language, children }: TranslationProviderP
     }
   }, [language]);
 
+  // ─── Update document-level lang and dir for accessibility ───
+  useEffect(() => {
+    const htmlEl = document.documentElement;
+    const langInfo = (AI_SUPPORTED_LANGUAGES as any)[language];
+    const code = langInfo?.code || 'en';
+    const rtl = isRTLLanguage(language);
+    htmlEl.setAttribute('lang', code);
+    htmlEl.setAttribute('dir', rtl ? 'rtl' : 'ltr');
+    return () => {
+      htmlEl.setAttribute('lang', 'en');
+      htmlEl.setAttribute('dir', 'ltr');
+    };
+  }, [language]);
+
   // ─── Main effect: observe DOM ───
   useEffect(() => {
     if (!containerRef.current || language === 'english') return;
@@ -291,6 +305,20 @@ export function TranslationProvider({ language, children }: TranslationProviderP
   // Always use div wrapper to avoid Fragment→div switch which
   // causes React to rebuild the entire child tree and break observers.
   // When English, the useEffect simply won't activate translation.
-  return <div ref={containerRef}>{children}</div>;
+  const rtl = isRTLLanguage(language);
+  const langCode = language !== 'english' && (AI_SUPPORTED_LANGUAGES as any)[language]
+    ? (AI_SUPPORTED_LANGUAGES as any)[language].code
+    : 'en';
+
+  return (
+    <div
+      ref={containerRef}
+      dir={rtl ? 'rtl' : 'ltr'}
+      lang={langCode}
+      style={rtl ? { textAlign: 'right' } : undefined}
+    >
+      {children}
+    </div>
+  );
 }
 

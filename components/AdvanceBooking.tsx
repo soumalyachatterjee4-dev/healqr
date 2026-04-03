@@ -52,22 +52,14 @@ export default function AdvanceBooking({ onMenuChange, onLogout, activeAddOns = 
   // Helper function to check if a clinic is off on a given date
   const isClinicOffForChamber = (chamberAddress: string, checkDate: string): boolean => {
     if (!checkDate) {
-      console.log('⚠️ isClinicOffForChamber: No checkDate provided');
       return false;
     }
 
-    console.log('🔍 Checking if chamber is off:', {
-      chamberAddress,
-      checkDate,
-      clinicSchedulesCount: Object.keys(clinicSchedules).length,
-      clinicDataCount: Object.keys(clinicData).length
-    });
 
     // Find if this chamber belongs to any clinic by matching addresses
     for (const [clinicId, schedule] of Object.entries(clinicSchedules)) {
       const clinic = clinicData[clinicId];
       if (!clinic) {
-        console.log('⚠️ No clinic data found for clinic ID:', clinicId);
         continue;
       }
       
@@ -78,24 +70,15 @@ export default function AdvanceBooking({ onMenuChange, onLogout, activeAddOns = 
       const clinicLower = clinicAddress.toLowerCase();
       const isMatch = chamberLower.includes(clinicLower) || clinicLower.includes(chamberLower);
       
-      console.log('🏥 Checking clinic:', {
-        clinicId,
-        clinicName: clinic.clinicName,
-        clinicAddress,
-        chamberAddress,
-        addressMatch: isMatch
-      });
       
       if (isMatch) {
         const plannedOffPeriods = schedule?.plannedOffPeriods || [];
-        console.log('📋 Planned off periods for matched clinic:', plannedOffPeriods);
         
         // Check if date falls within any planned off period
         // CRITICAL: Only apply clinic planned off for THIS specific clinic
         for (const period of plannedOffPeriods) {
           // Check status field (not isActive)
           if (period.status !== 'active') {
-            console.log('⏭️ Skipping inactive period:', period);
             continue;
           }
           
@@ -103,49 +86,24 @@ export default function AdvanceBooking({ onMenuChange, onLogout, activeAddOns = 
           if (period.appliesTo === 'clinic') {
             // If period has clinicId, only block if it matches this clinic
             if (period.clinicId && period.clinicId !== clinicId) {
-              console.log('⏭️ Skipping clinic planned off from different clinic:', {
-                periodClinicId: period.clinicId,
-                currentClinicId: clinicId
-              });
               continue;
             }
             // If period has NO clinicId (legacy), apply to this clinic anyway
             // (These are old periods created before clinicId tracking was added)
-            console.log('✅ Applying clinic planned off (legacy or matching):', {
-              periodClinicId: period.clinicId || 'LEGACY',
-              currentClinicId: clinicId,
-              hasClinicId: !!period.clinicId
-            });
           }
           
           const start = new Date(period.startDate);
           const end = new Date(period.endDate);
           const check = new Date(checkDate);
           
-          console.log('📅 Comparing dates:', {
-            checkDate: check.toDateString(),
-            periodStart: start.toDateString(),
-            periodEnd: end.toDateString(),
-            isInRange: check >= start && check <= end,
-            appliesTo: period.appliesTo
-          });
           
           if (check >= start && check <= end) {
-            console.log('🚫🚫🚫 Chamber IS OFF (clinic off):', {
-              chamberAddress,
-              clinicId,
-              clinicName: clinic.clinicName,
-              period: `${period.startDate} to ${period.endDate}`,
-              reason: period.reason,
-              appliesTo: period.appliesTo
-            });
             return true;
           }
         }
       }
     }
     
-    console.log('✅ Chamber is AVAILABLE (clinic open)');
     return false;
   };
 
@@ -166,15 +124,10 @@ export default function AdvanceBooking({ onMenuChange, onLogout, activeAddOns = 
           const doctorData = doctorSnap.data();
           setChambers(doctorData.chambers || []);
           const advanceDays = doctorData.maxAdvanceBookingDays || 30;
-          console.log('📅 AdvanceBooking: Loading max advance days:', {
-            fromFirestore: doctorData.maxAdvanceBookingDays,
-            using: advanceDays
-          });
           setMaxAdvanceDays(advanceDays);
           
           // Load clinic schedules for linked clinics
           const linkedClinics = doctorData.linkedClinics || [];
-          console.log('🏥 Doctor QR Flow: Loading clinic schedules for', linkedClinics.length, 'linked clinics');
           
           const schedules: Record<string, any> = {};
           const clinics: Record<string, any> = {};
@@ -190,7 +143,6 @@ export default function AdvanceBooking({ onMenuChange, onLogout, activeAddOns = 
               
               if (clinicSnap.exists()) {
                 clinics[clinicId] = clinicSnap.data();
-                console.log('✅ Loaded clinic data for', clinicId, clinics[clinicId].clinicName);
               }
               
               // Load clinic schedule
@@ -200,9 +152,7 @@ export default function AdvanceBooking({ onMenuChange, onLogout, activeAddOns = 
               if (clinicScheduleSnap.exists()) {
                 const scheduleData = clinicScheduleSnap.data();
                 schedules[clinicId] = scheduleData;
-                console.log('✅ Loaded clinic schedule for', clinicId, scheduleData);
               } else {
-                console.log('⚠️ No schedule found for clinic', clinicId);
               }
             } catch (err) {
               console.error('❌ Error loading clinic data/schedule for', clinicId, err);
@@ -235,12 +185,6 @@ export default function AdvanceBooking({ onMenuChange, onLogout, activeAddOns = 
         const userEmail = localStorage.getItem('userEmail');
         if (!userId) return;
 
-        console.log('🔢 Loading booking counts:', {
-          userId,
-          userEmail,
-          selectedDate,
-          chambersCount: chambers.length
-        });
 
         const { db } = await import('../lib/firebase/config');
         const { collection, query, where, getDocs } = await import('firebase/firestore');
@@ -281,10 +225,8 @@ export default function AdvanceBooking({ onMenuChange, onLogout, activeAddOns = 
 
   // Load bookings when chamber is selected
   useEffect(() => {
-    console.log('🎬 loadBookings useEffect triggered:', { selectedDate, selectedChamberId });
     
     if (!selectedDate || selectedChamberId === null) {
-      console.log('⏹️ Early return:', { hasDate: !!selectedDate, hasChamber: selectedChamberId !== null });
       setBookings([]);
       return;
     }
@@ -294,11 +236,9 @@ export default function AdvanceBooking({ onMenuChange, onLogout, activeAddOns = 
         setLoading(true);
         const userId = localStorage.getItem('userId');
         if (!userId) {
-          console.log('❌ No userId found');
           return;
         }
 
-        console.log('🔍 Loading bookings:', { userId, chamberId: selectedChamberId, date: selectedDate });
 
         const { db } = await import('../lib/firebase/config');
         const { collection, query, where, getDocs } = await import('firebase/firestore');
@@ -324,7 +264,6 @@ export default function AdvanceBooking({ onMenuChange, onLogout, activeAddOns = 
           });
 
           if (restrictedClinicIds.length > 0) {
-            console.log('🔒 Restricted clinics for advance booking:', restrictedClinicIds);
           }
         } catch (error) {
           console.error('Error checking clinic access restrictions:', error);
@@ -334,18 +273,15 @@ export default function AdvanceBooking({ onMenuChange, onLogout, activeAddOns = 
         
         // TEMPORARILY force fallback to debug
         let snapshot;
-        console.log('🔧 Using fallback query to debug');
         const qFallback = query(
           bookingsRef,
           where('chamberId', '==', selectedChamberId),
           where('appointmentDate', '==', selectedDate)
         );
         snapshot = await getDocs(qFallback);
-        console.log(`📋 Fallback query returned ${snapshot.docs.length} documents`);
         
         snapshot.docs.forEach(doc => {
           const data = doc.data();
-          console.log(`  - Doc ${doc.id}: doctorId="${data.doctorId}", appointmentDate="${data.appointmentDate}", status="${data.status}"`);
         });
 
         const bookingsList: Booking[] = [];
@@ -353,17 +289,12 @@ export default function AdvanceBooking({ onMenuChange, onLogout, activeAddOns = 
         snapshot.docs.forEach(doc => {
           const data = doc.data();
           
-          console.log(`📄 Doc ${doc.id}:`, { doctorId: data.doctorId, status: data.status });
           
           // Filter by doctorId (in case we used fallback query) and exclude cancelled
           if (data.doctorId === userId && data.status !== 'cancelled') {
             // 🔒 PATIENT DATA ACCESS CONTROL: Check if booking is from restricted clinic
             const bookingClinicId = data.clinicId;
             if (bookingClinicId && restrictedClinicIds.includes(bookingClinicId)) {
-              console.log('🔒 Filtered out booking from restricted clinic:', { 
-                bookingId: doc.id, 
-                clinicId: bookingClinicId 
-              });
               return; // Skip this booking
             }
 
@@ -392,7 +323,6 @@ export default function AdvanceBooking({ onMenuChange, onLogout, activeAddOns = 
             bookingsList.push(bookingData);
           }
         });
-        console.log(`🎯 Final bookings: ${bookingsList.length} total`);
         setBookings(bookingsList);
       } catch (error) {
         console.error('❌ Error loading bookings:', error);
@@ -490,7 +420,6 @@ export default function AdvanceBooking({ onMenuChange, onLogout, activeAddOns = 
                   value={selectedChamberId || ''}
                   onChange={(e) => {
                     const chamberIdValue = e.target.value ? Number(e.target.value) : null;
-                    console.log('🏥 Chamber selected:', { raw: e.target.value, parsed: chamberIdValue });
                     setSelectedChamberId(chamberIdValue);
                   }}
                   className="w-full bg-[#0f1419] border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-emerald-500"

@@ -36,7 +36,6 @@ export default function LanguageSelection({ onContinue, onBack, onLanguagePrevie
     ? 'from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700'
     : 'from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700';
 
-  console.log('🔍 LanguageSelection Props:', { doctorName, doctorSpecialty, doctorPhoto, doctorDegrees });
 
   const coreIndianLanguages: Array<{ id: Language; code: string; name: string; subtitle: string }> = [
     {

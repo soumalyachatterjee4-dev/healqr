@@ -78,8 +78,6 @@ export default function PatientLogin({ onSuccess, onBack }: PatientLoginProps) {
       ];
       const collections = ['bookings', 'appointments']; // Check both collections
 
-      console.log('🔍 Checking phone formats:', formats);
-      console.log('📱 Input phone:', phoneNumber);
 
       for (const collectionName of collections) {
         const collectionRef = collection(db, collectionName);
@@ -88,15 +86,12 @@ export default function PatientLogin({ onSuccess, onBack }: PatientLoginProps) {
         for (const fieldName of phoneFields) {
           for (const format of formats) {
             try {
-              console.log(`🔍 Trying ${collectionName}.${fieldName}:`, format);
               const q = query(collectionRef, where(fieldName, '==', format));
               const snapshot = await getDocs(q);
-              console.log('📊 Results:', snapshot.size);
 
               if (!snapshot.empty) {
                 querySnapshot = snapshot;
                 matchedFormat = format;
-                console.log('✅ Match found in', collectionName, fieldName, ':', format);
                 break;
               }
             } catch (err) {

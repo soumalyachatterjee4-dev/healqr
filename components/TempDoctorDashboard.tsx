@@ -130,7 +130,6 @@ const TempDoctorDashboard: React.FC = () => {
       try {
         if (auth && !auth.currentUser) {
           await signInAnonymously(auth);
-          console.log('✅ Temp doctor: anonymous auth established for storage access');
         }
       } catch (err) {
         console.warn('⚠️ Anonymous auth failed (PDF uploads may not work):', err);
