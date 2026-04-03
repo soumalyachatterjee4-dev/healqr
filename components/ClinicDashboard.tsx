@@ -224,6 +224,8 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
       // Get current month date range for client-side filtering
       const now = new Date();
       const todayStr = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+      const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+      const currentMonthEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-31`;
 
       // 1. Fetch all doctor bookings in parallel
       const doctorBookingsPromises = (data.linkedDoctorsDetails || []).map(async (doctor) => {
@@ -340,6 +342,40 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
       const totalScans = scansSnap?.size || 0;
       const totalBookings = qrBookings + walkinBookings;
 
+      // Count monthly bookings (current month only)
+      let monthlyQR = 0;
+      let monthlyWalkin = 0;
+      bookingsSnapshots.forEach((snap) => {
+        if (!snap) return;
+        snap.forEach((docSnap) => {
+          const bData = docSnap.data();
+
+          // Branch filter (same as above)
+          if (isLocationManager && locationManagerBranchId) {
+            const bLocId = bData.clinicLocationId || bData.locationId || '';
+            if (bLocId) {
+              if (bLocId !== locationManagerBranchId) return;
+            } else if (branchChamberIds && branchChamberIds.size > 0) {
+              if (!branchChamberIds.has(String(bData.chamberId))) return;
+            } else {
+              return;
+            }
+          }
+
+          const apptDate = bData.appointmentDate || '';
+          if (apptDate < currentMonthStart || apptDate > currentMonthEnd) return;
+
+          const isCancelled = bData.status === 'cancelled' || bData.isCancelled === true;
+          if (isCancelled) return;
+
+          if (bData.bookingSource === 'clinic_qr' || bData.bookingSource === 'doctor_qr' || (bData.type === 'qr_booking' && !bData.bookingSource)) {
+            monthlyQR++;
+          } else if (bData.type === 'walkin_booking') {
+            monthlyWalkin++;
+          }
+        });
+      });
+
       setAnalyticsData({
         totalScans,
         totalBookings,
@@ -349,7 +385,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
         walkinBookings,
         dropOuts,
         cancelled,
-        monthlyBookings: totalBookings
+        monthlyBookings: monthlyQR + monthlyWalkin
       });
     } catch (error) {
       console.error('Error processing clinic analytics:', error);
@@ -599,6 +635,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
       <ClinicReports
         onMenuChange={handleMenuChange}
         onLogout={handleLogout}
+        clinicId={resolvedClinicId}
       />
     );
   }
@@ -974,7 +1011,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
                     <span className="text-2xl font-semibold text-white">Bookings</span>
                   </div>
                   <p className="text-[11px] text-emerald-100 opacity-80 font-medium">
-                    {new Date().toLocaleString('default', { month: 'short' })} 1, 2026 – {new Date().toLocaleString('default', { month: 'short' })} 31, 2026
+                    {new Date().toLocaleString('default', { month: 'short' })} 1, {new Date().getFullYear()} – {new Date().toLocaleString('default', { month: 'short' })} {new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()}, {new Date().getFullYear()}
                   </p>
                 </div>
 
