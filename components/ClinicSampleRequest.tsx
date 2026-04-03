@@ -63,7 +63,7 @@ export default function ClinicSampleRequest({ onBack, companyName, clinicName }:
 
       for (const compDoc of companiesSnap.docs) {
         const clinicSnap = await getDocs(
-          query(collection(db, 'pharmaCompanies', compDoc.id, 'distributedDoctors'), where('doctorId', '==', clinicId))
+          query(collection(db, 'pharmaCompanies', compDoc.id, 'distributedClinics'), where('clinicId', '==', clinicId))
         );
         if (!clinicSnap.empty) {
           const data = clinicSnap.docs[0].data();

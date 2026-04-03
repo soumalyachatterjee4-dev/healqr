@@ -55,9 +55,9 @@ export default function ClinicCMEViewer({ onBack, companyName, clinicName }: Cli
       let foundCompanyId = '';
 
       for (const compDoc of companiesSnap.docs) {
-        // Check distributedDoctors — clinics are also tracked here with their clinic ID
+        // Check distributedClinics — clinics are tracked here
         const clinicSnap = await getDocs(
-          query(collection(db, 'pharmaCompanies', compDoc.id, 'distributedDoctors'), where('doctorId', '==', clinicId))
+          query(collection(db, 'pharmaCompanies', compDoc.id, 'distributedClinics'), where('clinicId', '==', clinicId))
         );
         if (!clinicSnap.empty) {
           const clinicData = clinicSnap.docs[0].data();

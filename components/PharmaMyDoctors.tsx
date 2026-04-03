@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Search, MapPin, Users, ChevronDown, ChevronUp, X, BarChart3 } from 'lucide-react';
+import { Search, MapPin, Users, ChevronDown, ChevronUp, X, BarChart3, BookOpen, Package } from 'lucide-react';
 import { db } from '../lib/firebase/config';
-import { collection, getDocs, getDoc, doc, query, where, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, query, where, addDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { getLocationFromPincode } from '../utils/pincodeMapping';
 
 interface PharmaMyDoctorsProps {
@@ -33,6 +33,8 @@ interface DoctorRecord {
   monthlyScans: number;
   qrDistributedDate: string;
   isActive: boolean;
+  cmeEnabled: boolean;
+  samplesEnabled: boolean;
   chamberBreakdown: ChamberBreakdown[];
   todayChamberBreakdown: ChamberBreakdown[];
 }
@@ -75,6 +77,8 @@ export default function PharmaMyDoctors({ companyId }: PharmaMyDoctorsProps) {
         pincode: string;
         qrDistributedDate: string;
         isActive: boolean;
+        cmeEnabled: boolean;
+        samplesEnabled: boolean;
       }>();
 
       snap.docs.forEach(docSnap => {
@@ -86,6 +90,8 @@ export default function PharmaMyDoctors({ companyId }: PharmaMyDoctorsProps) {
           pincode: data.pincode || '',
           qrDistributedDate: data.distributedAt?.toDate?.()?.toLocaleDateString?.() || data.distributedAt || '-',
           isActive: data.isActive !== false,
+          cmeEnabled: data.cmeEnabled === true,
+          samplesEnabled: data.samplesEnabled === true,
         });
       });
 
@@ -220,6 +226,8 @@ export default function PharmaMyDoctors({ companyId }: PharmaMyDoctorsProps) {
           monthlyScans: scansByDoctor.get(doctorId) || 0,
           qrDistributedDate: info.qrDistributedDate,
           isActive: info.isActive,
+          cmeEnabled: info.cmeEnabled,
+          samplesEnabled: info.samplesEnabled,
           chamberBreakdown: Array.from(chamberMap.values()),
           todayChamberBreakdown: Array.from(todayChamberMap.values()),
         });
@@ -311,6 +319,22 @@ export default function PharmaMyDoctors({ companyId }: PharmaMyDoctorsProps) {
     }
   };
 
+  const toggleAccess = async (doctorId: string, field: 'cmeEnabled' | 'samplesEnabled') => {
+    try {
+      const distRef = collection(db, 'pharmaCompanies', companyId, 'distributedDoctors');
+      const snap = await getDocs(query(distRef, where('doctorId', '==', doctorId)));
+      if (!snap.empty) {
+        const currentVal = snap.docs[0].data()[field] === true;
+        await updateDoc(snap.docs[0].ref, { [field]: !currentVal });
+        setDoctors(prev => prev.map(d =>
+          d.doctorId === doctorId ? { ...d, [field]: !currentVal } : d
+        ));
+      }
+    } catch (err) {
+      console.error('Toggle access error:', err);
+    }
+  };
+
   const SortIcon = ({ field }: { field: string }) => {
     if (sortField !== field) return null;
     return sortAsc ? <ChevronUp className="w-3 h-3 inline" /> : <ChevronDown className="w-3 h-3 inline" />;
@@ -396,12 +420,13 @@ export default function PharmaMyDoctors({ companyId }: PharmaMyDoctorsProps) {
                   Distributed <SortIcon field="date" />
                 </th>
                 <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-500">Status</th>
+                <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-500 text-center">Access</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800">
               {filteredDoctors.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
                     {searchQuery || selectedState !== 'all' || selectedZone !== 'all'
                       ? 'No doctors match the current filters'
                       : 'No distributed doctors yet'}
@@ -438,6 +463,34 @@ export default function PharmaMyDoctors({ companyId }: PharmaMyDoctorsProps) {
                       }`}>
                         {doc.isActive ? 'Active' : 'Inactive'}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5 justify-center">
+                        <button
+                          onClick={() => toggleAccess(doc.doctorId, 'cmeEnabled')}
+                          title={doc.cmeEnabled ? 'CME Enabled — click to disable' : 'CME Disabled — click to enable'}
+                          className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition ${
+                            doc.cmeEnabled
+                              ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
+                              : 'bg-zinc-800 text-gray-500 hover:bg-zinc-700'
+                          }`}
+                        >
+                          <BookOpen className="w-3 h-3" />
+                          CME
+                        </button>
+                        <button
+                          onClick={() => toggleAccess(doc.doctorId, 'samplesEnabled')}
+                          title={doc.samplesEnabled ? 'Samples Enabled — click to disable' : 'Samples Disabled — click to enable'}
+                          className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition ${
+                            doc.samplesEnabled
+                              ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
+                              : 'bg-zinc-800 text-gray-500 hover:bg-zinc-700'
+                          }`}
+                        >
+                          <Package className="w-3 h-3" />
+                          Samples
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -491,6 +544,29 @@ export default function PharmaMyDoctors({ companyId }: PharmaMyDoctorsProps) {
                   <div className="ml-auto text-right">
                     <p className="text-xs text-gray-500">Distributed: {doc.qrDistributedDate}</p>
                   </div>
+                </div>
+                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-zinc-800">
+                  <span className="text-xs text-gray-500">Access:</span>
+                  <button
+                    onClick={() => toggleAccess(doc.doctorId, 'cmeEnabled')}
+                    className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition ${
+                      doc.cmeEnabled
+                        ? 'bg-emerald-500/20 text-emerald-400'
+                        : 'bg-zinc-800 text-gray-500'
+                    }`}
+                  >
+                    <BookOpen className="w-3 h-3" /> CME
+                  </button>
+                  <button
+                    onClick={() => toggleAccess(doc.doctorId, 'samplesEnabled')}
+                    className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition ${
+                      doc.samplesEnabled
+                        ? 'bg-emerald-500/20 text-emerald-400'
+                        : 'bg-zinc-800 text-gray-500'
+                    }`}
+                  >
+                    <Package className="w-3 h-3" /> Samples
+                  </button>
                 </div>
               </div>
             ))
