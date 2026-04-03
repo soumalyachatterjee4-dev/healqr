@@ -2681,6 +2681,9 @@ export default function App() {
             onBack={() => setCurrentPage("dashboard")}
             companyName={userCompanyName}
             doctorName={userName}
+            onMenuChange={menuChangeHandler}
+            onLogout={handleLogout}
+            activeAddOns={activeAddOns}
           />
         </Suspense>
       )}
@@ -2691,6 +2694,9 @@ export default function App() {
             onBack={() => setCurrentPage("dashboard")}
             companyName={userCompanyName}
             doctorName={userName}
+            onMenuChange={menuChangeHandler}
+            onLogout={handleLogout}
+            activeAddOns={activeAddOns}
           />
         </Suspense>
       )}
@@ -3528,21 +3534,23 @@ export default function App() {
 
       </TranslationProvider>
 
-      {/* AI PM Assistant � always visible on every page */}
-      <AIChatBot
-        language="english"
-        userRole={
-          currentPage === 'doctor-dashboard' || currentPage === 'dashboard'
-            ? 'doctor'
-            : currentPage === 'clinic-dashboard'
-            ? 'clinic'
-            : currentPage === 'patient-dashboard' || currentPage === 'patient-login'
-            ? 'patient'
-            : currentPage === 'admin-panel'
-            ? 'admin'
-            : 'visitor'
-        }
-      />
+      {/* AI PM Assistant — hide on portals that have their own UnifiedChatWidget */}
+      {!['pharma-portal', 'doctor-dashboard', 'dashboard', 'clinic-dashboard', 'advertiser-dashboard'].includes(currentPage) && (
+        <AIChatBot
+          language="english"
+          userRole={
+            currentPage === 'doctor-dashboard' || currentPage === 'dashboard'
+              ? 'doctor'
+              : currentPage === 'clinic-dashboard'
+              ? 'clinic'
+              : currentPage === 'patient-dashboard' || currentPage === 'patient-login'
+              ? 'patient'
+              : currentPage === 'admin-panel'
+              ? 'admin'
+              : 'visitor'
+          }
+        />
+      )}
 
       <Toaster
         position="top-center"

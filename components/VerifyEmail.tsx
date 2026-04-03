@@ -207,6 +207,7 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
                     pincode: signupData.pinCode || '',
                     division: signupData.division || '',
                     qrNumber: signupData.qrNumber || '',
+                    specialty: 'clinic',
                     isActive: true,
                     distributedAt: serverTimestamp(),
                   });

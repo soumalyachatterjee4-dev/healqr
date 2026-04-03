@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { BookOpen, FileText, Video, Link2, FileType, ExternalLink, ArrowLeft, Loader2 } from 'lucide-react';
+import { BookOpen, FileText, Video, Link2, FileType, ExternalLink, ArrowLeft, Loader2, Menu } from 'lucide-react';
+import DashboardSidebar from './DashboardSidebar';
+import { Button } from './ui/button';
 
 interface CMEContent {
   id: string;
@@ -18,9 +20,13 @@ interface DoctorCMEViewerProps {
   onBack: () => void;
   companyName: string;
   doctorName: string;
+  onMenuChange?: (menu: string) => void;
+  onLogout?: () => void | Promise<void>;
+  activeAddOns?: string[];
 }
 
-export default function DoctorCMEViewer({ onBack, companyName, doctorName }: DoctorCMEViewerProps) {
+export default function DoctorCMEViewer({ onBack, companyName, doctorName, onMenuChange = () => {}, onLogout, activeAddOns = [] }: DoctorCMEViewerProps) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [content, setContent] = useState<CMEContent[]>([]);
   const [loading, setLoading] = useState(true);
   const [enabled, setEnabled] = useState<boolean | null>(null);
@@ -127,21 +133,26 @@ export default function DoctorCMEViewer({ onBack, companyName, doctorName }: Doc
 
   if (enabled === false) {
     return (
-      <div className="min-h-screen bg-[#0a0f1a] flex flex-col items-center justify-center p-6">
-        <div className="text-center space-y-4">
-          <BookOpen className="w-16 h-16 text-gray-600 mx-auto" />
-          <h2 className="text-xl font-bold text-white">CME Content Not Available</h2>
-          <p className="text-gray-400 max-w-md">
-            {!companyName
-              ? 'You are not linked to any pharma company.'
-              : 'Your pharma company has not enabled CME content access for your account.'}
-          </p>
-          <button
-            onClick={onBack}
-            className="mt-4 px-4 py-2 bg-zinc-800 text-white rounded-lg hover:bg-zinc-700 transition"
-          >
-            Go Back
-          </button>
+      <div className="min-h-screen bg-[#0a0f1a] text-white">
+        <DashboardSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} activeMenu="pharma-cme" onMenuChange={onMenuChange} onLogout={onLogout} activeAddOns={activeAddOns} />
+        <div className="lg:pl-64">
+          <div className="flex flex-col items-center justify-center p-6 min-h-screen">
+            <div className="text-center space-y-4">
+              <BookOpen className="w-16 h-16 text-gray-600 mx-auto" />
+              <h2 className="text-xl font-bold text-white">CME Content Not Available</h2>
+              <p className="text-gray-400 max-w-md">
+                {!companyName
+                  ? 'You are not linked to any pharma company.'
+                  : 'Your pharma company has not enabled CME content access for your account.'}
+              </p>
+              <button
+                onClick={onBack}
+                className="mt-4 px-4 py-2 bg-zinc-800 text-white rounded-lg hover:bg-zinc-700 transition"
+              >
+                Go Back
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -149,20 +160,27 @@ export default function DoctorCMEViewer({ onBack, companyName, doctorName }: Doc
 
   return (
     <div className="min-h-screen bg-[#0a0f1a] text-white">
-      <div className="max-w-4xl mx-auto p-4 sm:p-6">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <button onClick={onBack} className="p-2 hover:bg-zinc-800 rounded-lg transition">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div>
-            <h1 className="text-xl font-bold flex items-center gap-2">
-              <BookOpen className="w-6 h-6 text-emerald-500" />
-              CME Content
-            </h1>
-            <p className="text-sm text-gray-400">Shared by {companyName}</p>
+      <DashboardSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} activeMenu="pharma-cme" onMenuChange={onMenuChange} onLogout={onLogout} activeAddOns={activeAddOns} />
+      <div className="lg:pl-64">
+        {/* Sticky Header */}
+        <div className="border-b border-gray-800 bg-[#0a0f1a]/95 backdrop-blur sticky top-0 z-40">
+          <div className="px-4 lg:px-8 py-4">
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="icon" className="lg:hidden text-white" onClick={() => setSidebarOpen(true)}>
+                <Menu className="h-5 w-5" />
+              </Button>
+              <div>
+                <h1 className="text-xl font-bold flex items-center gap-2">
+                  <BookOpen className="w-6 h-6 text-emerald-500" />
+                  CME Content
+                </h1>
+                <p className="text-sm text-gray-400">Shared by {companyName}</p>
+              </div>
+            </div>
           </div>
         </div>
+
+        <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
 
         {/* Filter */}
         <div className="flex gap-2 mb-6 flex-wrap">
@@ -230,6 +248,7 @@ export default function DoctorCMEViewer({ onBack, companyName, doctorName }: Doc
             ))}
           </div>
         )}
+      </div>
       </div>
     </div>
   );

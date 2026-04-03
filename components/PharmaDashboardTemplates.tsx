@@ -4,6 +4,7 @@ import { db, storage } from '../lib/firebase/config';
 import { collection, getDocs, addDoc, deleteDoc, doc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { getLocationFromPincode } from '../utils/pincodeMapping';
+import { getSpecialtyDisplayName } from '../utils/medicalSpecialties';
 
 interface PharmaDashboardTemplatesProps {
   companyId: string;
@@ -17,21 +18,8 @@ interface PromoTemplate {
   storagePath: string;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: any;
-  targetStates: string[];
-  targetSpecialties: string[];
-  targetDoctorIds: string[];
-  targetClinicIds: string[];
-  targetDoctorNames: string[];
-  targetClinicNames: string[];
-}
-
-interface TargetEntity {
-  id: string;
-  name: string;
-  type: 'doctor' | 'clinic';
+  territory: string;
   specialty: string;
-  state: string;
-  pincode: string;
 }
 
 export default function PharmaDashboardTemplates({ companyId }: PharmaDashboardTemplatesProps) {
@@ -45,146 +33,45 @@ export default function PharmaDashboardTemplates({ companyId }: PharmaDashboardT
   const [description, setDescription] = useState('');
   const [viewingImage, setViewingImage] = useState<string | null>(null);
 
-  // Cascading filter state
-  const [allEntities, setAllEntities] = useState<TargetEntity[]>([]);
-  const [companyStates, setCompanyStates] = useState<string[]>([]);
-  const [selectedStates, setSelectedStates] = useState<string[]>([]);
-  const [availableSpecialties, setAvailableSpecialties] = useState<string[]>([]);
-  const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
-  const [filteredEntities, setFilteredEntities] = useState<TargetEntity[]>([]);
-  const [selectedEntityIds, setSelectedEntityIds] = useState<string[]>([]);
-  const [selectAll, setSelectAll] = useState(false);
-  const [loadingEntities, setLoadingEntities] = useState(false);
+  // Territory → Specialty cascade (same as CME)
+  const [companyTerritories, setCompanyTerritories] = useState<string[]>([]);
+  const [territorySpecialtiesMap, setTerritorySpecialtiesMap] = useState<Record<string, string[]>>({});
+  const [selectedTerritory, setSelectedTerritory] = useState('');
+  const [selectedSpecialty, setSelectedSpecialty] = useState('');
   const [showDisclaimer, setShowDisclaimer] = useState(false);
 
   useEffect(() => {
     loadTemplates();
-    loadEntities();
+    loadCompanyProfile();
   }, [companyId]);
 
-  // Update available specialties when selected states change
-  useEffect(() => {
-    if (selectedStates.length === 0) {
-      setAvailableSpecialties([]);
-      setSelectedSpecialties([]);
-      setFilteredEntities([]);
-      setSelectedEntityIds([]);
-      return;
-    }
-    const specs = new Set<string>();
-    allEntities.filter(e => selectedStates.includes(e.state)).forEach(e => specs.add(e.specialty));
-    setAvailableSpecialties(Array.from(specs).sort());
-    // Reset downstream
-    setSelectedSpecialties([]);
-    setFilteredEntities([]);
-    setSelectedEntityIds([]);
-    setSelectAll(false);
-  }, [selectedStates, allEntities]);
-
-  // Update filtered entities when specialties change
-  useEffect(() => {
-    if (selectedSpecialties.length === 0) {
-      setFilteredEntities([]);
-      setSelectedEntityIds([]);
-      setSelectAll(false);
-      return;
-    }
-    const filtered = allEntities.filter(e =>
-      selectedStates.includes(e.state) && selectedSpecialties.includes(e.specialty)
-    );
-    setFilteredEntities(filtered);
-    setSelectedEntityIds([]);
-    setSelectAll(false);
-  }, [selectedSpecialties, selectedStates, allEntities]);
-
-  const loadEntities = async () => {
+  const loadCompanyProfile = async () => {
     if (!companyId || !db) return;
-    setLoadingEntities(true);
     try {
-      const entities: TargetEntity[] = [];
-
-      // Load distributed doctors
-      const doctorsSnap = await getDocs(collection(db, 'pharmaCompanies', companyId, 'distributedDoctors'));
-      doctorsSnap.forEach(d => {
-        const data = d.data();
-        const loc = getLocationFromPincode(data.pincode || '');
-        entities.push({
-          id: data.doctorId || d.id,
-          name: data.doctorName || 'Unknown Doctor',
-          type: 'doctor',
-          specialty: data.specialty || 'General',
-          state: loc.state,
-          pincode: data.pincode || '',
-        });
-      });
-
-      // Load distributed clinics
-      const clinicsSnap = await getDocs(collection(db, 'pharmaCompanies', companyId, 'distributedClinics'));
-      clinicsSnap.forEach(d => {
-        const data = d.data();
-        const loc = getLocationFromPincode(data.pincode || '');
-        entities.push({
-          id: data.clinicId || d.id,
-          name: data.clinicName || 'Unknown Clinic',
-          type: 'clinic',
-          specialty: 'Clinic',
-          state: loc.state,
-          pincode: data.pincode || '',
-        });
-      });
-
-      // Also check doctors & clinics collections by companyName (trimmed, case-insensitive)
       const companyDoc = await getDoc(doc(db, 'pharmaCompanies', companyId));
-      const companyName = companyDoc.exists() ? companyDoc.data().companyName : '';
-      if (companyName) {
-        const lcName = companyName.toLowerCase().trim();
-        const existingDoctorIds = new Set(entities.filter(e => e.type === 'doctor').map(e => e.id));
-
-        const allDoctorsSnap = await getDocs(collection(db, 'doctors'));
-        allDoctorsSnap.forEach(d => {
-          if (existingDoctorIds.has(d.id)) return;
-          const data = d.data();
-          const cn = data.companyName;
-          if (!cn || cn.toLowerCase().trim() !== lcName) return;
-          const loc = getLocationFromPincode(data.pinCode || '');
-          entities.push({
-            id: d.id,
-            name: data.name || 'Unknown Doctor',
-            type: 'doctor',
-            specialty: Array.isArray(data.specialties) ? data.specialties.join(', ') : (data.specialty || 'General'),
-            state: loc.state,
-            pincode: data.pinCode || '',
-          });
-        });
-
-        const existingClinicIds = new Set(entities.filter(e => e.type === 'clinic').map(e => e.id));
-        const allClinicsSnap = await getDocs(collection(db, 'clinics'));
-        allClinicsSnap.forEach(d => {
-          if (existingClinicIds.has(d.id)) return;
-          const data = d.data();
-          const cn = data.companyName;
-          if (!cn || cn.toLowerCase().trim() !== lcName) return;
-          const loc = getLocationFromPincode(data.pinCode || '');
-          entities.push({
-            id: d.id,
-            name: data.name || 'Unknown Clinic',
-            type: 'clinic',
-            specialty: 'Clinic',
-            state: loc.state,
-            pincode: data.pinCode || '',
-          });
-        });
+      if (companyDoc.exists()) {
+        const data = companyDoc.data();
+        setCompanyTerritories(data.territoryStates || []);
+        setTerritorySpecialtiesMap(data.territorySpecialties || data.profile?.territorySpecialties || {});
       }
-
-      setAllEntities(entities);
-      const stateSet = new Set(entities.map(e => e.state).filter(Boolean));
-      setCompanyStates(Array.from(stateSet).sort());
     } catch (err) {
-      console.error('Error loading entities:', err);
-    } finally {
-      setLoadingEntities(false);
+      console.error('Error loading company profile:', err);
     }
   };
+
+  const specialtyOptions = (() => {
+    const specSet = new Set<string>();
+    if (selectedTerritory && territorySpecialtiesMap[selectedTerritory]) {
+      territorySpecialtiesMap[selectedTerritory].forEach(s => specSet.add(s));
+    } else {
+      // All territories — merge all specialties
+      Object.values(territorySpecialtiesMap).forEach(arr => arr.forEach(s => specSet.add(s)));
+    }
+    specSet.add('Clinic');
+    return [...specSet]
+      .map(s => ({ value: s, label: getSpecialtyDisplayName(s) }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  })();
 
   const loadTemplates = async () => {
     if (!companyId || !db) return;
@@ -202,12 +89,8 @@ export default function PharmaDashboardTemplates({ companyId }: PharmaDashboardT
         storagePath: d.data().storagePath || '',
         status: d.data().status || 'pending',
         createdAt: d.data().createdAt,
-        targetSpecialties: d.data().targetSpecialties || [],
-        targetStates: d.data().targetStates || [],
-        targetDoctorIds: d.data().targetDoctorIds || [],
-        targetClinicIds: d.data().targetClinicIds || [],
-        targetDoctorNames: d.data().targetDoctorNames || [],
-        targetClinicNames: d.data().targetClinicNames || [],
+        territory: d.data().territory || 'All',
+        specialty: d.data().specialty || 'All',
       }));
 
       items.sort((a, b) => {
@@ -245,8 +128,8 @@ export default function PharmaDashboardTemplates({ companyId }: PharmaDashboardT
 
   const handleUploadClick = () => {
     if (!selectedFile || !title.trim() || !companyId || !db || !storage) return;
-    if (selectedEntityIds.length === 0) {
-      alert('Please select at least one doctor or clinic to target');
+    if (templates.length >= 2) {
+      alert('Maximum 2 templates allowed at a time. Please delete an existing template first.');
       return;
     }
     setShowDisclaimer(true);
@@ -265,10 +148,7 @@ export default function PharmaDashboardTemplates({ companyId }: PharmaDashboardT
       await uploadBytes(storageRef, selectedFile);
       const imageUrl = await getDownloadURL(storageRef);
 
-      const targetDoctors = filteredEntities.filter(e => e.type === 'doctor' && selectedEntityIds.includes(e.id));
-      const targetClinics = filteredEntities.filter(e => e.type === 'clinic' && selectedEntityIds.includes(e.id));
-
-      // Save to Firestore
+      // Save to Firestore with territory + specialty
       const templatesRef = collection(db, 'pharmaCompanies', companyId, 'promoTemplates');
       await addDoc(templatesRef, {
         title: title.trim(),
@@ -277,12 +157,8 @@ export default function PharmaDashboardTemplates({ companyId }: PharmaDashboardT
         storagePath,
         status: 'approved',
         createdAt: serverTimestamp(),
-        targetStates: selectedStates,
-        targetSpecialties: selectedSpecialties,
-        targetDoctorIds: targetDoctors.map(d => d.id),
-        targetClinicIds: targetClinics.map(c => c.id),
-        targetDoctorNames: targetDoctors.map(d => d.name),
-        targetClinicNames: targetClinics.map(c => c.name),
+        territory: selectedTerritory || 'All',
+        specialty: selectedSpecialty || 'All',
         companyId,
       });
 
@@ -291,10 +167,8 @@ export default function PharmaDashboardTemplates({ companyId }: PharmaDashboardT
       setDescription('');
       setSelectedFile(null);
       setPreviewUrl(null);
-      setSelectedStates([]);
-      setSelectedSpecialties([]);
-      setSelectedEntityIds([]);
-      setSelectAll(false);
+      setSelectedTerritory('');
+      setSelectedSpecialty('');
       setShowUpload(false);
 
       await loadTemplates();
@@ -367,10 +241,12 @@ export default function PharmaDashboardTemplates({ companyId }: PharmaDashboardT
         </div>
         <button
           onClick={() => setShowUpload(!showUpload)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors text-sm"
+          disabled={templates.length >= 2 && !showUpload}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors text-sm"
+          title={templates.length >= 2 ? 'Maximum 2 templates allowed' : ''}
         >
           <Plus className="w-4 h-4" />
-          Upload Template
+          {templates.length >= 2 ? 'Limit Reached (2/2)' : 'Upload Template'}
         </button>
       </div>
 
@@ -403,114 +279,46 @@ export default function PharmaDashboardTemplates({ companyId }: PharmaDashboardT
             />
           </div>
 
-          {/* Cascading Target Selection: State → Specialty → Doctor/Clinic */}
+          {/* Territory → Specialty Selection (same as CME) */}
           <div className="space-y-4 border border-zinc-700 rounded-lg p-4">
             <h4 className="text-sm font-medium text-gray-300">Target Selection</h4>
 
-            {loadingEntities ? (
-              <div className="flex items-center gap-2 text-sm text-gray-400">
-                <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent" />
-                Loading doctors & clinics...
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Territory Dropdown */}
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Territory</label>
+                <select
+                  value={selectedTerritory}
+                  onChange={(e) => { setSelectedTerritory(e.target.value); setSelectedSpecialty(''); }}
+                  className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Territories</option>
+                  {companyTerritories.map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
               </div>
-            ) : companyStates.length === 0 ? (
-              <p className="text-sm text-gray-500">No distributed doctors or clinics found. Add them from My Doctors / My Clinics first.</p>
-            ) : (
-              <>
-                {/* Step 1: Select States */}
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">1. Select State(s)</label>
-                  <div className="flex flex-wrap gap-2">
-                    {companyStates.map(state => (
-                      <button
-                        key={state}
-                        onClick={() => setSelectedStates(prev =>
-                          prev.includes(state) ? prev.filter(s => s !== state) : [...prev, state]
-                        )}
-                        className={`px-3 py-1.5 rounded-full text-xs transition-colors ${
-                          selectedStates.includes(state)
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-zinc-800 text-gray-400 hover:bg-zinc-700'
-                        }`}
-                      >
-                        {state}
-                      </button>
-                    ))}
-                  </div>
-                </div>
 
-                {/* Step 2: Select Specialties */}
-                {selectedStates.length > 0 && availableSpecialties.length > 0 && (
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-2">2. Select Specialty</label>
-                    <div className="flex flex-wrap gap-2">
-                      {availableSpecialties.map(spec => (
-                        <button
-                          key={spec}
-                          onClick={() => setSelectedSpecialties(prev =>
-                            prev.includes(spec) ? prev.filter(s => s !== spec) : [...prev, spec]
-                          )}
-                          className={`px-3 py-1.5 rounded-full text-xs transition-colors ${
-                            selectedSpecialties.includes(spec)
-                              ? 'bg-emerald-600 text-white'
-                              : 'bg-zinc-800 text-gray-400 hover:bg-zinc-700'
-                          }`}
-                        >
-                          {spec}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+              {/* Specialty Dropdown */}
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Specialty</label>
+                <select
+                  value={selectedSpecialty}
+                  onChange={(e) => setSelectedSpecialty(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Specialties</option>
+                  {specialtyOptions.map(s => (
+                    <option key={s.value} value={s.value}>{s.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
 
-                {/* Step 3: Select Doctors / Clinics */}
-                {selectedSpecialties.length > 0 && filteredEntities.length > 0 && (
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-2">3. Select Doctor(s) / Clinic(s)</label>
-                    <label className="flex items-center gap-2 mb-2 cursor-pointer text-sm text-gray-300">
-                      <input
-                        type="checkbox"
-                        checked={selectAll}
-                        onChange={(e) => {
-                          setSelectAll(e.target.checked);
-                          setSelectedEntityIds(e.target.checked ? filteredEntities.map(en => en.id) : []);
-                        }}
-                        className="rounded border-zinc-600 bg-zinc-800"
-                      />
-                      Select All ({filteredEntities.length})
-                    </label>
-                    <div className="max-h-48 overflow-y-auto space-y-1 border border-zinc-700 rounded-lg p-2">
-                      {filteredEntities.map(entity => (
-                        <label key={entity.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-zinc-800 rounded cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selectedEntityIds.includes(entity.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                const next = [...selectedEntityIds, entity.id];
-                                setSelectedEntityIds(next);
-                                setSelectAll(next.length === filteredEntities.length);
-                              } else {
-                                setSelectedEntityIds(prev => prev.filter(id => id !== entity.id));
-                                setSelectAll(false);
-                              }
-                            }}
-                            className="rounded border-zinc-600 bg-zinc-800"
-                          />
-                          <span className="text-sm text-gray-300">{entity.name}</span>
-                          <span className={`text-xs px-1.5 py-0.5 rounded-full ${entity.type === 'doctor' ? 'bg-blue-500/20 text-blue-400' : 'bg-purple-500/20 text-purple-400'}`}>
-                            {entity.type === 'doctor' ? 'Dr' : 'Clinic'}
-                          </span>
-                          <span className="text-xs text-gray-500 ml-auto">{entity.state}</span>
-                        </label>
-                      ))}
-                    </div>
-                    {selectedEntityIds.length > 0 && (
-                      <p className="text-xs text-emerald-400 mt-1">{selectedEntityIds.length} selected</p>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
+            <p className="text-xs text-gray-500">
+              Leave as "All" to show this template to all your distributed doctors/clinics.
+              Select territory + specialty to target specific groups.
+            </p>
           </div>
 
           {/* Image Upload */}
@@ -537,14 +345,14 @@ export default function PharmaDashboardTemplates({ companyId }: PharmaDashboardT
 
           <div className="flex justify-end gap-3 pt-2">
             <button
-              onClick={() => { setShowUpload(false); setTitle(''); setDescription(''); setSelectedFile(null); setPreviewUrl(null); setSelectedStates([]); setSelectedSpecialties([]); setSelectedEntityIds([]); setSelectAll(false); }}
+              onClick={() => { setShowUpload(false); setTitle(''); setDescription(''); setSelectedFile(null); setPreviewUrl(null); setSelectedTerritory(''); setSelectedSpecialty(''); }}
               className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={handleUploadClick}
-              disabled={uploading || !selectedFile || !title.trim() || selectedEntityIds.length === 0}
+              disabled={uploading || !selectedFile || !title.trim()}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm transition-colors flex items-center gap-2"
             >
               {uploading ? (
@@ -609,25 +417,18 @@ export default function PharmaDashboardTemplates({ companyId }: PharmaDashboardT
                   <p className="text-xs text-gray-500 mb-2 line-clamp-2">{template.description}</p>
                 )}
                 <div className="flex flex-wrap gap-1 mb-3">
-                  {(template.targetStates || []).map(state => (
-                    <span key={state} className="text-xs px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded-full">
-                      {state}
+                  {template.territory && (
+                    <span className="text-xs px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded-full">
+                      {template.territory}
                     </span>
-                  ))}
-                  {(template.targetDoctorNames || []).slice(0, 2).map(name => (
-                    <span key={name} className="text-xs px-2 py-0.5 bg-zinc-800 text-gray-400 rounded-full">
-                      {name}
+                  )}
+                  {template.specialty && (
+                    <span className="text-xs px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full">
+                      {getSpecialtyDisplayName(template.specialty)}
                     </span>
-                  ))}
-                  {(template.targetClinicNames || []).slice(0, 2).map(name => (
-                    <span key={name} className="text-xs px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded-full">
-                      {name}
-                    </span>
-                  ))}
-                  {((template.targetDoctorNames?.length || 0) + (template.targetClinicNames?.length || 0)) > 4 && (
-                    <span className="text-xs px-2 py-0.5 bg-zinc-800 text-gray-400 rounded-full">
-                      +{(template.targetDoctorNames?.length || 0) + (template.targetClinicNames?.length || 0) - 4} more
-                    </span>
+                  )}
+                  {!template.territory && !template.specialty && (
+                    <span className="text-xs px-2 py-0.5 bg-zinc-800 text-gray-400 rounded-full">All Targets</span>
                   )}
                 </div>
                 <div className="flex items-center justify-between">

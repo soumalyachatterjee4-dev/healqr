@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
-import { BookOpen, Plus, Power, Trash2, Upload, Search, Users, FileText, Video, Link, X, Loader2, Eye, EyeOff } from 'lucide-react';
-import { db, storage } from '../lib/firebase/config';
-import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { useState, useEffect, useMemo } from 'react';
+import { BookOpen, Plus, Power, Trash2, Search, Users, FileText, Video, Link, X, Loader2, Eye, EyeOff, ExternalLink } from 'lucide-react';
+import { db } from '../lib/firebase/config';
+import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, serverTimestamp, query, orderBy, getDoc } from 'firebase/firestore';
+import { getSpecialtyDisplayName } from '../utils/medicalSpecialties';
 
 interface PharmaCMEManagerProps {
   companyId: string;
@@ -15,6 +15,7 @@ interface CMEContent {
   type: 'pdf' | 'video' | 'link' | 'article';
   url: string;
   specialty: string;
+  territory: string;
   createdAt: any;
   isActive: boolean;
 }
@@ -41,10 +42,30 @@ export default function PharmaCMEManager({ companyId }: PharmaCMEManagerProps) {
   const [newType, setNewType] = useState<CMEContent['type']>('pdf');
   const [newUrl, setNewUrl] = useState('');
   const [newSpecialty, setNewSpecialty] = useState('');
-  const [newFile, setNewFile] = useState<File | null>(null);
+  const [newTerritory, setNewTerritory] = useState('');
+  const [companyTerritories, setCompanyTerritories] = useState<string[]>([]);
+  const [territorySpecialties, setTerritorySpecialties] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
     loadData();
+  }, [companyId]);
+
+  // Load company profile territories + specialties
+  useEffect(() => {
+    const loadCompanyProfile = async () => {
+      if (!companyId || !db) return;
+      try {
+        const companyDoc = await getDoc(doc(db, 'pharmaCompanies', companyId));
+        if (companyDoc.exists()) {
+          const data = companyDoc.data();
+          setCompanyTerritories(data.territoryStates || []);
+          setTerritorySpecialties(data.territorySpecialties || data.profile?.territorySpecialties || {});
+        }
+      } catch (err) {
+        console.error('Error loading company profile:', err);
+      }
+    };
+    loadCompanyProfile();
   }, [companyId]);
 
   const loadData = async () => {
@@ -63,6 +84,7 @@ export default function PharmaCMEManager({ companyId }: PharmaCMEManagerProps) {
         type: d.data().type || 'article',
         url: d.data().url || '',
         specialty: d.data().specialty || 'All',
+        territory: d.data().territory || 'All',
         createdAt: d.data().createdAt,
         isActive: d.data().isActive !== false,
       })));
@@ -83,21 +105,15 @@ export default function PharmaCMEManager({ companyId }: PharmaCMEManagerProps) {
   };
 
   const handleAddContent = async () => {
-    if (!newTitle.trim() || !db) return;
+    if (!newTitle.trim() || !newUrl.trim() || !db) return;
     setUploading(true);
     try {
-      let fileUrl = newUrl;
-      if (newFile && storage) {
-        const path = `pharma/${companyId}/cme/${Date.now()}_${newFile.name}`;
-        const storageRef = ref(storage, path);
-        await uploadBytes(storageRef, newFile);
-        fileUrl = await getDownloadURL(storageRef);
-      }
       await addDoc(collection(db, 'pharmaCompanies', companyId, 'cmeContent'), {
         title: newTitle.trim(),
         description: newDesc.trim(),
         type: newType,
-        url: fileUrl,
+        url: newUrl.trim(),
+        territory: newTerritory || 'All',
         specialty: newSpecialty || 'All',
         createdAt: serverTimestamp(),
         isActive: true,
@@ -113,7 +129,7 @@ export default function PharmaCMEManager({ companyId }: PharmaCMEManagerProps) {
   };
 
   const resetForm = () => {
-    setNewTitle(''); setNewDesc(''); setNewType('pdf'); setNewUrl(''); setNewSpecialty(''); setNewFile(null);
+    setNewTitle(''); setNewDesc(''); setNewType('pdf'); setNewUrl(''); setNewSpecialty(''); setNewTerritory('');
   };
 
   const toggleContentActive = async (id: string, current: boolean) => {
@@ -172,6 +188,20 @@ export default function PharmaCMEManager({ companyId }: PharmaCMEManagerProps) {
     : activations;
 
   const enabledCount = activations.filter(d => d.cmeEnabled).length;
+
+  const specialtyOptions = useMemo(() => {
+    const specSet = new Set<string>();
+    if (newTerritory && territorySpecialties[newTerritory]) {
+      territorySpecialties[newTerritory].forEach(s => specSet.add(s));
+    } else {
+      // All territories — merge all specialties
+      Object.values(territorySpecialties).forEach(arr => arr.forEach(s => specSet.add(s)));
+    }
+    specSet.add('Clinic');
+    return [...specSet]
+      .map(s => ({ value: s, label: getSpecialtyDisplayName(s) }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [newTerritory, territorySpecialties]);
 
   if (loading) {
     return (
@@ -247,7 +277,7 @@ export default function PharmaCMEManager({ companyId }: PharmaCMEManagerProps) {
                 <div className="p-8 text-center text-gray-500">
                   <BookOpen className="w-8 h-8 mx-auto mb-3 text-gray-600" />
                   <p>No content added yet</p>
-                  <p className="text-xs mt-1">Upload PDFs, videos, or links to share with doctors</p>
+                  <p className="text-xs mt-1">Share Google Drive links, articles & resources with doctors</p>
                 </div>
               ) : (
                 contents.map(c => {
@@ -263,6 +293,9 @@ export default function PharmaCMEManager({ companyId }: PharmaCMEManagerProps) {
                         <p className="text-xs text-gray-500 truncate">{c.description || 'No description'}</p>
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-xs px-1.5 py-0.5 bg-zinc-800 rounded text-gray-400 uppercase">{c.type}</span>
+                          {c.territory && c.territory !== 'All' && (
+                            <span className="text-xs text-emerald-500">{c.territory}</span>
+                          )}
                           <span className="text-xs text-gray-600">{c.specialty}</span>
                         </div>
                       </div>
@@ -372,49 +405,66 @@ export default function PharmaCMEManager({ companyId }: PharmaCMEManagerProps) {
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-400 mb-1 block">Type</label>
+                <label className="text-sm text-gray-400 mb-1 block">Content Type</label>
                 <select
                   value={newType}
                   onChange={e => setNewType(e.target.value as CMEContent['type'])}
                   className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white"
                 >
-                  <option value="pdf">PDF Document</option>
-                  <option value="video">Video</option>
+                  <option value="pdf">PDF (Google Drive Link)</option>
+                  <option value="video">Video (Google Drive Link)</option>
                   <option value="link">External Link</option>
-                  <option value="article">Article</option>
+                  <option value="article">Article Link</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-sm text-gray-400 mb-1 block">Territory</label>
+                <select
+                  value={newTerritory}
+                  onChange={e => { setNewTerritory(e.target.value); setNewSpecialty(''); }}
+                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white"
+                >
+                  <option value="">All Territories</option>
+                  {companyTerritories.map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
                 </select>
               </div>
               <div>
                 <label className="text-sm text-gray-400 mb-1 block">Specialty</label>
-                <input
+                <select
                   value={newSpecialty}
                   onChange={e => setNewSpecialty(e.target.value)}
                   className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white"
-                  placeholder="e.g. Cardiology (leave empty for All)"
-                />
+                >
+                  <option value="">All Specialties</option>
+                  {specialtyOptions.map(s => (
+                    <option key={s.value} value={s.value}>{s.label}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  {specialtyOptions.length > 0
+                    ? `${specialtyOptions.length} specialties available`
+                    : 'No specialties assigned yet'}
+                </p>
               </div>
-              {(newType === 'pdf' || newType === 'video') && (
-                <div>
-                  <label className="text-sm text-gray-400 mb-1 block">Upload File</label>
-                  <input
-                    type="file"
-                    accept={newType === 'pdf' ? '.pdf' : 'video/*'}
-                    onChange={e => setNewFile(e.target.files?.[0] || null)}
-                    className="w-full text-sm text-gray-400 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-zinc-800 file:text-gray-300 file:text-sm file:cursor-pointer"
-                  />
-                </div>
-              )}
-              {(newType === 'link' || newType === 'article') && (
-                <div>
-                  <label className="text-sm text-gray-400 mb-1 block">URL</label>
+              <div>
+                <label className="text-sm text-gray-400 mb-1 block">Google Drive / URL *</label>
+                <div className="flex items-center gap-2">
+                  <ExternalLink className="w-4 h-4 text-blue-400 flex-shrink-0" />
                   <input
                     value={newUrl}
                     onChange={e => setNewUrl(e.target.value)}
                     className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white"
-                    placeholder="https://..."
+                    placeholder={newType === 'pdf' || newType === 'video' ? 'https://drive.google.com/file/d/...' : 'https://...'}
                   />
                 </div>
-              )}
+                <p className="text-xs text-gray-500 mt-1">
+                  {newType === 'pdf' || newType === 'video' 
+                    ? 'Paste your Google Drive sharing link. Make sure the file is set to "Anyone with the link can view".' 
+                    : 'Paste the full URL to the content.'}
+                </p>
+              </div>
             </div>
             <div className="p-4 border-t border-zinc-800 flex justify-end gap-2">
               <button
@@ -425,11 +475,11 @@ export default function PharmaCMEManager({ companyId }: PharmaCMEManagerProps) {
               </button>
               <button
                 onClick={handleAddContent}
-                disabled={!newTitle.trim() || uploading}
+                disabled={!newTitle.trim() || !newUrl.trim() || uploading}
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium disabled:opacity-50 flex items-center gap-2"
               >
-                {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                {uploading ? 'Uploading...' : 'Add Content'}
+                {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                {uploading ? 'Saving...' : 'Add Content'}
               </button>
             </div>
           </div>

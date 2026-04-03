@@ -559,12 +559,13 @@ export class AdminStatsService {
           const data = doc.data();
           return {
             id: doc.id,
-            doctorName: data.doctorName || 'Unknown',
-            doctorCode: data.doctorId || data.doctorCode || 'N/A',
+            doctorName: data.entityName || data.doctorName || 'Unknown',
+            doctorCode: data.entityId || data.doctorId || data.doctorCode || 'N/A',
             message: data.comment || data.message || '',
             rating: data.rating || data.stars || 0,
             date: data.createdAt?.toDate()?.toLocaleDateString() || 'N/A',
-            uploaded: data.uploaded || false,
+            uploaded: data.uploadedToLanding || false,
+            entityType: data.entityType || 'doctor',
           };
         });
       

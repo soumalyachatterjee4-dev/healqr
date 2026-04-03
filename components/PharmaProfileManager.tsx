@@ -16,32 +16,9 @@ import { toast } from 'sonner';
 import { getAllStates } from '../utils/pincodeMapping';
 import { Button } from './ui/button';
 import { Globe, Plus, Trash2, Loader2, Upload, X, Pencil } from 'lucide-react';
+import { SPECIALTY_DISPLAY_NAMES } from '../utils/medicalSpecialties';
 
-const ALL_SPECIALTIES = [
-  "Clinic",
-  "General Physician",
-  "Cardiologist",
-  "Dermatologist",
-  "Gynecologist",
-  "Pediatrician",
-  "Orthopedist",
-  "Neurologist",
-  "Psychiatrist",
-  "Dentist",
-  "ENT Specialist",
-  "Ophthalmologist",
-  "Urologist",
-  "Gastroenterologist",
-  "Pulmonologist",
-  "Endocrinologist",
-  "Rheumatologist",
-  "Nephrologist",
-  "Oncologist",
-  "Surgeon",
-  "Physiotherapist",
-  "Ayurveda",
-  "Homeopathy",
-];
+const ALL_SPECIALTIES = SPECIALTY_DISPLAY_NAMES;
 
 interface PharmaProfileManagerProps {
   companyId: string;
@@ -51,9 +28,10 @@ interface ChangeRequest {
   id: string;
   companyId: string;
   companyName?: string;
-  type: 'territory' | 'specialty' | 'profile_edit';
+  type: 'territory' | 'specialty' | 'profile_edit' | 'territory_specialty';
   action: 'add' | 'remove' | 'update';
   items: string[];
+  territory?: string;
   changes?: Record<string, { from: string; to: string }>;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: any;
@@ -73,6 +51,7 @@ export default function PharmaProfileManager({ companyId }: PharmaProfileManager
   const [specialtyAdd, setSpecialtyAdd] = useState<string[]>([]);
   const [specialtyRemove, setSpecialtyRemove] = useState<string[]>([]);
   const [postingRequest, setPostingRequest] = useState(false);
+  const [selectedTerritory, setSelectedTerritory] = useState<string>('');
 
   // Registration Details edit state
   const [editingRegistration, setEditingRegistration] = useState(false);
@@ -101,6 +80,10 @@ export default function PharmaProfileManager({ companyId }: PharmaProfileManager
       const snap = await getDoc(docRef);
       if (snap.exists()) {
         const data = snap.data();
+        // Merge territorySpecialties from both possible locations (migration compat)
+        if (!data.territorySpecialties && data.profile?.territorySpecialties) {
+          data.territorySpecialties = data.profile.territorySpecialties;
+        }
         setProfile(data);
         setContactPerson(data.contactPerson || '');
         setContactPhone(data.contactPhone || '');
@@ -250,9 +233,10 @@ export default function PharmaProfileManager({ companyId }: PharmaProfileManager
   };
 
   const submitChangeRequest = async (
-    type: 'territory' | 'specialty',
+    type: 'territory' | 'specialty' | 'territory_specialty',
     action: 'add' | 'remove',
-    items: string[]
+    items: string[],
+    territory?: string
   ) => {
     if (!db || !companyId || items.length === 0) return;
     setPostingRequest(true);
@@ -263,6 +247,7 @@ export default function PharmaProfileManager({ companyId }: PharmaProfileManager
         type,
         action,
         items,
+        ...(territory ? { territory } : {}),
         status: 'pending',
         createdAt: serverTimestamp(),
       });
@@ -373,10 +358,13 @@ export default function PharmaProfileManager({ companyId }: PharmaProfileManager
 
   const availableAddStates = allStates.filter((s) => !profile.territoryStates?.includes(s));
   const availableRemoveStates = profile.territoryStates || [];
-  const availableAddSpecialties = ALL_SPECIALTIES.filter(
-    (s) => !profile.specialties?.includes(s)
-  );
-  const availableRemoveSpecialties = profile.specialties || [];
+  const territories = profile.territoryStates || [];
+  const territorySpecialties: Record<string, string[]> = profile.territorySpecialties || {};
+
+  // For the selected territory, compute available add/remove specialties
+  const currentTerritorySpecs = selectedTerritory ? (territorySpecialties[selectedTerritory] || []) : [];
+  const availableAddSpecialties = ALL_SPECIALTIES.filter(s => !currentTerritorySpecs.includes(s));
+  const availableRemoveSpecialties = currentTerritorySpecs;
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -634,63 +622,114 @@ export default function PharmaProfileManager({ companyId }: PharmaProfileManager
         )}
       </div>
 
-      {/* Specialties section */}
+      {/* Territory → Specialties section */}
       <div className="bg-zinc-900 rounded-xl p-6 space-y-4">
-        <h3 className="font-semibold">Specialties Covered</h3>
-        <p className="text-sm text-gray-400">{(profile.specialties || []).join(', ') || 'None'}</p>
-        {/* Add specialties */}
-        {availableAddSpecialties.length === 0 && (
-          <p className="text-xs text-gray-400 italic">
-            All available specialties are already covered.
-          </p>
-        )}
-        {availableAddSpecialties.length > 0 && (
+        <h3 className="font-semibold">Specialties by Territory</h3>
+
+        {/* Summary: show all territories and their specialties */}
+        {territories.length > 0 ? (
           <div className="space-y-2">
-            <p className="text-xs text-gray-400">Add specialties (click to select then Request addition)</p>
-            <div className="flex flex-wrap gap-2">
-              {availableAddSpecialties.map((s) => (
-                <button
-                  key={s}
-                  className={`px-2 py-1 rounded-full text-sm border ${specialtyAdd.includes(s)
-                    ? 'bg-blue-600 border-blue-600 text-white'
-                    : 'border-blue-400 text-blue-300'
-                  }`}
-                  onClick={() => {
-                    setSpecialtyAdd((prev) =>
-                      prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]
-                    );
-                  }}
-                >{s}</button>
-              ))}
-            </div>
-            <Button disabled={specialtyAdd.length === 0 || postingRequest} onClick={() => submitChangeRequest('specialty', 'add', specialtyAdd)}>
-              Request addition
-            </Button>
+            {territories.map((state) => (
+              <div key={state} className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-medium text-emerald-400 min-w-[120px]">{state}:</span>
+                <span className="text-sm text-gray-400">
+                  {(territorySpecialties[state] || []).length > 0
+                    ? (territorySpecialties[state] || []).join(', ')
+                    : <span className="italic">No specialties assigned</span>}
+                </span>
+              </div>
+            ))}
           </div>
+        ) : (
+          <p className="text-sm text-gray-500 italic">No territories added yet. Add territories above first.</p>
         )}
-        {/* Remove specialties */}
-        {availableRemoveSpecialties.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-xs text-gray-400">Remove specialties</p>
-            <div className="flex flex-wrap gap-2">
-              {availableRemoveSpecialties.map((s) => (
-                <button
-                  key={s}
-                  className={`px-2 py-1 rounded-full text-sm border ${specialtyRemove.includes(s)
-                    ? 'bg-red-600 border-red-600 text-white'
-                    : 'border-red-400 text-red-300'
-                  }`}
-                  onClick={() => {
-                    setSpecialtyRemove((prev) =>
-                      prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]
-                    );
-                  }}
-                >{s}</button>
-              ))}
+
+        {/* Territory selector */}
+        {territories.length > 0 && (
+          <div className="space-y-3 pt-2 border-t border-zinc-800">
+            <div>
+              <p className="text-xs text-gray-400 mb-1">Select territory to manage specialties</p>
+              <select
+                value={selectedTerritory}
+                onChange={e => { setSelectedTerritory(e.target.value); setSpecialtyAdd([]); setSpecialtyRemove([]); }}
+                className="w-full sm:w-64 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white"
+              >
+                <option value="">— Select a territory —</option>
+                {territories.map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
             </div>
-            <Button disabled={specialtyRemove.length === 0 || postingRequest} variant="outline" onClick={() => submitChangeRequest('specialty', 'remove', specialtyRemove)}>
-              Request removal
-            </Button>
+
+            {selectedTerritory && (
+              <>
+                {/* Current specialties for this territory */}
+                <div>
+                  <p className="text-xs text-gray-400 mb-1">
+                    Current specialties for <span className="text-emerald-400 font-medium">{selectedTerritory}</span>
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {currentTerritorySpecs.length > 0 ? currentTerritorySpecs.map(s => (
+                      <span key={s} className="px-2 py-1 rounded-full text-xs bg-emerald-900/50 text-emerald-300 border border-emerald-700">{s}</span>
+                    )) : (
+                      <span className="text-sm text-gray-500 italic">None assigned</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Add specialties */}
+                {availableAddSpecialties.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-gray-400">Add specialties to {selectedTerritory} (click to select then Request addition)</p>
+                    <div className="flex flex-wrap gap-2">
+                      {availableAddSpecialties.map((s) => (
+                        <button
+                          key={s}
+                          className={`px-2 py-1 rounded-full text-sm border ${specialtyAdd.includes(s)
+                            ? 'bg-blue-600 border-blue-600 text-white'
+                            : 'border-blue-400 text-blue-300'
+                          }`}
+                          onClick={() => {
+                            setSpecialtyAdd((prev) =>
+                              prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]
+                            );
+                          }}
+                        >{s}</button>
+                      ))}
+                    </div>
+                    <Button disabled={specialtyAdd.length === 0 || postingRequest} onClick={() => submitChangeRequest('territory_specialty', 'add', specialtyAdd, selectedTerritory)}>
+                      Request addition
+                    </Button>
+                  </div>
+                )}
+
+                {/* Remove specialties */}
+                {availableRemoveSpecialties.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-gray-400">Remove specialties from {selectedTerritory}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {availableRemoveSpecialties.map((s) => (
+                        <button
+                          key={s}
+                          className={`px-2 py-1 rounded-full text-sm border ${specialtyRemove.includes(s)
+                            ? 'bg-red-600 border-red-600 text-white'
+                            : 'border-red-400 text-red-300'
+                          }`}
+                          onClick={() => {
+                            setSpecialtyRemove((prev) =>
+                              prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]
+                            );
+                          }}
+                        >{s}</button>
+                      ))}
+                    </div>
+                    <Button disabled={specialtyRemove.length === 0 || postingRequest} variant="outline" onClick={() => submitChangeRequest('territory_specialty', 'remove', specialtyRemove, selectedTerritory)}>
+                      Request removal
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
       </div>

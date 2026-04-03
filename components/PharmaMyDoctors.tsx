@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, MapPin, Users, ChevronDown, ChevronUp, X, BarChart3, BookOpen, Package } from 'lucide-react';
+import { Search, MapPin, Users, ChevronDown, ChevronUp, X, BarChart3, BookOpen, Package, Printer } from 'lucide-react';
 import { db } from '../lib/firebase/config';
 import { collection, getDocs, getDoc, doc, query, where, addDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { getLocationFromPincode } from '../utils/pincodeMapping';
@@ -31,6 +31,7 @@ interface DoctorRecord {
   monthlyBookings: number;
   todayBookings: number;
   monthlyScans: number;
+  qrNumber: string;
   qrDistributedDate: string;
   isActive: boolean;
   cmeEnabled: boolean;
@@ -52,6 +53,7 @@ export default function PharmaMyDoctors({ companyId }: PharmaMyDoctorsProps) {
   const [zones, setZones] = useState<string[]>([]);
   const [breakdownDoctor, setBreakdownDoctor] = useState<DoctorRecord | null>(null);
   const [breakdownType, setBreakdownType] = useState<'monthly' | 'today'>('monthly');
+  const [companyName, setCompanyName] = useState('');
   const [showTrend, setShowTrend] = useState(false);
   const [trendData, setTrendData] = useState<MonthlyTrend[]>([]);
 
@@ -75,6 +77,7 @@ export default function PharmaMyDoctors({ companyId }: PharmaMyDoctorsProps) {
         doctorName: string;
         specialty: string;
         pincode: string;
+        qrNumber: string;
         qrDistributedDate: string;
         isActive: boolean;
         cmeEnabled: boolean;
@@ -88,6 +91,7 @@ export default function PharmaMyDoctors({ companyId }: PharmaMyDoctorsProps) {
           doctorName: data.doctorName || 'Unknown',
           specialty: data.specialty || 'General',
           pincode: data.pincode || '',
+          qrNumber: data.qrNumber || '',
           qrDistributedDate: data.distributedAt?.toDate?.()?.toLocaleDateString?.() || data.distributedAt || '-',
           isActive: data.isActive !== false,
           cmeEnabled: data.cmeEnabled === true,
@@ -97,11 +101,12 @@ export default function PharmaMyDoctors({ companyId }: PharmaMyDoctorsProps) {
 
       const companyDoc = await getDoc(doc(db, 'pharmaCompanies', companyId));
       if (companyDoc.exists()) {
-        const companyName = companyDoc.data().companyName;
-        if (companyName) {
+        const cName = companyDoc.data().companyName;
+        if (cName) setCompanyName(cName);
+        if (cName) {
           // Fetch all doctors and match by trimmed, case-insensitive company name
           const allDocsSnap = await getDocs(collection(db, 'doctors'));
-          const lcName = companyName.toLowerCase().trim();
+          const lcName = cName.toLowerCase().trim();
           const matchedDoctorDocs = allDocsSnap.docs.filter(d => {
             const cn = d.data().companyName;
             return cn && cn.toLowerCase().trim() === lcName;
@@ -114,6 +119,7 @@ export default function PharmaMyDoctors({ companyId }: PharmaMyDoctorsProps) {
               doctorName: dData.name || 'Unknown',
               specialty: Array.isArray(dData.specialties) ? dData.specialties.join(', ') : (dData.specialty || 'General'),
               pincode: dData.pinCode || '',
+              qrNumber: dData.qrNumber || '',
               qrDistributedDate: dData.createdAt?.toDate?.()?.toLocaleDateString?.() || '-',
               isActive: dData.status === 'active',
             });
@@ -224,6 +230,7 @@ export default function PharmaMyDoctors({ companyId }: PharmaMyDoctorsProps) {
           monthlyBookings: monthBookings.length,
           todayBookings: todayBookings.length,
           monthlyScans: scansByDoctor.get(doctorId) || 0,
+          qrNumber: info.qrNumber,
           qrDistributedDate: info.qrDistributedDate,
           isActive: info.isActive,
           cmeEnabled: info.cmeEnabled,
@@ -319,6 +326,30 @@ export default function PharmaMyDoctors({ companyId }: PharmaMyDoctorsProps) {
     }
   };
 
+  const [bulkLoading, setBulkLoading] = useState<string | null>(null);
+  const [reprintRequested, setReprintRequested] = useState<Set<string>>(new Set());
+
+  const requestReprint = async (name: string, qrNumber: string, entityId: string) => {
+    if (!db || !companyId || reprintRequested.has(entityId)) return;
+    try {
+      await addDoc(collection(db, 'supportRequests'), {
+        type: 'qr_reprint',
+        message: `QR Reprint Request — Doctor: ${name}, QR No: ${qrNumber || 'N/A'}`,
+        companyName: companyName || companyId,
+        companyId,
+        entityType: 'doctor',
+        entityName: name,
+        entityId,
+        qrNumber: qrNumber || '',
+        status: 'unread',
+        createdAt: serverTimestamp(),
+      });
+      setReprintRequested(prev => new Set(prev).add(entityId));
+    } catch (err) {
+      console.error('Reprint request error:', err);
+    }
+  };
+
   const toggleAccess = async (doctorId: string, field: 'cmeEnabled' | 'samplesEnabled') => {
     try {
       const distRef = collection(db, 'pharmaCompanies', companyId, 'distributedDoctors');
@@ -332,6 +363,24 @@ export default function PharmaMyDoctors({ companyId }: PharmaMyDoctorsProps) {
       }
     } catch (err) {
       console.error('Toggle access error:', err);
+    }
+  };
+
+  const bulkToggleAccess = async (field: 'cmeEnabled' | 'samplesEnabled', enable: boolean) => {
+    setBulkLoading(field);
+    try {
+      const distRef = collection(db, 'pharmaCompanies', companyId, 'distributedDoctors');
+      const snap = await getDocs(distRef);
+      await Promise.all(
+        snap.docs
+          .filter(d => (d.data()[field] === true) !== enable)
+          .map(d => updateDoc(d.ref, { [field]: enable }))
+      );
+      setDoctors(prev => prev.map(d => ({ ...d, [field]: enable })));
+    } catch (err) {
+      console.error('Bulk toggle error:', err);
+    } finally {
+      setBulkLoading(null);
     }
   };
 
@@ -411,6 +460,7 @@ export default function PharmaMyDoctors({ companyId }: PharmaMyDoctorsProps) {
                 </th>
                 <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-500">Specialty</th>
                 <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-500">Location</th>
+                <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-500">QR No.</th>
                 <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-500 text-right">Scans</th>
                 <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-500 cursor-pointer hover:text-gray-300 text-right" onClick={() => toggleSort('bookings')}>
                   Monthly Bookings <SortIcon field="bookings" />
@@ -420,13 +470,37 @@ export default function PharmaMyDoctors({ companyId }: PharmaMyDoctorsProps) {
                   Distributed <SortIcon field="date" />
                 </th>
                 <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-500">Status</th>
-                <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-500 text-center">Access</th>
+                <th className="px-4 py-3 text-xs uppercase tracking-wider text-gray-500 text-center">
+                  <span className="block mb-1">Access</span>
+                  <div className="flex items-center gap-2 justify-center">
+                    <label className="flex items-center gap-1 cursor-pointer text-[10px] font-normal normal-case tracking-normal">
+                      <input
+                        type="checkbox"
+                        checked={doctors.length > 0 && doctors.every(d => d.cmeEnabled)}
+                        onChange={e => bulkToggleAccess('cmeEnabled', e.target.checked)}
+                        disabled={bulkLoading !== null}
+                        className="w-3 h-3 accent-emerald-500"
+                      />
+                      All CME
+                    </label>
+                    <label className="flex items-center gap-1 cursor-pointer text-[10px] font-normal normal-case tracking-normal">
+                      <input
+                        type="checkbox"
+                        checked={doctors.length > 0 && doctors.every(d => d.samplesEnabled)}
+                        onChange={e => bulkToggleAccess('samplesEnabled', e.target.checked)}
+                        disabled={bulkLoading !== null}
+                        className="w-3 h-3 accent-emerald-500"
+                      />
+                      All Samples
+                    </label>
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800">
               {filteredDoctors.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
                     {searchQuery || selectedState !== 'all' || selectedZone !== 'all'
                       ? 'No doctors match the current filters'
                       : 'No distributed doctors yet'}
@@ -442,6 +516,21 @@ export default function PharmaMyDoctors({ companyId }: PharmaMyDoctorsProps) {
                     <td className="px-4 py-3">
                       <p className="text-sm">{doc.state}</p>
                       <p className="text-xs text-gray-500">{doc.pincode} • {doc.zone}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-mono text-amber-400">{doc.qrNumber || '—'}</span>
+                        {doc.qrNumber && (
+                          <button
+                            onClick={() => requestReprint(doc.doctorName, doc.qrNumber, doc.doctorId)}
+                            disabled={reprintRequested.has(doc.doctorId)}
+                            title={reprintRequested.has(doc.doctorId) ? 'Reprint requested' : 'Request QR reprint'}
+                            className={`p-1 rounded transition-colors ${reprintRequested.has(doc.doctorId) ? 'text-emerald-400' : 'text-gray-500 hover:text-amber-400 hover:bg-zinc-800'}`}
+                          >
+                            <Printer className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-right">
                       <span className="text-sm font-mono font-bold text-blue-400">{doc.monthlyScans}</span>

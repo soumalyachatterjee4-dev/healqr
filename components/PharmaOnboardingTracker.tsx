@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { UserCheck, Clock, Activity, AlertTriangle, Search, Filter, CheckCircle, XCircle } from 'lucide-react';
 import { db } from '../lib/firebase/config';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, query, where } from 'firebase/firestore';
 import { getLocationFromPincode } from '../utils/pincodeMapping';
 
 interface PharmaOnboardingTrackerProps {
@@ -41,15 +41,89 @@ export default function PharmaOnboardingTracker({ companyId }: PharmaOnboardingT
     try {
       const snap = await getDocs(collection(db, 'pharmaCompanies', companyId, 'distributedDoctors'));
       const now = new Date();
-      const list: DoctorOnboarding[] = snap.docs.map(d => {
+      const seenIds = new Set<string>();
+
+      interface DoctorInfo {
+        doctorId: string;
+        doctorName: string;
+        specialty: string;
+        pincode: string;
+        qrDate: Date | null;
+        distributedAt: Date | null;
+      }
+
+      const doctorInfoList: DoctorInfo[] = [];
+
+      snap.docs.forEach(d => {
         const data = d.data();
-        const pincode = data.pincode || '';
-        const location = getLocationFromPincode(pincode);
-        const qrDate = data.qrDistributedDate?.toDate?.() || data.createdAt?.toDate?.() || null;
-        const firstBooking = data.firstBookingDate?.toDate?.() || null;
-        const lastBooking = data.lastBookingDate?.toDate?.() || null;
-        const totalBookings = data.totalBookingCount || 0;
-        const daysSinceQR = qrDate ? Math.floor((now.getTime() - qrDate.getTime()) / 86400000) : 0;
+        const doctorId = data.doctorId || d.id;
+        if (seenIds.has(doctorId)) return;
+        seenIds.add(doctorId);
+        doctorInfoList.push({
+          doctorId,
+          doctorName: data.doctorName || 'Unknown',
+          specialty: data.specialty || 'General',
+          pincode: data.pincode || '',
+          qrDate: data.qrDistributedDate?.toDate?.() || data.distributedAt?.toDate?.() || data.createdAt?.toDate?.() || null,
+          distributedAt: data.distributedAt?.toDate?.() || data.createdAt?.toDate?.() || null,
+        });
+      });
+
+      // Fallback: query doctors by companyName
+      const companyDoc = await getDoc(doc(db, 'pharmaCompanies', companyId));
+      const cName = companyDoc.exists() ? companyDoc.data().companyName : '';
+      if (cName) {
+        const allDocsSnap = await getDocs(collection(db, 'doctors'));
+        const lcName = cName.toLowerCase().trim();
+        for (const dDoc of allDocsSnap.docs) {
+          const cn = dDoc.data().companyName;
+          if (!cn || cn.toLowerCase().trim() !== lcName) continue;
+          if (seenIds.has(dDoc.id)) continue;
+          seenIds.add(dDoc.id);
+          const dData = dDoc.data();
+          doctorInfoList.push({
+            doctorId: dDoc.id,
+            doctorName: dData.name || 'Unknown',
+            specialty: Array.isArray(dData.specialties) ? dData.specialties.join(', ') : (dData.specialty || 'General'),
+            pincode: dData.pinCode || '',
+            qrDate: dData.createdAt?.toDate?.() || null,
+            distributedAt: dData.createdAt?.toDate?.() || null,
+          });
+        }
+      }
+
+      // Query actual bookings for all doctors
+      const allDoctorIds = doctorInfoList.map(d => d.doctorId);
+      const bookingMap: Record<string, { total: number; firstDate: Date | null; lastDate: Date | null }> = {};
+      try {
+        for (let i = 0; i < allDoctorIds.length; i += 30) {
+          const batch = allDoctorIds.slice(i, i + 30);
+          const bSnap = await getDocs(query(collection(db, 'bookings'), where('doctorId', 'in', batch)));
+          bSnap.forEach(b => {
+            const data = b.data();
+            if (data.status === 'cancelled') return;
+            const docId = data.doctorId;
+            if (!bookingMap[docId]) bookingMap[docId] = { total: 0, firstDate: null, lastDate: null };
+            bookingMap[docId].total++;
+            const createdAt = data.createdAt?.toDate?.();
+            if (createdAt) {
+              if (!bookingMap[docId].firstDate || createdAt < bookingMap[docId].firstDate!) bookingMap[docId].firstDate = createdAt;
+              if (!bookingMap[docId].lastDate || createdAt > bookingMap[docId].lastDate!) bookingMap[docId].lastDate = createdAt;
+            }
+          });
+        }
+      } catch (err) {
+        console.warn('Bookings query failed:', err);
+      }
+
+      // Build doctor records with real booking data
+      const list: DoctorOnboarding[] = doctorInfoList.map(info => {
+        const location = getLocationFromPincode(info.pincode);
+        const bd = bookingMap[info.doctorId];
+        const totalBookings = bd?.total || 0;
+        const firstBooking = bd?.firstDate || null;
+        const lastBooking = bd?.lastDate || null;
+        const daysSinceQR = info.qrDate ? Math.floor((now.getTime() - info.qrDate.getTime()) / 86400000) : 0;
         const daysSinceLastActivity = lastBooking ? Math.floor((now.getTime() - lastBooking.getTime()) / 86400000) : null;
 
         let status: DoctorOnboarding['status'] = 'qr-only';
@@ -61,13 +135,13 @@ export default function PharmaOnboardingTracker({ companyId }: PharmaOnboardingT
         }
 
         return {
-          id: d.id,
-          doctorName: data.doctorName || 'Unknown',
-          specialty: data.specialty || 'General',
-          pincode,
+          id: info.doctorId,
+          doctorName: info.doctorName,
+          specialty: info.specialty,
+          pincode: info.pincode,
           state: location.state,
           zone: location.zone,
-          qrDistributedDate: qrDate || undefined,
+          qrDistributedDate: info.qrDate || undefined,
           firstBookingDate: firstBooking || undefined,
           lastBookingDate: lastBooking || undefined,
           totalBookings,
@@ -76,6 +150,7 @@ export default function PharmaOnboardingTracker({ companyId }: PharmaOnboardingT
           status,
         };
       });
+
       setDoctors(list);
     } catch (err) {
       console.error('Error loading onboarding data:', err);

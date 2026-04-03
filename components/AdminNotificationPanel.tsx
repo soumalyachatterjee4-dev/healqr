@@ -1,17 +1,23 @@
 import { useState, useEffect } from 'react';
-import { X, CheckCircle, User, Mail, MessageSquare, Calendar, Star } from 'lucide-react';
+import { X, CheckCircle, User, Mail, MessageSquare, Calendar, Star, Printer } from 'lucide-react';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
 
 interface SupportRequest {
   id: string;
-  type: 'doctor' | 'landing';
+  type: 'doctor' | 'landing' | 'qr_reprint';
   // Doctor requests
   doctorName?: string;
   doctorCode?: string;
   // Landing page requests
   name?: string;
   email?: string;
+  // QR Reprint requests
+  companyName?: string;
+  companyId?: string;
+  entityType?: string;
+  entityName?: string;
+  qrNumber?: string;
   // Common fields
   message: string;
   rating: number | null;
@@ -29,7 +35,7 @@ interface AdminNotificationPanelProps {
 export default function AdminNotificationPanel({ isOpen, onClose, onNotificationRead }: AdminNotificationPanelProps) {
   const [requests, setRequests] = useState<SupportRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'unread' | 'doctor' | 'landing'>('unread');
+  const [filter, setFilter] = useState<'all' | 'unread' | 'doctor' | 'landing' | 'qr_reprint'>('unread');
 
   // Load support requests from Firestore
   useEffect(() => {
@@ -54,6 +60,11 @@ export default function AdminNotificationPanel({ isOpen, onClose, onNotification
         doctorCode: doc.data().doctorCode,
         name: doc.data().name,
         email: doc.data().email,
+        companyName: doc.data().companyName,
+        companyId: doc.data().companyId,
+        entityType: doc.data().entityType,
+        entityName: doc.data().entityName,
+        qrNumber: doc.data().qrNumber,
         message: doc.data().message,
         rating: doc.data().rating,
         status: doc.data().status,
@@ -69,6 +80,8 @@ export default function AdminNotificationPanel({ isOpen, onClose, onNotification
         loadedRequests = loadedRequests.filter(req => req.type === 'doctor');
       } else if (filter === 'landing') {
         loadedRequests = loadedRequests.filter(req => req.type === 'landing');
+      } else if (filter === 'qr_reprint') {
+        loadedRequests = loadedRequests.filter(req => req.type === 'qr_reprint');
       }
       
       
@@ -238,6 +251,16 @@ export default function AdminNotificationPanel({ isOpen, onClose, onNotification
             >
               Landing Page
             </button>
+            <button
+              onClick={() => setFilter('qr_reprint')}
+              className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
+                filter === 'qr_reprint'
+                  ? 'bg-amber-500 text-white'
+                  : 'bg-zinc-900 text-gray-400 hover:bg-zinc-800'
+              }`}
+            >
+              QR Reprint
+            </button>
           </div>
         </div>
 
@@ -269,10 +292,14 @@ export default function AdminNotificationPanel({ isOpen, onClose, onNotification
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-start gap-3">
                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                      request.type === 'doctor' ? 'bg-blue-500/20' : 'bg-purple-500/20'
+                      request.type === 'doctor' ? 'bg-blue-500/20' 
+                        : request.type === 'qr_reprint' ? 'bg-amber-500/20'
+                        : 'bg-purple-500/20'
                     }`}>
                       {request.type === 'doctor' ? (
                         <User className="w-5 h-5 text-blue-400" />
+                      ) : request.type === 'qr_reprint' ? (
+                        <Printer className="w-5 h-5 text-amber-400" />
                       ) : (
                         <Mail className="w-5 h-5 text-purple-400" />
                       )}
@@ -281,11 +308,15 @@ export default function AdminNotificationPanel({ isOpen, onClose, onNotification
                       <h3 className="text-white font-medium text-sm">
                         {request.type === 'doctor' 
                           ? request.doctorName 
+                          : request.type === 'qr_reprint'
+                          ? `QR Reprint — ${request.entityName}`
                           : request.name}
                       </h3>
                       <p className="text-gray-400 text-xs mt-0.5">
                         {request.type === 'doctor' 
                           ? `Code: ${request.doctorCode}` 
+                          : request.type === 'qr_reprint'
+                          ? `${request.companyName} • ${request.entityType === 'clinic' ? 'Clinic' : 'Doctor'} • QR: ${request.qrNumber || 'N/A'}`
                           : request.email}
                       </p>
                     </div>

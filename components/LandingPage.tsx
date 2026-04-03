@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Video, User, AlertCircle, Star, Grid3x3, Smartphone, Clock, FileText, CheckCircle, TrendingUp, Bell, Users, Layout, ShoppingCart, Building2, MessageSquare, MonitorPlay, ShoppingBag, ScanLine, Twitter, Linkedin, Facebook, ArrowLeft, Sparkles } from 'lucide-react';
-import { collection, query, where, getDocs, getCountFromServer, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, getCountFromServer, Timestamp, orderBy, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase/config';
 import LandingSupportModal from './LandingSupportModal';
 import AdvertiserGatewayModal from './AdvertiserGatewayModal';
@@ -61,6 +61,7 @@ export default function LandingPage({
   const [showAdvertiserOptions, setShowAdvertiserOptions] = useState(false);
   const [showPatientOptions, setShowPatientOptions] = useState(false);
   const [showPharmaOptions, setShowPharmaOptions] = useState(false);
+  const [firestoreTestimonials, setFirestoreTestimonials] = useState<DoctorTestimonial[]>([]);
 
   // Real-time stats
   const [stats, setStats] = useState({
@@ -102,9 +103,49 @@ export default function LandingPage({
   ];
 
   // Use uploaded testimonials if available (max 3), otherwise use defaults
-  const displayTestimonials = uploadedTestimonials.length > 0
+  // Priority: Firestore uploaded → prop-passed → defaults
+  const displayTestimonials = firestoreTestimonials.length > 0
+    ? firestoreTestimonials.slice(0, 3)
+    : uploadedTestimonials.length > 0
     ? uploadedTestimonials.slice(0, 3)
     : defaultTestimonials;
+
+  // Fetch testimonials uploaded to landing page from Firestore
+  useEffect(() => {
+    const fetchTestimonials = async () => {
+      try {
+        const q = query(
+          collection(db, 'reviews'),
+          where('type', '==', 'support'),
+          where('uploadedToLanding', '==', true),
+          orderBy('createdAt', 'desc'),
+          limit(3)
+        );
+        const snap = await getDocs(q);
+        const testimonials: DoctorTestimonial[] = snap.docs.map((doc, idx) => {
+          const data = doc.data();
+          const entityLabel = data.entityType === 'clinic' ? 'Clinic' :
+                              data.entityType === 'pharma' ? 'Pharma' :
+                              data.entityType === 'advertiser' ? 'Advertiser' : '';
+          return {
+            id: idx + 1,
+            doctor: data.entityName || data.doctorName || 'HealQR User',
+            patient: entityLabel || 'Verified User',
+            rating: data.rating || 5,
+            comment: data.comment || '',
+            date: data.createdAt?.toDate()?.toLocaleDateString() || '',
+            specialty: data.entityType ? data.entityType.charAt(0).toUpperCase() + data.entityType.slice(1) : 'User',
+          };
+        });
+        if (testimonials.length > 0) {
+          setFirestoreTestimonials(testimonials);
+        }
+      } catch (err) {
+        console.error('Error fetching landing testimonials:', err);
+      }
+    };
+    fetchTestimonials();
+  }, []);
 
   // Fetch real-time stats
   useEffect(() => {
@@ -561,24 +602,29 @@ export default function LandingPage({
                   </div>
                 </div>
 
-                {/* Verified Patient */}
+                {/* Verified Badge */}
                 <div className="flex justify-between items-center mb-4">
-                  <p className="text-sm text-emerald-500">Verified Patient</p>
+                  <p className="text-sm text-emerald-500">Verified User</p>
                   <p className="text-sm text-gray-400">{testimonial.patient}</p>
                 </div>
 
                 {/* Stars */}
                 <div className="flex gap-1 mb-6">
-                  {[...Array(5)].map((_, i) => (
-                    <Star
-                      key={i}
-                      className={`w-4 h-4 ${
-                        i < testimonial.rating
-                          ? 'text-emerald-500 fill-emerald-500'
-                          : 'text-gray-600'
-                      }`}
-                    />
-                  ))}
+                  {[1, 2, 3, 4, 5].map((star) => {
+                    const filled = testimonial.rating >= star;
+                    const halfFilled = testimonial.rating >= star - 0.5 && testimonial.rating < star;
+                    return (
+                      <span key={star} className="relative inline-block">
+                        <Star className="w-4 h-4 text-gray-600" />
+                        {filled && <Star className="w-4 h-4 fill-emerald-500 text-emerald-500 absolute inset-0" />}
+                        {halfFilled && (
+                          <span className="absolute inset-0 overflow-hidden" style={{ width: '50%' }}>
+                            <Star className="w-4 h-4 fill-emerald-500 text-emerald-500" />
+                          </span>
+                        )}
+                      </span>
+                    );
+                  })}
                 </div>
 
                 {/* Testimonial */}

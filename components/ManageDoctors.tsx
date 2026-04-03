@@ -94,30 +94,8 @@ interface LinkedDoctor {
   footerLine2?: string; // Custom footer line 2 for RX/Diet Chart PDFs
 }
 
-const SPECIALTIES = [
-  'General Physician',
-  'Cardiologist',
-  'Dermatologist',
-  'Pediatrician',
-  'Orthopedic',
-  'Gynecologist',
-  'Neurologist',
-  'Psychiatrist',
-  'ENT Specialist',
-  'Ophthalmologist',
-  'Dentist',
-  'Urologist',
-  'Gastroenterologist',
-  'Endocrinologist',
-  'Pulmonologist',
-  'Nephrologist',
-  'Oncologist',
-  'Rheumatologist',
-  'Anesthesiologist',
-  'Radiologist',
-  'Pathologist',
-  'Other'
-];
+import { SPECIALTY_DISPLAY_NAMES } from '../utils/medicalSpecialties';
+const SPECIALTIES = SPECIALTY_DISPLAY_NAMES;
 
 interface ManageDoctorsProps {
   onNavigate?: (view: string, doctorId?: string) => void;

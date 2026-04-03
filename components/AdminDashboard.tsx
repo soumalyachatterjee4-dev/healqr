@@ -2,6 +2,8 @@ import { Star, Presentation, Calendar, Users, TrendingUp, UserPlus, UserMinus, C
 import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { AdminStatsService, AdminStats, BirthdayDoctor } from '../lib/firebase/admin-stats.service';
+import { db } from '../lib/firebase/config';
+import { doc, updateDoc } from 'firebase/firestore';
 
 interface DoctorTestimonial {
   id: number;
@@ -14,13 +16,14 @@ interface DoctorTestimonial {
 }
 
 interface SupportRequest {
-  id: number;
+  id: string;
   doctorName: string;
   doctorCode: string;
   message: string;
   rating: number;
   date: string;
   uploaded: boolean;
+  entityType?: string;
 }
 
 interface AdminDashboardProps {
@@ -128,15 +131,24 @@ export default function AdminDashboard({ adminEmail, onStartDemo, uploadedTestim
     loadBirthdayDoctors();
   }, []);
 
-  const handleUploadTestimonial = (request: SupportRequest) => {
-    if (onUploadTestimonial) {
-      // Maximum 3 testimonials allowed on landing page
-      onUploadTestimonial(request);
+  const handleUploadTestimonial = async (request: SupportRequest) => {
+    try {
+      // Persist to Firestore — mark review as uploaded to landing page
+      const reviewRef = doc(db, 'reviews', request.id);
+      await updateDoc(reviewRef, { uploadedToLanding: true });
+      // Update local state so the button shows 'Uploaded' immediately
+      setRecentReviews(prev => prev.map(r => r.id === request.id ? { ...r, uploaded: true } : r));
+      // Also call parent handler if provided
+      if (onUploadTestimonial) {
+        onUploadTestimonial(request as any);
+      }
+    } catch (error) {
+      console.error('Error uploading testimonial:', error);
     }
   };
 
-  const isAlreadyUploaded = (requestId: number) => {
-    return supportRequests.some(r => r.id === requestId && r.uploaded);
+  const isAlreadyUploaded = (requestId: string) => {
+    return recentReviews.some(r => r.id === requestId && r.uploaded);
   };
 
   return (
@@ -287,7 +299,7 @@ export default function AdminDashboard({ adminEmail, onStartDemo, uploadedTestim
           {/* Last 5 Reviews Dropdown */}
           {showReviews && (
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 md:p-6 mt-4">
-              <h3 className="text-base md:text-lg mb-4">Last 5 Doctor Support Reviews</h3>
+              <h3 className="text-base md:text-lg mb-4">Last 5 Support Reviews</h3>
               <div className="space-y-3">
                 {recentReviews.length === 0 ? (
                   <p className="text-sm text-gray-400 text-center py-4">No support reviews yet</p>
@@ -296,19 +308,40 @@ export default function AdminDashboard({ adminEmail, onStartDemo, uploadedTestim
                     <div key={request.id} className="bg-zinc-800/50 rounded-lg p-3 md:p-4">
                       <div className="flex flex-col sm:flex-row items-start justify-between gap-2 mb-2">
                         <div className="flex-1">
-                          <p className="text-sm text-white">{request.doctorName}</p>
-                          <p className="text-xs text-gray-400">Code: {request.doctorCode}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm text-white">{request.doctorName}</p>
+                            {request.entityType && (
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                                request.entityType === 'doctor' ? 'bg-emerald-500/20 text-emerald-400' :
+                                request.entityType === 'clinic' ? 'bg-purple-500/20 text-purple-400' :
+                                request.entityType === 'pharma' ? 'bg-blue-500/20 text-blue-400' :
+                                request.entityType === 'patient' ? 'bg-pink-500/20 text-pink-400' :
+                                'bg-amber-500/20 text-amber-400'
+                              }`}>
+                                {request.entityType}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-400">ID: {request.doctorCode}</p>
                         </div>
                         <div className="flex items-center gap-3">
-                          <div className="flex items-center gap-1">
-                            {[...Array(5)].map((_, i) => (
-                              <Star
-                                key={i}
-                                className={`w-3 h-3 ${
-                                  i < request.rating ? 'fill-yellow-500 text-yellow-500' : 'text-gray-600'
-                                }`}
-                              />
-                            ))}
+                          <div className="flex items-center gap-0.5">
+                            {[1, 2, 3, 4, 5].map((star) => {
+                              const filled = request.rating >= star;
+                              const halfFilled = request.rating >= star - 0.5 && request.rating < star;
+                              return (
+                                <span key={star} className="relative inline-block">
+                                  <Star className="w-3 h-3 text-gray-600" />
+                                  {filled && <Star className="w-3 h-3 fill-yellow-500 text-yellow-500 absolute inset-0" />}
+                                  {halfFilled && (
+                                    <span className="absolute inset-0 overflow-hidden" style={{ width: '50%' }}>
+                                      <Star className="w-3 h-3 fill-yellow-500 text-yellow-500" />
+                                    </span>
+                                  )}
+                                </span>
+                              );
+                            })}
+                            <span className="text-xs text-yellow-400 ml-1">{request.rating}</span>
                           </div>
                           <Button
                             size="sm"

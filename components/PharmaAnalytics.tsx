@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { BarChart3, TrendingUp, MapPin, Users, Activity, Zap, AlertTriangle, Clock, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { db } from '../lib/firebase/config';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, query, where } from 'firebase/firestore';
 import { getLocationFromPincode } from '../utils/pincodeMapping';
 
 interface PharmaAnalyticsProps {
@@ -44,16 +44,20 @@ export default function PharmaAnalytics({ companyId }: PharmaAnalyticsProps) {
       const snap = await getDocs(doctorsRef);
       const specMap: Record<string, number> = {};
       const drList: DoctorRecord[] = [];
+      const seenIds = new Set<string>();
 
       snap.docs.forEach(d => {
         const data = d.data();
+        const doctorId = data.doctorId || d.id;
+        if (seenIds.has(doctorId)) return;
+        seenIds.add(doctorId);
         const pincode = data.pincode || '';
         const location = getLocationFromPincode(pincode);
         const specialty = data.specialty || 'General';
         specMap[specialty] = (specMap[specialty] || 0) + 1;
 
         drList.push({
-          id: d.id,
+          id: doctorId,
           doctorName: data.doctorName || 'Unknown',
           specialty,
           pincode,
@@ -63,6 +67,35 @@ export default function PharmaAnalytics({ companyId }: PharmaAnalyticsProps) {
           isActive: data.isActive !== false,
         });
       });
+
+      // Fallback: also query doctors collection by companyName
+      const companyDoc = await getDoc(doc(db, 'pharmaCompanies', companyId));
+      const cName = companyDoc.exists() ? companyDoc.data().companyName : '';
+      if (cName) {
+        const allDocsSnap = await getDocs(collection(db, 'doctors'));
+        const lcName = cName.toLowerCase().trim();
+        for (const dDoc of allDocsSnap.docs) {
+          const cn = dDoc.data().companyName;
+          if (!cn || cn.toLowerCase().trim() !== lcName) continue;
+          if (seenIds.has(dDoc.id)) continue;
+          seenIds.add(dDoc.id);
+          const dData = dDoc.data();
+          const pincode = dData.pinCode || '';
+          const location = getLocationFromPincode(pincode);
+          const specialty = Array.isArray(dData.specialties) ? dData.specialties.join(', ') : (dData.specialty || 'General');
+          specMap[specialty] = (specMap[specialty] || 0) + 1;
+          drList.push({
+            id: dDoc.id,
+            doctorName: dData.name || 'Unknown',
+            specialty,
+            pincode,
+            state: location.state,
+            zone: location.zone,
+            totalBookingCount: 0,
+            isActive: dData.status === 'active',
+          });
+        }
+      }
 
       setDoctors(drList);
       setSpecialtyBreakdown(specMap);

@@ -1,15 +1,7 @@
 import { Button } from './ui/button';
 import { Check, Download, Share2, Bell, BellOff } from 'lucide-react';
+import { formatSpecialtyLabel as formatSpecialty } from '../utils/medicalSpecialties';
 
-
-
-// Convert slug like "general_medicine" to "General Medicine"
-function formatSpecialty(slug: string): string {
-  if (!slug) return '';
-  return slug
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, c => c.toUpperCase());
-}
 import BookingFlowLayout from './BookingFlowLayout';
 import { toast } from 'sonner';
 import type { Language } from '../utils/translations';

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Calendar, Activity, MapPin, TrendingUp, Building2, RefreshCw, Shield, Lock } from 'lucide-react';
+import { Users, Calendar, MapPin, TrendingUp, Building2, RefreshCw, Shield, Lock, FileText, Brain } from 'lucide-react';
 import { db } from '../lib/firebase/config';
 import { collection, getDocs, doc, getDoc, query, where, Timestamp } from 'firebase/firestore';
 import { getLocationFromPincode } from '../utils/pincodeMapping';
@@ -23,8 +23,9 @@ interface DoctorSummary {
 interface CompanyStats {
   totalDoctors: number;
   totalClinics: number;
-  totalBookingsToday: number;
-  activeDoctorsToday: number;
+  monthlyBookings: number;
+  digitalRxCount: number;
+  aiRxReaderCount: number;
   zoneBreakdown: Record<string, number>;
   stateBreakdown: Record<string, number>;
 }
@@ -33,8 +34,9 @@ export default function PharmaDashboard({ companyId, companyName }: PharmaDashbo
   const [stats, setStats] = useState<CompanyStats>({
     totalDoctors: 0,
     totalClinics: 0,
-    totalBookingsToday: 0,
-    activeDoctorsToday: 0,
+    monthlyBookings: 0,
+    digitalRxCount: 0,
+    aiRxReaderCount: 0,
     zoneBreakdown: {},
     stateBreakdown: {},
   });
@@ -45,6 +47,7 @@ export default function PharmaDashboard({ companyId, companyName }: PharmaDashbo
   const [territoryType, setTerritoryType] = useState<string>('');
   const [registeredState, setRegisteredState] = useState<string>('');
   const [companySpecialties, setCompanySpecialties] = useState<string[]>([]);
+  const [territorySpecialtiesMap, setTerritorySpecialtiesMap] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
     loadDashboardData();
@@ -61,6 +64,9 @@ export default function PharmaDashboard({ companyId, companyName }: PharmaDashbo
         setTerritoryType(data.territoryType || '');
         setRegisteredState(data.registeredOfficeState || '');
         setCompanySpecialties(data.specialties || []);
+        // Load territory-specialty map
+        const tsMap = data.territorySpecialties || {};
+        setTerritorySpecialtiesMap(tsMap);
       }
     } catch (err) {
       console.error('Error loading company profile:', err);
@@ -76,64 +82,175 @@ export default function PharmaDashboard({ companyId, companyName }: PharmaDashbo
       const doctorsRef = collection(db, 'pharmaCompanies', companyId, 'distributedDoctors');
       const doctorsSnap = await getDocs(doctorsRef);
 
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
       const doctors: DoctorSummary[] = [];
-      let totalBookingsToday = 0;
-      let activeDoctorsToday = 0;
       const zoneBreakdown: Record<string, number> = {};
       const stateBreakdown: Record<string, number> = {};
+      const doctorIdSet = new Set<string>();
 
       for (const docSnap of doctorsSnap.docs) {
         const data = docSnap.data();
+        const doctorId = data.doctorId || docSnap.id;
+        if (doctorIdSet.has(doctorId)) continue;
+        doctorIdSet.add(doctorId);
         const pincode = data.pincode || '';
         const location = getLocationFromPincode(pincode);
         const state = location.state;
         const zone = location.zone;
 
-        // Count by zone and state
         zoneBreakdown[zone] = (zoneBreakdown[zone] || 0) + 1;
         stateBreakdown[state] = (stateBreakdown[state] || 0) + 1;
 
-        // Get today's booking count from the doctor's stats
-        const todayBookings = data.todayBookingCount || 0;
-        const totalBookings = data.totalBookingCount || 0;
-
-        if (todayBookings > 0) {
-          activeDoctorsToday++;
-          totalBookingsToday += todayBookings;
-        }
-
         doctors.push({
-          doctorId: docSnap.id,
+          doctorId,
           doctorName: data.doctorName || 'Unknown Doctor',
           specialty: data.specialty || 'General',
           pincode,
           state,
           zone,
-          todayBookings,
-          totalBookings,
+          todayBookings: data.todayBookingCount || 0,
+          totalBookings: data.totalBookingCount || 0,
         });
       }
 
-      // Sort by today's bookings desc, then total bookings
-      doctors.sort((a, b) => b.todayBookings - a.todayBookings || b.totalBookings - a.totalBookings);
+      // Also query doctors collection by companyName (same fallback as My Doctors)
+      const companyDoc = await getDoc(doc(db, 'pharmaCompanies', companyId));
+      const cName = companyDoc.exists() ? companyDoc.data().companyName : '';
+      if (cName) {
+        const allDocsSnap = await getDocs(collection(db, 'doctors'));
+        const lcName = cName.toLowerCase().trim();
+        for (const dDoc of allDocsSnap.docs) {
+          const cn = dDoc.data().companyName;
+          if (!cn || cn.toLowerCase().trim() !== lcName) continue;
+          if (doctorIdSet.has(dDoc.id)) continue;
+          doctorIdSet.add(dDoc.id);
+          const dData = dDoc.data();
+          const pincode = dData.pinCode || '';
+          const location = getLocationFromPincode(pincode);
+          zoneBreakdown[location.zone] = (zoneBreakdown[location.zone] || 0) + 1;
+          stateBreakdown[location.state] = (stateBreakdown[location.state] || 0) + 1;
+          doctors.push({
+            doctorId: dDoc.id,
+            doctorName: dData.name || 'Unknown Doctor',
+            specialty: Array.isArray(dData.specialties) ? dData.specialties.join(', ') : (dData.specialty || 'General'),
+            pincode,
+            state: location.state,
+            zone: location.zone,
+            todayBookings: 0,
+            totalBookings: 0,
+          });
+        }
+      }
 
-      // Get distributed clinics count
+      // Get distributed clinics
       const clinicsRef = collection(db, 'pharmaCompanies', companyId, 'distributedClinics');
       const clinicsSnap = await getDocs(clinicsRef);
+      const clinicIdSet = new Set<string>();
+      clinicsSnap.docs.forEach(d => {
+        const cid = d.data().clinicId || d.id;
+        clinicIdSet.add(cid);
+      });
 
+      // Also query clinics by companyName fallback
+      if (cName) {
+        const allClinicsSnap = await getDocs(collection(db, 'clinics'));
+        const lcName = cName.toLowerCase().trim();
+        for (const cDoc of allClinicsSnap.docs) {
+          const cn = cDoc.data().companyName;
+          if (!cn || cn.toLowerCase().trim() !== lcName) continue;
+          if (clinicIdSet.has(cDoc.id)) continue;
+          clinicIdSet.add(cDoc.id);
+        }
+      }
+
+      const allDoctorIds = Array.from(doctorIdSet);
+      const allClinicIds = Array.from(clinicIdSet);
+      const totalDoctors = allDoctorIds.length;
+      const totalClinics = allClinicIds.length;
+
+      // Set base stats immediately so cards show even if booking queries fail
       setStats({
-        totalDoctors: doctorsSnap.size,
-        totalClinics: clinicsSnap.size,
-        totalBookingsToday,
-        activeDoctorsToday,
+        totalDoctors,
+        totalClinics,
+        monthlyBookings: 0,
+        digitalRxCount: 0,
+        aiRxReaderCount: 0,
         zoneBreakdown,
         stateBreakdown,
       });
       setRecentDoctors(doctors.slice(0, 5));
       setLastRefresh(new Date());
+
+      // Query bookings for all doctors (batched by 30) — may fail due to permissions
+      let monthlyBookings = 0;
+      let digitalRxCount = 0;
+      let aiRxReaderCount = 0;
+
+      try {
+        for (let i = 0; i < allDoctorIds.length; i += 30) {
+          const batch = allDoctorIds.slice(i, i + 30);
+          const bSnap = await getDocs(query(collection(db, 'bookings'), where('doctorId', 'in', batch)));
+          bSnap.forEach(d => {
+            const data = d.data();
+            if (data.status === 'cancelled') return;
+            const createdAt = data.createdAt?.toDate?.();
+            if (createdAt && createdAt >= monthStart) {
+              monthlyBookings++;
+              if (data.digitalRxUrl || data.rxPdfUrl) digitalRxCount++;
+            }
+          });
+        }
+
+        // Query bookings for clinics too
+        for (let i = 0; i < allClinicIds.length; i += 30) {
+          const batch = allClinicIds.slice(i, i + 30);
+          const bSnap = await getDocs(query(collection(db, 'bookings'), where('clinicId', 'in', batch)));
+          bSnap.forEach(d => {
+            const data = d.data();
+            if (data.status === 'cancelled') return;
+            const createdAt = data.createdAt?.toDate?.();
+            if (createdAt && createdAt >= monthStart) {
+              if (data.doctorId && doctorIdSet.has(data.doctorId)) return;
+              monthlyBookings++;
+              if (data.digitalRxUrl || data.rxPdfUrl) digitalRxCount++;
+            }
+          });
+        }
+      } catch (bookingErr) {
+        console.warn('📊 Bookings query failed (permissions):', bookingErr);
+      }
+
+      // Query AI RX Reader usage from notifications collection
+      try {
+        for (let i = 0; i < allDoctorIds.length; i += 30) {
+          const batch = allDoctorIds.slice(i, i + 30);
+          const nSnap = await getDocs(query(
+            collection(db, 'notifications'),
+            where('type', '==', 'ai_rx_prescription'),
+            where('doctorId', 'in', batch)
+          ));
+          nSnap.forEach(d => {
+            const createdAt = d.data().createdAt?.toDate?.();
+            if (createdAt && createdAt >= monthStart) aiRxReaderCount++;
+          });
+        }
+      } catch (notifErr) {
+        console.warn('📊 Notifications query failed (permissions):', notifErr);
+      }
+
+      // Update stats with booking/RX data if queries succeeded
+      setStats(prev => ({
+        ...prev,
+        monthlyBookings,
+        digitalRxCount,
+        aiRxReaderCount,
+      }));
+
+      // Sort doctors by today's bookings for the leaderboard
+      doctors.sort((a, b) => b.todayBookings - a.todayBookings || b.totalBookings - a.totalBookings);
+
     } catch (error) {
       console.error('Error loading pharma dashboard:', error);
     } finally {
@@ -198,27 +315,37 @@ export default function PharmaDashboard({ companyId, companyName }: PharmaDashbo
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard
           icon={Users}
-          label="Total Doctors"
-          value={stats.totalDoctors}
-          subtext={`${stats.totalClinics} clinic${stats.totalClinics !== 1 ? 's' : ''} distributed`}
+          label="Total Distributed"
+          value={stats.totalDoctors + stats.totalClinics}
+          subtext={`${stats.totalDoctors} dr${stats.totalDoctors !== 1 ? 's' : ''} + ${stats.totalClinics} clinic${stats.totalClinics !== 1 ? 's' : ''}`}
         />
         <StatCard
           icon={Calendar}
-          label="Today's Bookings"
-          value={stats.totalBookingsToday}
+          label="Monthly Bookings"
+          value={stats.monthlyBookings}
           subtext={`Across ${stats.totalDoctors} dr${stats.totalDoctors !== 1 ? 's' : ''} + ${stats.totalClinics} clinic${stats.totalClinics !== 1 ? 's' : ''}`}
         />
         <StatCard
-          icon={Activity}
-          label="Active Today"
-          value={stats.activeDoctorsToday}
-          subtext={`Of ${stats.totalDoctors} dr${stats.totalDoctors !== 1 ? 's' : ''} + ${stats.totalClinics} clinic${stats.totalClinics !== 1 ? 's' : ''}`}
+          icon={MapPin}
+          label="Territories"
+          value={(() => {
+            const tsKeys = Object.keys(territorySpecialtiesMap);
+            return tsKeys.length > 0 ? tsKeys.length : territoryStates.length;
+          })()}
+          subtext={`${(() => {
+            const tsKeys = Object.keys(territorySpecialtiesMap);
+            if (tsKeys.length > 0) {
+              const uniqueSpecs = new Set(Object.values(territorySpecialtiesMap).flat());
+              return uniqueSpecs.size;
+            }
+            return companySpecialties.length;
+          })()} specialties covered`}
         />
         <StatCard
-          icon={MapPin}
-          label="Zones Covered"
-          value={Object.keys(stats.zoneBreakdown).length}
-          subtext={`${Object.keys(stats.stateBreakdown).length} states`}
+          icon={FileText}
+          label="Digital Rx"
+          value={stats.digitalRxCount}
+          subtext={`${stats.aiRxReaderCount} AI Rx Reader used`}
         />
       </div>
 

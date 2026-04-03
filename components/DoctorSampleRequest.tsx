@@ -1,16 +1,19 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, addDoc, serverTimestamp, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, serverTimestamp, orderBy, doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { Package, ArrowLeft, Loader2, Send, Clock, CheckCircle, XCircle, Truck } from 'lucide-react';
+import { Package, ArrowLeft, Loader2, Send, Clock, CheckCircle, XCircle, Truck, Menu, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
+import DashboardSidebar from './DashboardSidebar';
+import { Button } from './ui/button';
 
 interface SampleRequest {
   id: string;
   itemName: string;
-  itemType: 'sample' | 'literature';
+  itemType: 'sample';
   quantity: number;
   notes: string;
   status: 'pending' | 'approved' | 'rejected' | 'fulfilled';
+  approvalMessage?: string;
   createdAt: any;
   updatedAt?: any;
 }
@@ -19,9 +22,13 @@ interface DoctorSampleRequestProps {
   onBack: () => void;
   companyName: string;
   doctorName: string;
+  onMenuChange?: (menu: string) => void;
+  onLogout?: () => void | Promise<void>;
+  activeAddOns?: string[];
 }
 
-export default function DoctorSampleRequest({ onBack, companyName, doctorName }: DoctorSampleRequestProps) {
+export default function DoctorSampleRequest({ onBack, companyName, doctorName, onMenuChange = () => {}, onLogout, activeAddOns = [] }: DoctorSampleRequestProps) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [requests, setRequests] = useState<SampleRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [enabled, setEnabled] = useState<boolean | null>(null);
@@ -31,7 +38,7 @@ export default function DoctorSampleRequest({ onBack, companyName, doctorName }:
 
   // Form state
   const [itemName, setItemName] = useState('');
-  const [itemType, setItemType] = useState<'sample' | 'literature'>('sample');
+  const [itemType] = useState<'sample'>('sample');
   const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState('');
 
@@ -99,7 +106,7 @@ export default function DoctorSampleRequest({ onBack, companyName, doctorName }:
         orderBy('createdAt', 'desc')
       )
     );
-    setRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as SampleRequest)));
+    setRequests(snap.docs.map(d => ({ id: d.id, ...d.data(), approvalMessage: d.data().approvalMessage || '' } as SampleRequest)));
   };
 
   const handleSubmit = async () => {
@@ -113,10 +120,27 @@ export default function DoctorSampleRequest({ onBack, companyName, doctorName }:
       const userId = localStorage.getItem('userId') || '';
       const userEmail = localStorage.getItem('healqr_user_email') || '';
 
+      // Fetch doctor details for the request
+      let doctorCode = '';
+      let specialty = '';
+      let territory = '';
+      try {
+        const doctorDoc = await getDoc(doc(db, 'doctors', userId));
+        if (doctorDoc.exists()) {
+          const dd = doctorDoc.data();
+          doctorCode = dd.doctorCode || '';
+          specialty = dd.specialty || '';
+          territory = [dd.city, dd.state].filter(Boolean).join(', ') || dd.pincode || '';
+        }
+      } catch {}
+
       await addDoc(collection(db, 'pharmaCompanies', companyId, 'sampleRequests'), {
         doctorId: userId,
         doctorName,
         doctorEmail: userEmail,
+        doctorCode,
+        specialty,
+        territory,
         itemName: itemName.trim(),
         itemType,
         quantity,
@@ -128,7 +152,6 @@ export default function DoctorSampleRequest({ onBack, companyName, doctorName }:
       toast.success('Request submitted successfully');
       setShowForm(false);
       setItemName('');
-      setItemType('sample');
       setQuantity(1);
       setNotes('');
       await loadRequests(companyId, userId);
@@ -175,18 +198,23 @@ export default function DoctorSampleRequest({ onBack, companyName, doctorName }:
 
   if (enabled === false) {
     return (
-      <div className="min-h-screen bg-[#0a0f1a] flex flex-col items-center justify-center p-6">
-        <div className="text-center space-y-4">
-          <Package className="w-16 h-16 text-gray-600 mx-auto" />
-          <h2 className="text-xl font-bold text-white">Sample Requests Not Available</h2>
-          <p className="text-gray-400 max-w-md">
-            {!companyName
-              ? 'You are not linked to any pharma company.'
-              : 'Your pharma company has not enabled sample request access for your account.'}
-          </p>
-          <button onClick={onBack} className="mt-4 px-4 py-2 bg-zinc-800 text-white rounded-lg hover:bg-zinc-700 transition">
-            Go Back
-          </button>
+      <div className="min-h-screen bg-[#0a0f1a] text-white">
+        <DashboardSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} activeMenu="pharma-samples" onMenuChange={onMenuChange} onLogout={onLogout} activeAddOns={activeAddOns} />
+        <div className="lg:pl-64">
+          <div className="flex flex-col items-center justify-center p-6 min-h-screen">
+            <div className="text-center space-y-4">
+              <Package className="w-16 h-16 text-gray-600 mx-auto" />
+              <h2 className="text-xl font-bold text-white">Sample Requests Not Available</h2>
+              <p className="text-gray-400 max-w-md">
+                {!companyName
+                  ? 'You are not linked to any pharma company.'
+                  : 'Your pharma company has not enabled sample request access for your account.'}
+              </p>
+              <button onClick={onBack} className="mt-4 px-4 py-2 bg-zinc-800 text-white rounded-lg hover:bg-zinc-700 transition">
+                Go Back
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -194,55 +222,40 @@ export default function DoctorSampleRequest({ onBack, companyName, doctorName }:
 
   return (
     <div className="min-h-screen bg-[#0a0f1a] text-white">
-      <div className="max-w-4xl mx-auto p-4 sm:p-6">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <button onClick={onBack} className="p-2 hover:bg-zinc-800 rounded-lg transition">
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <div>
-              <h1 className="text-xl font-bold flex items-center gap-2">
-                <Package className="w-6 h-6 text-emerald-500" />
-                Sample Requests
-              </h1>
-              <p className="text-sm text-gray-400">Request from {companyName}</p>
+      <DashboardSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} activeMenu="pharma-samples" onMenuChange={onMenuChange} onLogout={onLogout} activeAddOns={activeAddOns} />
+      <div className="lg:pl-64">
+        {/* Sticky Header */}
+        <div className="border-b border-gray-800 bg-[#0a0f1a]/95 backdrop-blur sticky top-0 z-40">
+          <div className="px-4 lg:px-8 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Button variant="ghost" size="icon" className="lg:hidden text-white" onClick={() => setSidebarOpen(true)}>
+                  <Menu className="h-5 w-5" />
+                </Button>
+                <div>
+                  <h1 className="text-xl font-bold flex items-center gap-2">
+                    <Package className="w-6 h-6 text-emerald-500" />
+                    Sample Requests
+                  </h1>
+                  <p className="text-sm text-gray-400">Request from {companyName}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowForm(!showForm)}
+                className="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition text-sm font-medium"
+              >
+                {showForm ? 'Cancel' : '+ New Request'}
+              </button>
             </div>
           </div>
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition text-sm font-medium"
-          >
-            {showForm ? 'Cancel' : '+ New Request'}
-          </button>
         </div>
+
+        <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
 
         {/* New Request Form */}
         {showForm && (
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-6 space-y-4">
-            <h3 className="font-semibold text-white">New Sample / Literature Request</h3>
-
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">Item Type</label>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setItemType('sample')}
-                  className={`px-3 py-1.5 rounded-lg text-sm transition ${
-                    itemType === 'sample' ? 'bg-emerald-500 text-white' : 'bg-zinc-800 text-gray-400'
-                  }`}
-                >
-                  Sample
-                </button>
-                <button
-                  onClick={() => setItemType('literature')}
-                  className={`px-3 py-1.5 rounded-lg text-sm transition ${
-                    itemType === 'literature' ? 'bg-emerald-500 text-white' : 'bg-zinc-800 text-gray-400'
-                  }`}
-                >
-                  Literature
-                </button>
-              </div>
-            </div>
+            <h3 className="font-semibold text-white">New Sample Request</h3>
 
             <div>
               <label className="block text-sm text-gray-400 mb-1">Item Name</label>
@@ -305,9 +318,9 @@ export default function DoctorSampleRequest({ onBack, companyName, doctorName }:
                     <div className="flex items-center gap-2 mb-1">
                       <h4 className="font-semibold text-white truncate">{req.itemName}</h4>
                       <span className={`px-2 py-0.5 rounded-full text-xs ${
-                        req.itemType === 'sample' ? 'bg-blue-500/20 text-blue-400' : 'bg-purple-500/20 text-purple-400'
+                        'bg-blue-500/20 text-blue-400'
                       }`}>
-                        {req.itemType}
+                        sample
                       </span>
                     </div>
                     <p className="text-sm text-gray-400">Qty: {req.quantity}</p>
@@ -315,6 +328,18 @@ export default function DoctorSampleRequest({ onBack, companyName, doctorName }:
                   </div>
                   {getStatusBadge(req.status)}
                 </div>
+                {req.approvalMessage && (req.status === 'approved' || req.status === 'fulfilled') && (
+                  <div className="mt-2 flex items-start gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2">
+                    <MessageSquare className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-emerald-300">{req.approvalMessage}</p>
+                  </div>
+                )}
+                {req.approvalMessage && req.status === 'rejected' && (
+                  <div className="mt-2 flex items-start gap-2 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+                    <MessageSquare className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-red-300">{req.approvalMessage}</p>
+                  </div>
+                )}
                 {req.createdAt && (
                   <p className="text-xs text-gray-600 mt-2">
                     Requested: {req.createdAt.toDate?.()?.toLocaleDateString() || ''}
@@ -324,6 +349,7 @@ export default function DoctorSampleRequest({ onBack, companyName, doctorName }:
             ))}
           </div>
         )}
+      </div>
       </div>
     </div>
   );

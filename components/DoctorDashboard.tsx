@@ -29,6 +29,7 @@ import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 import DashboardSidebar from './DashboardSidebar';
 import ContactSupport from './ContactSupport';
+import UnifiedChatWidget from './UnifiedChatWidget';
 import PatientReviewsPanel from './PatientReviewsPanel';
 import NotificationCenter from './NotificationCenter';
 import { subscribeToDoctorNotifications, markNotificationRead, markAllNotificationsRead, deleteDoctorNotification, DoctorNotification } from '../services/doctorNotificationService';
@@ -1418,6 +1419,15 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
         doctorName={doctorName}
         onGeneratePatientList={handleGeneratePatientList}
         onDelete={handleDeleteNotification}
+      />
+
+      {/* Unified AI + Support Chat */}
+      <UnifiedChatWidget
+        entityType="doctor"
+        entityId={localStorage.getItem('userId') || ''}
+        entityName={doctorName}
+        userRole="doctor"
+        collectionName="doctors"
       />
     </div>
   );

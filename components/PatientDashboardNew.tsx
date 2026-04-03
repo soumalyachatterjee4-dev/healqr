@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, BarChart3, History, Bell, FolderHeart, Search, LogOut, Calendar, Stethoscope, Activity, TrendingUp, Heart } from 'lucide-react';
-import { getFirestore, collection, query, where, getDocs, onSnapshot, orderBy, limit, doc, getDoc } from 'firebase/firestore';
+import { Lock, BarChart3, History, Bell, FolderHeart, Search, LogOut, Calendar, Stethoscope, Activity, TrendingUp, Heart, Star, Loader2, X } from 'lucide-react';
+import { getFirestore, collection, query, where, getDocs, onSnapshot, orderBy, limit, doc, getDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import healqrLogo from '../assets/healqr.logo.png';
 
 // Import sub-components
@@ -196,6 +196,15 @@ const PatientDashboardNew = ({ onLanguageDetected }: { onLanguageDetected?: (lan
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [demoMode, setDemoMode] = useState(false);
   const [healthCardData, setHealthCardData] = useState<any>(null);
+
+  // Rating state
+  const [showRatingCard, setShowRatingCard] = useState(false);
+  const [patientRating, setPatientRating] = useState(0);
+  const [patientHoveredRating, setPatientHoveredRating] = useState(0);
+  const [patientRatingComment, setPatientRatingComment] = useState('');
+  const [patientRatingSubmitted, setPatientRatingSubmitted] = useState(false);
+  const [patientRatingLoading, setPatientRatingLoading] = useState(false);
+  const [existingPatientRating, setExistingPatientRating] = useState<number | null>(null);
 
   useEffect(() => {
     // Check if in demo mode
@@ -458,6 +467,72 @@ const PatientDashboardNew = ({ onLanguageDetected }: { onLanguageDetected?: (lan
     window.location.href = '/?page=patient-login';
   };
 
+  // Check if patient already submitted a rating
+  useEffect(() => {
+    const phone = localStorage.getItem('patient_phone');
+    if (!phone) return;
+    const db = getFirestore();
+    const checkRating = async () => {
+      try {
+        const q = query(
+          collection(db, 'reviews'),
+          where('entityId', '==', phone),
+          where('type', '==', 'support')
+        );
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          setExistingPatientRating(snap.docs[0].data().rating || 0);
+          setPatientRatingSubmitted(true);
+        }
+      } catch (err) {
+        console.error('Error checking patient rating:', err);
+      }
+    };
+    checkRating();
+  }, []);
+
+  const handlePatientStarClick = (starIndex: number, e: React.MouseEvent<HTMLButtonElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const isLeftHalf = clickX < rect.width / 2;
+    setPatientRating(isLeftHalf ? starIndex - 0.5 : starIndex);
+  };
+
+  const handlePatientStarHover = (starIndex: number, e: React.MouseEvent<HTMLButtonElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const hoverX = e.clientX - rect.left;
+    const isLeftHalf = hoverX < rect.width / 2;
+    setPatientHoveredRating(isLeftHalf ? starIndex - 0.5 : starIndex);
+  };
+
+  const handlePatientRatingSubmit = async () => {
+    const phone = localStorage.getItem('patient_phone');
+    if (patientRating === 0 || !phone) return;
+    setPatientRatingLoading(true);
+    try {
+      const db = getFirestore();
+      await addDoc(collection(db, 'reviews'), {
+        type: 'support',
+        entityType: 'patient',
+        entityId: phone,
+        entityName: patientData?.name || 'Patient',
+        doctorName: patientData?.name || 'Patient',
+        doctorId: phone,
+        rating: patientRating,
+        comment: patientRatingComment.trim() || (patientRating >= 4.5 ? 'Excellent platform!' : patientRating >= 3.5 ? 'Great service!' : 'Good service'),
+        createdAt: serverTimestamp(),
+        uploadedToLanding: false,
+      });
+      setExistingPatientRating(patientRating);
+      setPatientRatingSubmitted(true);
+      setShowRatingCard(false);
+    } catch (err) {
+      console.error('Error submitting patient rating:', err);
+    } finally {
+      setPatientRatingLoading(false);
+    }
+  };
+
   const renderDashboardContent = () => {
     return (
       <div className="space-y-6">
@@ -561,6 +636,96 @@ const PatientDashboardNew = ({ onLanguageDetected }: { onLanguageDetected?: (lan
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Rate HealQR Card */}
+        <div className="bg-gradient-to-r from-yellow-900/30 to-amber-900/20 rounded-xl border border-yellow-700/30 overflow-hidden">
+          {patientRatingSubmitted ? (
+            <div className="px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Star className="w-6 h-6 fill-yellow-400 text-yellow-400" />
+                <div>
+                  <p className="text-white font-medium">Thank you for rating HealQR!</p>
+                  <p className="text-gray-400 text-sm">Your rating: <span className="text-yellow-400 font-bold">{existingPatientRating}</span>/5</p>
+                </div>
+              </div>
+              <span className="text-emerald-400 text-sm font-medium">Submitted ✓</span>
+            </div>
+          ) : !showRatingCard ? (
+            <button
+              onClick={() => setShowRatingCard(true)}
+              className="w-full px-6 py-4 flex items-center justify-between hover:bg-yellow-800/10 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-yellow-500/20 rounded-xl flex items-center justify-center">
+                  <Star className="w-5 h-5 text-yellow-400" />
+                </div>
+                <div className="text-left">
+                  <p className="text-white font-medium">Rate Your HealQR Experience</p>
+                  <p className="text-gray-400 text-sm">Help us improve our platform</p>
+                </div>
+              </div>
+              <span className="text-yellow-400 text-sm font-medium">Rate Now →</span>
+            </button>
+          ) : (
+            <div className="p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-white font-bold text-lg">Rate HealQR</h3>
+                <button onClick={() => setShowRatingCard(false)} className="text-gray-500 hover:text-gray-300">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <p className="text-gray-400 text-sm">How has your experience been with HealQR?</p>
+
+              {/* Half-star selector */}
+              <div className="flex items-center justify-center gap-2 py-2">
+                {[1, 2, 3, 4, 5].map((star) => {
+                  const displayValue = patientHoveredRating || patientRating;
+                  const filled = displayValue >= star;
+                  const halfFilled = displayValue >= star - 0.5 && displayValue < star;
+                  return (
+                    <button
+                      key={star}
+                      onClick={(e) => handlePatientStarClick(star, e)}
+                      onMouseMove={(e) => handlePatientStarHover(star, e)}
+                      onMouseLeave={() => setPatientHoveredRating(0)}
+                      className="relative transition-transform hover:scale-110 focus:outline-none"
+                    >
+                      <Star className="w-10 h-10 text-gray-600" />
+                      {filled && <Star className="w-10 h-10 fill-yellow-400 text-yellow-400 absolute inset-0" />}
+                      {halfFilled && (
+                        <span className="absolute inset-0 overflow-hidden" style={{ width: '50%' }}>
+                          <Star className="w-10 h-10 fill-yellow-400 text-yellow-400" />
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              {patientRating > 0 && (
+                <p className="text-center text-yellow-400 text-sm font-medium">
+                  {patientRating} / 5 {patientRating >= 4.5 ? '— Excellent!' : patientRating >= 3.5 ? '— Great!' : patientRating >= 2.5 ? '— Good' : patientRating >= 1.5 ? '— Fair' : '— Poor'}
+                </p>
+              )}
+
+              <input
+                type="text"
+                value={patientRatingComment}
+                onChange={(e) => setPatientRatingComment(e.target.value)}
+                placeholder="Share your experience (optional)..."
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-yellow-500/50"
+              />
+
+              <button
+                onClick={handlePatientRatingSubmit}
+                disabled={patientRating === 0 || patientRatingLoading}
+                className="w-full bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 disabled:opacity-40 disabled:cursor-not-allowed text-black font-bold py-3 rounded-lg transition-all flex items-center justify-center gap-2 shadow-lg shadow-yellow-500/20"
+              >
+                {patientRatingLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Star className="w-5 h-5 fill-black" />}
+                {patientRatingLoading ? 'Submitting...' : 'Submit Rating'}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Health Tip Card */}

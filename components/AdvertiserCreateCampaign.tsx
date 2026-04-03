@@ -5,19 +5,14 @@ import { db, storage, auth } from '../lib/firebase/config';
 import { MapPin, Stethoscope, X, ArrowRight, Users, Activity, List, LayoutGrid, MonitorPlay, Image as ImageIcon, CheckCircle2, Clock, AlertCircle, Calendar, UploadCloud, CreditCard, FileVideo, FileImage, Trash2, Tag } from 'lucide-react';
 import SelectionModal from './SelectionModal';
 import { Badge } from './ui/badge';
+import { SPECIALTY_DISPLAY_NAMES } from '../utils/medicalSpecialties';
 
 interface AudienceStats {
   doctorCount: number;
   dailyPatientReach: number;
 }
 
-const COMMON_SPECIALTIES = [
-  "General Physician", "Cardiologist", "Dermatologist", "Gynecologist",
-  "Pediatrician", "Orthopedist", "Neurologist", "Psychiatrist", "Dentist",
-  "ENT Specialist", "Ophthalmologist", "Urologist", "Gastroenterologist",
-  "Pulmonologist", "Endocrinologist", "Rheumatologist", "Nephrologist",
-  "Oncologist", "Surgeon", "Physiotherapist", "Ayurveda", "Homeopathy"
-];
+const COMMON_SPECIALTIES = SPECIALTY_DISPLAY_NAMES;
 
 const SAMPLE_PINCODES = [
   "400001", "400050", "400099", "110001", "110020", "110099",

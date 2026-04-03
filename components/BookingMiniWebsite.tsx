@@ -9,13 +9,8 @@ import {
   DialogDescription,
   DialogFooter,
 } from './ui/dialog';
+import { formatSpecialtyLabel as formatSpecialty } from '../utils/medicalSpecialties';
 
-// Convert slug like "general_medicine" to "General Medicine"
-function formatSpecialty(slug: string): string {
-  return slug
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, c => c.toUpperCase());
-}
 import ReviewCard from './ReviewCard';
 import { useState, useEffect } from 'react';
 import TemplateDisplay from './TemplateDisplay';

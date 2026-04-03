@@ -23,6 +23,7 @@ import AdvertiserAnalytics from './AdvertiserAnalytics';
 import AdvertiserWallet from './AdvertiserWallet';
 import AdvertiserMarketResearch from './AdvertiserMarketResearch';
 import AdvertiserHealthTips from './AdvertiserHealthTips';
+import UnifiedChatWidget from './UnifiedChatWidget';
 
 interface AdvertiserDashboardProps {
   onLogout: () => void;
@@ -318,6 +319,15 @@ export default function AdvertiserDashboard({ onLogout }: AdvertiserDashboardPro
           {renderContent()}
         </div>
       </main>
+
+      {/* Unified AI + Support Chat */}
+      <UnifiedChatWidget
+        entityType="advertiser"
+        entityId={auth.currentUser?.uid || localStorage.getItem('healqr_advertiser_id') || ''}
+        entityName={localStorage.getItem('healqr_advertiser_company') || 'Advertiser'}
+        userRole="visitor"
+        collectionName="advertisers"
+      />
 
       {/* Overlay for mobile sidebar */}
       {isSidebarOpen && (

@@ -54,6 +54,7 @@ import ClinicVideoConsultationManager from './ClinicVideoConsultationManager';
 import VideoLibrary from './VideoLibrary';
 import ClinicCMEViewer from './ClinicCMEViewer';
 import ClinicSampleRequest from './ClinicSampleRequest';
+import UnifiedChatWidget from './UnifiedChatWidget';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 
 interface ClinicData {
@@ -1323,6 +1324,15 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
           </div>
         </main>
       </div>
+
+      {/* Unified AI + Support Chat */}
+      <UnifiedChatWidget
+        entityType="clinic"
+        entityId={resolvedClinicId}
+        entityName={displayClinicName}
+        userRole="clinic"
+        collectionName="clinics"
+      />
     </div>
   );
 }

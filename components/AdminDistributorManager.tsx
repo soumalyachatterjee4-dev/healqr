@@ -5,6 +5,7 @@ import {
   getDocs,
   doc,
   updateDoc,
+  getDoc,
   arrayUnion,
   arrayRemove,
   serverTimestamp
@@ -15,9 +16,10 @@ interface ChangeRequest {
   id: string;
   companyId: string;
   companyName: string;
-  type: 'territory' | 'specialty' | 'profile_edit';
+  type: 'territory' | 'specialty' | 'profile_edit' | 'territory_specialty';
   action: 'add' | 'remove' | 'update';
   items: string[];
+  territory?: string;
   changes?: Record<string, { from: string; to: string }>;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: any;
@@ -47,6 +49,7 @@ export default function AdminDistributorManager() {
           type: data.type,
           action: data.action,
           items: data.items || [],
+          territory: data.territory || undefined,
           changes: data.changes || undefined,
           status: data.status || 'pending',
           createdAt: data.createdAt,
@@ -111,6 +114,24 @@ export default function AdminDistributorManager() {
             updateData[field] = to;
           }
           await updateDoc(compRef, updateData);
+        } else if (req.type === 'territory_specialty' && req.territory) {
+          // Update territorySpecialties map for specific territory
+          const compSnap = await getDoc(compRef);
+          const compData = compSnap.data() || {};
+          const current = compData.territorySpecialties || {};
+          const territorySpecs = current[req.territory] || [];
+          let updated: string[];
+          if (req.action === 'add') {
+            updated = [...new Set([...territorySpecs, ...req.items])];
+          } else {
+            updated = territorySpecs.filter((s: string) => !req.items.includes(s));
+          }
+          // Write full map to avoid issues with special chars in territory names
+          const newMap = { ...current, [req.territory]: updated };
+          await updateDoc(compRef, {
+            territorySpecialties: newMap,
+            updatedAt: serverTimestamp(),
+          });
         }
       }
 
@@ -158,7 +179,9 @@ export default function AdminDistributorManager() {
                   </div>
                 ) : (
                   <p className="text-xs text-gray-400">
-                    {req.type} {req.action} – {req.items.join(', ')}
+                    {req.type === 'territory_specialty' && req.territory
+                      ? `Specialty ${req.action} for ${req.territory} – ${req.items.join(', ')}`
+                      : `${req.type} ${req.action} – ${req.items.join(', ')}`}
                   </p>
                 )}
               </div>

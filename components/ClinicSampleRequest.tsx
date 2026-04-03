@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 interface SampleRequest {
   id: string;
   itemName: string;
-  itemType: 'sample' | 'literature';
+  itemType: 'sample';
   quantity: number;
   notes: string;
   status: 'pending' | 'approved' | 'rejected' | 'fulfilled';
@@ -31,7 +31,7 @@ export default function ClinicSampleRequest({ onBack, companyName, clinicName }:
 
   // Form state
   const [itemName, setItemName] = useState('');
-  const [itemType, setItemType] = useState<'sample' | 'literature'>('sample');
+  const [itemType] = useState<'sample'>('sample');
   const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState('');
 
@@ -129,7 +129,6 @@ export default function ClinicSampleRequest({ onBack, companyName, clinicName }:
       toast.success('Request submitted successfully');
       setShowForm(false);
       setItemName('');
-      setItemType('sample');
       setQuantity(1);
       setNotes('');
       await loadRequests(companyId, clinicId);
@@ -217,29 +216,7 @@ export default function ClinicSampleRequest({ onBack, companyName, clinicName }:
         {/* New Request Form */}
         {showForm && (
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-6 space-y-4">
-            <h3 className="font-semibold text-white">New Sample / Literature Request</h3>
-
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">Item Type</label>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setItemType('sample')}
-                  className={`px-3 py-1.5 rounded-lg text-sm transition ${
-                    itemType === 'sample' ? 'bg-emerald-500 text-white' : 'bg-zinc-800 text-gray-400'
-                  }`}
-                >
-                  Sample
-                </button>
-                <button
-                  onClick={() => setItemType('literature')}
-                  className={`px-3 py-1.5 rounded-lg text-sm transition ${
-                    itemType === 'literature' ? 'bg-emerald-500 text-white' : 'bg-zinc-800 text-gray-400'
-                  }`}
-                >
-                  Literature
-                </button>
-              </div>
-            </div>
+            <h3 className="font-semibold text-white">New Sample Request</h3>
 
             <div>
               <label className="block text-sm text-gray-400 mb-1">Item Name</label>

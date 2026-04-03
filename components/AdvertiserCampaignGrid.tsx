@@ -19,6 +19,7 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { SPECIALTY_DISPLAY_NAMES } from '../utils/medicalSpecialties';
 
 interface CampaignGridProps {
   pincodes: string[];
@@ -35,9 +36,7 @@ const MOCK_TEMPLATES = [
   { id: 't4', name: 'Vaccine Drive', type: 'video', image: 'https://images.unsplash.com/photo-1584036561566-b93a945c3575?w=150&h=150&fit=crop' },
 ];
 
-const MOCK_SPECIALTIES = [
-  "Cardiologist", "Dentist", "General Physician", "Dermatologist", "Pediatrician"
-];
+const MOCK_SPECIALTIES = SPECIALTY_DISPLAY_NAMES;
 
 const MOCK_PINCODES = [
   "400001", "400050", "400099", "110001", "110020"

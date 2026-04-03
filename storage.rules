@@ -267,6 +267,18 @@ service firebase.storage {
     }
 
     // ============================================
+    // PHARMA CME FILES (PDFs, Videos, Documents)
+    // ============================================
+
+    match /pharma/{companyId}/cme/{fileName} {
+      // Allow read by anyone (shared CME content)
+      allow read: if true;
+
+      // Allow write by authenticated pharma users, max 50MB
+      allow write: if isAuthenticated() && isValidFileSize();
+    }
+
+    // ============================================
     // DEFAULT DENY
     // ============================================
 
