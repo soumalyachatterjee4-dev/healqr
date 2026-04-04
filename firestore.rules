@@ -104,6 +104,13 @@ service cloud.firestore {
           (request.auth.token.email in get(/databases/$(database)/documents/clinics/$(clinicId)).data.locationEmails)
         );
       }
+
+      // ============================================
+      // SUPPORT MESSAGES SUBCOLLECTION
+      // ============================================
+      match /supportMessages/{messageId} {
+        allow read, write: if isAuthenticated();
+      }
     }
 
     // ============================================
@@ -186,6 +193,13 @@ service cloud.firestore {
       match /usage/{usageId} {
         allow read, write: if isOwner(doctorId);
       }
+
+      // ============================================
+      // SUPPORT MESSAGES SUBCOLLECTION
+      // ============================================
+      match /supportMessages/{messageId} {
+        allow read, write: if isAuthenticated();
+      }
     }
 
     // ============================================
@@ -231,6 +245,13 @@ service cloud.firestore {
 
       // No deletes allowed
       allow delete: if false;
+
+      // ============================================
+      // SUPPORT MESSAGES SUBCOLLECTION
+      // ============================================
+      match /supportMessages/{messageId} {
+        allow read, write: if isAuthenticated();
+      }
     }
 
     // ============================================
@@ -458,14 +479,14 @@ service cloud.firestore {
     // ============================================
 
     match /reviews/{reviewId} {
-      // Allow read by anyone (public reviews)
+      // Allow read by anyone (public reviews + landing page testimonials)
       allow read: if true;
 
       // Allow create by authenticated users
       allow create: if isAuthenticated();
 
-      // Allow update only by the doctor (for responding)
-      allow update: if isAuthenticated() && request.auth.uid == resource.data.doctorId;
+      // Allow update by authenticated users (admin uploads to landing, doctor responds)
+      allow update: if isAuthenticated();
 
       // No deletes
       allow delete: if false;
@@ -903,6 +924,13 @@ service cloud.firestore {
     match /advertisers/{userId} {
       // Allow read/write by the owner
       allow read, write: if isAuthenticated() && request.auth.uid == userId;
+
+      // ============================================
+      // SUPPORT MESSAGES SUBCOLLECTION
+      // ============================================
+      match /supportMessages/{messageId} {
+        allow read, write: if isAuthenticated();
+      }
     }
 
     // ============================================
@@ -932,17 +960,17 @@ service cloud.firestore {
     // ============================================
 
     match /reviews/{reviewId} {
-      // Allow read by the doctor who owns the review
-      allow read: if isAuthenticated() && resource.data.doctorId == request.auth.uid;
+      // Allow read by anyone (public reviews)
+      allow read: if true;
 
       // Allow create by anyone (patients submitting reviews)
       allow create: if true;
 
-      // Allow update by doctor (e.g. marking as published)
-      allow update: if isAuthenticated() && resource.data.doctorId == request.auth.uid;
+      // Allow update by authenticated users (admin uploads to landing, doctor responds)
+      allow update: if isAuthenticated();
 
-      // Allow delete by doctor
-      allow delete: if isAuthenticated() && resource.data.doctorId == request.auth.uid;
+      // No deletes
+      allow delete: if false;
     }
 
     // ============================================

@@ -17,7 +17,8 @@ import {
   MapPinned,
   BarChart2,
   LayoutGrid,
-  Brain
+  Brain,
+  Headphones
 } from 'lucide-react';
 import { useState } from 'react';
 import healqrLogo from '../assets/healqr.logo.png';
@@ -52,6 +53,7 @@ export default function AdminSidebar({
     { id: 'clinics', label: 'Clinic Management', icon: Building2 },
     { id: 'patients', label: 'Patient Management', icon: UserCheck },
     { id: 'personal-management', label: 'Personal Management', icon: Briefcase },
+    { id: 'support-chat', label: 'Support Chat', icon: Headphones },
   ];
 
   const contentTools = [

@@ -639,7 +639,7 @@ const PatientDashboardNew = ({ onLanguageDetected }: { onLanguageDetected?: (lan
         </div>
 
         {/* Rate HealQR Card */}
-        <div className="bg-gradient-to-r from-yellow-900/30 to-amber-900/20 rounded-xl border border-yellow-700/30 overflow-hidden">
+        <div className="bg-gradient-to-r from-yellow-900/30 to-amber-900/20 rounded-xl border border-yellow-700/30">
           {patientRatingSubmitted ? (
             <div className="px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -719,9 +719,9 @@ const PatientDashboardNew = ({ onLanguageDetected }: { onLanguageDetected?: (lan
               <button
                 onClick={handlePatientRatingSubmit}
                 disabled={patientRating === 0 || patientRatingLoading}
-                className="w-full bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 disabled:opacity-40 disabled:cursor-not-allowed text-black font-bold py-3 rounded-lg transition-all flex items-center justify-center gap-2 shadow-lg shadow-yellow-500/20"
+                style={{ background: patientRating > 0 ? 'linear-gradient(to right, #eab308, #f59e0b)' : '#374151', color: patientRating > 0 ? '#000' : '#9ca3af', padding: '12px', borderRadius: '8px', width: '100%', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: patientRating > 0 ? 'pointer' : 'not-allowed', opacity: patientRating === 0 ? 0.4 : 1 }}
               >
-                {patientRatingLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Star className="w-5 h-5 fill-black" />}
+                {patientRatingLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Star className="w-5 h-5" style={{ fill: patientRating > 0 ? '#000' : 'none' }} />}
                 {patientRatingLoading ? 'Submitting...' : 'Submit Rating'}
               </button>
             </div>

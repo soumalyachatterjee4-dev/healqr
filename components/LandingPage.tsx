@@ -594,7 +594,7 @@ export default function LandingPage({
                 {/* Doctor Info */}
                 <div className="flex items-center gap-4 mb-6">
                   <div className="w-12 h-12 bg-emerald-500 rounded-full flex items-center justify-center flex-shrink-0">
-                    <span className="text-white">Dr</span>
+                    <span className="text-white font-bold text-sm">{testimonial.doctor.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}</span>
                   </div>
                   <div>
                     <h3 className="mb-1">{testimonial.doctor}</h3>

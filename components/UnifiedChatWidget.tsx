@@ -201,20 +201,50 @@ export default function UnifiedChatWidget({ entityType, entityId, entityName, us
   // --- Support Chat ---
   const handleSupportSend = async () => {
     const text = supportInput.trim();
-    if (!text || !entityId || !db) return;
+    if (!entityId || !db) return;
+
+    // If rating is selected but no text, use text as empty — still allow submit
+    const hasRating = showRatingForm && userRating > 0 && !ratingSubmitted;
+    if (!text && !hasRating) return;
+
     setSupportSending(true);
     try {
-      await addDoc(collection(db, collectionName, entityId, 'supportMessages'), {
-        message: text,
-        sender: senderType,
-        senderName: entityName || 'User',
-        entityType,
-        createdAt: serverTimestamp(),
-        read: false,
-      });
+      // Submit rating first if stars are selected
+      if (hasRating) {
+        setRatingLoading(true);
+        await addDoc(collection(db, 'reviews'), {
+          type: 'support',
+          entityType,
+          entityId,
+          entityName: entityName || 'Unknown',
+          doctorName: entityName || 'Unknown',
+          doctorId: entityId,
+          rating: userRating,
+          comment: text || (userRating >= 4.5 ? 'Excellent service!' : userRating >= 3.5 ? 'Great service!' : 'Good service'),
+          createdAt: serverTimestamp(),
+          uploadedToLanding: false,
+        });
+        setExistingRating(userRating);
+        setRatingSubmitted(true);
+        setShowRatingForm(false);
+        setRatingLoading(false);
+      }
+
+      // Send support message if there's text
+      if (text) {
+        await addDoc(collection(db, collectionName, entityId, 'supportMessages'), {
+          message: text,
+          sender: senderType,
+          senderName: entityName || 'User',
+          entityType,
+          createdAt: serverTimestamp(),
+          read: false,
+        });
+      }
       setSupportInput('');
     } catch (error) {
       console.error('Error sending support message:', error);
+      setRatingLoading(false);
     } finally {
       setSupportSending(false);
     }
@@ -497,8 +527,8 @@ export default function UnifiedChatWidget({ entityType, entityId, entityName, us
           {activeTab === 'support' && (
             <>
               {/* Rating Card — fixed above scroll area */}
-              <div className="px-3 pt-3 pb-0 shrink-0">
-                <div className="bg-gradient-to-r from-zinc-800/80 to-zinc-900/80 rounded-xl border border-zinc-700/50 overflow-hidden">
+              <div className="px-3 pt-2 pb-0 shrink-0 max-h-[280px] overflow-y-auto custom-scrollbar">
+                <div className="bg-gradient-to-r from-zinc-800/80 to-zinc-900/80 rounded-xl border border-zinc-700/50">
                   {ratingSubmitted ? (
                     <div className="px-3 py-2.5 flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -519,7 +549,7 @@ export default function UnifiedChatWidget({ entityType, entityId, entityName, us
                       <span className="text-[10px] text-emerald-400">Tap to rate →</span>
                     </button>
                   ) : (
-                    <div className="p-3 space-y-2.5">
+                    <div className="p-3 space-y-2">
                       <div className="flex items-center justify-between">
                         <p className="text-xs font-medium text-white">How's our service?</p>
                         <button onClick={() => setShowRatingForm(false)} className="text-gray-500 hover:text-gray-300">
@@ -528,7 +558,7 @@ export default function UnifiedChatWidget({ entityType, entityId, entityName, us
                       </div>
 
                       {/* Half-star selector */}
-                      <div className="flex items-center justify-center gap-1">
+                      <div className="flex items-center justify-center gap-0.5">
                         {[1, 2, 3, 4, 5].map((star) => {
                           const displayValue = hoveredRating || userRating;
                           const filled = displayValue >= star;
@@ -557,24 +587,9 @@ export default function UnifiedChatWidget({ entityType, entityId, entityName, us
                           {userRating} / 5 {userRating >= 4.5 ? '— Excellent!' : userRating >= 3.5 ? '— Great!' : userRating >= 2.5 ? '— Good' : userRating >= 1.5 ? '— Fair' : '— Poor'}
                         </p>
                       )}
-
-                      {/* Optional comment */}
-                      <input
-                        type="text"
-                        value={ratingComment}
-                        onChange={(e) => setRatingComment(e.target.value)}
-                        placeholder="Say something nice (optional)..."
-                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-yellow-500/50"
-                      />
-
-                      <button
-                        onClick={handleRatingSubmit}
-                        disabled={userRating === 0 || ratingLoading}
-                        className="w-full bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 disabled:opacity-40 disabled:cursor-not-allowed text-black text-sm font-bold py-2 rounded-lg transition-all flex items-center justify-center gap-2 shadow-lg shadow-yellow-500/20"
-                      >
-                        {ratingLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Star className="w-4 h-4 fill-black" />}
-                        {ratingLoading ? 'Submitting...' : 'Submit Rating'}
-                      </button>
+                      {userRating > 0 && (
+                        <p className="text-center text-gray-500 text-[10px]">↓ Use the message box below to submit</p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -617,23 +632,26 @@ export default function UnifiedChatWidget({ entityType, entityId, entityName, us
 
               {/* Support Input */}
               <div className="border-t border-gray-700 p-3 shrink-0">
+                {showRatingForm && userRating > 0 && !ratingSubmitted && (
+                  <p className="text-[10px] text-yellow-400 mb-1.5 text-center">⭐ {userRating}/5 selected — tap send to submit rating{supportInput.trim() ? ' & message' : ''}</p>
+                )}
                 <div className="flex items-end gap-2">
                   <textarea
                     ref={supportInputRef}
                     value={supportInput}
                     onChange={(e) => setSupportInput(e.target.value)}
                     onKeyDown={handleSupportKeyDown}
-                    placeholder="Type a message to support..."
+                    placeholder={showRatingForm && userRating > 0 && !ratingSubmitted ? 'Add a comment (optional) & tap send...' : 'Type a message to support...'}
                     rows={1}
                     className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 resize-none max-h-24"
                     style={{ minHeight: '38px' }}
                   />
                   <button
                     onClick={handleSupportSend}
-                    disabled={!supportInput.trim() || supportSending}
-                    className="p-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors shrink-0"
+                    disabled={(!supportInput.trim() && !(showRatingForm && userRating > 0 && !ratingSubmitted)) || supportSending}
+                    className={`p-2 ${showRatingForm && userRating > 0 && !ratingSubmitted ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-emerald-600 hover:bg-emerald-700'} disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors shrink-0`}
                   >
-                    {supportSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    {supportSending || ratingLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   </button>
                 </div>
               </div>

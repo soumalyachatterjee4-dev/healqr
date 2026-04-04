@@ -19,6 +19,7 @@ import AdminAdvertiserManagement from './AdminAdvertiserManagement';
 import AdminDistributorManager from './AdminDistributorManager';
 import AdminPageDistribution from './AdminPageDistribution';
 import AdminAIPMDashboard from './AdminAIPMDashboard';
+import AdminSupportChat from './AdminSupportChat';
 
 interface DoctorTestimonial {
   id: number;
@@ -54,7 +55,7 @@ interface AdminPanelProps {
 
 export default function AdminPanel({ adminEmail, onLogout, onStartDemo, uploadedTestimonials = [], onUploadTestimonial, supportRequests = [], onNavigateToQRGenerator, onNavigateToQRGeneration, onNavigateToQRManagement }: AdminPanelProps) {
   const [currentPage, setCurrentPage] = useState<
-    'dashboard' | 'profile' | 'doctors' | 'clinics' | 'patients' | 'personal-management' | 'templates' | 'videos' | 'promo-manager' | 'data-cleanup' | 'pharma-management' | 'pharma-templates' | 'distribution-requests' | 'advertiser-management' | 'page-distribution' | 'ai-pm-dashboard'
+    'dashboard' | 'profile' | 'doctors' | 'clinics' | 'patients' | 'personal-management' | 'templates' | 'videos' | 'promo-manager' | 'data-cleanup' | 'pharma-management' | 'pharma-templates' | 'distribution-requests' | 'advertiser-management' | 'page-distribution' | 'ai-pm-dashboard' | 'support-chat'
   >('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
@@ -77,6 +78,7 @@ export default function AdminPanel({ adminEmail, onLogout, onStartDemo, uploaded
     'advertiser-management': 'Advertiser Management',
     'page-distribution': 'Page Distribution',
     'ai-pm-dashboard': 'AI PM Dashboard',
+    'support-chat': 'Support Chat',
   };
 
   // Load unread notification count
@@ -194,6 +196,7 @@ export default function AdminPanel({ adminEmail, onLogout, onStartDemo, uploaded
         {currentPage === 'advertiser-management' && <AdminAdvertiserManagement />}
         {currentPage === 'page-distribution' && <AdminPageDistribution />}
         {currentPage === 'ai-pm-dashboard' && <AdminAIPMDashboard adminEmail={adminEmail} />}
+        {currentPage === 'support-chat' && <AdminSupportChat />}
       </div>
     </div>
   );
