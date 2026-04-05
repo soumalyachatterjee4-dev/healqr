@@ -17,7 +17,7 @@ import {
 import { AuthService } from '../lib/firebase/auth.service';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase/config';
-import healQRAdsLogo from '../assets/healQRADS_LOGO.svg';
+import healQRLogo from '../assets/healqr.logo.png';
 import AdvertiserCampaigns from './AdvertiserCampaigns';
 import AdvertiserAnalytics from './AdvertiserAnalytics';
 import AdvertiserWallet from './AdvertiserWallet';
@@ -227,7 +227,7 @@ export default function AdvertiserDashboard({ onLogout }: AdvertiserDashboardPro
     <div className="min-h-screen bg-black text-white font-sans">
       {/* Mobile Header */}
       <div className="lg:hidden flex items-center justify-between p-4 border-b border-zinc-800 bg-black/50 backdrop-blur-md sticky top-0 z-50">
-        <img src={healQRAdsLogo} alt="HealQR Ads" className="h-14 w-auto" />
+        <img src={healQRLogo} alt="HealQR Ads" className="h-14 w-auto" />
         <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-zinc-400 hover:text-white">
           <Menu className="w-6 h-6" />
         </button>
@@ -240,7 +240,7 @@ export default function AdvertiserDashboard({ onLogout }: AdvertiserDashboardPro
         ${isCollapsed ? 'w-20' : 'w-64'}
       `}>
         <div className={`p-6 flex items-center border-b border-zinc-900 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
-          {!isCollapsed && <img src={healQRAdsLogo} alt="HealQR Ads" className="h-14 w-auto" />}
+          {!isCollapsed && <img src={healQRLogo} alt="HealQR Ads" className="h-14 w-auto" />}
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
             className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"

@@ -74,12 +74,12 @@ export default function AdminAdvertiserManagement() {
         return {
           id: d.id,
           companyName: data.companyName || '',
-          contactEmail: data.contactEmail || '',
-          contactPhone: data.contactPhone || '',
-          contactPerson: data.contactPerson || '',
+          contactEmail: data.contactEmail || data.email || '',
+          contactPhone: data.contactPhone || data.companyPhone || '',
+          contactPerson: data.contactPerson || data.affiliatedPersonName || '',
           businessType: data.businessType || '',
           targetPincodes: data.targetPincodes || [],
-          status: data.status || 'pending',
+          status: data.status === 'pending_approval' || data.status === 'pending_verification' ? 'pending' : (data.status || 'pending'),
           planType: data.planType || 'basic',
           allocatedPages: data.allocatedPages || [],
           createdAt: data.createdAt,
@@ -137,6 +137,7 @@ export default function AdminAdvertiserManagement() {
       const payload = {
         companyName: formData.companyName.trim(),
         contactEmail: formData.contactEmail.trim().toLowerCase(),
+        email: formData.contactEmail.trim().toLowerCase(),
         contactPhone: formData.contactPhone.trim(),
         contactPerson: formData.contactPerson.trim(),
         businessType: formData.businessType.trim(),
@@ -177,6 +178,21 @@ export default function AdminAdvertiserManagement() {
       setAdvertisers(prev => prev.filter(a => a.id !== id));
     } catch (error) {
       console.error('Error deleting advertiser:', error);
+    }
+  };
+
+  const handleApprove = async (id: string, name: string) => {
+    if (!db) return;
+    try {
+      await updateDoc(doc(db, 'advertisers', id), {
+        status: 'active',
+        updatedAt: serverTimestamp(),
+      });
+      setAdvertisers(prev => prev.map(a => a.id === id ? { ...a, status: 'active' as const } : a));
+      alert(`${name} approved successfully!`);
+    } catch (error) {
+      console.error('Error approving advertiser:', error);
+      alert('Failed to approve');
     }
   };
 
@@ -343,7 +359,7 @@ export default function AdminAdvertiserManagement() {
 
           <div className="flex justify-end gap-3">
             <button onClick={resetForm} className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm transition-colors">Cancel</button>
-            <button onClick={handleSave} disabled={saving || !formData.companyName.trim() || !formData.contactEmail.trim()}
+            <button onClick={handleSave} disabled={saving || !formData.companyName.trim()}
               className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 rounded-lg text-sm transition-colors flex items-center gap-2">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
               {editingId ? 'Update' : 'Create'}
@@ -404,6 +420,12 @@ export default function AdminAdvertiserManagement() {
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
+                  {adv.status !== 'active' && (
+                    <button onClick={() => handleApprove(adv.id, adv.companyName)}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4" /> Approve
+                    </button>
+                  )}
                   <button onClick={() => handleEdit(adv)} className="p-2 text-gray-400 hover:bg-zinc-800 rounded-lg transition-colors">
                     <Edit2 className="w-4 h-4" />
                   </button>

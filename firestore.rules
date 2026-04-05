@@ -922,8 +922,13 @@ service cloud.firestore {
     // ============================================
 
     match /advertisers/{userId} {
-      // Allow read/write by the owner
-      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      // Allow read for login/signup email check (no secrets in this collection)
+      allow read: if true;
+      // Allow create for signup (before auth)
+      allow create: if true;
+      // Allow update/delete by authenticated users (doc ID is auto-generated, not UID)
+      allow update: if isAuthenticated();
+      allow delete: if false;
 
       // ============================================
       // SUPPORT MESSAGES SUBCOLLECTION

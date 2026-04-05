@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { auth, db } from '../lib/firebase/config';
 import { sendSignInLinkToEmail } from 'firebase/auth';
 import { collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
-import healQRAdsLogo from '../assets/healQRADS_LOGO.svg';
+import healQRLogo from '../assets/healqr.logo.png';
 
 interface AdvertiserSignUpProps {
   onBack: () => void;
@@ -51,6 +51,20 @@ export default function AdvertiserSignUp({ onBack, onLogin }: AdvertiserSignUpPr
       const existing = await getDocs(q);
 
       if (!existing.empty) {
+        const existingData = existing.docs[0].data();
+        if (existingData.status === 'pending_verification') {
+          // Resend verification link for pending accounts
+          const actionCodeSettings = {
+            url: `${window.location.origin}/?page=advertiser-verify`,
+            handleCodeInApp: true,
+          };
+          await sendSignInLinkToEmail(auth!, email.toLowerCase().trim(), actionCodeSettings);
+          localStorage.setItem('healqr_advertiser_email_for_signin', email.toLowerCase().trim());
+          setSent(true);
+          toast.success('Verification link resent to your email!');
+          setLoading(false);
+          return;
+        }
         setError('This email is already registered. Please login instead.');
         setLoading(false);
         return;
@@ -173,7 +187,7 @@ export default function AdvertiserSignUp({ onBack, onLogin }: AdvertiserSignUpPr
           <div className="p-6">
             <div className="flex flex-col items-center mb-6">
               <div className="bg-slate-950/50 p-3 rounded-xl border border-slate-800 mb-4 shadow-lg">
-                <img src={healQRAdsLogo} alt="HealQR Ads" className="h-14 w-auto" />
+                <img src={healQRLogo} alt="HealQR Ads" className="h-14 w-auto" />
               </div>
               <p className="text-slate-400 text-center text-sm">
                 {step === 'email' 

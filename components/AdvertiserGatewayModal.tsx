@@ -1,5 +1,5 @@
 import { X, UserPlus, LogIn } from 'lucide-react';
-import healQRAdsLogo from '../assets/healQRADS_LOGO.svg';
+import healQRLogo from '../assets/healqr.logo.png';
 
 interface AdvertiserGatewayModalProps {
   open: boolean;
@@ -23,7 +23,7 @@ export default function AdvertiserGatewayModal({ open, onOpenChange, onSignUp, o
       <div className="relative w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-zinc-800">
-          <img src={healQRAdsLogo} alt="HealQR Ads" className="h-14 w-auto" />
+          <img src={healQRLogo} alt="HealQR Ads" className="h-14 w-auto" />
           <button
             onClick={() => onOpenChange(false)}
             className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors"

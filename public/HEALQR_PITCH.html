@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HealQR — Business Pitch 2026</title>
+    <link rel="icon" type="image/png" href="/icon-192.png" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #6366f1; --primary-light: #a5b4fc; --accent: #06b6d4;
+            --bg: #0a0a14; --bg2: #12121f; --bg3: #1a1a2e;
+            --text: #f1f5f9; --muted: #94a3b8; --dim: #64748b;
+            --border: rgba(255,255,255,0.07);
+            --green: #22c55e; --gold: #f59e0b; --red: #ef4444; --teal: #14b8a6;
+        }
+        html, body { height: 100%; overflow: hidden; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); }
+
+        .deck { position: relative; width: 100%; height: 100vh; }
+        .slide {
+            position: absolute; inset: 0;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 50px 60px; opacity: 0; visibility: hidden;
+            transition: opacity .45s ease, transform .45s ease;
+            transform: translateX(50px); overflow-y: auto;
+        }
+        .slide.active { opacity: 1; visibility: visible; transform: translateX(0); }
+        .slide.prev { transform: translateX(-50px); }
+        .sc { max-width: 1100px; width: 100%; }
+
+        .controls {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 100;
+            display: flex; align-items: center; gap: 14px;
+            background: rgba(10,10,20,.92); backdrop-filter: blur(12px);
+            border: 1px solid var(--border); border-radius: 14px; padding: 8px 18px;
+        }
+        .controls button {
+            background: none; border: none; color: var(--muted); font-size: 18px;
+            cursor: pointer; padding: 5px 8px; border-radius: 6px; transition: .2s;
+        }
+        .controls button:hover { background: rgba(255,255,255,.08); color: var(--text); }
+        .sc-num { font-size: 12px; color: var(--dim); font-weight: 600; min-width: 50px; text-align: center; }
+        .pbar { position: fixed; top: 0; left: 0; height: 3px; z-index: 100; background: linear-gradient(90deg, var(--primary), var(--teal)); transition: width .4s; }
+
+        .topbar { position: fixed; top: 0; left: 0; right: 0; padding: 14px 28px; z-index: 99; display: flex; justify-content: space-between; align-items: center; }
+        .topbar img { height: 28px; opacity: .7; }
+        .topbar span { font-size: 10px; color: var(--dim); font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
+
+        .fs-btn { position: fixed; top: 14px; right: 28px; z-index: 100; background: rgba(255,255,255,.06); border: 1px solid var(--border); color: var(--muted); padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 14px; }
+        .fs-btn:hover { background: rgba(255,255,255,.12); color: var(--text); }
+
+        /* Typography */
+        .sh { font-size: 12px; color: var(--primary-light); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px; }
+        .st { font-size: clamp(24px, 3vw, 38px); font-weight: 800; margin-bottom: 28px; line-height: 1.15; }
+        .st span { color: var(--primary-light); }
+
+        /* Cover */
+        .cover { text-align: center; }
+        .cover-badge { display: inline-block; background: rgba(99,102,241,.12); border: 1px solid rgba(99,102,241,.25); color: var(--primary-light); padding: 7px 20px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 14px; }
+        .cover h1 { font-size: clamp(30px, 4.5vw, 52px); font-weight: 900; line-height: 1.08; margin-bottom: 18px; }
+        .cover h1 span { color: var(--primary-light); }
+        .cover p { font-size: 17px; color: var(--muted); max-width: 580px; margin: 0 auto 16px; line-height: 1.55; }
+        .cover-hero { max-height: 180px; margin-top: 10px; filter: drop-shadow(0 16px 32px rgba(0,0,0,.4)); }
+        .cover-meta { font-size: 11px; color: var(--dim); margin-top: 14px; }
+
+        /* Grid */
+        .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .g3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+        .g4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+
+        .card { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 24px 20px; }
+        .card-icon { font-size: 28px; margin-bottom: 10px; }
+        .card h4 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+        .card p { font-size: 12.5px; color: var(--muted); line-height: 1.55; }
+        .card-g { border-left: 3px solid var(--green); }
+        .card-p { border-left: 3px solid var(--primary); }
+        .card-t { border-left: 3px solid var(--teal); }
+        .card-o { border-left: 3px solid var(--gold); }
+
+        /* Stats */
+        .stat-row { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; margin-bottom: 32px; }
+        .stat-box { text-align: center; min-width: 140px; }
+        .stat-box .num { font-size: 42px; font-weight: 900; background: linear-gradient(135deg, var(--primary-light), var(--teal)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .stat-box .lbl { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+        /* Table */
+        .tb { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .tb thead { background: var(--bg3); }
+        .tb th { padding: 12px 14px; text-align: left; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); border-bottom: 1px solid var(--border); }
+        .tb td { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+        .tb tr:hover { background: rgba(255,255,255,.015); }
+        .rev { font-weight: 700; color: var(--green); }
+        .cost { color: var(--red); font-weight: 600; }
+        .ph { font-weight: 700; color: var(--primary-light); }
+
+        /* Highlight */
+        .hl { background: linear-gradient(135deg, rgba(34,197,94,.08), rgba(6,182,212,.08)); border: 1px solid rgba(34,197,94,.18); border-radius: 14px; padding: 28px; margin-top: 20px; }
+        .hl h3 { color: var(--green); font-size: 18px; margin-bottom: 14px; }
+        .hl-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .hl-item { display: flex; justify-content: space-between; padding: 10px 14px; background: rgba(0,0,0,.2); border-radius: 8px; }
+        .hl-l { font-weight: 600; font-size: 13px; }
+        .hl-v { font-weight: 800; color: var(--green); font-size: 13px; }
+
+        /* Two-col */
+        .two { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: center; }
+
+        /* List */
+        .sl { list-style: none; }
+        .sl li { padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px; display: flex; align-items: flex-start; gap: 10px; }
+        .sl li:last-child { border-bottom: none; }
+        .sl .ck { color: var(--green); font-weight: 700; flex-shrink: 0; }
+
+        /* Flow */
+        .flow { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+        .fi { background: var(--bg2); border: 1px solid var(--border); padding: 8px 14px; border-radius: 8px; font-size: 12px; display: flex; align-items: center; gap: 6px; }
+        .fn { background: var(--primary); color: #fff; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; flex-shrink: 0; }
+
+        /* Badge */
+        .bf { display: inline-block; background: rgba(34,197,94,.12); color: var(--green); font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 5px; text-transform: uppercase; }
+
+        /* Thankyou */
+        .ty { text-align: center; }
+        .ty h2 { font-size: 46px; font-weight: 900; margin-bottom: 14px; }
+        .ty h2 span { color: var(--primary-light); }
+        .ty p { font-size: 16px; color: var(--muted); margin-bottom: 6px; }
+        .ty .em { color: var(--primary-light); font-weight: 600; text-decoration: none; font-size: 18px; }
+
+        @media (max-width: 768px) {
+            .slide { padding: 50px 20px; }
+            .g2, .g3, .g4 { grid-template-columns: 1fr; }
+            .two { grid-template-columns: 1fr; }
+            .hl-grid { grid-template-columns: 1fr; }
+            .stat-row { flex-direction: column; align-items: center; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="pbar" id="pbar"></div>
+<div class="topbar">
+    <img src="/healqr.logo.png" alt="HealQR" style="height: 32px;" />
+    <span>Corporate Pitch &bull; April 2026</span>
+</div>
+<button class="fs-btn" onclick="toggleFS()" title="Fullscreen">&#x26F6;</button>
+
+<div class="deck" id="deck">
+
+<!-- ========== SLIDE 1: COVER ========== -->
+<div class="slide active" data-slide="1">
+    <div class="sc cover">
+        <div class="cover-badge">Business Pitch &bull; April 2026</div>
+        <h1>heal<span>QR</span></h1>
+        <p style="font-size: 22px; font-weight: 700; color: var(--text); margin-bottom: 8px;">World's First QR-based e-Assistant for Doctors</p>
+        <p>One QR code. Instant bookings. 31 languages. Digital prescriptions. Zero cost to doctors. Zero app downloads for patients.</p>
+        <div style="margin-top: 24px;"><img src="/healqr.logo.png" alt="HealQR" class="cover-hero" style="max-height: 140px;" /></div>
+        <div class="cover-meta">CONFIDENTIAL &bull; healqr.com &bull; support@healqr.com</div>
+    </div>
+</div>
+
+<!-- ========== SLIDE 2: INTRODUCTION ========== -->
+<div class="slide" data-slide="2">
+    <div class="sc">
+        <div class="sh">Introduction</div>
+        <h2 class="st">What is <span>HealQR</span>?</h2>
+        <div class="two">
+            <div>
+                <p style="font-size: 15px; color: var(--muted); line-height: 1.7; margin-bottom: 14px;">
+                    HealQR is a <strong style="color: var(--text);">complete digital healthcare ecosystem</strong> that connects Patients, Doctors, Clinics, Pharma Companies, and Advertisers &mdash; all through a single QR code.
+                </p>
+                <div class="card" style="background: rgba(239,68,68,.04); border-color: rgba(239,68,68,.18); margin-bottom: 14px; padding: 16px 18px;">
+                    <h4 style="color: var(--red); font-size: 13px; margin-bottom: 8px;">⚠️ Why HealQR? The Problem Today</h4>
+                    <p style="font-size: 12.5px; color: var(--muted); line-height: 1.6;"><strong style="color: var(--text);">Phone call?</strong> Time-bonded &mdash; works only during clinic hours. Language barrier with human phone assistants. <strong style="color: var(--text);">App?</strong> Patient must download, register, search. Both fail at scale &mdash; especially for rural, elderly, or first-time patients.</p>
+                </div>
+                <ul class="sl">
+                    <li><span class="ck">&#10003;</span> <strong>No app download</strong> &mdash; patients scan QR &amp; book in seconds</li>
+                    <li><span class="ck">&#10003;</span> <strong>31 languages</strong> &mdash; real-time translation</li>
+                    <li><span class="ck">&#10003;</span> <strong>100% FREE</strong> for doctors, clinics &amp; patients &mdash; forever</li>
+                    <li><span class="ck">&#10003;</span> <strong>Digital Rx</strong> &mdash; 100% doctor-created prescriptions, zero medical interference</li>
+                    <li><span class="ck">&#10003;</span> <strong>Pharma analytics</strong> &mdash; anonymous Rx molecule &amp; pathology trends</li>
+                    <li><span class="ck">&#10003;</span> <strong>Revenue via ads only</strong> &mdash; no hidden charges, no commissions</li>
+                </ul>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 14px;">
+                <div class="card" style="background: rgba(99,102,241,.06); border-color: rgba(99,102,241,.18); text-align: center;">
+                    <div style="font-size: 36px; font-weight: 900; color: var(--primary-light);">5</div>
+                    <div style="font-size: 13px; color: var(--muted);">Stakeholder Ecosystem</div>
+                    <div style="font-size: 11px; color: var(--dim); margin-top: 4px;">Patient &bull; Doctor &bull; Clinic &bull; Pharma &bull; Advertiser</div>
+                </div>
+                <div class="card" style="background: rgba(34,197,94,.06); border-color: rgba(34,197,94,.18); text-align: center;">
+                    <div style="font-size: 36px; font-weight: 900; color: var(--green);">₹0</div>
+                    <div style="font-size: 13px; color: var(--muted);">Cost to Doctor &amp; Patient</div>
+                </div>
+                <div class="card" style="background: rgba(245,158,11,.06); border-color: rgba(245,158,11,.18);">
+                    <div style="font-size: 28px; font-weight: 900; color: var(--gold); text-align: center;">10</div>
+                    <div style="font-size: 13px; color: var(--muted); text-align: center; margin-bottom: 10px;">Touchpoints per Booking</div>
+                    <div class="flow" style="justify-content: center;">
+                        <div class="fi"><span class="fn">1</span>Language</div>
+                        <div class="fi"><span class="fn">2</span>Mini-site</div>
+                        <div class="fi"><span class="fn">3</span>Date</div>
+                        <div class="fi"><span class="fn">4</span>Chamber</div>
+                        <div class="fi"><span class="fn">5</span>Form</div>
+                        <div class="fi"><span class="fn">6</span>Confirm</div>
+                        <div class="fi"><span class="fn">7</span>Consult</div>
+                        <div class="fi"><span class="fn">8</span>Review</div>
+                    </div>
+                    <div style="font-size: 11px; color: var(--teal); margin-top: 6px; text-align: center;">Clinic: +2 (Choose Location &bull; Choose Doctor)</div>
+                    <div style="font-size: 11px; color: var(--dim); margin-top: 4px; text-align: center;">Cancellation: Day &bull; Chamber &bull; Patients</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========== SLIDE 3: COMPARISON ========== -->
+<div class="slide" data-slide="3">
+    <div class="sc">
+        <div class="sh">The Problem &amp; Solution</div>
+        <h2 class="st">Phone Assistant vs App vs <span>HealQR</span></h2>
+        <table class="tb" style="margin-bottom: 20px;">
+            <thead>
+                <tr><th style="width: 28%;">Criteria</th><th style="width: 24%;">📞 Human Phone Assistant</th><th style="width: 24%;">📱 App (Practo etc.)</th><th style="width: 24%; color: var(--green);">✅ HealQR</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><strong>Availability</strong></td><td class="cost">Clinic hours only</td><td>24&times;7</td><td class="rev">24&times;7 &mdash; scan anytime</td></tr>
+                <tr><td><strong>Language Support</strong></td><td class="cost">1-2 languages max</td><td class="cost">English / Hindi only</td><td class="rev">31 languages, real-time</td></tr>
+                <tr><td><strong>App Download</strong></td><td>Not needed</td><td class="cost">Required</td><td class="rev">Not needed</td></tr>
+                <tr><td><strong>Registration</strong></td><td class="cost">Phone number needed</td><td class="cost">Full signup required</td><td class="rev">Zero registration</td></tr>
+                <tr><td><strong>Know the Doctor?</strong></td><td class="cost">Must know clinic number</td><td>Can search (limited)</td><td class="rev">Just scan the QR</td></tr>
+                <tr><td><strong>Waiting Time</strong></td><td class="cost">Hold, busy lines, redial</td><td>Instant (if found)</td><td class="rev">Instant &mdash; always</td></tr>
+                <tr><td><strong>Scalability</strong></td><td class="cost">1 call at a time</td><td>Scalable</td><td class="rev">Unlimited scans</td></tr>
+                <tr><td><strong>Cost to Doctor</strong></td><td class="cost">₹8-15K/month salary</td><td class="cost">Commission / subscription</td><td class="rev">₹0 &mdash; forever free</td></tr>
+                <tr><td><strong>Data Ownership</strong></td><td class="cost">Paper / no records</td><td class="cost">Platform owns data</td><td class="rev">Doctor owns 100%</td></tr>
+                <tr><td><strong>Digital Prescription</strong></td><td class="cost">Not possible</td><td class="cost">Extra cost / limited</td><td class="rev">Free, bilingual, instant</td></tr>
+                <tr><td><strong>Patient Experience</strong></td><td class="cost">Frustrating, error-prone</td><td>Decent but fragmented</td><td class="rev">Seamless, 3-tap booking</td></tr>
+            </tbody>
+        </table>
+        <div class="card" style="text-align: center; border-color: rgba(34,197,94,.2); background: rgba(34,197,94,.04);">
+            <p style="font-size: 14px;"><strong style="color: var(--green);">HealQR eliminates every friction point</strong> &mdash; no phone lines, no apps, no registration, no language barriers, no cost. Just scan &amp; book.</p>
+        </div>
+    </div>
+</div>
+
+<!-- ========== SLIDE 4: PATIENT ========== -->
+<div class="slide" data-slide="4">
+    <div class="sc">
+        <div class="sh">For Patients</div>
+        <h2 class="st">Scan. Book. Done. <span>No App Needed.</span></h2>
+        <div class="g3">
+            <div class="card card-g">
+                <div class="card-icon">📱</div>
+                <h4>24&times;7 Scan &amp; Book</h4>
+                <p>Scan QR code with any phone camera &mdash; <strong>anytime, 24&times;7</strong>. Choose date, time, doctor &mdash; confirmed instantly. No registration, no login, no app download.</p>
+            </div>
+            <div class="card card-g">
+                <div class="card-icon">🗣️</div>
+                <h4>Your Language, Your Way</h4>
+                <p>Entire booking flow in 31 languages. A rural patient in Tamil Nadu books as easily as someone in Delhi &mdash; in their own language.</p>
+            </div>
+            <div class="card card-g">
+                <div class="card-icon">💊</div>
+                <h4>AI Rx Reader</h4>
+                <p>Upload prescription photo &rarr; AI decodes medicine names, dosages, timings. Explains everything in simple language the patient understands.</p>
+            </div>
+            <div class="card card-g">
+                <div class="card-icon">🥗</div>
+                <h4>AI Diet Charts</h4>
+                <p>Personalized diet plans generated by AI based on diagnosis. Culturally relevant food suggestions in the patient's preferred language.</p>
+            </div>
+            <div class="card card-g">
+                <div class="card-icon">📄</div>
+                <h4>Digital Prescription</h4>
+                <p>Receive bilingual digital prescriptions &mdash; English + your language. Access anytime from patient dashboard, share with pharmacist.</p>
+            </div>
+            <div class="card card-g">
+                <div class="card-icon">🔔</div>
+                <h4>Smart Notifications</h4>
+                <p>Booking confirmations, appointment reminders, follow-up alerts, and prescription updates &mdash; all via push notifications.</p>
+            </div>
+        </div>
+        <div class="card" style="margin-top: 18px; border-color: rgba(99,102,241,.2); background: rgba(99,102,241,.04); padding: 18px 24px;">
+            <h4 style="color: var(--primary-light); margin-bottom: 12px;">📊 Patient Dashboard — Access with Booked Phone Number</h4>
+            <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                <div style="flex: 1; min-width: 150px; background: rgba(0,0,0,.2); border-radius: 8px; padding: 10px 14px;">
+                    <div style="font-size: 12px; color: var(--green); font-weight: 700;">📋 Booking History</div>
+                    <div style="font-size: 11px; color: var(--muted); margin-top: 3px;">Unlimited records, all doctors</div>
+                </div>
+                <div style="flex: 1; min-width: 150px; background: rgba(0,0,0,.2); border-radius: 8px; padding: 10px 14px;">
+                    <div style="font-size: 12px; color: var(--green); font-weight: 700;">🔔 All Notifications</div>
+                    <div style="font-size: 11px; color: var(--muted); margin-top: 3px;">Up to 120 days, one place</div>
+                </div>
+                <div style="flex: 1; min-width: 150px; background: rgba(0,0,0,.2); border-radius: 8px; padding: 10px 14px;">
+                    <div style="font-size: 12px; color: var(--green); font-weight: 700;">⏱️ Live Queue Monitor</div>
+                    <div style="font-size: 11px; color: var(--muted); margin-top: 3px;">Real-time during chamber hours</div>
+                </div>
+                <div style="flex: 1; min-width: 150px; background: rgba(0,0,0,.2); border-radius: 8px; padding: 10px 14px;">
+                    <div style="font-size: 12px; color: var(--green); font-weight: 700;">📍 Doctor Search</div>
+                    <div style="font-size: 11px; color: var(--muted); margin-top: 3px;">Geocoding-based nearby search</div>
+                </div>
+            </div>
+        </div>
+        <div style="text-align: center; margin-top: 12px; font-size: 13px; color: var(--dim);"><span class="bf">100% FREE</span> &nbsp; Zero cost to patients &bull; No app &bull; No registration required</div>
+    </div>
+</div>
+
+<!-- ========== SLIDE 5: DOCTOR ========== -->
+<div class="slide" data-slide="5">
+    <div class="sc">
+        <div class="sh">For Doctors</div>
+        <h2 class="st">Your Complete <span>Practice Platform</span> — FREE</h2>
+        <div class="g3">
+            <div class="card card-p">
+                <div class="card-icon">🌐</div>
+                <h4>Free Mini-Website + QR</h4>
+                <p>Get a professional shareable website with your QR code, profile, specializations, chambers, and integrated booking. Share on WhatsApp, prints, visiting cards.</p>
+            </div>
+            <div class="card card-p">
+                <div class="card-icon">📊</div>
+                <h4>Advanced Analytics</h4>
+                <p>Real-time booking trends, patient demographics, revenue tracking, cancellation analysis. Know exactly how your practice is performing.</p>
+            </div>
+            <div class="card card-p">
+                <div class="card-icon">📋</div>
+                <h4>Digital Prescriptions</h4>
+                <p>Write bilingual digital prescriptions with smart medicine DB. Patients receive via notification. AI-powered medicine suggestions speed up workflow.</p>
+            </div>
+            <div class="card card-p">
+                <div class="card-icon">🤖</div>
+                <h4>AI Rx Reader + Diet Charts</h4>
+                <p>Upload any prescription &rarr; AI extracts medicines, decodes dosage, translates for patient. Generate personalized diet charts in one click.</p>
+            </div>
+            <div class="card card-p">
+                <div class="card-icon">👥</div>
+                <h4>Assistant &amp; Staff Access</h4>
+                <p>Give your receptionist or staff controlled dashboard access. They manage bookings &amp; schedules while you focus on patient care.</p>
+            </div>
+            <div class="card card-p">
+                <div class="card-icon">🔒</div>
+                <h4>100% Data Ownership</h4>
+                <p>Unlike Practo or other platforms, YOU own all patient data. Export anytime. No lock-in. No commission. No subscription fees — ever.</p>
+            </div>
+            <div class="card card-p">
+                <div class="card-icon">📣</div>
+                <h4>One-Click Digital Marketing</h4>
+                <p>Share your mini-website on social media (WhatsApp, Facebook, Instagram) &amp; Google with one click. Enhance your practice base &mdash; patients find you online without any ad spend.</p>
+            </div>
+            <div class="card card-p">
+                <div class="card-icon">🚫</div>
+                <h4>Zero Cross-Booking</h4>
+                <p>Unlike other apps, HealQR has proper availability management &mdash; no double bookings, no overbooking. Slot-level control ensures every booking is valid.</p>
+            </div>
+            <div class="card card-p">
+                <div class="card-icon">📅</div>
+                <h4>Multi-Chamber Management</h4>
+                <p>Manage multiple chambers with different schedules, fees &amp; time slots. Patients see only available slots per chamber &mdash; no confusion, no overlap.</p>
+            </div>
+            <div class="card card-p" style="grid-column: span 3;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div class="card-icon" style="margin-bottom: 0;">🚶</div>
+                    <div>
+                        <h4>Walk-in Patient Management</h4>
+                        <p>Handle walk-in patients alongside pre-booked appointments. Live token system, real-time queue updates &mdash; no chaos, no missed patients.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card" style="margin-top: 16px; text-align: center; border-color: rgba(34,197,94,.2); background: rgba(34,197,94,.04);">
+            <p style="font-size: 14px;"><strong style="color: var(--green);">Win for Doctor:</strong> Free dashboard + Free QR + Free AI tools + Free analytics + Social media marketing + Zero commission = More patients, zero cost</p>
+        </div>
+    </div>
+</div>
+
+<!-- ========== SLIDE 6: CLINIC ========== -->
+<div class="slide" data-slide="6">
+    <div class="sc">
+        <div class="sh">For Clinics</div>
+        <h2 class="st">Multi-Specialty, <span>Multi-Location</span> — One QR</h2>
+        <div class="two">
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <div class="card card-t" style="padding: 14px 18px;">
+                    <div style="display: flex; align-items: center; gap: 10px;"><span style="font-size: 18px;">🏥</span><div><h4 style="font-size: 13px;">Unified Dashboard</h4><p>Manage all doctors, all locations, all bookings from one screen</p></div></div>
+                </div>
+                <div class="card card-t" style="padding: 14px 18px;">
+                    <div style="display: flex; align-items: center; gap: 10px;"><span style="font-size: 18px;">🩺</span><div><h4 style="font-size: 13px;">Multi-Specialty Support</h4><p>Cardiologist, ENT, Gynecologist — all under one clinic QR</p></div></div>
+                </div>
+                <div class="card card-t" style="padding: 14px 18px;">
+                    <div style="display: flex; align-items: center; gap: 10px;"><span style="font-size: 18px;">📍</span><div><h4 style="font-size: 13px;">Multi-Location</h4><p>Main branch + satellite clinics managed centrally</p></div></div>
+                </div>
+                <div class="card card-t" style="padding: 14px 18px;">
+                    <div style="display: flex; align-items: center; gap: 10px;"><span style="font-size: 18px;">🎫</span><div><h4 style="font-size: 13px;">Token System</h4><p>Live queue management for walk-in patients with real-time display</p></div></div>
+                </div>
+                <div class="card card-t" style="padding: 14px 18px;">
+                    <div style="display: flex; align-items: center; gap: 10px;"><span style="font-size: 18px;">📊</span><div><h4 style="font-size: 13px;">Clinic Analytics</h4><p>Cross-doctor performance, speciality-wise booking distribution</p></div></div>
+                </div>
+                <div class="card card-t" style="padding: 14px 18px;">
+                    <div style="display: flex; align-items: center; gap: 10px;"><span style="font-size: 18px;">🔐</span><div><h4 style="font-size: 13px;">Staff Access Control</h4><p>Role-based permissions for reception, admin, and management</p></div></div>
+                </div>
+                <div class="card card-t" style="padding: 14px 18px;">
+                    <div style="display: flex; align-items: center; gap: 10px;"><span style="font-size: 18px;">📅</span><div><h4 style="font-size: 13px;">Schedule View</h4><p>Today's appointments, upcoming slots, and doctor availability at a glance</p></div></div>
+                </div>
+                <div class="card" style="padding: 14px 18px; border-left: 3px solid var(--gold); background: rgba(245,158,11,.04);">
+                    <div style="display: flex; align-items: center; gap: 10px;"><span style="font-size: 18px;">🚶</span><div><h4 style="font-size: 13px; color: var(--gold);">Walk-in Patient Management</h4><p>Individual doctor-wise walk-in handling alongside pre-booked slots. Live token, real-time queue — no chaos</p></div></div>
+                </div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 14px;">
+                <div class="card" style="background: rgba(20,184,166,.06); border-color: rgba(20,184,166,.18); text-align: center;">
+                    <div style="font-size: 34px; font-weight: 900; color: var(--teal);">∞</div>
+                    <div style="font-size: 13px; color: var(--muted);">Unlimited Doctors per Clinic</div>
+                </div>
+                <div class="card" style="background: rgba(34,197,94,.06); border-color: rgba(34,197,94,.18); text-align: center;">
+                    <div style="font-size: 34px; font-weight: 900; color: var(--green);">₹0</div>
+                    <div style="font-size: 13px; color: var(--muted);">Zero Cost — All Features Free</div>
+                </div>
+                <div class="card" style="background: rgba(99,102,241,.06); border-color: rgba(99,102,241,.18); text-align: center;">
+                    <div style="font-size: 34px; font-weight: 900; color: var(--primary-light);">1 QR</div>
+                    <div style="font-size: 13px; color: var(--muted);">One Code, Entire Clinic</div>
+                </div>
+                <div class="card" style="background: rgba(245,158,11,.06); border-color: rgba(245,158,11,.18);">
+                    <p style="font-size: 13px; color: var(--gold); font-weight: 600; text-align: center;">Win for Clinic: Operational efficiency ↑, Patient wait time ↓, Digital presence — all at zero cost</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========== SLIDE 7: DISTRIBUTION PARTNER ========== -->
+<div class="slide" data-slide="7">
+    <div class="sc">
+        <div class="sh">Strategic Partnership</div>
+        <h2 class="st"><span>HealQR</span> Distribution Partner</h2>
+        <p style="font-size: 15px; color: var(--muted); margin-bottom: 24px; line-height: 1.6;">India has <strong style="color: var(--text);">5+ lakh field force representatives</strong> visiting 8–12 doctors daily. HealQR becomes a <strong style="color: var(--text);">value-addition tool</strong> in their existing workflow — helping them build stronger rapport, earn more doctor time, and deliver genuine practice value.</p>
+        <div class="g3">
+            <div class="card card-t">
+                <div class="card-icon">🤝</div>
+                <h4>Rapport Building Tool</h4>
+                <p>Field reps introduce HealQR as a <strong>genuine value-add</strong> for the doctor's practice — free digital platform, booking system, AI tools. This builds trust &amp; earns more quality time with every doctor visit.</p>
+            </div>
+            <div class="card card-t">
+                <div class="card-icon">📊</div>
+                <h4>Rx Trends — Direct from Source</h4>
+                <p>Anonymized prescription trends from <strong>real prescriptions at the point of care</strong> — no intermediaries, no via. Which molecules, which specialty, which territory. Available on-demand from your own dashboard. <strong>No approval needed. No cost.</strong></p>
+            </div>
+            <div class="card card-t">
+                <div class="card-icon">🔬</div>
+                <h4>Pathology Trends — On Demand</h4>
+                <p>Lab test ordering patterns directly from doctor prescriptions — <strong>source data, not derived</strong>. Access from your company dashboard anytime. No request process, no waiting — self-serve analytics.</p>
+            </div>
+        </div>
+        <div class="g2" style="margin-top: 16px;">
+            <div class="card" style="border-color: rgba(20,184,166,.2); background: rgba(20,184,166,.04);">
+                <h4 style="color: var(--teal); margin-bottom: 10px;">🏢 For Pharma Companies</h4>
+                <ul class="sl" style="font-size: 12.5px;">
+                    <li><span class="ck">✓</span> Field force delivers real practice value — not just product pitches</li>
+                    <li><span class="ck">✓</span> Source-level Rx &amp; pathology analytics on self-serve dashboard</li>
+                    <li><span class="ck">✓</span> Hyperlocal data — territory-wise, specialty-wise, pincode-wise</li>
+                    <li><span class="ck">✓</span> Stronger doctor relationships = better business outcomes</li>
+                </ul>
+            </div>
+            <div class="card" style="border-color: rgba(99,102,241,.2); background: rgba(99,102,241,.04);">
+                <h4 style="color: var(--primary-light); margin-bottom: 10px;">👨‍⚕️ For Doctors (via Field Rep)</h4>
+                <ul class="sl" style="font-size: 12.5px;">
+                    <li><span class="ck">✓</span> Free complete digital practice platform — no strings attached</li>
+                    <li><span class="ck">✓</span> QR-based booking, digital Rx, analytics — all at zero cost</li>
+                    <li><span class="ck">✓</span> 100% data ownership — no lock-in, no commission, ever</li>
+                    <li><span class="ck">✓</span> Field rep becomes a trusted practice enabler, not just a promoter</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========== SLIDE 8: PER BOOKING COST ========== -->
+<div class="slide" data-slide="8">
+    <div class="sc">
+        <div class="sh">Unit Economics</div>
+        <h2 class="st">Per Booking <span>Cost Breakdown</span></h2>
+        <p style="font-size: 14px; color: var(--muted); margin-bottom: 24px;">Every single booking on HealQR has a measurable infrastructure cost. Here's the transparent breakdown:</p>
+        <div class="two">
+            <div>
+                <table class="tb">
+                    <thead><tr><th>Cost Component</th><th>Per Booking</th></tr></thead>
+                    <tbody>
+                        <tr><td>Firestore (DB reads/writes)</td><td>₹0.04</td></tr>
+                        <tr><td>Firebase Hosting + CDN</td><td>₹0.02</td></tr>
+                        <tr><td>Push Notification (FCM)</td><td>₹0.01</td></tr>
+                        <tr><td>AI Translation (Gemini)</td><td>₹0.06</td></tr>
+                        <tr><td>Geocoding API</td><td>₹0.04</td></tr>
+                        <tr><td>Cloud Functions</td><td>₹0.03</td></tr>
+                        <tr><td>AI Rx Reader (if used)</td><td>₹0.06</td></tr>
+                        <tr><td>Storage &amp; bandwidth</td><td>₹0.02</td></tr>
+                        <tr style="font-weight: 700; background: rgba(255,255,255,.03);">
+                            <td><strong>Total Cost/Booking</strong></td>
+                            <td style="color: var(--gold); font-size: 16px;"><strong>₹0.28</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div>
+                <div class="card" style="border-color: rgba(34,197,94,.25); background: rgba(34,197,94,.05); margin-bottom: 14px;">
+                    <h4 style="color: var(--green);">Revenue per Booking: ₹1.00 — ₹4.00</h4>
+                    <p style="margin-top: 8px;">From 8 ad impressions per booking (see Slide 8). Even at Phase 1 rates, each booking generates <strong>3.5x</strong> the cost.</p>
+                </div>
+                <div class="card" style="border-color: rgba(99,102,241,.25); background: rgba(99,102,241,.05); margin-bottom: 14px;">
+                    <h4 style="color: var(--primary-light);">Benchmark Comparison</h4>
+                    <p style="margin-top: 8px;">WhatsApp charges <strong>₹0.78</strong> for a single notification message. HealQR's full booking (with AI + translation + notifications) costs only <strong>₹0.28</strong>.</p>
+                </div>
+                <div class="card" style="border-color: rgba(245,158,11,.25); background: rgba(245,158,11,.05);">
+                    <h4 style="color: var(--gold);">Cost Decreases at Scale</h4>
+                    <p style="margin-top: 8px;">Translation caching, batch Gemini calls, and CDN optimizations reduce per-booking cost to <strong>₹0.21</strong> at Phase 4.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========== SLIDE 9: REVENUE & AD TOUCHPOINTS ========== -->
+<div class="slide" data-slide="9">
+    <div class="sc">
+        <div class="sh">Revenue Model</div>
+        <h2 class="st">8 Ad Touchpoints per Booking = <span>Revenue Engine</span></h2>
+        <p style="font-size: 14px; color: var(--muted); margin-bottom: 20px;">Every booking creates <strong>8 natural moments</strong> where non-medical ads appear organically. No intrusion, no spam — contextual placement at the right time.</p>
+        <div class="g4">
+            <div class="card card-o">
+                <div class="card-icon">1️⃣</div>
+                <h4>QR Landing</h4>
+                <p>Patient scans QR — banner ad appears on the doctor/clinic landing page</p>
+            </div>
+            <div class="card card-o">
+                <div class="card-icon">2️⃣</div>
+                <h4>Booking Form</h4>
+                <p>While filling booking details — sidebar/footer ad displayed</p>
+            </div>
+            <div class="card card-o">
+                <div class="card-icon">3️⃣</div>
+                <h4>Confirmation Page</h4>
+                <p>Booking confirmed — full banner ad with high engagement</p>
+            </div>
+            <div class="card card-o">
+                <div class="card-icon">4️⃣</div>
+                <h4>Reminder Notification</h4>
+                <p>Push notification reminder — in-notification ad placement</p>
+            </div>
+            <div class="card card-o">
+                <div class="card-icon">5️⃣</div>
+                <h4>Patient Dashboard</h4>
+                <p>Patient opens dashboard — display ad card in feed</p>
+            </div>
+            <div class="card card-o">
+                <div class="card-icon">6️⃣</div>
+                <h4>Prescription View</h4>
+                <p>Patient views digital Rx — contextual ad below prescription</p>
+            </div>
+            <div class="card card-o">
+                <div class="card-icon">7️⃣</div>
+                <h4>Follow-up Reminder</h4>
+                <p>Doctor sends follow-up alert — ad in notification card</p>
+            </div>
+            <div class="card card-o">
+                <div class="card-icon">8️⃣</div>
+                <h4>Review Request</h4>
+                <p>Post-visit review prompt — ad placement alongside</p>
+            </div>
+        </div>
+        <div class="card" style="margin-top: 16px; text-align: center; border-color: rgba(245,158,11,.2); background: rgba(245,158,11,.04);">
+            <p style="font-size: 14px;"><strong style="color: var(--gold);">Key Principle:</strong> Only non-medical 3rd party ads &bull; No pharma ads to patients &bull; No treatment interference &bull; Health insurance, wellness, nutrition brands only</p>
+        </div>
+    </div>
+</div>
+
+<!-- ========== SLIDE 10: PER BOOKING COST — PHASE WISE ========== -->
+<div class="slide" data-slide="10">
+    <div class="sc">
+        <div class="sh">Scaling Economics</div>
+        <h2 class="st">Per Booking Revenue — <span>Phase-wise Growth</span></h2>
+        <table class="tb" style="margin-bottom: 24px;">
+            <thead>
+                <tr><th>Phase</th><th>Doctors</th><th>Bookings/month</th><th>Revenue/Booking</th><th>Monthly Revenue</th><th>Operating Cost</th><th>Net Margin</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="ph">Phase 1 (Jun '26)</td><td>10,000</td><td>25 Lakh</td>
+                    <td class="rev">₹1.00</td><td class="rev">₹25 Lakh</td><td class="cost">₹6-8 Lakh</td><td>~72%</td>
+                </tr>
+                <tr>
+                    <td class="ph">Phase 2 (Sep '26)</td><td>30,000</td><td>75 Lakh</td>
+                    <td class="rev">₹1.50</td><td class="rev">₹1.12 Crore</td><td class="cost">₹14-17 Lakh</td><td>~86%</td>
+                </tr>
+                <tr>
+                    <td class="ph">Phase 3 (Dec '26)</td><td>60,000</td><td>1.5 Crore</td>
+                    <td class="rev">₹2.50</td><td class="rev">₹3.75 Crore</td><td class="cost">₹27-32 Lakh</td><td>~92%</td>
+                </tr>
+                <tr>
+                    <td class="ph">Phase 4 (Mar '27)</td><td>1,00,000</td><td>2.5 Crore</td>
+                    <td class="rev">₹4.00</td><td class="rev">₹10 Crore</td><td class="cost">₹47-57 Lakh</td><td>~95%</td>
+                </tr>
+            </tbody>
+        </table>
+        <div class="hl">
+            <h3>Why Revenue per Booking Increases 4x</h3>
+            <div class="g3" style="margin-top: 12px;">
+                <div class="card" style="background: transparent; border-color: rgba(34,197,94,.2);">
+                    <h4 style="color: var(--green);">Network Effect</h4>
+                    <p>More doctors → more patients → more impressions → higher CPM rates from advertisers</p>
+                </div>
+                <div class="card" style="background: transparent; border-color: rgba(99,102,241,.2);">
+                    <h4 style="color: var(--primary-light);">Better Targeting</h4>
+                    <p>With more data, ads become more targeted — specialty-wise, geography-wise — advertisers pay premium</p>
+                </div>
+                <div class="card" style="background: transparent; border-color: rgba(245,158,11,.2);">
+                    <h4 style="color: var(--gold);">Premium Placements</h4>
+                    <p>As platform grows, premium ad slots (booking confirmation, in-app notification) become auction-worthy</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========== SLIDE 11: PER BOOKING BASIC REVENUE (3RD PARTY ADV) ========== -->
+<div class="slide" data-slide="11">
+    <div class="sc">
+        <div class="sh">Revenue Deep Dive</div>
+        <h2 class="st">Per Booking Revenue — <span>3rd Party Advertisers</span></h2>
+        <div class="two">
+            <div>
+                <p style="font-size: 14px; color: var(--muted); line-height: 1.7; margin-bottom: 18px;">
+                    Each booking generates <strong>8 ad impressions</strong>. At standard healthcare CPM rates, here's the per-booking math:
+                </p>
+                <table class="tb">
+                    <thead><tr><th>Touchpoint</th><th>CPM (₹)</th><th>Rev/Booking</th></tr></thead>
+                    <tbody>
+                        <tr><td>QR Landing Banner</td><td>₹80-120</td><td class="rev">₹0.10</td></tr>
+                        <tr><td>Booking Form Ad</td><td>₹60-80</td><td class="rev">₹0.07</td></tr>
+                        <tr><td>Confirmation Banner</td><td>₹120-180</td><td class="rev">₹0.15</td></tr>
+                        <tr><td>Reminder Notification</td><td>₹150-250</td><td class="rev">₹0.20</td></tr>
+                        <tr><td>Patient Dashboard</td><td>₹80-120</td><td class="rev">₹0.10</td></tr>
+                        <tr><td>Prescription View</td><td>₹100-150</td><td class="rev">₹0.12</td></tr>
+                        <tr><td>Follow-up Alert</td><td>₹120-200</td><td class="rev">₹0.16</td></tr>
+                        <tr><td>Review Prompt</td><td>₹80-100</td><td class="rev">₹0.10</td></tr>
+                        <tr style="font-weight: 700; background: rgba(255,255,255,.03);">
+                            <td><strong>Total / Booking</strong></td><td></td>
+                            <td style="color: var(--green); font-size: 16px;"><strong>₹1.00</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div style="margin-top: 10px; font-size: 11px; color: var(--dim);">Phase 1 conservative estimates. CPM scales 2-4x with network growth.</div>
+            </div>
+            <div>
+                <div class="card" style="border-color: rgba(34,197,94,.25); background: rgba(34,197,94,.04); margin-bottom: 14px;">
+                    <h4 style="color: var(--green); font-size: 18px;">Advertiser Categories</h4>
+                    <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px;">
+                        <div style="display: flex; justify-content: space-between; padding: 8px 12px; background: rgba(0,0,0,.2); border-radius: 6px;">
+                            <span style="font-size: 13px;">🏥 Health Insurance</span><span style="font-size: 12px; color: var(--green);">High CPM</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 8px 12px; background: rgba(0,0,0,.2); border-radius: 6px;">
+                            <span style="font-size: 13px;">🧘 Wellness &amp; Fitness</span><span style="font-size: 12px; color: var(--green);">High CPM</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 8px 12px; background: rgba(0,0,0,.2); border-radius: 6px;">
+                            <span style="font-size: 13px;">🥗 Nutrition Brands</span><span style="font-size: 12px; color: var(--teal);">Medium CPM</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 8px 12px; background: rgba(0,0,0,.2); border-radius: 6px;">
+                            <span style="font-size: 13px;">🏦 Financial Services</span><span style="font-size: 12px; color: var(--teal);">Medium CPM</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 8px 12px; background: rgba(0,0,0,.2); border-radius: 6px;">
+                            <span style="font-size: 13px;">🏋️ Gym &amp; Yoga</span><span style="font-size: 12px; color: var(--muted);">Standard CPM</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 8px 12px; background: rgba(0,0,0,.2); border-radius: 6px;">
+                            <span style="font-size: 13px;">🛍️ E-commerce Health</span><span style="font-size: 12px; color: var(--muted);">Standard CPM</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card" style="text-align: center; border-color: rgba(239,68,68,.2); background: rgba(239,68,68,.04);">
+                    <p style="font-size: 12px; color: var(--red); font-weight: 600;">🚫 No pharmaceutical ads shown to patients — strict ethical compliance</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========== SLIDE 12: CONCLUSION ========== -->
+<div class="slide" data-slide="12">
+    <div class="sc ty">
+        <div class="cover-badge" style="margin-bottom: 20px;">The Opportunity</div>
+        <h2>heal<span>QR</span></h2>
+        <p style="font-size: 20px; color: var(--text); font-weight: 700; margin-bottom: 24px;">Everyone Wins. No One Pays.</p>
+
+        <div class="g3" style="margin-bottom: 28px; text-align: left;">
+            <div class="card card-g">
+                <h4>👤 Patient Wins</h4>
+                <p>Free bookings, no app, 31 languages, AI tools, digital prescriptions</p>
+            </div>
+            <div class="card card-p">
+                <h4>👨‍⚕️ Doctor Wins</h4>
+                <p>Free platform, own data, AI tools, more patients, zero commission</p>
+            </div>
+            <div class="card card-t">
+                <h4>🏥 Clinic Wins</h4>
+                <p>Unified management, multi-location, queue system, analytics — free</p>
+            </div>
+            <div class="card card-o">
+                <h4>💊 Pharma Wins</h4>
+                <p>Zero-cost doctor onboarding + anonymous Rx &amp; pathology trends data</p>
+            </div>
+            <div class="card" style="border-left: 3px solid var(--accent);">
+                <h4>📢 Advertiser Wins</h4>
+                <p>8 high-intent healthcare touchpoints, targeted by specialty &amp; geography</p>
+            </div>
+            <div class="card" style="border-left: 3px solid var(--green);">
+                <h4>🏢 HealQR Wins</h4>
+                <p>~95% margin at scale, zero acquisition cost, viral QR-based growth</p>
+            </div>
+        </div>
+
+        <div class="stat-row" style="margin-bottom: 24px;">
+            <div class="stat-box"><div class="num">13L+</div><div class="lbl">Addressable Doctors</div></div>
+            <div class="stat-box"><div class="num">₹0</div><div class="lbl">Cost to Users</div></div>
+            <div class="stat-box"><div class="num">~95%</div><div class="lbl">Net Margin at Scale</div></div>
+            <div class="stat-box"><div class="num">₹100Cr</div><div class="lbl">Annual Revenue (Phase 4)</div></div>
+        </div>
+
+        <p style="font-size: 16px; color: var(--muted); margin-bottom: 6px;">Let's build the future of healthcare together.</p>
+        <a href="mailto:support@healqr.com" class="em">support@healqr.com</a>
+        <p style="margin-top: 6px; font-size: 14px; color: var(--muted);">healqr.com &bull; +91 98741 14283</p>
+        <p style="font-size: 11px; color: var(--dim); margin-top: 24px; text-transform: uppercase; letter-spacing: 2px;">Confidential &bull; HealQR &bull; April 2026</p>
+    </div>
+</div>
+
+</div><!-- /deck -->
+
+<!-- CONTROLS -->
+<div class="controls">
+    <button onclick="go(-1)" title="Previous (←)">&#8592;</button>
+    <span class="sc-num" id="scNum">1 / 11</span>
+    <button onclick="go(1)" title="Next (→)">&#8594;</button>
+</div>
+
+<script>
+let cur = 1;
+const total = 12;
+
+function go(d) {
+    const next = cur + d;
+    if (next < 1 || next > total) return;
+    const oldSlide = document.querySelector(`.slide[data-slide="${cur}"]`);
+    const newSlide = document.querySelector(`.slide[data-slide="${next}"]`);
+    if (!oldSlide || !newSlide) return;
+
+    oldSlide.classList.remove('active');
+    oldSlide.classList.toggle('prev', d > 0);
+    newSlide.classList.remove('prev');
+    newSlide.classList.add('active');
+    cur = next;
+    update();
+}
+
+function update() {
+    document.getElementById('scNum').textContent = `${cur} / ${total}`;
+    document.getElementById('pbar').style.width = `${(cur / total) * 100}%`;
+}
+
+document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); go(1); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); go(-1); }
+    if (e.key === 'f' || e.key === 'F') toggleFS();
+});
+
+let touchX = 0;
+document.addEventListener('touchstart', e => { touchX = e.touches[0].clientX; });
+document.addEventListener('touchend', e => {
+    const diff = touchX - e.changedTouches[0].clientX;
+    if (Math.abs(diff) > 50) go(diff > 0 ? 1 : -1);
+});
+
+function toggleFS() {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+    else document.exitFullscreen();
+}
+
+update();
+</script>
+</body>
+</html>

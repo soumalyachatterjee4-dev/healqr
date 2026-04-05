@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HealQR — Distribution Partnership</title>
+    <link rel="icon" type="image/png" href="/icon-192.png" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #6366f1; --primary-light: #a5b4fc; --accent: #06b6d4;
+            --bg: #0a0a14; --bg2: #12121f; --bg3: #1a1a2e;
+            --text: #f1f5f9; --muted: #94a3b8; --dim: #64748b;
+            --border: rgba(255,255,255,0.07);
+            --green: #22c55e; --gold: #f59e0b; --red: #ef4444; --teal: #14b8a6;
+        }
+        html, body { height: 100%; overflow: hidden; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); }
+
+        .deck { position: relative; width: 100%; height: 100vh; }
+        .slide {
+            position: absolute; inset: 0;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 36px 50px 50px; opacity: 0; visibility: hidden;
+            transition: opacity .45s ease, transform .45s ease;
+            transform: translateX(50px); overflow: hidden;
+        }
+        .slide.active { opacity: 1; visibility: visible; transform: translateX(0); }
+        .slide.prev { transform: translateX(-50px); }
+        .sc { max-width: 1100px; width: 100%; }
+
+        .controls {
+            position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); z-index: 100;
+            display: flex; align-items: center; gap: 12px;
+            background: rgba(10,10,20,.92); backdrop-filter: blur(12px);
+            border: 1px solid var(--border); border-radius: 12px; padding: 6px 14px;
+        }
+        .controls button {
+            background: none; border: none; color: var(--muted); font-size: 16px;
+            cursor: pointer; padding: 4px 7px; border-radius: 5px; transition: .2s;
+        }
+        .controls button:hover { background: rgba(255,255,255,.08); color: var(--text); }
+        .sc-num { font-size: 11px; color: var(--dim); font-weight: 600; min-width: 44px; text-align: center; }
+        .pbar { position: fixed; top: 0; left: 0; height: 3px; z-index: 100; background: linear-gradient(90deg, var(--primary), var(--teal)); transition: width .4s; }
+
+        .topbar { position: fixed; top: 0; left: 0; right: 0; padding: 12px 26px; z-index: 99; display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 18px; font-weight: 900; color: var(--text); opacity: .7; }
+        .logo span { color: var(--primary-light); }
+        .topbar .tag { font-size: 10px; color: var(--dim); font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
+
+        .fs-btn { position: fixed; top: 10px; right: 24px; z-index: 100; background: rgba(255,255,255,.06); border: 1px solid var(--border); color: var(--muted); padding: 4px 8px; border-radius: 5px; cursor: pointer; font-size: 12px; }
+        .fs-btn:hover { background: rgba(255,255,255,.12); color: var(--text); }
+
+        /* Typography */
+        .sh { font-size: 11px; color: var(--primary-light); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px; }
+        .st { font-size: clamp(22px, 2.8vw, 34px); font-weight: 800; margin-bottom: 18px; line-height: 1.15; }
+        .st span { color: var(--primary-light); }
+
+        /* Cover */
+        .cover { text-align: center; }
+        .cover-badge { display: inline-block; background: rgba(99,102,241,.12); border: 1px solid rgba(99,102,241,.25); color: var(--primary-light); padding: 6px 18px; border-radius: 18px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 14px; }
+        .cover h1 { font-size: clamp(32px, 4.5vw, 50px); font-weight: 900; line-height: 1.08; margin-bottom: 12px; }
+        .cover h1 span { color: var(--primary-light); }
+        .cover p { font-size: 16px; color: var(--muted); max-width: 580px; margin: 0 auto 12px; line-height: 1.5; }
+        .cover-meta { font-size: 11px; color: var(--dim); margin-top: 14px; }
+
+        /* Grid */
+        .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .g3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+        .g4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+
+        .card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 18px 16px; }
+        .card-icon { font-size: 24px; margin-bottom: 8px; }
+        .card h4 { font-size: 14px; font-weight: 700; margin-bottom: 5px; }
+        .card p { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+        .card-g { border-left: 3px solid var(--green); }
+        .card-p { border-left: 3px solid var(--primary); }
+        .card-t { border-left: 3px solid var(--teal); }
+        .card-o { border-left: 3px solid var(--gold); }
+
+        /* Stats */
+        .stat-row { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; margin-bottom: 24px; }
+        .stat-box { text-align: center; min-width: 130px; }
+        .stat-box .num { font-size: 38px; font-weight: 900; background: linear-gradient(135deg, var(--primary-light), var(--teal)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .stat-box .lbl { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+        /* Table */
+        .tb { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+        .tb thead { background: var(--bg3); }
+        .tb th { padding: 10px 12px; text-align: left; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); border-bottom: 1px solid var(--border); }
+        .tb td { padding: 9px 12px; border-bottom: 1px solid var(--border); }
+        .tb tr:hover { background: rgba(255,255,255,.015); }
+        .rev { font-weight: 700; color: var(--green); }
+        .cost { color: var(--red); font-weight: 600; }
+
+        /* Two-col */
+        .two { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+
+        /* List */
+        .sl { list-style: none; }
+        .sl li { padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 13px; display: flex; align-items: flex-start; gap: 9px; }
+        .sl li:last-child { border-bottom: none; }
+        .sl .ck { color: var(--green); font-weight: 700; flex-shrink: 0; }
+
+        /* Flow */
+        .flow { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+        .fi { background: var(--bg2); border: 1px solid var(--border); padding: 6px 12px; border-radius: 7px; font-size: 11px; display: flex; align-items: center; gap: 6px; }
+        .fn { background: var(--primary); color: #fff; width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; flex-shrink: 0; }
+
+        /* Badge */
+        .bf { display: inline-block; background: rgba(34,197,94,.12); color: var(--green); font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 5px; text-transform: uppercase; }
+
+        /* Highlight */
+        .hl { background: linear-gradient(135deg, rgba(34,197,94,.08), rgba(6,182,212,.08)); border: 1px solid rgba(34,197,94,.18); border-radius: 12px; padding: 20px; margin-top: 14px; }
+        .hl h3 { color: var(--green); font-size: 16px; margin-bottom: 12px; }
+
+        /* Thankyou */
+        .ty { text-align: center; }
+        .ty h2 { font-size: 44px; font-weight: 900; margin-bottom: 12px; }
+        .ty h2 span { color: var(--primary-light); }
+        .ty p { font-size: 15px; color: var(--muted); margin-bottom: 6px; }
+        .ty .em { color: var(--primary-light); font-weight: 600; text-decoration: none; font-size: 17px; }
+
+        /* ===== MOBILE RESPONSIVE ===== */
+        @media (max-width: 768px) {
+            .slide {
+                padding: 36px 10px 44px;
+                overflow: hidden;
+                justify-content: flex-start;
+            }
+            .sc { max-width: 100%; }
+            .g2, .g3, .g4 { grid-template-columns: 1fr 1fr; gap: 5px; }
+            .two { grid-template-columns: 1fr; gap: 6px; }
+
+            /* Topbar */
+            .topbar { padding: 6px 10px; }
+            .logo { font-size: 12px; }
+            .topbar .tag { font-size: 7px; letter-spacing: .8px; }
+
+            /* Fullscreen button */
+            .fs-btn { top: 5px; right: 8px; font-size: 9px; padding: 2px 5px; }
+
+            /* Controls / footer */
+            .controls { bottom: 5px; padding: 4px 8px; gap: 6px; border-radius: 8px; }
+            .controls button { font-size: 12px; padding: 2px 5px; }
+            .sc-num { font-size: 9px; min-width: 30px; }
+
+            /* Typography */
+            .sh { font-size: 8px; letter-spacing: 1.2px; margin-bottom: 3px; }
+            .st { font-size: 16px; margin-bottom: 6px; }
+
+            /* Cover */
+            .cover h1 { font-size: 26px; }
+            .cover p { font-size: 11px; line-height: 1.4; margin-bottom: 6px; }
+            .cover-badge { font-size: 8px; padding: 4px 10px; letter-spacing: 1.2px; margin-bottom: 8px; }
+            .cover-meta { font-size: 8px; margin-top: 8px; }
+
+            /* Stats */
+            .stat-row { gap: 10px; margin-bottom: 10px; }
+            .stat-box { min-width: 60px; }
+            .stat-box .num { font-size: 20px; }
+            .stat-box .lbl { font-size: 8px; }
+
+            /* Cards — ultra compact */
+            .card { padding: 7px 8px; border-radius: 8px; }
+            .card-icon { font-size: 14px; margin-bottom: 2px; }
+            .card h4 { font-size: 10px; margin-bottom: 1px; }
+            .card p { font-size: 9px; line-height: 1.35; }
+
+            /* Table — fit on screen */
+            .tb { width: 100%; table-layout: fixed; }
+            .tb th, .tb td { font-size: 9px; padding: 5px 4px; white-space: normal; word-break: break-word; }
+            .tb th { font-size: 7.5px; letter-spacing: .3px; }
+            .tb th:first-child, .tb td:first-child { width: 22%; }
+            .tb th:nth-child(4), .tb td:nth-child(4) { width: 28%; }
+
+            /* Lists */
+            .sl li { font-size: 9px; padding: 3px 0; gap: 4px; }
+            .sl .ck { font-size: 9px; }
+
+            /* Flow items */
+            .flow { gap: 3px; margin-bottom: 4px; }
+            .fi { font-size: 8px; padding: 3px 6px; }
+            .fn { width: 13px; height: 13px; font-size: 7px; }
+
+            /* Highlight box */
+            .hl { padding: 10px; margin-top: 6px; }
+            .hl h3 { font-size: 11px; margin-bottom: 6px; }
+
+            /* Thank you / conclusion */
+            .ty h2 { font-size: 26px; margin-bottom: 8px; }
+            .ty p { font-size: 10px; margin-bottom: 3px; }
+            .ty .em { font-size: 12px; }
+
+            /* Badge */
+            .bf { font-size: 8px; padding: 2px 5px; }
+
+            /* ---- Slide-specific mobile overrides for inline styles ---- */
+            /* Slide 2: Introduction */
+            .slide[data-slide="2"] p[style] { font-size: 10px !important; line-height: 1.4 !important; margin-bottom: 5px !important; }
+            .slide[data-slide="2"] .card[style] { padding: 6px 8px !important; margin-bottom: 5px !important; }
+            .slide[data-slide="2"] .card h4[style] { font-size: 9px !important; }
+            .slide[data-slide="2"] .card p[style] { font-size: 9px !important; }
+            .slide[data-slide="2"] .two { gap: 8px; }
+            .slide[data-slide="2"] div[style*="font-size: 28px"] { font-size: 18px !important; }
+            .slide[data-slide="2"] div[style*="font-size: 22px"] { font-size: 16px !important; }
+            .slide[data-slide="2"] div[style*="font-size: 11px"] { font-size: 8px !important; }
+            .slide[data-slide="2"] div[style*="font-size: 9.5px"] { font-size: 7.5px !important; }
+
+            /* Slide 4: Patient */
+            .slide[data-slide="4"] .card { padding: 6px 8px !important; }
+            .slide[data-slide="4"] .card-icon { font-size: 13px !important; margin-bottom: 1px !important; }
+            .slide[data-slide="4"] .card[style*="margin-top"] { margin-top: 5px !important; padding: 6px 8px !important; }
+            .slide[data-slide="4"] h4[style*="font-size: 11px"] { font-size: 8px !important; margin-bottom: 4px !important; }
+            .slide[data-slide="4"] div[style*="flex-wrap"] { gap: 4px !important; }
+            .slide[data-slide="4"] div[style*="min-width: 130px"] { min-width: 0 !important; padding: 5px 6px !important; }
+            .slide[data-slide="4"] div[style*="font-size: 10px"] { font-size: 8px !important; }
+            .slide[data-slide="4"] div[style*="font-size: 9.5px"] { font-size: 7.5px !important; }
+            .slide[data-slide="4"] div[style*="margin-top: 8px"] { margin-top: 4px !important; }
+
+            /* Slide 5: Doctor */
+            .slide[data-slide="5"] .g2 { gap: 5px !important; }
+            .slide[data-slide="5"] .card[style] { padding: 5px 7px !important; }
+            .slide[data-slide="5"] span[style*="font-size: 18px"] { font-size: 13px !important; }
+            .slide[data-slide="5"] h4[style*="font-size: 12.5px"] { font-size: 9px !important; }
+
+            /* Slide 6: Clinic */
+            .slide[data-slide="6"] .two { gap: 6px; }
+            .slide[data-slide="6"] .card[style] { padding: 5px 7px !important; }
+            .slide[data-slide="6"] span[style*="font-size: 15px"] { font-size: 12px !important; }
+            .slide[data-slide="6"] h4[style*="font-size: 11px"] { font-size: 9px !important; }
+            .slide[data-slide="6"] div[style*="font-size: 28px"] { font-size: 18px !important; }
+            .slide[data-slide="6"] div[style*="gap: 10px"] { gap: 5px !important; }
+            .slide[data-slide="6"] div[style*="gap: 7px"] { gap: 4px !important; }
+            .slide[data-slide="6"] p[style*="font-size: 11px"] { font-size: 8px !important; }
+
+            /* Slide 7: Strategic Partnership */
+            .slide[data-slide="7"] p[style*="font-size: 12.5px"] { font-size: 9px !important; margin-bottom: 8px !important; line-height: 1.35 !important; }
+            .slide[data-slide="7"] .g3 { margin-bottom: 6px !important; }
+            .slide[data-slide="7"] .card[style] { padding: 7px 8px !important; }
+            .slide[data-slide="7"] h4[style*="font-size: 12px"] { font-size: 9px !important; margin-bottom: 4px !important; }
+
+            /* Slide 9: Business Plan Cover */
+            .slide[data-slide="9"] .cover-badge { margin-bottom: 6px !important; }
+            .slide[data-slide="9"] h1 { font-size: 22px !important; margin-top: 8px !important; }
+            .slide[data-slide="9"] p[style*="font-size: 14px"] { font-size: 10px !important; margin-bottom: 8px !important; }
+            .slide[data-slide="9"] .g2 { gap: 6px !important; margin-bottom: 8px !important; }
+            .slide[data-slide="9"] .g4 { max-width: 100% !important; margin-bottom: 8px !important; }
+            .slide[data-slide="9"] .card[style*="padding: 12px"] { padding: 6px 8px !important; }
+            .slide[data-slide="9"] .card[style*="padding: 10px"] { padding: 6px 8px !important; }
+            .slide[data-slide="9"] h4[style*="font-size: 12px"] { font-size: 9px !important; margin-bottom: 3px !important; }
+            .slide[data-slide="9"] p[style*="font-size: 10px"] { font-size: 8px !important; }
+            .slide[data-slide="9"] div[style*="font-size: 11px"] { font-size: 9px !important; }
+            .slide[data-slide="9"] div[style*="font-size: 8px"] { font-size: 7px !important; }
+
+            /* Slide 10: Phase 1 */
+            .slide[data-slide="10"] .two { gap: 8px !important; }
+            .slide[data-slide="10"] h4[style] { font-size: 9px !important; margin-bottom: 4px !important; }
+            .slide[data-slide="10"] .card[style] { padding: 6px 8px !important; }
+            .slide[data-slide="10"] div[style*="font-size: 32px"] { font-size: 22px !important; }
+            .slide[data-slide="10"] span[style*="font-size: 8px"] { font-size: 6.5px !important; }
+            .slide[data-slide="10"] p[style*="font-size: 10px"] { font-size: 8px !important; }
+
+            /* Slide 11: Phase 2 */
+            .slide[data-slide="11"] .two { gap: 8px !important; }
+            .slide[data-slide="11"] h4[style] { font-size: 9px !important; margin-bottom: 4px !important; }
+            .slide[data-slide="11"] .g2 { gap: 6px !important; margin-top: 6px !important; }
+            .slide[data-slide="11"] .card[style] { padding: 6px 8px !important; }
+            .slide[data-slide="11"] div[style*="font-size: 20px"] { font-size: 16px !important; }
+            .slide[data-slide="11"] span[style*="font-size: 8px"] { font-size: 6.5px !important; }
+            .slide[data-slide="11"] p[style*="font-size: 9px"] { font-size: 7.5px !important; }
+
+            /* Slide 12: P1+P2 Rainbow */
+            .slide[data-slide="12"] .cover-badge { margin-bottom: 6px !important; }
+            .slide[data-slide="12"] h2[style] { font-size: 20px !important; margin-bottom: 4px !important; }
+            .slide[data-slide="12"] p[style*="font-size: 13px"] { font-size: 10px !important; margin-bottom: 8px !important; }
+            .slide[data-slide="12"] .g3 { gap: 6px !important; margin-bottom: 8px !important; }
+            .slide[data-slide="12"] .card[style] { padding: 8px !important; }
+            .slide[data-slide="12"] div[style*="font-size: 32px"] { font-size: 22px !important; }
+            .slide[data-slide="12"] div[style*="font-size: 14px"] { font-size: 11px !important; }
+            .slide[data-slide="12"] div[style*="font-size: 10px"] { font-size: 8px !important; }
+            .slide[data-slide="12"] div[style*="font-size: 9px"] { font-size: 7px !important; }
+            .slide[data-slide="12"] div[style*="font-size: 8px"] { font-size: 6.5px !important; }
+            .slide[data-slide="12"] div[style*="font-size: 7px"] { font-size: 6px !important; }
+            .slide[data-slide="12"] .g2 { gap: 5px !important; }
+
+            /* Slide 13: Phase 3 */
+            .slide[data-slide="13"] .two { gap: 8px !important; }
+            .slide[data-slide="13"] h4[style] { font-size: 9px !important; margin-bottom: 4px !important; }
+            .slide[data-slide="13"] .card[style] { padding: 5px 7px !important; }
+            .slide[data-slide="13"] div[style*="font-size: 24px"] { font-size: 18px !important; }
+            .slide[data-slide="13"] span[style*="font-size: 8px"] { font-size: 6.5px !important; }
+            .slide[data-slide="13"] p[style*="font-size: 9px"] { font-size: 7.5px !important; }
+
+            /* Slide 14: Phase 4 */
+            .slide[data-slide="14"] p[style*="font-size: 11px"] { font-size: 9px !important; margin-bottom: 6px !important; }
+            .slide[data-slide="14"] .two { gap: 8px !important; }
+            .slide[data-slide="14"] h4[style] { font-size: 9px !important; margin-bottom: 4px !important; }
+            .slide[data-slide="14"] .card[style] { padding: 5px 7px !important; }
+            .slide[data-slide="14"] div[style*="font-size: 28px"] { font-size: 20px !important; }
+            .slide[data-slide="14"] span[style*="font-size: 8px"] { font-size: 6.5px !important; }
+            .slide[data-slide="14"] p[style*="font-size: 9px"] { font-size: 7.5px !important; }
+            .slide[data-slide="14"] td[style*="font-size: 10px"] { font-size: 8px !important; }
+
+            /* Slide 15: Total 4-Phase Cost vs Revenue */
+            .slide[data-slide="15"] .tb { table-layout: fixed; }
+            .slide[data-slide="15"] .tb th, .slide[data-slide="15"] .tb td { font-size: 8px !important; padding: 4px 3px !important; white-space: normal; word-break: break-word; }
+            .slide[data-slide="15"] .tb th { font-size: 7px !important; }
+            .slide[data-slide="15"] span[style*="font-size: 8px"] { font-size: 6.5px !important; }
+            .slide[data-slide="15"] .g4 { gap: 5px !important; margin-bottom: 6px !important; }
+            .slide[data-slide="15"] .card[style] { padding: 6px 8px !important; }
+            .slide[data-slide="15"] div[style*="font-size: 24px"] { font-size: 18px !important; }
+            .slide[data-slide="15"] div[style*="font-size: 14px"] { font-size: 11px !important; }
+            .slide[data-slide="15"] p[style*="font-size: 10px"] { font-size: 8px !important; }
+            .slide[data-slide="15"] p[style*="font-size: 9px"] { font-size: 7.5px !important; }
+
+            /* Slide 16: Revenue Streams */
+            .slide[data-slide="16"] .g2 { gap: 6px !important; margin-bottom: 6px !important; }
+            .slide[data-slide="16"] .card[style] { padding: 7px 8px !important; }
+            .slide[data-slide="16"] h4[style*="font-size: 13px"] { font-size: 10px !important; margin-bottom: 4px !important; }
+            .slide[data-slide="16"] p[style*="font-size: 11px"] { font-size: 9px !important; }
+            .slide[data-slide="16"] p[style*="font-size: 10px"] { font-size: 8px !important; }
+            .slide[data-slide="16"] p[style*="font-size: 9px"] { font-size: 7.5px !important; }
+
+            /* Slide 17: Advertiser Dashboard */
+            .slide[data-slide="17"] .two { gap: 8px !important; }
+            .slide[data-slide="17"] p[style*="font-size: 12px"] { font-size: 9px !important; margin-bottom: 6px !important; }
+            .slide[data-slide="17"] .card[style] { padding: 5px 7px !important; }
+            .slide[data-slide="17"] h4[style*="font-size: 12px"] { font-size: 9px !important; margin-bottom: 4px !important; }
+            .slide[data-slide="17"] h4[style*="font-size: 11px"] { font-size: 9px !important; }
+            .slide[data-slide="17"] div[style*="font-size: 18px"] { font-size: 14px !important; }
+            .slide[data-slide="17"] div[style*="font-size: 8px"] { font-size: 7px !important; }
+            .slide[data-slide="17"] div[style*="gap: 6px"] { gap: 4px !important; }
+
+            /* Slide 18: Conclusion */
+            .slide[data-slide="18"] p[style*="font-size: 15px"] { font-size: 11px !important; margin-bottom: 10px !important; }
+            .slide[data-slide="18"] .g4 { gap: 5px !important; margin-bottom: 8px !important; }
+            .slide[data-slide="18"] .card[style] { padding: 7px 5px !important; }
+            .slide[data-slide="18"] div[style*="font-size: 18px"] { font-size: 14px !important; }
+            .slide[data-slide="18"] .g2 { margin-bottom: 8px !important; gap: 6px !important; }
+            .slide[data-slide="18"] p[style*="font-size: 12px"] { font-size: 9px !important; }
+            .slide[data-slide="18"] p[style*="font-size: 11px"] { font-size: 9px !important; }
+        }
+
+        /* Small phones */
+        @media (max-width: 400px) {
+            .slide { padding: 32px 8px 40px; }
+            .st { font-size: 14px; margin-bottom: 5px; }
+            .cover h1 { font-size: 22px; }
+            .stat-box .num { font-size: 18px; }
+            .card { padding: 5px 6px; }
+            .card h4 { font-size: 9px; }
+            .card p { font-size: 8px; }
+            .sl li { font-size: 8px; }
+            .tb th, .tb td { font-size: 8px; padding: 4px 3px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="pbar" id="pbar"></div>
+<div class="topbar">
+    <div class="logo">heal<span>QR</span></div>
+    <span class="tag">Distribution Partnership &bull; April 2026</span>
+</div>
+<button class="fs-btn" onclick="toggleFS()" title="Fullscreen">&#x26F6;</button>
+
+<div class="deck" id="deck">
+
+<!-- ========== SLIDE 1: COVER ========== -->
+<div class="slide active" data-slide="1">
+    <div class="sc cover">
+        <div class="cover-badge">Distribution Partnership &bull; April 2026</div>
+        <h1>heal<span>QR</span></h1>
+        <p style="font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 6px;">World's First QR-based e-Assistant for Doctors</p>
+        <p>One QR code. Instant bookings. 31 languages. Digital prescriptions. Zero cost to doctors. Zero app downloads for patients.</p>
+        <div style="margin-top: 16px; display: flex; justify-content: center; gap: 24px;">
+            <div class="stat-box"><div class="num">13L+</div><div class="lbl">Addressable Doctors</div></div>
+            <div class="stat-box"><div class="num">₹0</div><div class="lbl">Cost to Doctors</div></div>
+            <div class="stat-box"><div class="num">10</div><div class="lbl">Touchpoints/Booking</div></div>
+        </div>
+        <div class="cover-meta">CONFIDENTIAL &bull; healqr.com &bull; support@healqr.com &bull; +91 98741 14283</div>
+    </div>
+</div>
+
+<!-- ========== SLIDE 2: INTRODUCTION ========== -->
+<div class="slide" data-slide="2">
+    <div class="sc">
+        <div class="sh">Introduction</div>
+        <h2 class="st">What is <span>HealQR</span>?</h2>
+        <div class="two">
+            <div>
+                <p style="font-size: 12.5px; color: var(--muted); line-height: 1.6; margin-bottom: 10px;">
+                    HealQR is a <strong style="color: var(--text);">complete digital healthcare ecosystem</strong> connecting Patients, Doctors, Clinics, Pharma Companies &amp; Advertisers &mdash; all through a single QR code.
+                </p>
+                <div class="card" style="background: rgba(239,68,68,.04); border-color: rgba(239,68,68,.18); margin-bottom: 10px; padding: 10px 14px;">
+                    <h4 style="color: var(--red); font-size: 11px; margin-bottom: 5px;">⚠️ Why HealQR? The Problem Today</h4>
+                    <p style="font-size: 11px;"><strong style="color: var(--text);">Phone call?</strong> Time-bonded &mdash; clinic hours only. Language barrier. <strong style="color: var(--text);">App?</strong> Download, register, search. Both fail for rural, elderly &amp; first-time patients.</p>
+                </div>
+                <ul class="sl">
+                    <li><span class="ck">✓</span> <strong>No app download</strong> &mdash; scan QR &amp; book in seconds</li>
+                    <li><span class="ck">✓</span> <strong>31 languages</strong> &mdash; real-time translation</li>
+                    <li><span class="ck">✓</span> <strong>100% FREE</strong> for doctors, clinics &amp; patients</li>
+                    <li><span class="ck">✓</span> <strong>Digital Rx</strong> &mdash; 100% doctor-created, zero medical interference</li>
+                    <li><span class="ck">✓</span> <strong>Pharma analytics</strong> &mdash; anonymous Rx &amp; pathology trends</li>
+                    <li><span class="ck">✓</span> <strong>Revenue via ads only</strong> &mdash; no charges, no commissions</li>
+                </ul>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <div class="card" style="background: rgba(99,102,241,.06); border-color: rgba(99,102,241,.18); text-align: center; padding: 12px;">
+                    <div style="font-size: 28px; font-weight: 900; color: var(--primary-light);">5</div>
+                    <div style="font-size: 11px; color: var(--muted);">Stakeholder Ecosystem</div>
+                    <div style="font-size: 9.5px; color: var(--dim); margin-top: 3px;">Patient &bull; Doctor &bull; Clinic &bull; Pharma &bull; Advertiser</div>
+                </div>
+                <div class="card" style="background: rgba(34,197,94,.06); border-color: rgba(34,197,94,.18); text-align: center; padding: 12px;">
+                    <div style="font-size: 28px; font-weight: 900; color: var(--green);">₹0</div>
+                    <div style="font-size: 11px; color: var(--muted);">Cost to Doctor &amp; Patient</div>
+                </div>
+                <div class="card" style="background: rgba(245,158,11,.06); border-color: rgba(245,158,11,.18); padding: 12px;">
+                    <div style="font-size: 22px; font-weight: 900; color: var(--gold); text-align: center;">10</div>
+                    <div style="font-size: 11px; color: var(--muted); text-align: center; margin-bottom: 8px;">Touchpoints per Booking</div>
+                    <div class="flow" style="justify-content: center;">
+                        <div class="fi"><span class="fn">1</span>Language</div>
+                        <div class="fi"><span class="fn">2</span>Mini-site</div>
+                        <div class="fi"><span class="fn">3</span>Date</div>
+                        <div class="fi"><span class="fn">4</span>Chamber</div>
+                        <div class="fi"><span class="fn">5</span>Form</div>
+                        <div class="fi"><span class="fn">6</span>Confirm</div>
+                        <div class="fi"><span class="fn">7</span>Consult</div>
+                        <div class="fi"><span class="fn">8</span>Review</div>
+                    </div>
+                    <div style="font-size: 9.5px; color: var(--teal); margin-top: 4px; text-align: center;">Clinic: +2 (Location &bull; Doctor)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========== SLIDE 3: COMPARISON ========== -->
+<div class="slide" data-slide="3">
+    <div class="sc">
+        <div class="sh">The Problem &amp; Solution</div>
+        <h2 class="st">Phone Assistant vs App vs <span>HealQR</span></h2>
+        <table class="tb">
+            <thead>
+                <tr><th style="width: 26%;">Criteria</th><th style="width: 24%;">📞 Phone Assistant</th><th style="width: 24%;">📱 App (Practo etc.)</th><th style="width: 26%; color: var(--green);">✅ HealQR</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><strong>Availability</strong></td><td class="cost">Clinic hours only</td><td>24×7</td><td class="rev">24×7 — scan anytime</td></tr>
+                <tr><td><strong>Language Support</strong></td><td class="cost">1-2 languages max</td><td class="cost">English / Hindi only</td><td class="rev">31 languages, real-time</td></tr>
+                <tr><td><strong>App Download</strong></td><td>Not needed</td><td class="cost">Required</td><td class="rev">Not needed</td></tr>
+                <tr><td><strong>Registration</strong></td><td class="cost">Phone number needed</td><td class="cost">Full signup required</td><td class="rev">Zero registration</td></tr>
+                <tr><td><strong>Know the Doctor?</strong></td><td class="cost">Must know clinic number</td><td>Can search (limited)</td><td class="rev">Just scan the QR</td></tr>
+                <tr><td><strong>Waiting Time</strong></td><td class="cost">Hold, busy, redial</td><td>Instant (if found)</td><td class="rev">Instant — always</td></tr>
+                <tr><td><strong>Scalability</strong></td><td class="cost">1 call at a time</td><td>Scalable</td><td class="rev">Unlimited scans</td></tr>
+                <tr><td><strong>Cost to Doctor</strong></td><td class="cost">₹8-15K/month</td><td class="cost">Commission / subscription</td><td class="rev">₹0 — forever free</td></tr>
+                <tr><td><strong>Data Ownership</strong></td><td class="cost">Paper / no records</td><td class="cost">Platform owns data</td><td class="rev">Doctor owns 100%</td></tr>
+                <tr><td><strong>Digital Prescription</strong></td><td class="cost">Not possible</td><td class="cost">Extra cost / limited</td><td class="rev">Free, bilingual</td></tr>
+                <tr><td><strong>Patient Experience</strong></td><td class="cost">Frustrating</td><td>Decent but fragmented</td><td class="rev">Seamless, 3-tap</td></tr>
+            </tbody>
+        </table>
+        <div class="card" style="margin-top: 12px; text-align: center; border-color: rgba(34,197,94,.2); background: rgba(34,197,94,.04); padding: 10px;">
+            <p style="font-size: 12px;"><strong style="color: var(--green);">HealQR eliminates every friction point</strong> — no phone lines, no apps, no registration, no language barriers, no cost.</p>
+        </div>
+    </div>
+</div>
+
+<!-- ========== SLIDE 4: PATIENT ========== -->
+<div class="slide" data-slide="4">
+    <div class="sc">
+        <div class="sh">For Patients</div>
+        <h2 class="st">Scan. Book. Done. <span>No App Needed.</span></h2>
+        <div class="g3">
+            <div class="card card-g">
+                <div class="card-icon">📱</div>
+                <h4>24×7 Scan &amp; Book</h4>
+                <p>Scan QR with any phone camera — <strong>anytime, 24×7</strong>. Choose date, time, doctor — confirmed instantly. No registration, no app.</p>
+            </div>
+            <div class="card card-g">
+                <div class="card-icon">🗣️</div>
+                <h4>Your Language, Your Way</h4>
+                <p>Entire booking flow in 31 languages. Rural patient in Tamil Nadu books as easily as someone in Delhi.</p>
+            </div>
+            <div class="card card-g">
+                <div class="card-icon">💊</div>
+                <h4>AI Rx Reader</h4>
+                <p>Upload prescription photo → AI decodes medicine names, dosages, timings in simple language.</p>
+            </div>
+            <div class="card card-g">
+                <div class="card-icon">🥗</div>
+                <h4>AI Diet Charts</h4>
+                <p>Personalized diet plans by AI based on diagnosis. Culturally relevant food suggestions in patient's language.</p>
+            </div>
+            <div class="card card-g">
+                <div class="card-icon">📄</div>
+                <h4>Digital Prescription</h4>
+                <p>Bilingual digital prescriptions — English + patient's language. Access anytime, share with pharmacist.</p>
+            </div>
+            <div class="card card-g">
+                <div class="card-icon">🔔</div>
+                <h4>Smart Notifications</h4>
+                <p>Booking confirmations, reminders, follow-up alerts, prescription updates — all via push notifications.</p>
+            </div>
+        </div>
+        <div class="card" style="margin-top: 10px; border-color: rgba(99,102,241,.2); background: rgba(99,102,241,.04); padding: 12px 16px;">
+            <h4 style="color: var(--primary-light); font-size: 11px; margin-bottom: 8px;">📊 Patient Dashboard — Access with Booked Phone Number</h4>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                <div style="flex: 1; min-width: 130px; background: rgba(0,0,0,.2); border-radius: 6px; padding: 8px 10px;">
+                    <div style="font-size: 10px; color: var(--green); font-weight: 700;">📋 Booking History</div>
+                    <div style="font-size: 9.5px; color: var(--muted); margin-top: 2px;">Unlimited records</div>
+                </div>
+                <div style="flex: 1; min-width: 130px; background: rgba(0,0,0,.2); border-radius: 6px; padding: 8px 10px;">
+                    <div style="font-size: 10px; color: var(--green); font-weight: 700;">🔔 Notifications</div>
+                    <div style="font-size: 9.5px; color: var(--muted); margin-top: 2px;">Up to 120 days</div>
+                </div>
+                <div style="flex: 1; min-width: 130px; background: rgba(0,0,0,.2); border-radius: 6px; padding: 8px 10px;">
+                    <div style="font-size: 10px; color: var(--green); font-weight: 700;">⏱️ Live Queue</div>
+                    <div style="font-size: 9.5px; color: var(--muted); margin-top: 2px;">Real-time monitor</div>
+                </div>
+                <div style="flex: 1; min-width: 130px; background: rgba(0,0,0,.2); border-radius: 6px; padding: 8px 10px;">
+                    <div style="font-size: 10px; color: var(--green); font-weight: 700;">📍 Doctor Search</div>
+                    <div style="font-size: 9.5px; color: var(--muted); margin-top: 2px;">Geocoding nearby</div>
+                </div>
+            </div>
+        </div>
+        <div style="text-align: center; margin-top: 8px; font-size: 11px; color: var(--dim);"><span class="bf">100% FREE</span> &nbsp; Zero cost &bull; No app &bull; No registration</div>
+    </div>
+</div>
+
+<!-- ========== SLIDE 5: DOCTOR ========== -->
+<div class="slide" data-slide="5">
+    <div class="sc">
+        <div class="sh">For Doctors</div>
+        <h2 class="st">Complete <span>Practice Platform</span> — FREE</h2>
+        <div class="g2" style="gap: 10px;">
+            <div class="card card-p" style="padding: 12px 14px;">
+                <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 18px;">🌐</span><div><h4 style="font-size: 12.5px;">Free Mini-Website + QR</h4><p>Professional shareable website with QR, profile, specializations, chambers &amp; booking.</p></div></div>
+            </div>
+            <div class="card card-p" style="padding: 12px 14px;">
+                <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 18px;">📊</span><div><h4 style="font-size: 12.5px;">Advanced Analytics</h4><p>Real-time booking trends, patient demographics, revenue &amp; cancellation analysis.</p></div></div>
+            </div>
+            <div class="card card-p" style="padding: 12px 14px;">
+                <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 18px;">📋</span><div><h4 style="font-size: 12.5px;">Digital Prescriptions</h4><p>Bilingual digital Rx with smart medicine DB. 100% doctor-created, zero interference.</p></div></div>
+            </div>
+            <div class="card card-p" style="padding: 12px 14px;">
+                <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 18px;">🤖</span><div><h4 style="font-size: 12.5px;">AI Rx Reader + Diet Charts</h4><p>AI extracts medicines, decodes dosage, translates. One-click diet charts.</p></div></div>
+            </div>
+            <div class="card card-p" style="padding: 12px 14px;">
+                <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 18px;">👥</span><div><h4 style="font-size: 12.5px;">Assistant &amp; Staff Access</h4><p>Receptionist/staff get controlled dashboard access for bookings &amp; schedules.</p></div></div>
+            </div>
+            <div class="card card-p" style="padding: 12px 14px;">
+                <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 18px;">🔒</span><div><h4 style="font-size: 12.5px;">100% Data Ownership</h4><p>YOU own all data. No lock-in. No commission. No subscription — ever.</p></div></div>
+            </div>
+            <div class="card card-p" style="padding: 12px 14px;">
+                <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 18px;">📣</span><div><h4 style="font-size: 12.5px;">One-Click Marketing</h4><p>Share on WhatsApp, Facebook, Instagram &amp; Google. Zero ad spend.</p></div></div>
+            </div>
+            <div class="card card-p" style="padding: 12px 14px;">
+                <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 18px;">🚫</span><div><h4 style="font-size: 12.5px;">Zero Cross-Booking</h4><p>Proper slot-level availability management — no double bookings.</p></div></div>
+            </div>
+            <div class="card card-p" style="padding: 12px 14px;">
+                <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 18px;">📅</span><div><h4 style="font-size: 12.5px;">Multi-Chamber</h4><p>Multiple chambers, different schedules &amp; fees. Only available slots shown.</p></div></div>
+            </div>
+            <div class="card" style="padding: 12px 14px; border-left: 3px solid var(--gold); background: rgba(245,158,11,.04);">
+                <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 18px;">🚶</span><div><h4 style="font-size: 12.5px; color: var(--gold);">Walk-in Patient Management</h4><p>Walk-ins alongside pre-booked. Live token, real-time queue — no chaos.</p></div></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========== SLIDE 6: CLINIC ========== -->
+<div class="slide" data-slide="6">
+    <div class="sc">
+        <div class="sh">For Clinics</div>
+        <h2 class="st">Multi-Specialty, <span>Multi-Location</span> — One QR</h2>
+        <div class="two">
+            <div style="display: flex; flex-direction: column; gap: 7px;">
+                <div class="card card-t" style="padding: 10px 14px;">
+                    <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 15px;">🏥</span><div><h4 style="font-size: 11px;">Unified Dashboard</h4><p>All doctors, locations &amp; bookings from one screen</p></div></div>
+                </div>
+                <div class="card card-t" style="padding: 10px 14px;">
+                    <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 15px;">🩺</span><div><h4 style="font-size: 11px;">Multi-Specialty</h4><p>Cardiologist, ENT, Gynec — all under one clinic QR</p></div></div>
+                </div>
+                <div class="card card-t" style="padding: 10px 14px;">
+                    <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 15px;">📍</span><div><h4 style="font-size: 11px;">Multi-Location</h4><p>Main branch + satellite clinics managed centrally</p></div></div>
+                </div>
+                <div class="card card-t" style="padding: 10px 14px;">
+                    <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 15px;">🎫</span><div><h4 style="font-size: 11px;">Token System</h4><p>Live queue for walk-ins with real-time display</p></div></div>
+                </div>
+                <div class="card card-t" style="padding: 10px 14px;">
+                    <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 15px;">📊</span><div><h4 style="font-size: 11px;">Clinic Analytics</h4><p>Cross-doctor performance, speciality-wise distribution</p></div></div>
+                </div>
+                <div class="card card-t" style="padding: 10px 14px;">
+                    <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 15px;">🔐</span><div><h4 style="font-size: 11px;">Staff Access Control</h4><p>Role-based permissions for reception, admin, management</p></div></div>
+                </div>
+                <div class="card card-t" style="padding: 10px 14px;">
+                    <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 15px;">📅</span><div><h4 style="font-size: 11px;">Schedule View</h4><p>Appointments, upcoming slots, doctor availability at a glance</p></div></div>
+                </div>
+                <div class="card" style="padding: 10px 14px; border-left: 3px solid var(--gold); background: rgba(245,158,11,.04);">
+                    <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 15px;">🚶</span><div><h4 style="font-size: 11px; color: var(--gold);">Walk-in Management</h4><p>Individual doctor-wise walk-in alongside pre-booked slots</p></div></div>
+                </div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <div class="card" style="background: rgba(20,184,166,.06); border-color: rgba(20,184,166,.18); text-align: center; padding: 14px;">
+                    <div style="font-size: 28px; font-weight: 900; color: var(--teal);">∞</div>
+                    <div style="font-size: 11px; color: var(--muted);">Unlimited Doctors per Clinic</div>
+                </div>
+                <div class="card" style="background: rgba(34,197,94,.06); border-color: rgba(34,197,94,.18); text-align: center; padding: 14px;">
+                    <div style="font-size: 28px; font-weight: 900; color: var(--green);">₹0</div>
+                    <div style="font-size: 11px; color: var(--muted);">Zero Cost — All Features Free</div>
+                </div>
+                <div class="card" style="background: rgba(99,102,241,.06); border-color: rgba(99,102,241,.18); text-align: center; padding: 14px;">
+                    <div style="font-size: 28px; font-weight: 900; color: var(--primary-light);">1 QR</div>
+                    <div style="font-size: 11px; color: var(--muted);">One Code, Entire Clinic</div>
+                </div>
+                <div class="card" style="background: rgba(245,158,11,.06); border-color: rgba(245,158,11,.18); padding: 12px;">
+                    <p style="font-size: 11px; color: var(--gold); font-weight: 600; text-align: center;">Win: Efficiency ↑ &bull; Wait time ↓ &bull; Digital presence — zero cost</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========== SLIDE 7: STRATEGIC PARTNERSHIP ========== -->
+<div class="slide" data-slide="7">
+    <div class="sc">
+        <div class="sh">Strategic Partnership</div>
+        <h2 class="st"><span>HealQR</span> Distribution Partner</h2>
+        <p style="font-size: 12.5px; color: var(--muted); margin-bottom: 16px; line-height: 1.55;">India has <strong style="color: var(--text);">5+ lakh field force representatives</strong> visiting 8–12 doctors daily. HealQR becomes a <strong style="color: var(--text);">value-addition tool</strong> in their existing workflow — helping them build stronger rapport, earn more quality time, and deliver genuine practice value to every doctor they visit.</p>
+        <div class="g3" style="margin-bottom: 12px;">
+            <div class="card card-t">
+                <div class="card-icon">🤝</div>
+                <h4>Rapport Building Tool</h4>
+                <p>Field reps introduce HealQR as a <strong>genuine value-add</strong> for the doctor's practice — free digital platform, booking system, AI tools. Builds trust &amp; earns more quality time with every visit.</p>
+            </div>
+            <div class="card card-t">
+                <div class="card-icon">📊</div>
+                <h4>Rx Trends — Direct from Source</h4>
+                <p>Anonymized prescription trends from <strong>real prescriptions at point of care</strong> — no intermediaries. Which molecules, which specialty, which territory. <strong>Self-serve dashboard. No approval. No cost.</strong></p>
+            </div>
+            <div class="card card-t">
+                <div class="card-icon">🔬</div>
+                <h4>Pathology Trends — On Demand</h4>
+                <p>Lab test ordering patterns from doctor prescriptions — <strong>source data, not derived</strong>. Access from your company dashboard anytime. No request process, no waiting.</p>
+            </div>
+        </div>
+        <div class="g2">
+            <div class="card" style="border-color: rgba(20,184,166,.2); background: rgba(20,184,166,.04); padding: 14px;">
+                <h4 style="color: var(--teal); font-size: 12px; margin-bottom: 8px;">🏢 For Pharma Companies</h4>
+                <ul class="sl">
+                    <li><span class="ck">✓</span> Field force delivers real practice value — not just pitches</li>
+                    <li><span class="ck">✓</span> Source-level Rx &amp; pathology analytics, self-serve dashboard</li>
+                    <li><span class="ck">✓</span> Hyperlocal — territory, specialty &amp; pincode level data</li>
+                    <li><span class="ck">✓</span> Stronger doctor relationships = better business outcomes</li>
+                </ul>
+            </div>
+            <div class="card" style="border-color: rgba(99,102,241,.2); background: rgba(99,102,241,.04); padding: 14px;">
+                <h4 style="color: var(--primary-light); font-size: 12px; margin-bottom: 8px;">👨‍⚕️ For Doctors (via Field Rep)</h4>
+                <ul class="sl">
+                    <li><span class="ck">✓</span> Free complete digital practice platform — no strings</li>
+                    <li><span class="ck">✓</span> QR booking, digital Rx, analytics — all at zero cost</li>
+                    <li><span class="ck">✓</span> 100% data ownership — no lock-in, no commission, ever</li>
+                    <li><span class="ck">✓</span> Field rep becomes a trusted practice enabler</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========== SLIDE 8: CONCLUSION ========== -->
+<!-- ========== SLIDE 8: PARTNERSHIP SNAPSHOT ========== -->
+<div class="slide" data-slide="8">
+    <div class="sc ty">
+        <div class="cover-badge" style="margin-bottom: 14px;">The Partnership Opportunity</div>
+        <h2>heal<span>QR</span></h2>
+        <p style="font-size: 16px; color: var(--text); font-weight: 700; margin-bottom: 18px;">Your Field Force Becomes a Practice Enabler</p>
+
+        <div class="g3" style="margin-bottom: 20px; text-align: left;">
+            <div class="card card-t">
+                <h4>🤝 For Your Field Force</h4>
+                <p>A genuine value-add tool that earns more doctor time, builds trust, and differentiates your rep from every other visitor. Not a pitch — a practice solution.</p>
+            </div>
+            <div class="card card-t">
+                <h4>📊 For Your Business Intelligence</h4>
+                <p>Source-level Rx molecule &amp; pathology trends — hyperlocal, real-time, self-serve. No intermediaries, no approvals, no cost. Like IQVIA, but from the source.</p>
+            </div>
+            <div class="card card-t">
+                <h4>👨‍⚕️ For Your Doctors</h4>
+                <p>Free digital practice platform your reps gift to doctors. Booking, Rx, analytics, marketing — everything free, forever. Doctor sees your company as a practice partner.</p>
+            </div>
+        </div>
+
+        <div class="stat-row" style="margin-bottom: 18px;">
+            <div class="stat-box"><div class="num">13L+</div><div class="lbl">Doctors in India</div></div>
+            <div class="stat-box"><div class="num">₹0</div><div class="lbl">Cost to Anyone</div></div>
+            <div class="stat-box"><div class="num">8-12</div><div class="lbl">Drs/Day per Rep</div></div>
+            <div class="stat-box"><div class="num">100%</div><div class="lbl">Source-Level Data</div></div>
+        </div>
+
+        <p style="font-size: 11px; color: var(--dim); text-align: center;">Next: Business Plan — Costs, Revenue &amp; Unit Economics →</p>
+    </div>
+</div>
+
+<!-- ========== SLIDE 9: BUSINESS PLAN COVER ========== -->
+<div class="slide" data-slide="9">
+    <div class="sc cover" style="text-align: center;">
+        <div class="cover-badge" style="background: rgba(99,102,241,.12); border-color: rgba(99,102,241,.25); color: var(--primary-light);">Confidential &bull; For Partners Only</div>
+        <h1 style="margin-top: 14px;">Business <span>Plan</span></h1>
+        <p style="font-size: 14px; color: var(--muted); max-width: 520px; margin: 0 auto 14px;">Complete cost structure, revenue model, unit economics &amp; growth roadmap.</p>
+
+        <div class="g2" style="max-width: 700px; margin: 0 auto 14px; text-align: left; gap: 10px;">
+            <div class="card card-p" style="padding: 12px 14px;">
+                <h4 style="font-size: 12px; color: var(--primary-light); margin-bottom: 4px;">👨‍💻 Partner 1 — Technology &amp; Growth</h4>
+                <p style="font-size: 10px;">Project development, bug monitoring &amp; individual-level digital marketing — until distribution channel is established. Thereafter, Phase 1 begins.</p>
+            </div>
+            <div class="card card-o" style="padding: 12px 14px;">
+                <h4 style="font-size: 12px; color: var(--gold); margin-bottom: 4px;">🤝 Partner 2 — Distribution Channel</h4>
+                <p style="font-size: 10px;">Distribution network creation — connecting with pharma field force, medical reps, and clinic chains for nationwide doctor onboarding.</p>
+            </div>
+        </div>
+
+        <div class="g4" style="max-width: 750px; margin: 0 auto 12px;">
+            <div class="card card-p" style="text-align: center; padding: 10px 5px;">
+                <div style="font-size: 11px; font-weight: 800; color: var(--primary-light);">Phase 1</div>
+                <div style="font-size: 8px; color: var(--dim);">Jun–Aug '26</div>
+                <div style="font-size: 8px; color: var(--muted); margin-top: 2px;">Build &amp; Onboard</div>
+            </div>
+            <div class="card card-o" style="text-align: center; padding: 10px 5px;">
+                <div style="font-size: 11px; font-weight: 800; color: var(--gold);">Phase 2</div>
+                <div style="font-size: 8px; color: var(--dim);">Sep–Nov '26</div>
+                <div style="font-size: 8px; color: var(--muted); margin-top: 2px;">Scale &amp; Monetize</div>
+            </div>
+            <div class="card card-t" style="text-align: center; padding: 10px 5px;">
+                <div style="font-size: 11px; font-weight: 800; color: var(--teal);">Phase 3</div>
+                <div style="font-size: 8px; color: var(--dim);">Dec '26–Mar '27</div>
+                <div style="font-size: 8px; color: var(--muted); margin-top: 2px;">Pan India</div>
+            </div>
+            <div class="card card-g" style="text-align: center; padding: 10px 5px;">
+                <div style="font-size: 11px; font-weight: 800; color: var(--green);">Phase 4</div>
+                <div style="font-size: 8px; color: var(--dim);">Apr '27+</div>
+                <div style="font-size: 8px; color: var(--muted); margin-top: 2px;">Enterprise Handoff</div>
+            </div>
+        </div>
+
+        <div class="card" style="max-width: 750px; margin: 0 auto; border-color: rgba(99,102,241,.2); background: rgba(99,102,241,.04); padding: 10px 14px; text-align: center;">
+            <p style="font-size: 10px; color: var(--muted);">At the start of <strong style="color: var(--primary-light);">Phase 1</strong>, both partners fix their responsibilities &amp; founding allotment. Partner investment covers Phase 1 + Phase 2 (6 months). <strong style="color: var(--green);">Phase 2 onward — platform sustains itself.</strong></p>
+        </div>
+    </div>
+</div>
+
+<!-- ========== SLIDE 10: PHASE 1 ========== -->
+<div class="slide" data-slide="10">
+    <div class="sc">
+        <div class="sh" style="color: var(--primary-light);">Phase 1 &bull; Jun–Aug 2026</div>
+        <h2 class="st">Build &amp; Onboard — <span>10K Doctors</span></h2>
+        <div class="two" style="gap: 16px;">
+            <div>
+                <h4 style="font-size: 12px; color: var(--red); margin-bottom: 6px;">💸 Costs (Monthly)</h4>
+                <table class="tb">
+                    <thead><tr><th>Item</th><th>Monthly</th><th>3 Months</th></tr></thead>
+                    <tbody>
+                        <tr><td><strong>Developer</strong> <span style="font-size: 8px; color: var(--dim);">(1 founder)</span></td><td>₹1,00,000</td><td>₹3,00,000</td></tr>
+                        <tr><td><strong>Tools</strong> <span style="font-size: 8px; color: var(--dim);">Copilot+Canva+Misc</span></td><td>₹10,000</td><td>₹30,000</td></tr>
+                        <tr><td><strong>Digital Marketing</strong> <span style="font-size: 8px; color: var(--dim);">₹2K/day</span></td><td class="cost">₹60,000</td><td class="cost">₹1,80,000</td></tr>
+                        <tr><td><strong>QR Printing</strong> <span style="font-size: 8px; color: var(--dim);">₹50/dr × ~3.3K/mo</span></td><td>₹1,67,000</td><td>₹5,00,000</td></tr>
+                        <tr><td><strong>Firebase/Hosting</strong></td><td>₹3,000</td><td>₹9,000</td></tr>
+                        <tr style="background: rgba(239,68,68,.06);"><td><strong style="color: var(--red);">Fixed Total</strong></td><td class="cost"><strong>₹3,40,000</strong></td><td class="cost"><strong>₹10,20,000</strong></td></tr>
+                        <tr><td><strong>Variable</strong> <span style="font-size: 8px; color: var(--dim);">₹0.06 × 30K/day</span></td><td>₹54,000</td><td>₹1,62,000</td></tr>
+                        <tr style="background: rgba(239,68,68,.1);"><td colspan="2"><strong style="color: var(--red);">Phase 1 Total Cost</strong></td><td class="cost"><strong style="font-size: 13px;">₹11.82L</strong></td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div>
+                <h4 style="font-size: 12px; color: var(--dim); margin-bottom: 6px;">📊 Revenue</h4>
+                <div class="card" style="background: rgba(100,116,139,.06); border-color: rgba(100,116,139,.15); padding: 14px; text-align: center; margin-bottom: 10px;">
+                    <div style="font-size: 32px; font-weight: 900; color: var(--dim);">₹0</div>
+                    <div style="font-size: 11px; color: var(--dim); margin-top: 4px;">Pre-revenue phase</div>
+                    <p style="font-size: 10px; color: var(--muted); margin-top: 8px;">End of Phase 1: 10K doctors onboarded, 30K bookings/day established. We start searching for advertisers.</p>
+                </div>
+
+                <h4 style="font-size: 12px; color: var(--primary-light); margin-bottom: 6px;">🎯 Phase 1 Targets</h4>
+                <ul class="sl">
+                    <li><span class="ck">✓</span> <strong>10,000 doctors</strong> onboarded via distribution</li>
+                    <li><span class="ck">✓</span> <strong>3 bookings/dr/day</strong> average = 30K/day</li>
+                    <li><span class="ck">✓</span> Platform stable, all features live</li>
+                    <li><span class="ck">✓</span> Begin advertiser outreach (end of phase)</li>
+                </ul>
+                <div class="card" style="margin-top: 8px; border-color: rgba(239,68,68,.2); background: rgba(239,68,68,.04); padding: 8px; text-align: center;">
+                    <p style="font-size: 10px;"><strong style="color: var(--red);">Net: −₹11.82L</strong> <span style="color: var(--dim);">(Investment phase — building foundation)</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========== SLIDE 11: PHASE 2 ========== -->
+<div class="slide" data-slide="11">
+    <div class="sc">
+        <div class="sh" style="color: var(--gold);">Phase 2 &bull; Sep–Nov 2026</div>
+        <h2 class="st">Scale to 30K Doctors — <span>First Revenue</span></h2>
+        <div class="two" style="gap: 16px;">
+            <div>
+                <h4 style="font-size: 12px; color: var(--red); margin-bottom: 6px;">💸 Costs (Monthly)</h4>
+                <table class="tb">
+                    <thead><tr><th>Item</th><th>Monthly</th><th>3 Months</th></tr></thead>
+                    <tbody>
+                        <tr><td><strong>Developer</strong> <span style="font-size: 8px; color: var(--dim);">(1 founder)</span></td><td>₹1,00,000</td><td>₹3,00,000</td></tr>
+                        <tr><td><strong>Tools</strong></td><td>₹10,000</td><td>₹30,000</td></tr>
+                        <tr><td><strong>Digital Marketing</strong> <span style="font-size: 8px; color: var(--dim);">₹2K/day</span></td><td class="cost">₹60,000</td><td class="cost">₹1,80,000</td></tr>
+                        <tr><td><strong>QR Printing</strong> <span style="font-size: 8px; color: var(--dim);">₹50/dr × ~6.7K/mo</span></td><td>₹3,33,000</td><td>₹10,00,000</td></tr>
+                        <tr><td><strong>Firebase/Hosting</strong></td><td>₹10,000</td><td>₹30,000</td></tr>
+                        <tr style="background: rgba(239,68,68,.06);"><td><strong style="color: var(--red);">Fixed Total</strong></td><td class="cost"><strong>₹5,13,000</strong></td><td class="cost"><strong>₹15,40,000</strong></td></tr>
+                        <tr><td><strong>Variable</strong> <span style="font-size: 8px; color: var(--dim);">₹0.06 × avg 90K/day</span></td><td>₹1,62,000</td><td>₹4,86,000</td></tr>
+                        <tr style="background: rgba(239,68,68,.1);"><td colspan="2"><strong style="color: var(--red);">Phase 2 Total Cost</strong></td><td class="cost"><strong style="font-size: 13px;">₹20.26L</strong></td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div>
+                <h4 style="font-size: 12px; color: var(--green); margin-bottom: 6px;">💰 Revenue — ₹1/booking (10 impressions × ₹0.10)</h4>
+                <table class="tb">
+                    <thead><tr><th>Month</th><th>Drs</th><th>Bkngs/Day</th><th>Revenue</th></tr></thead>
+                    <tbody>
+                        <tr><td><strong>Sep '26</strong> <span style="font-size: 8px; color: var(--dim);">onboard + search adv</span></td><td>15K</td><td>52K</td><td style="color: var(--dim);">₹0</td></tr>
+                        <tr><td><strong>Oct '26</strong> <span style="font-size: 8px; color: var(--dim);">ads live</span></td><td>22K</td><td>88K</td><td class="rev">₹26.4L</td></tr>
+                        <tr><td><strong>Nov '26</strong></td><td>30K</td><td>1.5L</td><td class="rev">₹45L</td></tr>
+                        <tr style="background: rgba(34,197,94,.08);"><td colspan="3"><strong style="color: var(--green);">Phase 2 Total Revenue</strong></td><td class="rev"><strong style="font-size: 13px;">₹71.4L</strong></td></tr>
+                    </tbody>
+                </table>
+
+                <div class="g2" style="margin-top: 10px; gap: 8px;">
+                    <div class="card" style="border-color: rgba(34,197,94,.2); background: rgba(34,197,94,.04); padding: 8px; text-align: center;">
+                        <div style="font-size: 20px; font-weight: 900; color: var(--green);">₹51.1L</div>
+                        <div style="font-size: 9px; color: var(--muted);">Phase 2 Net Profit</div>
+                    </div>
+                    <div class="card" style="border-color: rgba(245,158,11,.2); background: rgba(245,158,11,.04); padding: 8px; text-align: center;">
+                        <div style="font-size: 20px; font-weight: 900; color: var(--gold);">₹0</div>
+                        <div style="font-size: 9px; color: var(--muted);">Founder Salary After P2</div>
+                    </div>
+                </div>
+                <p style="font-size: 9px; color: var(--dim); text-align: center; margin-top: 6px;">After Phase 2: revenue sustains platform. No more partner investment needed.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========== SLIDE 12: P1+P2 SUMMARY — RAINBOW ========== -->
+<div class="slide" data-slide="12">
+    <div class="sc ty">
+        <div class="cover-badge" style="background: rgba(34,197,94,.12); border-color: rgba(34,197,94,.25); color: var(--green); margin-bottom: 12px;">Phase 1 + Phase 2 &bull; The Complete Picture</div>
+        <h2 style="font-size: clamp(24px, 3vw, 38px); font-weight: 900; margin-bottom: 6px;">6 Months — <span style="color: var(--primary-light);">Investment</span> to <span style="color: var(--green);">Returns</span></h2>
+        <p style="font-size: 13px; color: var(--muted); margin-bottom: 16px;">Partner investment required only for first 6 months. Here's the full picture.</p>
+
+        <div class="g3" style="margin-bottom: 14px; text-align: center;">
+            <div class="card" style="border-color: rgba(239,68,68,.25); background: rgba(239,68,68,.06); padding: 14px;">
+                <div style="font-size: 10px; color: var(--red); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">Total Investment</div>
+                <div style="font-size: 32px; font-weight: 900; color: var(--red);">₹32.1L</div>
+                <div style="font-size: 9px; color: var(--dim); margin-top: 4px;">P1: ₹11.82L + P2: ₹20.26L</div>
+            </div>
+            <div class="card" style="border-color: rgba(34,197,94,.25); background: rgba(34,197,94,.06); padding: 14px;">
+                <div style="font-size: 10px; color: var(--green); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">Total Revenue</div>
+                <div style="font-size: 32px; font-weight: 900; color: var(--green);">₹71.4L</div>
+                <div style="font-size: 9px; color: var(--dim); margin-top: 4px;">From ad revenue (Oct–Nov '26)</div>
+            </div>
+            <div class="card" style="border: 2px solid rgba(34,197,94,.4); background: linear-gradient(135deg, rgba(34,197,94,.08), rgba(6,182,212,.08)); padding: 14px;">
+                <div style="font-size: 10px; color: var(--teal); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">Net Profit</div>
+                <div style="font-size: 32px; font-weight: 900; background: linear-gradient(135deg, var(--green), var(--teal)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">₹39.3L</div>
+                <div style="font-size: 9px; color: var(--dim); margin-top: 4px;">After just 6 months</div>
+            </div>
+        </div>
+
+        <div class="card" style="border-color: rgba(34,197,94,.2); background: rgba(34,197,94,.04); padding: 12px 16px; margin-bottom: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                <div style="text-align: center; flex: 1;">
+                    <div style="font-size: 8px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px;">Jun '26</div>
+                    <div style="font-size: 14px; font-weight: 800; color: var(--red);">−₹3.4L</div>
+                    <div style="font-size: 7px; color: var(--dim);">Burn</div>
+                </div>
+                <div style="color: var(--dim);">→</div>
+                <div style="text-align: center; flex: 1;">
+                    <div style="font-size: 8px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px;">Aug '26</div>
+                    <div style="font-size: 14px; font-weight: 800; color: var(--red);">−₹11.8L</div>
+                    <div style="font-size: 7px; color: var(--dim);">cumulative</div>
+                </div>
+                <div style="color: var(--dim);">→</div>
+                <div style="text-align: center; flex: 1;">
+                    <div style="font-size: 8px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px;">Oct '26</div>
+                    <div style="font-size: 14px; font-weight: 800; color: var(--gold);">₹26.4L</div>
+                    <div style="font-size: 7px; color: var(--green);">first revenue!</div>
+                </div>
+                <div style="color: var(--dim);">→</div>
+                <div style="text-align: center; flex: 1;">
+                    <div style="font-size: 8px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px;">Nov '26</div>
+                    <div style="font-size: 14px; font-weight: 800; color: var(--green);">₹45L</div>
+                    <div style="font-size: 7px; color: var(--green);">monthly rev</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="g2" style="gap: 8px;">
+            <div class="card" style="padding: 8px 10px; border-color: rgba(34,197,94,.18); text-align: center;">
+                <p style="font-size: 10px; color: var(--muted);"><strong style="color: var(--green);">After Phase 2:</strong> Platform generates ₹45L+/month. No further partner investment required. Founder takes ₹0 salary.</p>
+            </div>
+            <div class="card" style="padding: 8px 10px; border-color: rgba(99,102,241,.18); text-align: center;">
+                <p style="font-size: 10px; color: var(--muted);"><strong style="color: var(--primary-light);">ROI:</strong> ₹32.1L invested → ₹39.3L profit in 6 months. <strong style="color: var(--green);">122% return.</strong> And this is just the beginning.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========== SLIDE 13: PHASE 3 ========== -->
+<div class="slide" data-slide="13">
+    <div class="sc">
+        <div class="sh" style="color: var(--teal);">Phase 3 &bull; Dec 2026 – Mar 2027</div>
+        <h2 class="st">Pan India — <span>1 Lakh Doctors</span></h2>
+        <div class="two" style="gap: 16px;">
+            <div>
+                <h4 style="font-size: 12px; color: var(--red); margin-bottom: 6px;">💸 Costs (Monthly) — Self-funded from Revenue</h4>
+                <table class="tb">
+                    <thead><tr><th>Item</th><th>Monthly</th><th>4 Months</th></tr></thead>
+                    <tbody>
+                        <tr><td><strong>4 Pro Developers</strong> <span style="font-size: 8px; color: var(--dim);">₹1L each</span></td><td>₹4,00,000</td><td>₹16,00,000</td></tr>
+                        <tr><td><strong>Founder</strong></td><td style="color: var(--green);">₹0</td><td style="color: var(--green);">₹0</td></tr>
+                        <tr><td><strong>Tools + Infra</strong></td><td>₹20,000</td><td>₹80,000</td></tr>
+                        <tr><td><strong>Marketing + Influencers</strong></td><td class="cost">₹1,50,000</td><td class="cost">₹6,00,000</td></tr>
+                        <tr><td><strong>QR Printing</strong> <span style="font-size: 8px; color: var(--dim);">₹50 × 17.5K/mo</span></td><td>₹8,75,000</td><td>₹35,00,000</td></tr>
+                        <tr><td><strong>Firebase (scaled)</strong></td><td>₹30,000</td><td>₹1,20,000</td></tr>
+                        <tr style="background: rgba(239,68,68,.06);"><td><strong style="color: var(--red);">Fixed Total</strong></td><td class="cost"><strong>₹14,75,000</strong></td><td class="cost"><strong>₹59,00,000</strong></td></tr>
+                        <tr><td><strong>Variable</strong> <span style="font-size: 8px; color: var(--dim);">₹0.06 × avg 6L/day</span></td><td>₹10,80,000</td><td>₹43,20,000</td></tr>
+                        <tr style="background: rgba(239,68,68,.1);"><td colspan="2"><strong style="color: var(--red);">Phase 3 Total Cost</strong></td><td class="cost"><strong>₹1.02Cr</strong></td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div>
+                <h4 style="font-size: 12px; color: var(--green); margin-bottom: 6px;">💰 Revenue — ₹2.50/booking (₹0.25 × 10)</h4>
+                <table class="tb">
+                    <thead><tr><th>Month</th><th>Drs</th><th>Bkngs/Day</th><th>Revenue</th></tr></thead>
+                    <tbody>
+                        <tr><td><strong>Dec '26</strong></td><td>47K</td><td>3.3L</td><td class="rev">₹2.5Cr</td></tr>
+                        <tr><td><strong>Jan '27</strong></td><td>65K</td><td>5.5L</td><td class="rev">₹4.1Cr</td></tr>
+                        <tr><td><strong>Feb '27</strong></td><td>82K</td><td>7.5L</td><td class="rev">₹5.6Cr</td></tr>
+                        <tr><td><strong>Mar '27</strong></td><td>1L</td><td>10L</td><td class="rev">₹7.5Cr</td></tr>
+                        <tr style="background: rgba(34,197,94,.08);"><td colspan="3"><strong style="color: var(--green);">Phase 3 Total Revenue</strong></td><td class="rev"><strong>₹19.7Cr</strong></td></tr>
+                    </tbody>
+                </table>
+                <div class="card" style="margin-top: 6px; border-color: rgba(20,184,166,.2); background: rgba(20,184,166,.04); padding: 8px; text-align: center;">
+                    <div style="font-size: 10px; color: var(--dim); margin-bottom: 2px;">+ Data Analytics Revenue (starts Phase 3)</div>
+                    <div style="font-size: 9px; color: var(--teal);">₹2-5L/month per pharma subscriber × 2-3 companies = ₹10-15L/month additional</div>
+                </div>
+
+                <div class="card" style="margin-top: 6px; border: 2px solid rgba(34,197,94,.3); background: rgba(34,197,94,.06); padding: 10px; text-align: center;">
+                    <div style="font-size: 10px; color: var(--dim); margin-bottom: 2px;">Phase 3 Net Profit</div>
+                    <div style="font-size: 24px; font-weight: 900; color: var(--green);">₹18.7Cr+</div>
+                    <div style="font-size: 9px; color: var(--teal); margin-top: 2px;">QR ₹50/dr negotiable with distribution company — if they cover, this is extra margin</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========== SLIDE 14: PHASE 4 ========== -->
+<div class="slide" data-slide="14">
+    <div class="sc">
+        <div class="sh" style="color: var(--green);">Phase 4 &bull; April 2027 Onward</div>
+        <h2 class="st">Enterprise Handoff — <span>Scale &amp; Sustain</span></h2>
+        <p style="font-size: 11px; color: var(--muted); margin-bottom: 10px;">Project handed to enterprise tech companies (TCS/Cognizant/Zoho) for professional service &amp; maintenance. Regional databases, Kubernetes orchestration, enterprise-grade infrastructure.</p>
+        <div class="two" style="gap: 16px;">
+            <div>
+                <h4 style="font-size: 12px; color: var(--red); margin-bottom: 6px;">💸 Costs (Monthly)</h4>
+                <table class="tb">
+                    <thead><tr><th>Item</th><th>Monthly</th></tr></thead>
+                    <tbody>
+                        <tr><td colspan="2" style="color: var(--teal); font-weight: 700; font-size: 10px; padding: 6px 8px; background: rgba(20,184,166,.04);">🏢 Enterprise Tech Contract</td></tr>
+                        <tr><td><strong>TCS/Cognizant/Zoho</strong> <span style="font-size: 8px; color: var(--dim);">10-15 person team</span></td><td class="cost">₹15,00,000</td></tr>
+                        <tr><td colspan="2" style="color: var(--primary-light); font-weight: 700; font-size: 10px; padding: 6px 8px; background: rgba(99,102,241,.04);">☁️ Enterprise Infrastructure</td></tr>
+                        <tr><td><strong>Kubernetes (GKE)</strong> <span style="font-size: 8px; color: var(--dim);">multi-region cluster</span></td><td class="cost">₹4,00,000</td></tr>
+                        <tr><td><strong>Cloud SQL</strong> <span style="font-size: 8px; color: var(--dim);">regional databases</span></td><td class="cost">₹2,00,000</td></tr>
+                        <tr><td><strong>Redis / Memorystore</strong> <span style="font-size: 8px; color: var(--dim);">caching layer</span></td><td class="cost">₹50,000</td></tr>
+                        <tr><td><strong>CDN + Load Balancer</strong></td><td class="cost">₹30,000</td></tr>
+                        <tr><td><strong>Monitoring</strong> <span style="font-size: 8px; color: var(--dim);">Datadog/NewRelic</span></td><td class="cost">₹50,000</td></tr>
+                        <tr><td colspan="2" style="color: var(--gold); font-weight: 700; font-size: 10px; padding: 6px 8px; background: rgba(245,158,11,.04);">📣 Operations</td></tr>
+                        <tr><td><strong>Marketing + Ops</strong></td><td class="cost">₹3,00,000</td></tr>
+                        <tr><td><strong>QR Printing</strong> <span style="font-size: 8px; color: var(--dim);">maintenance + new</span></td><td>₹5,00,000</td></tr>
+                        <tr><td><strong>Firebase + Hosting</strong></td><td>₹60,000</td></tr>
+                        <tr style="background: rgba(239,68,68,.06);"><td><strong style="color: var(--red);">Fixed Total</strong></td><td class="cost"><strong>₹30,90,000</strong></td></tr>
+                        <tr><td><strong>Variable</strong> <span style="font-size: 8px; color: var(--dim);">₹0.06 × 10L/day</span></td><td class="cost">₹18,00,000</td></tr>
+                        <tr style="background: rgba(239,68,68,.1);"><td><strong style="color: var(--red);">Total Monthly Cost</strong></td><td class="cost"><strong style="font-size: 13px;">₹48.9L</strong></td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div>
+                <h4 style="font-size: 12px; color: var(--green); margin-bottom: 6px;">💰 Revenue — ₹5/booking (₹0.50 × 10)</h4>
+                <table class="tb">
+                    <thead><tr><th>Stream</th><th>Monthly</th></tr></thead>
+                    <tbody>
+                        <tr><td><strong>Ad Revenue</strong> <span style="font-size: 8px; color: var(--dim);">₹5 × 10L/day × 30</span></td><td class="rev">₹15Cr</td></tr>
+                        <tr><td><strong>Rx Data Subscriptions</strong> <span style="font-size: 8px; color: var(--dim);">5-10 pharma cos</span></td><td class="rev">₹25L</td></tr>
+                        <tr><td><strong>Pathology Data</strong></td><td class="rev">₹10L</td></tr>
+                        <tr style="background: rgba(34,197,94,.08);"><td><strong style="color: var(--green);">Total Revenue</strong></td><td class="rev"><strong style="font-size: 14px;">₹15.35Cr</strong></td></tr>
+                    </tbody>
+                </table>
+
+                <div class="card" style="margin-top: 10px; border: 2px solid rgba(34,197,94,.4); background: linear-gradient(135deg, rgba(34,197,94,.08), rgba(6,182,212,.08)); padding: 12px; text-align: center;">
+                    <div style="font-size: 10px; color: var(--dim); margin-bottom: 2px;">Monthly Net Profit</div>
+                    <div style="font-size: 28px; font-weight: 900; background: linear-gradient(135deg, var(--green), var(--teal)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">₹14.86Cr</div>
+                    <div style="font-size: 9px; color: var(--dim); margin-top: 4px;">₹48.9L cost vs ₹15.35Cr revenue</div>
+                </div>
+
+                <div class="card" style="margin-top: 8px; padding: 8px 10px; border-color: rgba(20,184,166,.2); text-align: center;">
+                    <p style="font-size: 9px; color: var(--muted);">QR ₹50/dr stays at our cost. If distribution company covers — that's extra ₹5L/month margin.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========== SLIDE 15: TOTAL 4-PHASE COST vs REVENUE ========== -->
+<div class="slide" data-slide="15">
+    <div class="sc">
+        <div class="sh">Complete Financial Overview</div>
+        <h2 class="st">4-Phase Journey — <span>Cost vs Revenue</span></h2>
+        <table class="tb">
+            <thead>
+                <tr><th style="width: 18%;">Metric</th><th style="color: var(--primary-light);">Phase 1<br><span style="font-weight: 400; font-size: 7px;">Jun–Aug '26</span></th><th style="color: var(--gold);">Phase 2<br><span style="font-weight: 400; font-size: 7px;">Sep–Nov '26</span></th><th style="color: var(--teal);">Phase 3<br><span style="font-weight: 400; font-size: 7px;">Dec '26–Mar '27</span></th><th style="color: var(--green);">Phase 4<br><span style="font-weight: 400; font-size: 7px;">Apr '27+</span></th></tr>
+            </thead>
+            <tbody>
+                <tr><td><strong>Doctors</strong></td><td>10,000</td><td>30,000</td><td>1,00,000</td><td>1,00,000+</td></tr>
+                <tr><td><strong>Bookings/Day</strong></td><td>30K</td><td>1.5L</td><td>10L</td><td>10L+</td></tr>
+                <tr style="border-top: 2px solid var(--border);"><td><strong>Fixed Cost</strong> <span style="font-size: 8px; color: var(--dim);">(total)</span></td><td class="cost">₹10.2L</td><td class="cost">₹15.4L</td><td class="cost">₹59L</td><td class="cost">₹30.9L<span style="font-size: 7px; color: var(--dim);">/mo</span></td></tr>
+                <tr><td><strong>Variable</strong> <span style="font-size: 8px; color: var(--dim);">₹0.06/bkng</span></td><td class="cost">₹1.62L</td><td class="cost">₹4.86L</td><td class="cost">₹43.2L</td><td class="cost">₹18L<span style="font-size: 7px; color: var(--dim);">/mo</span></td></tr>
+                <tr style="background: rgba(239,68,68,.08);"><td><strong style="color: var(--red);">Total Cost</strong></td><td class="cost"><strong>₹11.82L</strong></td><td class="cost"><strong>₹20.26L</strong></td><td class="cost"><strong>₹1.02Cr</strong></td><td class="cost"><strong>₹48.9L</strong><span style="font-size: 7px; color: var(--dim);">/mo</span></td></tr>
+                <tr style="border-top: 2px solid var(--border);"><td><strong>Ad Revenue</strong></td><td style="color: var(--dim);">₹0</td><td class="rev">₹71.4L</td><td class="rev">₹19.7Cr</td><td class="rev">₹15Cr<span style="font-size: 7px; color: var(--dim);">/mo</span></td></tr>
+                <tr><td><strong>Data Revenue</strong></td><td style="color: var(--dim);">—</td><td style="color: var(--dim);">—</td><td class="rev">₹40-60L</td><td class="rev">₹35L<span style="font-size: 7px; color: var(--dim);">/mo</span></td></tr>
+                <tr style="background: rgba(34,197,94,.08);"><td><strong style="color: var(--green);">Total Revenue</strong></td><td style="color: var(--dim);">₹0</td><td class="rev"><strong>₹71.4L</strong></td><td class="rev"><strong>₹20.3Cr</strong></td><td class="rev"><strong>₹15.35Cr</strong><span style="font-size: 7px; color: var(--dim);">/mo</span></td></tr>
+                <tr style="background: rgba(34,197,94,.14);"><td><strong style="font-size: 12px; color: var(--green);">NET</strong></td><td class="cost"><strong>−₹11.82L</strong></td><td class="rev"><strong>+₹51.1L</strong></td><td class="rev"><strong>+₹19.3Cr</strong></td><td class="rev"><strong>+₹14.86Cr</strong><span style="font-size: 7px; color: var(--dim);">/mo</span></td></tr>
+            </tbody>
+        </table>
+
+        <div class="g4" style="margin-top: 10px; text-align: center;">
+            <div class="card" style="border-color: rgba(239,68,68,.2); background: rgba(239,68,68,.04); padding: 8px;">
+                <div style="font-size: 8px; color: var(--red); text-transform: uppercase; letter-spacing: 1px;">Jun '26</div>
+                <div style="font-size: 14px; font-weight: 900; color: var(--red);">−₹3.4L</div>
+                <div style="font-size: 7px; color: var(--dim);">Monthly Burn</div>
+            </div>
+            <div class="card" style="border-color: rgba(245,158,11,.2); background: rgba(245,158,11,.04); padding: 8px;">
+                <div style="font-size: 8px; color: var(--gold); text-transform: uppercase; letter-spacing: 1px;">Nov '26</div>
+                <div style="font-size: 14px; font-weight: 900; color: var(--gold);">+₹39.3L</div>
+                <div style="font-size: 7px; color: var(--dim);">P1+P2 Net</div>
+            </div>
+            <div class="card" style="border-color: rgba(20,184,166,.2); background: rgba(20,184,166,.04); padding: 8px;">
+                <div style="font-size: 8px; color: var(--teal); text-transform: uppercase; letter-spacing: 1px;">Mar '27</div>
+                <div style="font-size: 14px; font-weight: 900; color: var(--teal);">+₹19.3Cr</div>
+                <div style="font-size: 7px; color: var(--dim);">Cumulative</div>
+            </div>
+            <div class="card" style="border: 2px solid rgba(34,197,94,.3); background: rgba(34,197,94,.06); padding: 8px;">
+                <div style="font-size: 8px; color: var(--green); text-transform: uppercase; letter-spacing: 1px;">May '27+</div>
+                <div style="font-size: 14px; font-weight: 900; color: var(--green);">₹14.9Cr</div>
+                <div style="font-size: 7px; color: var(--dim);">Monthly Profit</div>
+            </div>
+        </div>
+
+        <div class="g2" style="margin-top: 8px; gap: 6px;">
+            <div class="card" style="padding: 6px 10px; border-color: rgba(239,68,68,.15); text-align: center;">
+                <p style="font-size: 10px;"><strong style="color: var(--red);">Total Investment (P1+P2):</strong> <span style="color: var(--text);">₹32.1L</span> — partner funds only for 6 months</p>
+            </div>
+            <div class="card" style="padding: 6px 10px; border-color: rgba(34,197,94,.15); text-align: center;">
+                <p style="font-size: 10px;"><strong style="color: var(--green);">Cumulative Revenue (P1→P4 first month):</strong> <span style="color: var(--text);">₹35.7Cr+</span></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========== SLIDE 16: REVENUE STREAMS ========== -->
+<div class="slide" data-slide="16">
+    <div class="sc">
+        <div class="sh">Revenue Model</div>
+        <h2 class="st">Two Revenue Streams — <span>Zero User Charges</span></h2>
+        <div class="g2" style="gap: 14px; margin-bottom: 12px;">
+            <div class="card" style="border-left: 3px solid var(--green); padding: 14px;">
+                <h4 style="color: var(--green); font-size: 13px; margin-bottom: 8px;">💰 Stream 1: Advertiser Revenue</h4>
+                <p style="font-size: 11px; margin-bottom: 8px;">Every booking = <strong style="color: var(--text);">10 ad-eligible touchpoints</strong> (language, mini-site, date, chamber, form, confirm, consult, review + clinic: location, doctor)</p>
+                <table class="tb" style="margin-bottom: 8px;">
+                    <thead><tr><th>Phase</th><th>Rate/Impression</th><th>Revenue/Booking</th></tr></thead>
+                    <tbody>
+                        <tr><td>P2: 30K Drs</td><td>₹0.10</td><td class="rev">₹1.00</td></tr>
+                        <tr><td>P3: 1L Drs</td><td>₹0.25</td><td class="rev">₹2.50</td></tr>
+                        <tr><td>P4: 1L+ Drs</td><td>₹0.50+</td><td class="rev">₹5.00+</td></tr>
+                    </tbody>
+                </table>
+                <p style="font-size: 9px; color: var(--dim);">Ref: WhatsApp Business charges ₹0.78/message. Our ₹0.10–0.50 is conservative for healthcare vertical.</p>
+            </div>
+            <div class="card" style="border-left: 3px solid var(--teal); padding: 14px;">
+                <h4 style="color: var(--teal); font-size: 13px; margin-bottom: 8px;">📊 Stream 2: Anonymous Data (Phase 3+)</h4>
+                <p style="font-size: 11px; margin-bottom: 10px;"><strong style="color: var(--text);">100% legal, zero PII</strong> — no patient name, no doctor name. Anonymized molecule, diagnosis &amp; territory trends.</p>
+                <div class="card" style="background: rgba(20,184,166,.06); border: 1px solid rgba(20,184,166,.15); padding: 10px; margin-bottom: 8px;">
+                    <h4 style="font-size: 11px; color: var(--teal);">🔬 Rx Molecule Trends</h4>
+                    <p style="font-size: 10px;">Which molecules, which specialty, which territory. Source data from real prescriptions at point-of-care.</p>
+                </div>
+                <div class="card" style="background: rgba(20,184,166,.06); border: 1px solid rgba(20,184,166,.15); padding: 10px; margin-bottom: 8px;">
+                    <h4 style="font-size: 11px; color: var(--teal);">🧪 Pathology Trends</h4>
+                    <p style="font-size: 10px;">Lab test ordering patterns — which tests, which specialty, which geography. From doctor prescriptions directly.</p>
+                </div>
+                <p style="font-size: 10px; color: var(--muted);">Model: <strong style="color: var(--text);">₹2–5L/month per pharma company</strong>. Self-serve dashboard. Like IQVIA but hyperlocal.</p>
+            </div>
+        </div>
+        <div class="card" style="text-align: center; border-color: rgba(34,197,94,.2); background: rgba(34,197,94,.04); padding: 8px;">
+            <p style="font-size: 11px;"><strong style="color: var(--green);">Zero charge to doctors, patients, or clinics — ever.</strong> Revenue from advertisers &amp; pharma analytics only.</p>
+        </div>
+    </div>
+</div>
+
+<!-- ========== SLIDE 17: ADVERTISER DASHBOARD ========== -->
+<div class="slide" data-slide="17">
+    <div class="sc">
+        <div class="sh">Advertiser Platform</div>
+        <h2 class="st">Self-Serve <span>Advertiser Dashboard</span></h2>
+        <p style="font-size: 12px; color: var(--muted); margin-bottom: 10px;">Fully built &amp; live at healqr.com — advertisers sign up, create campaigns, track results. Zero manual intervention.</p>
+        <div class="two" style="gap: 14px;">
+            <div>
+                <h4 style="font-size: 12px; color: var(--gold); margin-bottom: 8px;">📣 What Advertisers Get</h4>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <div class="card card-o" style="padding: 8px 10px;">
+                        <h4 style="font-size: 11px;">🎯 Geo + Specialty Targeting</h4>
+                        <p>Target by state, city, pincode. Filter by doctor specialty — Cardio, Ortho, Gynec, etc.</p>
+                    </div>
+                    <div class="card card-o" style="padding: 8px 10px;">
+                        <h4 style="font-size: 11px;">📊 Real-Time Analytics</h4>
+                        <p>Impressions, clicks, CTR, spend — live dashboard. No waiting for reports.</p>
+                    </div>
+                    <div class="card card-o" style="padding: 8px 10px;">
+                        <h4 style="font-size: 11px;">🏥 Health Tip Sponsorship</h4>
+                        <p>Brand health tips shown in patient booking flow — trusted context, high engagement.</p>
+                    </div>
+                    <div class="card card-o" style="padding: 8px 10px;">
+                        <h4 style="font-size: 11px;">💳 Wallet + Auto-Billing</h4>
+                        <p>Pre-load wallet, auto-deduct per impression. Transparent spend tracking.</p>
+                    </div>
+                    <div class="card card-o" style="padding: 8px 10px;">
+                        <h4 style="font-size: 11px;">📈 Market Research</h4>
+                        <p>Anonymous aggregated Rx &amp; pathology trends by region, specialty.</p>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <h4 style="font-size: 12px; color: var(--green); margin-bottom: 8px;">🤝 Mutual Benefits</h4>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <div class="card" style="border-color: rgba(245,158,11,.2); background: rgba(245,158,11,.04); padding: 10px;">
+                        <h4 style="color: var(--gold); font-size: 11px; margin-bottom: 5px;">Advertiser Wins</h4>
+                        <ul class="sl">
+                            <li><span class="ck">✓</span> Direct healthcare audience — no waste</li>
+                            <li><span class="ck">✓</span> Specialty &amp; geo targeting</li>
+                            <li><span class="ck">✓</span> Trusted medical context = high CTR</li>
+                            <li><span class="ck">✓</span> Self-serve — no middleman</li>
+                        </ul>
+                    </div>
+                    <div class="card" style="border-color: rgba(34,197,94,.2); background: rgba(34,197,94,.04); padding: 10px;">
+                        <h4 style="color: var(--green); font-size: 11px; margin-bottom: 5px;">HealQR Wins</h4>
+                        <ul class="sl">
+                            <li><span class="ck">✓</span> Recurring revenue — scales with bookings</li>
+                            <li><span class="ck">✓</span> Zero sales team — platform sells itself</li>
+                            <li><span class="ck">✓</span> 10 touchpoints = 10× monetization</li>
+                            <li><span class="ck">✓</span> Platform stays 100% free for users</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="card" style="margin-top: 8px; text-align: center; background: rgba(99,102,241,.06); border-color: rgba(99,102,241,.18); padding: 10px;">
+                    <div style="font-size: 10px; color: var(--dim); margin-bottom: 3px;">Ad Pricing by Phase</div>
+                    <div style="display: flex; justify-content: center; gap: 14px;">
+                        <div><div style="font-size: 18px; font-weight: 900; color: var(--primary-light);">₹0.10</div><div style="font-size: 8px; color: var(--dim);">P2 · 30K Drs</div></div>
+                        <div><div style="font-size: 18px; font-weight: 900; color: var(--gold);">₹0.25</div><div style="font-size: 8px; color: var(--dim);">P3 · 1L Drs</div></div>
+                        <div><div style="font-size: 18px; font-weight: 900; color: var(--green);">₹0.50</div><div style="font-size: 8px; color: var(--dim);">P4 · Scale</div></div>
+                    </div>
+                    <div style="font-size: 8px; color: var(--dim); margin-top: 4px;">Per impression × 10 touchpoints/booking</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========== SLIDE 18: CONCLUSION ========== -->
+<div class="slide" data-slide="18">
+    <div class="sc ty">
+        <div class="cover-badge" style="margin-bottom: 12px;">The Opportunity</div>
+        <h2>heal<span>QR</span></h2>
+        <p style="font-size: 15px; color: var(--text); font-weight: 700; margin-bottom: 14px;">₹32L Investment → ₹15Cr+/month at Scale</p>
+
+        <div class="g4" style="margin-bottom: 12px; text-align: center;">
+            <div class="card" style="padding: 10px 6px; border-left: 3px solid var(--primary);">
+                <div style="font-size: 18px; font-weight: 900; color: var(--primary-light);">₹32L</div>
+                <div style="font-size: 9px; color: var(--muted);">Total Investment<br>Phase 1+2</div>
+            </div>
+            <div class="card" style="padding: 10px 6px; border-left: 3px solid var(--gold);">
+                <div style="font-size: 18px; font-weight: 900; color: var(--gold);">122%</div>
+                <div style="font-size: 9px; color: var(--muted);">ROI in<br>6 Months</div>
+            </div>
+            <div class="card" style="padding: 10px 6px; border-left: 3px solid var(--teal);">
+                <div style="font-size: 18px; font-weight: 900; color: var(--teal);">₹18.7Cr</div>
+                <div style="font-size: 9px; color: var(--muted);">Phase 3 Profit<br>(4 months)</div>
+            </div>
+            <div class="card" style="padding: 10px 6px; border-left: 3px solid var(--green);">
+                <div style="font-size: 18px; font-weight: 900; color: var(--green);">₹14.9Cr</div>
+                <div style="font-size: 9px; color: var(--muted);">Monthly Profit<br>Phase 4</div>
+            </div>
+        </div>
+
+        <div class="g2" style="margin-bottom: 12px; text-align: left; gap: 8px;">
+            <div class="card" style="padding: 10px; border-color: rgba(34,197,94,.2); background: rgba(34,197,94,.04);">
+                <h4 style="font-size: 11px; color: var(--green); margin-bottom: 5px;">✅ Why This Works</h4>
+                <ul class="sl">
+                    <li><span class="ck">✓</span> Variable cost ₹0.06/booking — near-zero marginal</li>
+                    <li><span class="ck">✓</span> Revenue scales linearly, costs stay flat</li>
+                    <li><span class="ck">✓</span> Founder takes ₹0 salary after Phase 2</li>
+                    <li><span class="ck">✓</span> Phase 4: TCS/Cognizant/Zoho enterprise handoff</li>
+                </ul>
+            </div>
+            <div class="card" style="padding: 10px; border-color: rgba(99,102,241,.2); background: rgba(99,102,241,.04);">
+                <h4 style="font-size: 11px; color: var(--primary-light); margin-bottom: 5px;">🛡️ Built-in Safeguards</h4>
+                <ul class="sl">
+                    <li><span class="ck">✓</span> Investment capped at ₹32L for 6 months</li>
+                    <li><span class="ck">✓</span> Self-sustaining from Phase 2 onward</li>
+                    <li><span class="ck">✓</span> Platform already built &amp; live — not vaporware</li>
+                    <li><span class="ck">✓</span> QR cost ₹50/dr — negotiable with distribution co.</li>
+                </ul>
+            </div>
+        </div>
+
+        <p style="font-size: 12px; color: var(--muted); margin-bottom: 4px;">Let's build India's healthcare digital infrastructure — together.</p>
+        <a href="mailto:support@healqr.com" class="em">support@healqr.com</a>
+        <p style="margin-top: 4px; font-size: 11px; color: var(--muted);">healqr.com &bull; +91 98741 14283</p>
+        <p style="font-size: 8px; color: var(--dim); margin-top: 10px; text-transform: uppercase; letter-spacing: 2px;">Confidential &bull; HealQR Business Plan &bull; April 2026</p>
+    </div>
+</div>
+
+</div><!-- /deck -->
+
+<!-- CONTROLS -->
+<div class="controls">
+    <button onclick="go(-1)" title="Previous (←)">&#8592;</button>
+    <span class="sc-num" id="scNum">1 / 18</span>
+    <button onclick="go(1)" title="Next (→)">&#8594;</button>
+</div>
+
+<script>
+let cur = 1;
+const params = new URLSearchParams(window.location.search);
+const total = parseInt(params.get('slides')) || 18;
+
+function go(d) {
+    const next = cur + d;
+    if (next < 1 || next > total) return;
+    const oldSlide = document.querySelector(`.slide[data-slide="${cur}"]`);
+    const newSlide = document.querySelector(`.slide[data-slide="${next}"]`);
+    if (!oldSlide || !newSlide) return;
+    oldSlide.classList.remove('active');
+    oldSlide.classList.toggle('prev', d > 0);
+    newSlide.classList.remove('prev');
+    newSlide.classList.add('active');
+    cur = next;
+    update();
+}
+
+function update() {
+    document.getElementById('scNum').textContent = `${cur} / ${total}`;
+    document.getElementById('pbar').style.width = `${(cur / total) * 100}%`;
+}
+
+document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); go(1); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); go(-1); }
+    if (e.key === 'f' || e.key === 'F') toggleFS();
+});
+
+let touchX = 0;
+document.addEventListener('touchstart', e => { touchX = e.touches[0].clientX; });
+document.addEventListener('touchend', e => {
+    const diff = touchX - e.changedTouches[0].clientX;
+    if (Math.abs(diff) > 50) go(diff > 0 ? 1 : -1);
+});
+
+function toggleFS() {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+    else document.exitFullscreen();
+}
+
+update();
+</script>
+</body>
+</html>

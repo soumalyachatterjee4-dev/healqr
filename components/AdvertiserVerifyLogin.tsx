@@ -3,7 +3,7 @@ import { auth, db } from '../lib/firebase/config';
 import { isSignInWithEmailLink, signInWithEmailLink } from 'firebase/auth';
 import { collection, query, where, getDocs, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { CheckCircle2, Loader2, XCircle, Clock, ShieldCheck } from 'lucide-react';
-import healQRAdsLogo from '../assets/healQRADS_LOGO.svg';
+import healQRLogo from '../assets/healqr.logo.png';
 
 interface AdvertiserVerifyLoginProps {
   onSuccess?: () => void;
@@ -125,7 +125,7 @@ export default function AdvertiserVerifyLogin({ onSuccess, onError }: Advertiser
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden p-8 text-center">
           <div className="flex justify-center mb-6">
             <div className="bg-slate-950/50 p-3 rounded-xl border border-slate-800 shadow-lg">
-              <img src={healQRAdsLogo} alt="HealQR Ads" className="h-12 w-auto" />
+              <img src={healQRLogo} alt="HealQR Ads" className="h-12 w-auto" />
             </div>
           </div>
 
