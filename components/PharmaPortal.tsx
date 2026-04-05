@@ -9,6 +9,7 @@ import PharmaDashboardTemplates from './PharmaDashboardTemplates';
 import PharmaProfileManager from './PharmaProfileManager';
 import VideoLibrary from './VideoLibrary';
 import PharmaRxTrends from './PharmaRxTrends';
+import PharmaPathologyTrends from './PharmaPathologyTrends';
 import PharmaOnboardingTracker from './PharmaOnboardingTracker';
 import PharmaCMEManager from './PharmaCMEManager';
 import PharmaSampleRequests from './PharmaSampleRequests';
@@ -22,7 +23,7 @@ interface PharmaPortalProps {
 
 export default function PharmaPortal({ onLogout }: PharmaPortalProps) {
   const [currentPage, setCurrentPage] = useState<
-    'profile' | 'dashboard' | 'my-doctors' | 'my-clinics' | 'analytics' | 'templates' | 'video-library' | 'rx-trends' | 'onboarding' | 'cme' | 'samples'
+    'profile' | 'dashboard' | 'my-doctors' | 'my-clinics' | 'analytics' | 'templates' | 'video-library' | 'rx-trends' | 'pathology-trends' | 'onboarding' | 'cme' | 'samples'
   >('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -39,7 +40,8 @@ export default function PharmaPortal({ onLogout }: PharmaPortalProps) {
     analytics: 'Analytics',
     templates: 'Dashboard Templates',
     'video-library': 'Video Library',
-    'rx-trends': 'Rx Molecule Trends',
+    'rx-trends': 'Rx Trends',
+    'pathology-trends': 'Pathology Trends',
     'onboarding': 'Onboarding Tracker',
     'cme': 'CME Content',
     'samples': 'Sample Requests',
@@ -248,6 +250,9 @@ export default function PharmaPortal({ onLogout }: PharmaPortalProps) {
         )}
         {currentPage === 'rx-trends' && (
           <PharmaRxTrends companyId={companyId} />
+        )}
+        {currentPage === 'pathology-trends' && (
+          <PharmaPathologyTrends companyId={companyId} />
         )}
         {currentPage === 'onboarding' && (
           <PharmaOnboardingTracker companyId={companyId} />

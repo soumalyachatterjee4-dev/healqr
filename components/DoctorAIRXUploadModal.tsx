@@ -362,7 +362,7 @@ export const DoctorAIRXUploadModal: React.FC<DoctorAIRXUploadModalProps> = ({
 
     const prompt = `You are an expert Pharmacist. You are given prescription image(s). The user has highlighted a specific area containing medicines.
 
-Task: Extract ALL medicine names, dosage, frequency, duration, and any advice/instructions from the prescription.
+Task: Extract ALL medicine names, dosage, frequency, duration, any advice/instructions, AND any lab tests/investigations advised from the prescription.
 
 OUTPUT FORMAT (Strict JSON):
 {
@@ -382,6 +382,8 @@ OUTPUT FORMAT (Strict JSON):
       "translated": "Translation in ${lang}"
     }
   ],
+  "labTestsAdvised": ["CBC", "FBS", "HbA1c", "LFT", "KFT"],
+  "diagnosis": "Primary diagnosis or clinical indication if visible (e.g. URTI, Hypertension, Diabetes). Return empty string if not found.",
   "confidenceScore": 85
 }
 
@@ -391,7 +393,9 @@ RULES:
 3. Correct obvious spelling mistakes in medicine names.
 4. Translate ALL instructions to ${lang}.
 5. Do NOT include doctor name, clinic info, or patient demographics.
-6. If you can see ANY text at all, try your best to decode it. Do NOT return empty arrays unless the image is completely unreadable.`;
+6. If you can see ANY text at all, try your best to decode it. Do NOT return empty arrays unless the image is completely unreadable.
+7. Look for diagnosis/clinical indication anywhere on the prescription (often written as Dx, D/D, or near the top). Extract if visible.
+8. For labTestsAdvised: Extract any lab tests, investigations, or pathology tests mentioned anywhere on the prescription (e.g. "Adv CBC", "Inv: LFT, KFT", "FBS/PPBS", "HbA1c", "Lipid Profile", "TFT", "Urine R/M", "X-ray Chest", "USG Abdomen"). Return full test names. Return empty array if none found.`;
 
     const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
       method: 'POST',
@@ -652,8 +656,30 @@ RULES:
                 pincode: drPincode,
                 companyName: drCompany,
                 division: drDivision,
+                diagnosis: analysisResult.diagnosis || '',
+                territory: drState ? `${drState}-${drPincode?.substring(0, 3) || ''}` : '',
                 createdAt: serverTimestamp(),
               }).catch(() => {}); // silent fail — analytics data is non-critical
+            }
+          }
+
+          // Save lab tests/investigations to pathologyMoleculeData
+          const labTests: string[] = analysisResult.labTestsAdvised || [];
+          for (const test of labTests) {
+            if (test && test.trim()) {
+              addDoc(collection(db!, 'pathologyMoleculeData'), {
+                testName: test.trim(),
+                testKey: 'suggested',
+                testValue: 'ordered',
+                testUnit: '',
+                specialty: drSpecialties[0] || '',
+                state: drState,
+                pincode: drPincode,
+                diagnosis: analysisResult.diagnosis || '',
+                territory: drState ? `${drState}-${drPincode?.substring(0, 3) || ''}` : '',
+                source: 'ai-rx-reader',
+                createdAt: serverTimestamp(),
+              }).catch(() => {});
             }
           }
         }

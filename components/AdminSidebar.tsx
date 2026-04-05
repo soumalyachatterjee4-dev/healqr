@@ -18,7 +18,9 @@ import {
   BarChart2,
   LayoutGrid,
   Brain,
-  Headphones
+  Headphones,
+  Download,
+  Microscope
 } from 'lucide-react';
 import { useState } from 'react';
 import healqrLogo from '../assets/healqr.logo.png';
@@ -45,6 +47,8 @@ export default function AdminSidebar({
 
   const aiTools = [
     { id: 'ai-pm-dashboard', label: 'AI PM Dashboard', icon: Brain },
+    { id: 'rx-trends', label: 'Rx Trends', icon: BarChart2 },
+    { id: 'admin-pathology-trends', label: 'Pathology Trends', icon: Microscope },
   ];
 
   const managementTools = [
@@ -68,8 +72,7 @@ export default function AdminSidebar({
     { id: 'pharma-templates', label: 'Pharma Templates', icon: FileText },
     { id: 'distribution-requests', label: 'Distributor Requests', icon: MapPinned },
     { id: 'advertiser-management', label: 'Advertisers', icon: BarChart2 },
-    { id: 'page-distribution', label: 'Page Distribution', icon: LayoutGrid },
-  ];
+    { id: 'page-distribution', label: 'Page Distribution', icon: LayoutGrid },      { id: 'pharma-extractions', label: 'Pharma Extractions', icon: Download },  ];
 
   const handleMenuClick = (menuId: string) => {
     onNavigate(menuId);

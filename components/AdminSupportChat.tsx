@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase/config';
-import { MessageSquare, Send, ArrowLeft, Loader2, User, Building2, Pill, BarChart2, Search, Circle, Heart } from 'lucide-react';
+import { MessageSquare, Send, ArrowLeft, Loader2, User, Building2, Pill, BarChart2, Search, Circle } from 'lucide-react';
 
 interface Conversation {
   entityId: string;
   entityName: string;
-  entityType: 'doctor' | 'clinic' | 'pharma' | 'advertiser' | 'patient';
+  entityType: 'doctor' | 'clinic' | 'pharma' | 'advertiser';
   collectionName: string;
   lastMessage: string;
   lastMessageAt: any;
@@ -27,7 +27,6 @@ const ENTITY_CONFIGS = [
   { type: 'clinic' as const, collectionName: 'clinics', label: 'Clinics', icon: Building2, color: 'purple' },
   { type: 'pharma' as const, collectionName: 'pharmaCompanies', label: 'Pharma', icon: Pill, color: 'blue' },
   { type: 'advertiser' as const, collectionName: 'advertisers', label: 'Advertisers', icon: BarChart2, color: 'amber' },
-  { type: 'patient' as const, collectionName: 'patients', label: 'Patients', icon: Heart, color: 'pink' },
 ];
 
 export default function AdminSupportChat() {
@@ -185,7 +184,6 @@ export default function AdminSupportChat() {
       case 'clinic': return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
       case 'pharma': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
       case 'advertiser': return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
-      case 'patient': return 'bg-pink-500/20 text-pink-400 border-pink-500/30';
       default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
     }
   };
@@ -196,7 +194,6 @@ export default function AdminSupportChat() {
       case 'clinic': return 'bg-purple-600';
       case 'pharma': return 'bg-blue-600';
       case 'advertiser': return 'bg-amber-600';
-      case 'patient': return 'bg-pink-600';
       default: return 'bg-gray-600';
     }
   };
@@ -235,7 +232,6 @@ export default function AdminSupportChat() {
               { id: 'clinic', label: 'Clinics' },
               { id: 'pharma', label: 'Pharma' },
               { id: 'advertiser', label: 'Advertisers' },
-              { id: 'patient', label: 'Patients' },
             ].map(f => (
               <button
                 key={f.id}

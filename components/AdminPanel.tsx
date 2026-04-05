@@ -19,6 +19,9 @@ import AdminAdvertiserManagement from './AdminAdvertiserManagement';
 import AdminDistributorManager from './AdminDistributorManager';
 import AdminPageDistribution from './AdminPageDistribution';
 import AdminAIPMDashboard from './AdminAIPMDashboard';
+import AdminRxTrends from './AdminRxTrends';
+import AdminPharmaExtractions from './AdminPharmaExtractions';
+import AdminPathologyTrends from './AdminPathologyTrends';
 import AdminSupportChat from './AdminSupportChat';
 
 interface DoctorTestimonial {
@@ -55,7 +58,7 @@ interface AdminPanelProps {
 
 export default function AdminPanel({ adminEmail, onLogout, onStartDemo, uploadedTestimonials = [], onUploadTestimonial, supportRequests = [], onNavigateToQRGenerator, onNavigateToQRGeneration, onNavigateToQRManagement }: AdminPanelProps) {
   const [currentPage, setCurrentPage] = useState<
-    'dashboard' | 'profile' | 'doctors' | 'clinics' | 'patients' | 'personal-management' | 'templates' | 'videos' | 'promo-manager' | 'data-cleanup' | 'pharma-management' | 'pharma-templates' | 'distribution-requests' | 'advertiser-management' | 'page-distribution' | 'ai-pm-dashboard' | 'support-chat'
+    'dashboard' | 'profile' | 'doctors' | 'clinics' | 'patients' | 'personal-management' | 'templates' | 'videos' | 'promo-manager' | 'data-cleanup' | 'pharma-management' | 'pharma-templates' | 'distribution-requests' | 'advertiser-management' | 'page-distribution' | 'ai-pm-dashboard' | 'support-chat' | 'rx-trends' | 'pharma-extractions' | 'admin-pathology-trends'
   >('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
@@ -78,6 +81,9 @@ export default function AdminPanel({ adminEmail, onLogout, onStartDemo, uploaded
     'advertiser-management': 'Advertiser Management',
     'page-distribution': 'Page Distribution',
     'ai-pm-dashboard': 'AI PM Dashboard',
+    'rx-trends': 'Rx Trends',
+    'pharma-extractions': 'Pharma Extractions',
+    'admin-pathology-trends': 'Pathology Trends',
     'support-chat': 'Support Chat',
   };
 
@@ -197,6 +203,9 @@ export default function AdminPanel({ adminEmail, onLogout, onStartDemo, uploaded
         {currentPage === 'page-distribution' && <AdminPageDistribution />}
         {currentPage === 'ai-pm-dashboard' && <AdminAIPMDashboard adminEmail={adminEmail} />}
         {currentPage === 'support-chat' && <AdminSupportChat />}
+        {currentPage === 'rx-trends' && <AdminRxTrends />}
+      {currentPage === 'pharma-extractions' && <AdminPharmaExtractions />}
+      {currentPage === 'admin-pathology-trends' && <AdminPathologyTrends />}
       </div>
     </div>
   );

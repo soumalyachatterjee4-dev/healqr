@@ -13,7 +13,8 @@ import { needsNonLatinRendering, ensureFontLoaded, transliterateTexts, renderNon
 import type { AILanguage } from '../services/aiTranslationService';
 
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { app } from '../lib/firebase/config';
+import { collection, addDoc, serverTimestamp, doc as firestoreDoc, getDoc } from 'firebase/firestore';
+import { app, db } from '../lib/firebase/config';
 import { processConsultationCompletion } from '../services/fcmLogicService';
 
 interface DigitalRXMakerProps {
@@ -912,6 +913,90 @@ export default function DigitalRXMaker({
       // Save PDF to local device
       doc.save(`Prescription_${patient.name.replace(/\s+/g, '_')}.pdf`);
 
+      // Fire-and-forget: Save medicine data for pharma analytics (no patient PII)
+      try {
+        const validMeds = items.filter(item => item.medicineName.trim());
+        if (validMeds.length > 0) {
+          const doctorDoc = await getDoc(firestoreDoc(db!, 'doctors', doctorInfo.doctorId));
+          const drData = doctorDoc.exists() ? doctorDoc.data() : {};
+          const drCompany = drData.companyName || '';
+          const drDivision = drData.division || '';
+          const drSpecialties = drData.specialties || drData.specialities || [];
+          const drPincode = drData.pinCode || drData.residentialPinCode || '';
+          const drState = drData.state || '';
+          for (const med of validMeds) {
+            addDoc(collection(db!, 'rxMoleculeData'), {
+              medicineName: med.medicineName.trim(),
+              medicineType: med.type || 'Tablet',
+              strength: med.strength || '',
+              dosage: med.dosage || '',
+              frequency: med.dosage || '',
+              duration: med.duration || '',
+              doctorId: doctorInfo.doctorId,
+              specialty: drSpecialties[0] || doctorInfo.specialty || '',
+              state: drState,
+              pincode: drPincode,
+              companyName: drCompany,
+              division: drDivision,
+              diagnosis: diagnosis || '',
+              territory: drState ? `${drState}-${drPincode?.substring(0, 3) || ''}` : '',
+              source: 'digital-rx',
+              createdAt: serverTimestamp(),
+            }).catch(() => {}); // silent fail — analytics data is non-critical
+          }
+        }
+      } catch {} // never block prescription generation for analytics
+
+      // Fire-and-forget: Save pathology test data for analytics (no patient PII)
+      try {
+        const pathEntries = Object.entries(pathology).filter(([, v]) => v.trim());
+        const hasPathOrTests = pathEntries.length > 0 || suggestedTests.length > 0;
+        if (hasPathOrTests) {
+          let drData2: any = {};
+          try {
+            const dd = await getDoc(firestoreDoc(db!, 'doctors', doctorInfo.doctorId));
+            drData2 = dd.exists() ? dd.data() : {};
+          } catch {}
+          const drSpecialties2 = drData2.specialties || drData2.specialities || [];
+          const drPincode2 = drData2.pinCode || drData2.residentialPinCode || '';
+          const drState2 = drData2.state || '';
+          // Save actual pathology values
+          for (const [testKey, testValue] of pathEntries) {
+            const testLabel = PATHOLOGY_OPTIONS[testKey]?.label || testKey;
+            const testUnit = PATHOLOGY_OPTIONS[testKey]?.unit || '';
+            addDoc(collection(db!, 'pathologyMoleculeData'), {
+              testName: testLabel,
+              testKey,
+              testValue: testValue.trim(),
+              testUnit,
+              specialty: drSpecialties2[0] || doctorInfo.specialty || '',
+              state: drState2,
+              pincode: drPincode2,
+              diagnosis: diagnosis || '',
+              territory: drState2 ? `${drState2}-${drPincode2?.substring(0, 3) || ''}` : '',
+              source: 'digital-rx',
+              createdAt: serverTimestamp(),
+            }).catch(() => {});
+          }
+          // Save suggested/advised tests (independent of actual values)
+          for (const test of suggestedTests.filter(t => t.trim())) {
+            addDoc(collection(db!, 'pathologyMoleculeData'), {
+              testName: test.trim(),
+              testKey: 'suggested',
+              testValue: 'ordered',
+              testUnit: '',
+              specialty: drSpecialties2[0] || doctorInfo.specialty || '',
+              state: drState2,
+              pincode: drPincode2,
+              diagnosis: diagnosis || '',
+              territory: drState2 ? `${drState2}-${drPincode2?.substring(0, 3) || ''}` : '',
+              source: 'digital-rx',
+              createdAt: serverTimestamp(),
+            }).catch(() => {});
+          }
+        }
+      } catch {} // never block for analytics
+
       if (onGenerated) {
         toast.success('Digital RX generated!');
         onGenerated(downloadURL, { items, remarks, diagnosis, vitals, pathology, suggestedTests });
@@ -1226,8 +1311,8 @@ export default function DigitalRXMaker({
             <div className="space-y-3">
               {items.map((item, index) => (
                 <div key={item.id} className="p-3 sm:p-4 bg-zinc-900/50 rounded-xl border border-zinc-800 space-y-4 relative">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div className="md:col-span-1 relative">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div className="relative">
                       <Label className="text-[10px] text-gray-500 mb-1 block">Medicine Name</Label>
                       <div className="flex gap-2">
                         <Input
@@ -1265,6 +1350,34 @@ export default function DigitalRXMaker({
                           ))}
                         </div>
                       )}
+                    </div>
+
+                    <div>
+                      <Label className="text-[10px] text-gray-500 mb-1 block">Type</Label>
+                      <select
+                        value={item.type}
+                        onChange={(e) => updateItem(index, 'type', e.target.value)}
+                        className="w-full h-9 px-3 rounded-md bg-zinc-900 border border-zinc-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      >
+                        <option value="Tablet">Tablet</option>
+                        <option value="Capsule">Capsule</option>
+                        <option value="Syrup">Syrup</option>
+                        <option value="Solution">Solution</option>
+                        <option value="Suspension">Suspension</option>
+                        <option value="Powder">Powder</option>
+                        <option value="Drops">Drops</option>
+                        <option value="Injection">Injection</option>
+                        <option value="Cream">Cream</option>
+                        <option value="Ointment">Ointment</option>
+                        <option value="Gel">Gel</option>
+                        <option value="Inhaler">Inhaler</option>
+                        <option value="Patch">Patch</option>
+                        <option value="Spray">Spray</option>
+                        <option value="Suppository">Suppository</option>
+                        <option value="Sachet">Sachet</option>
+                        <option value="Lotion">Lotion</option>
+                        <option value="Respule">Respule</option>
+                      </select>
                     </div>
 
                     <div>

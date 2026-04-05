@@ -5,6 +5,7 @@ const sendPatientOTP = require('./sendPatientOTP');
 const checkVideoCallExpiry = require('./checkVideoCallExpiry');
 const processScheduledNotifications = require('./processScheduledNotifications');
 const translateBatch = require('./translateBatch');
+const aggregateRxTrends = require('./aggregateRxTrends');
 
 exports.sendAIRXNotification = sendAIRXNotification.sendAIRXNotification;
 exports.sendFCMNotification = sendFCMNotification.sendFCMNotification;
@@ -19,4 +20,5 @@ exports.monitorPlatformHealth = require('./monitorPlatformHealth').monitorPlatfo
 exports.resolveLocationPincode = require('./resolveLocationPincode').resolveLocationPincode;
 exports.migrateClinicCodes = require('./migrateClinicCodes').migrateClinicCodes;
 exports.generateDemoBookings = require('./generateDemoBookings').generateDemoBookings;
+exports.aggregateRxTrends = aggregateRxTrends.aggregateRxTrends;
 

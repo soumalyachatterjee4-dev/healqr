@@ -1174,6 +1174,100 @@ service cloud.firestore {
     }
 
     // ============================================
+    // RX MOLECULE DATA (Anonymous Prescription Analytics)
+    // ============================================
+
+    match /rxMoleculeData/{docId} {
+      // Authenticated users can read (pharma companies, admin)
+      allow read: if isAuthenticated();
+      // Authenticated users can create (doctors sending RX)
+      allow create: if isAuthenticated();
+      // No updates or deletes — immutable analytics data
+      allow update, delete: if false;
+    }
+
+    // ============================================
+    // RX TRENDS (Daily Aggregated Summaries)
+    // ============================================
+
+    match /rxTrends/{dateId} {
+      // Authenticated users can read (admin, pharma)
+      allow read: if isAuthenticated();
+      // Only Cloud Functions write (via admin SDK, bypasses rules)
+      allow write: if false;
+    }
+
+    // ============================================
+    // EXTRACTION REQUESTS (Pharma Unlock Requests)
+    // ============================================
+
+    match /extractionRequests/{requestId} {
+      // Authenticated users can read (pharma + admin)
+      allow read: if isAuthenticated();
+      // Authenticated users can create (pharma requesting unlock)
+      allow create: if isAuthenticated();
+      // Authenticated users can update (admin approving/rejecting)
+      allow update: if isAuthenticated();
+      // No deletes
+      allow delete: if false;
+    }
+
+    // ============================================
+    // PHARMA RX EXTRACTIONS (Subcollection)
+    // ============================================
+
+    match /pharmaCompanies/{companyId}/rxExtractions/{extractionId} {
+      // Authenticated users can read
+      allow read: if isAuthenticated();
+      // Authenticated users can create
+      allow create: if isAuthenticated();
+      // No updates or deletes
+      allow update, delete: if false;
+    }
+
+    // ============================================
+    // PATHOLOGY MOLECULE DATA (Anonymous Lab Data)
+    // ============================================
+
+    match /pathologyMoleculeData/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if false;
+    }
+
+    // ============================================
+    // PATHOLOGY ACCESS REQUESTS
+    // ============================================
+
+    match /pathologyAccessRequests/{requestId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    // ============================================
+    // RX ACCESS REQUESTS
+    // ============================================
+
+    match /rxAccessRequests/{requestId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    // ============================================
+    // PHARMA PATHOLOGY EXTRACTIONS (Subcollection)
+    // ============================================
+
+    match /pharmaCompanies/{companyId}/pathologyExtractions/{extractionId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if false;
+    }
+
+    // ============================================
     // DEFAULT DENY
     // ============================================
 
