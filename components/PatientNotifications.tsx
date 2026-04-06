@@ -388,6 +388,84 @@ export default function PatientNotifications({ patientPhone }: PatientNotificati
               );
             }
 
+            // ===== CHRONIC CARE CARD (with image cards) =====
+            if (notification.type === 'chronic_care') {
+              const meta = (notification as any).metadata || {};
+              return (
+                <Card
+                  key={notification.id}
+                  className={`bg-zinc-900 border-zinc-800 overflow-hidden ${!notification.isRead ? 'border-l-4 border-l-rose-500' : ''}`}
+                  onClick={() => handleMarkAsRead(notification.id)}
+                >
+                  <CardContent className="p-0">
+                    {/* Header */}
+                    <div className="bg-rose-500/10 px-5 py-3 flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-rose-400">❤️ Chronic Care</span>
+                      <div className="flex items-center gap-2">
+                        {notification.fcmSuccess ? (
+                          <span className="text-xs px-2 py-0.5 bg-green-500/20 text-green-400 rounded-full">📱 Push Sent</span>
+                        ) : (
+                          <span className="text-xs px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded-full">💾 Saved</span>
+                        )}
+                        {!notification.isRead && (
+                          <span className="text-xs px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded-full">🆕</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="p-5">
+                      {/* Doctor info */}
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-10 h-10 bg-rose-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                          {(notification.doctorName || 'D').charAt(0)}
+                        </div>
+                        <div>
+                          <p className="text-white font-semibold text-sm">{notification.doctorName}</p>
+                          {notification.doctorSpecialty && <p className="text-gray-400 text-xs">{notification.doctorSpecialty}</p>}
+                        </div>
+                      </div>
+
+                      <h3 className="text-white font-bold text-base mb-1">{notification.title}</h3>
+                      <p className="text-gray-300 text-sm mb-4">{notification.message}</p>
+
+                      {/* Image Cards */}
+                      {(meta.campImageUrl || meta.platformImageUrl) && (
+                        <div className="grid grid-cols-1 gap-3 mb-4">
+                          {/* Doctor's Camp Poster */}
+                          {meta.campImageUrl && (
+                            <div className="relative rounded-xl overflow-hidden border border-zinc-700">
+                              <img src={meta.campImageUrl} alt={meta.campImageLabel || 'Camp'} className="w-full h-44 object-cover" />
+                              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-3">
+                                <p className="text-white text-xs font-semibold">{meta.campImageLabel || 'Camp / Event'}</p>
+                                <p className="text-gray-300 text-[10px]">From Dr. {notification.doctorName}</p>
+                              </div>
+                            </div>
+                          )}
+                          {/* Platform Health Tip */}
+                          {meta.platformImageUrl && (
+                            <div className="relative rounded-xl overflow-hidden border border-emerald-500/30">
+                              <img src={meta.platformImageUrl} alt={meta.platformImageLabel || 'Health Tip'} className="w-full h-44 object-cover" />
+                              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-3">
+                                <p className="text-emerald-400 text-xs font-semibold">{meta.platformImageLabel || 'Health Tip'}</p>
+                                <p className="text-gray-300 text-[10px]">HealQR Health Tips</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Footer */}
+                      <div className="flex items-center justify-between pt-3 border-t border-zinc-800">
+                        <span className="text-xs text-gray-500">
+                          {notification.createdAt.toDate().toLocaleDateString()} at {notification.createdAt.toDate().toLocaleTimeString()}
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            }
+
             // ===== SIMPLE CARD (other notification types) =====
             return (
               <Card
@@ -408,6 +486,7 @@ export default function PatientNotifications({ patientPhone }: PatientNotificati
                           {notification.type === 'booking_cancelled' && '❌'}
                           {notification.type === 'booking_restored' && '🔄'}
                           {notification.type === 'follow_up' && '📋'}
+                          {notification.type === 'chronic_care' && '❤️'}
                         </div>
                         <div>
                           <h3 className="text-lg font-bold text-white">

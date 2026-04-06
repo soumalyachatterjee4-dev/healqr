@@ -183,7 +183,18 @@ const PWAInstallBanner = () => {
 const PatientDashboardNew = ({ onLanguageDetected }: { onLanguageDetected?: (lang: string) => void }) => {
   const [patientData, setPatientData] = useState<any>(null);
   const [patientLanguage, setPatientLanguage] = useState<string>(localStorage.getItem('patient_language') || 'english');
-  const [currentView, setCurrentView] = useState('dashboard');
+  const [currentView, setCurrentView] = useState(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const viewParam = urlParams.get('view');
+    if (viewParam === 'notifications') {
+      // Clean up the URL param after reading
+      urlParams.delete('view');
+      const newUrl = urlParams.toString() ? `${window.location.pathname}?${urlParams}` : window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+      return 'notifications';
+    }
+    return 'dashboard';
+  });
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [stats, setStats] = useState({

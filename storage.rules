@@ -243,6 +243,24 @@ service firebase.storage {
     }
 
     // ============================================
+    // HEALTH TIP IMAGES (ADMIN UPLOADS)
+    // ============================================
+
+    match /health-tips/{fileName} {
+      allow read: if true;
+      allow write: if isAuthenticated() && isImageFile() && isValidImageSize();
+    }
+
+    // ============================================
+    // CHRONIC CARE CAMP IMAGES
+    // ============================================
+
+    match /chronic-care/{doctorId}/{fileName} {
+      allow read: if true;
+      allow write: if isOwner(doctorId) && isImageFile() && isValidImageSize();
+    }
+
+    // ============================================
     // DIET CHARTS
     // ============================================
 

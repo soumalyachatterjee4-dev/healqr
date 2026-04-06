@@ -22,7 +22,9 @@ import {
   Apple,
   Share2,
   BookOpen,
-  Package
+  Package,
+  Heart,
+  IndianRupee
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import healqrLogo from '../assets/healqr.logo.png';
@@ -59,6 +61,7 @@ export default function DashboardSidebar({
   const [isFreemiumAddOnOpen, setIsFreemiumAddOnOpen] = useState(true);
   const [isPharmaServicesOpen, setIsPharmaServicesOpen] = useState(true);
   const [isTodayBlocked, setIsTodayBlocked] = useState(false);
+  const [pendingReferralCount, setPendingReferralCount] = useState(0);
 
   // Helper function to check if page is accessible to assistant
   const isPageAccessible = (pageId: string) => {
@@ -113,6 +116,23 @@ export default function DashboardSidebar({
     checkPlannedOff();
   }, []);
 
+  // Listen for pending incoming referrals
+  useEffect(() => {
+    const userId = localStorage.getItem('userId');
+    if (!userId) return;
+    let unsub: (() => void) | undefined;
+    (async () => {
+      const { db } = await import('../lib/firebase/config');
+      if (!db) return;
+      const { collection, query, where, onSnapshot } = await import('firebase/firestore');
+      const q = query(collection(db, 'referrals'), where('toDoctorId', '==', userId), where('status', '==', 'sent'));
+      unsub = onSnapshot(q, (snap) => {
+        setPendingReferralCount(snap.size);
+      }, () => {});
+    })();
+    return () => { if (unsub) unsub(); };
+  }, []);
+
   const managementTools = [
     { id: 'profile', label: 'Profile Manager', icon: User },
     { id: 'qr', label: 'QR Manager', icon: QrCode },
@@ -124,6 +144,7 @@ export default function DashboardSidebar({
     { id: 'advance-booking', label: 'Advance Booking', icon: CalendarClock },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'reports', label: 'Reports', icon: FileText },
+    { id: 'revenue-dashboard', label: 'Revenue', icon: IndianRupee },
     { id: 'social-kit', label: 'Social Kit & Offers', icon: Share2 },
   ];
 
@@ -143,6 +164,18 @@ export default function DashboardSidebar({
       label: 'Lab Referral Tracking',
       icon: FileBarChart,
       addonKey: 'lab-referral-tracking'
+    },
+    {
+      id: 'referral-network',
+      label: 'Referral Network',
+      icon: Share2,
+      addonKey: 'referral-network'
+    },
+    {
+      id: 'chronic-care',
+      label: 'Chronic Care',
+      icon: Heart,
+      addonKey: 'chronic-care'
     },
     {
       id: 'personalized-templates',
@@ -195,7 +228,7 @@ export default function DashboardSidebar({
 
   const isPremiumFeatureAccessible = (addonKey: string): { accessible: boolean; isDemo: boolean; isPaid: boolean } => {
     // These features show as green/activated permanently
-    if (['emergency-button', 'assistant-access', 'ai-diet-chart', 'lab-referral-tracking', 'personalized-templates', 'ai-rx-reader', 'video-consultation'].includes(addonKey)) {
+    if (['emergency-button', 'assistant-access', 'ai-diet-chart', 'lab-referral-tracking', 'referral-network', 'chronic-care', 'personalized-templates', 'ai-rx-reader', 'video-consultation'].includes(addonKey)) {
       return {
         accessible: true,
         isDemo: false,
@@ -436,7 +469,11 @@ export default function DashboardSidebar({
                       >
                         <item.icon className="w-4 h-4" />
                         <span className="text-xs flex-1 text-left">{item.label}</span>
-                        <Check className={`w-3 h-3 ${isCurrentPage ? 'text-white' : 'text-emerald-500'}`} />
+                        {item.id === 'referral-network' && pendingReferralCount > 0 ? (
+                          <span className="px-1.5 py-0.5 rounded-full bg-amber-500 text-black text-[10px] font-bold animate-pulse">{pendingReferralCount}</span>
+                        ) : (
+                          <Check className={`w-3 h-3 ${isCurrentPage ? 'text-white' : 'text-emerald-500'}`} />
+                        )}
                       </button>
                     );
                   }

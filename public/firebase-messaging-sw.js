@@ -81,7 +81,12 @@ self.addEventListener('notificationclick', (event) => {
     urlToOpen = `/patient/rx/${notificationData.notificationId}`;
   } 
   
-  // Priority 3: Fallback to generic notifications page
+  // Priority 3: Chronic care notifications → patient dashboard notifications tab
+  else if (!notificationData.url && notificationData.type === 'chronic-care') {
+    urlToOpen = `/?page=chronic-care-notification`;
+  }
+  
+  // Priority 4: Fallback to generic notifications page
   else if (!notificationData.url && notificationData.notificationId) {
     urlToOpen = `/notifications/${notificationData.notificationId}`;
   }

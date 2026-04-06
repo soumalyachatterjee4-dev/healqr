@@ -32,6 +32,7 @@ const PatientDetails = lazy(() => import("./components/PatientDetails"));
 const PreviewCenter = lazy(() => import("./components/PreviewCenter"));
 const Analytics = lazy(() => import("./components/Analytics"));
 const DoctorReports = lazy(() => import("./components/DoctorReports"));
+const RevenueDashboard = lazy(() => import("./components/RevenueDashboard"));
 const LanguageSelection = lazy(() => import("./components/LanguageSelection"));
 const BookingMiniWebsite = lazy(() => import("./components/BookingMiniWebsite"));
 const SelectDate = lazy(() => import("./components/SelectDate"));
@@ -51,6 +52,8 @@ const AdminQRGenerator = lazy(() => import("./components/AdminQRGenerator"));
 const AdminQRGeneration = lazy(() => import("./components/AdminQRGeneration"));
 const AdminQRManagement = lazy(() => import("./components/AdminQRManagement"));
 const LabReferralTrackingManager = lazy(() => import("./components/LabReferralTrackingManager"));
+const DoctorReferralNetwork = lazy(() => import("./components/DoctorReferralNetwork"));
+const ChronicCareManager = lazy(() => import("./components/ChronicCareManager"));
 const PersonalizedTemplatesManager = lazy(() => import("./components/PersonalizedTemplatesManager"));
 import EmergencyButtonManager from "./components/EmergencyButtonManager";
 const PatientNewRXViewer = lazy(() => import("./components/PatientNewRXViewer").then(module => ({ default: module.PatientNewRXViewer })));
@@ -154,6 +157,7 @@ export default function App() {
     | "emergency-button"
     | "analytics"
     | "reports"
+    | "revenue-dashboard"
     | "template-uploader"
     | "reminder-notifications"
     | "booking-language"
@@ -176,6 +180,8 @@ export default function App() {
     | "premium-addons"
     | "assistant-access"
     | "lab-referral-tracking"
+    | "referral-network"
+    | "chronic-care"
     | "personalized-templates"
     | "testing-utilities"
     | "consultation-completed"
@@ -693,6 +699,15 @@ export default function App() {
     } else if (pageParam === 'patient-dashboard') {
       setCurrentPage('patient-dashboard');
       return;
+    } else if (pageParam === 'chronic-care-notification') {
+      // Chronic care notification click → patient dashboard notifications tab
+      setCurrentPage('patient-dashboard');
+      // Set URL param so PatientDashboardNew opens notifications tab
+      const url = new URL(window.location.href);
+      url.searchParams.set('view', 'notifications');
+      url.searchParams.delete('page');
+      window.history.replaceState({}, '', url.toString());
+      return;
     } else if (pageParam === 'patient-history') {
       setCurrentPage('patient-history');
       return;
@@ -1184,7 +1199,8 @@ export default function App() {
         pageParam === 'appointment-restored' ||
         pageParam === 'restoration' ||
         pageParam === 'admin-alert' ||
-        pageParam === 'video-call'
+        pageParam === 'video-call' ||
+        pageParam === 'chronic-care-notification'
       );
 
       const isVerifyVisit = window.location.pathname.includes('/verify-visit/');
@@ -1645,7 +1661,8 @@ export default function App() {
             currentPageParam === 'cancellation' ||
             currentPageParam === 'appointment-restored' ||
             currentPageParam === 'restoration' ||
-            currentPageParam === 'admin-alert'
+            currentPageParam === 'admin-alert' ||
+            currentPageParam === 'chronic-care-notification'
           );
 
           if (isOnNotificationPage) {
@@ -1757,6 +1774,7 @@ export default function App() {
             'preview-center',
             'analytics',
             'reports',
+            'revenue-dashboard',
             'upgrade',
             'purchase-history',
             'template-uploader',
@@ -1782,6 +1800,7 @@ export default function App() {
             'preview-center',
             'analytics',
             'reports',
+            'revenue-dashboard',
             'upgrade',
             'purchase-history',
             'template-uploader',
@@ -1884,6 +1903,8 @@ export default function App() {
     // 5 Premium features unlocked for all doctors
     const freeAddOns = [
       'lab-referral-tracking',
+      'referral-network',
+      'chronic-care',
       'personalized-templates',
       'doctor-patient-chat',
       'video-consultation',
@@ -2370,6 +2391,7 @@ export default function App() {
       setCurrentPage("emergency-button");
     else if (menu === "analytics") setCurrentPage("analytics");
     else if (menu === "reports") setCurrentPage("reports");
+    else if (menu === "revenue-dashboard") setCurrentPage("revenue-dashboard");
     else if (menu === "upgrade") setCurrentPage("upgrade");
     else if (menu === "purchase-history")
       setCurrentPage("purchase-history");
@@ -2387,6 +2409,10 @@ export default function App() {
       setCurrentPage("assistant-access");
     else if (menu === "lab-referral-tracking")
       setCurrentPage("lab-referral-tracking");
+    else if (menu === "referral-network")
+      setCurrentPage("referral-network");
+    else if (menu === "chronic-care")
+      setCurrentPage("chronic-care");
     else if (menu === "personalized-templates")
       setCurrentPage("personalized-templates");
     else if (menu === "doctor-patient-chat")
@@ -2855,6 +2881,14 @@ export default function App() {
         />
       )}
 
+      {currentPage === "revenue-dashboard" && (
+        <RevenueDashboard
+          onLogout={handleLogout}
+          onMenuChange={menuChangeHandler}
+          activeAddOns={activeAddOns}
+        />
+      )}
+
       {currentPage === "template-uploader" && (
         <TemplateUploader
           onLogout={handleLogout}
@@ -3271,6 +3305,26 @@ export default function App() {
 
       {currentPage === "lab-referral-tracking" && (
         <LabReferralTrackingManager
+          doctorName={userName}
+          email={userEmail}
+          onLogout={handleLogout}
+          onMenuChange={menuChangeHandler}
+          activeAddOns={activeAddOns}
+        />
+      )}
+
+      {currentPage === "referral-network" && (
+        <DoctorReferralNetwork
+          doctorName={userName}
+          email={userEmail}
+          onLogout={handleLogout}
+          onMenuChange={menuChangeHandler}
+          activeAddOns={activeAddOns}
+        />
+      )}
+
+      {currentPage === "chronic-care" && (
+        <ChronicCareManager
           doctorName={userName}
           email={userEmail}
           onLogout={handleLogout}

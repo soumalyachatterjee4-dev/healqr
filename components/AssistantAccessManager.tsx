@@ -43,6 +43,8 @@ const AVAILABLE_PAGES = [
   { id: 'monthly-planner', label: 'Monthly Planner', icon: '🗓️' },
   { id: 'preview', label: 'Preview Centre', icon: '👁️' },
   { id: 'lab-referral-tracking', label: 'Lab Referral Tracking', icon: '🔬' },
+  { id: 'referral-network', label: 'Referral Network', icon: '🔗' },
+  { id: 'chronic-care', label: 'Chronic Care', icon: '❤️' },
   { id: 'personalized-templates', label: 'Personalized Templates', icon: '📝' },
   { id: 'video-consultation', label: 'Video Consultation', icon: '🎥' },
   { id: 'ai-rx-reader', label: 'AI RX Reader', icon: '🤖' },

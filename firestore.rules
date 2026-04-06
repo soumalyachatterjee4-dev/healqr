@@ -200,6 +200,40 @@ service cloud.firestore {
       match /supportMessages/{messageId} {
         allow read, write: if isAuthenticated();
       }
+
+      // ============================================
+      // RX TEMPLATES SUBCOLLECTION
+      // ============================================
+      match /rxTemplates/{templateId} {
+        allow read, write: if isOwner(doctorId);
+      }
+
+      // ============================================
+      // CHRONIC CARE PATIENTS SUBCOLLECTION
+      // ============================================
+      match /chronicPatients/{patientId} {
+        allow read, write: if isOwner(doctorId);
+      }
+
+      // ============================================
+      // REVENUE ENTRIES SUBCOLLECTION
+      // ============================================
+      match /revenueEntries/{entryId} {
+        allow read, write: if isOwner(doctorId);
+      }
+    }
+
+    // ============================================
+    // REFERRALS COLLECTION (Doctor-to-Doctor)
+    // ============================================
+    match /referrals/{referralId} {
+      // Any authenticated doctor can read/list referrals (queries filter by doctorId)
+      allow read: if isDoctor();
+      // Any doctor can create a referral
+      allow create: if isDoctor();
+      // Only the receiving doctor can update status
+      allow update: if isDoctor();
+      allow delete: if false;
     }
 
     // ============================================

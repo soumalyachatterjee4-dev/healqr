@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Download, Plus, Trash2, Wand2, QrCode } from 'lucide-react';
+import { X, Download, Plus, Trash2, Wand2, QrCode, Save, BookOpen } from 'lucide-react';
 import QRCode from 'qrcode';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -13,7 +13,7 @@ import { needsNonLatinRendering, ensureFontLoaded, transliterateTexts, renderNon
 import type { AILanguage } from '../services/aiTranslationService';
 
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { collection, addDoc, serverTimestamp, doc as firestoreDoc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc as firestoreDoc, getDoc, getDocs, query, orderBy, deleteDoc } from 'firebase/firestore';
 import { app, db } from '../lib/firebase/config';
 import { processConsultationCompletion } from '../services/fcmLogicService';
 
@@ -213,6 +213,30 @@ export default function DigitalRXMaker({
   const [suggestions, setSuggestions] = useState<Medicine[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
 
+  // Template states
+  const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
+  const [showLoadTemplateModal, setShowLoadTemplateModal] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [savedTemplates, setSavedTemplates] = useState<Array<{ id: string; name: string; items: PrescriptionItem[]; diagnosis: string; remarks: string; vitals: Record<string,string>; pathology: Record<string,string>; suggestedTests: string[]; createdAt: any }>>([]);
+  const [pendingDownloadURL, setPendingDownloadURL] = useState('');
+  const [pendingRxData, setPendingRxData] = useState<{ items: any[]; remarks: string; diagnosis: string; vitals: Record<string,string>; pathology: Record<string,string>; suggestedTests: string[] } | null>(null);
+
+  // Load saved templates on mount
+  useEffect(() => {
+    const loadTemplates = async () => {
+      if (!db || !doctorInfo.doctorId) return;
+      try {
+        const q = query(collection(db, 'doctors', doctorInfo.doctorId, 'rxTemplates'), orderBy('createdAt', 'desc'));
+        const snap = await getDocs(q);
+        setSavedTemplates(snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]);
+      } catch (err) {
+        console.error('Failed to load templates:', err);
+      }
+    };
+    loadTemplates();
+  }, [doctorInfo.doctorId]);
+
   useEffect(() => {
     if (searchQuery.length > 1) {
       const localResults = searchMedicines(searchQuery);
@@ -239,6 +263,57 @@ export default function DigitalRXMaker({
       toast.error('No suggestions found');
     }
     setAiLoading(false);
+  };
+
+  // Template functions
+  const loadTemplate = (template: typeof savedTemplates[0]) => {
+    setItems(template.items || [{ id: '1', medicineName: '', type: 'Tablet', strength: '', dosage: '1-0-1', duration: '5 Days', instructions: 'After Food' }]);
+    setDiagnosis(template.diagnosis || '');
+    setRemarks(template.remarks || '');
+    // Do NOT load vitals/pathology/suggestedTests — patient-specific data must never carry over
+    setShowLoadTemplateModal(false);
+    toast.success(`Template "${template.name}" loaded`);
+  };
+
+  const saveAsTemplate = async () => {
+    if (!templateName.trim()) { toast.error('Please enter a template name'); return; }
+    if (!pendingRxData) return;
+    setSavingTemplate(true);
+    try {
+      await addDoc(collection(db!, 'doctors', doctorInfo.doctorId, 'rxTemplates'), {
+        name: templateName.trim(),
+        items: pendingRxData.items.map(i => ({ ...i })),
+        diagnosis: pendingRxData.diagnosis,
+        remarks: pendingRxData.remarks,
+        // vitals/pathology/suggestedTests intentionally excluded — patient-specific
+        createdAt: serverTimestamp(),
+      });
+      toast.success(`Template "${templateName.trim()}" saved!`);
+      completeGeneration();
+    } catch (err) {
+      console.error('Save template error:', err);
+      toast.error('Failed to save template');
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
+  const deleteTemplate = async (templateId: string) => {
+    try {
+      await deleteDoc(firestoreDoc(db!, 'doctors', doctorInfo.doctorId, 'rxTemplates', templateId));
+      setSavedTemplates(prev => prev.filter(t => t.id !== templateId));
+      toast.success('Template deleted');
+    } catch { toast.error('Failed to delete template'); }
+  };
+
+  const completeGeneration = () => {
+    if (onGenerated && pendingDownloadURL) {
+      onGenerated(pendingDownloadURL, pendingRxData!);
+    }
+    setShowSaveTemplateModal(false);
+    setTemplateName('');
+    setPendingDownloadURL('');
+    setPendingRxData(null);
   };
 
   const addItem = () => {
@@ -999,7 +1074,9 @@ export default function DigitalRXMaker({
 
       if (onGenerated) {
         toast.success('Digital RX generated!');
-        onGenerated(downloadURL, { items, remarks, diagnosis, vitals, pathology, suggestedTests });
+        setPendingDownloadURL(downloadURL);
+        setPendingRxData({ items, remarks, diagnosis, vitals, pathology, suggestedTests });
+        setShowSaveTemplateModal(true);
       } else {
         // Fallback for standalone usage
         try {
@@ -1044,9 +1121,21 @@ export default function DigitalRXMaker({
               <p className="text-xs text-gray-400">Professional RX for {patient.name}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-zinc-800 rounded-lg text-gray-400">
-            <X className="w-6 h-6" />
-          </button>
+          <div className="flex items-center gap-2">
+            {savedTemplates.length > 0 && (
+              <Button
+                onClick={() => setShowLoadTemplateModal(true)}
+                variant="outline"
+                size="sm"
+                className="border-amber-500/50 text-amber-400 hover:bg-amber-500/10 h-8 px-3 text-xs"
+              >
+                <BookOpen className="w-3.5 h-3.5 mr-1.5" /> Templates ({savedTemplates.length})
+              </Button>
+            )}
+            <button onClick={onClose} className="p-2 hover:bg-zinc-800 rounded-lg text-gray-400">
+              <X className="w-6 h-6" />
+            </button>
+          </div>
         </div>
 
         {/* Content */}
@@ -1559,6 +1648,82 @@ export default function DigitalRXMaker({
           </div>
         </div>
       </Card>
+
+      {/* Save as Template Modal */}
+      {showSaveTemplateModal && (
+        <div className="fixed inset-0 z-[70] bg-black/90 flex items-center justify-center p-4">
+          <div className="bg-[#0f172a] border border-zinc-600 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <h3 className="text-lg font-bold text-white mb-1">Save as Template?</h3>
+            <p className="text-sm text-gray-400 mb-4">Save this prescription as a reusable template for future patients</p>
+            <Input
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              placeholder="e.g. Fever Pack, Diabetes Routine..."
+              className="bg-zinc-800 border-zinc-700 text-white mb-4"
+              autoFocus
+              onKeyDown={(e) => e.key === 'Enter' && templateName.trim() && saveAsTemplate()}
+            />
+            <div className="flex gap-3">
+              <Button
+                onClick={completeGeneration}
+                variant="ghost"
+                className="flex-1 text-gray-400 hover:text-white"
+              >
+                Skip
+              </Button>
+              <Button
+                onClick={saveAsTemplate}
+                disabled={savingTemplate || !templateName.trim()}
+                style={{ backgroundColor: templateName.trim() ? '#f59e0b' : '#3f3f46', color: templateName.trim() ? '#000' : '#a1a1aa' }}
+                className="flex-1 font-bold hover:opacity-90"
+              >
+                {savingTemplate ? 'Saving...' : (
+                  <><Save className="w-4 h-4 mr-2" /> Save Template</>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Load Template Modal */}
+      {showLoadTemplateModal && (
+        <div className="fixed inset-0 z-[70] bg-black/90 flex items-center justify-center p-4">
+          <div className="bg-[#0f172a] border border-zinc-600 rounded-2xl p-6 w-full max-w-lg shadow-2xl max-h-[70vh] flex flex-col">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-lg font-bold text-white">Load Template</h3>
+              <button onClick={() => setShowLoadTemplateModal(false)} className="p-1 hover:bg-zinc-700 rounded text-gray-400">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-[11px] text-amber-400/80 mb-4">⚠ Please review all fields carefully before generating — template data may not suit every patient.</p>
+            <div className="flex-1 overflow-y-auto space-y-2">
+              {savedTemplates.map(t => (
+                <div key={t.id} className="flex items-center justify-between p-3 bg-zinc-800/50 rounded-xl border border-zinc-700/50 hover:border-amber-500/30 transition-colors">
+                  <button
+                    onClick={() => loadTemplate(t)}
+                    className="flex-1 text-left"
+                  >
+                    <p className="text-sm font-medium text-white">{t.name}</p>
+                    <p className="text-[10px] text-gray-500">
+                      {t.items?.length || 0} medicines {t.diagnosis ? `• Dx: ${t.diagnosis.length > 30 ? t.diagnosis.substring(0, 30) + '...' : t.diagnosis}` : ''}
+                    </p>
+                  </button>
+                  <button
+                    onClick={() => deleteTemplate(t.id)}
+                    className="p-1.5 hover:bg-red-500/20 rounded text-gray-500 hover:text-red-400 ml-2"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+              {savedTemplates.length === 0 && (
+                <p className="text-center text-gray-500 py-8 text-sm">No templates saved yet</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

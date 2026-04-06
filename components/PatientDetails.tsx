@@ -1,4 +1,4 @@
-import { ArrowLeft, Calendar, MapPin, Clock, Bell, Eye, Star, Apple, Phone, X, Check, RotateCcw, CheckCircle2, Video, Send, UserCircle, Sparkles, History, Upload, Lock, QrCode, FileText, Stethoscope, Loader2, MessageCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Clock, Bell, Eye, Star, Apple, Phone, X, Check, RotateCcw, CheckCircle2, Video, Send, UserCircle, Sparkles, History, Upload, Lock, QrCode, FileText, Stethoscope, Loader2, MessageCircle, Heart } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import FollowUpModal from './FollowUpModal';
 import CancellationModal from './CancellationModal';
@@ -10,7 +10,7 @@ import DigitalRXMaker from './DigitalRXMaker';
 import InlineDietChartModal from './InlineDietChartModal';
 // import { PatientOldRXViewer } from './PatientOldRXViewer';
 import { toast } from 'sonner';
-import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, getDoc, addDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase/config';
 import { translateDataValue, transliterateName, type Language } from '../utils/translations';
 import { sendAppointmentRestored, sendAppointmentCancelled, sendVideoCallLink } from '../services/notificationService';
@@ -222,6 +222,69 @@ export default function PatientDetails({
   const [lastRxData, setLastRxData] = useState<{ items: any[], remarks: string, diagnosis: string, vitals: Record<string,string>, pathology: Record<string,string>, suggestedTests: string[] } | null>(null); // Last generated RX data for regen
   const [regenSuccessModalOpen, setRegenSuccessModalOpen] = useState(false); // Show success modal after RX regen
   const [regenRxUrl, setRegenRxUrl] = useState<string | null>(null); // Store regen RX URL for WhatsApp
+
+  // Chronic Care state
+  const [chronicModalOpen, setChronicModalOpen] = useState(false);
+  const [chronicPatient, setChronicPatient] = useState<Patient | null>(null);
+  const [chronicConditions, setChronicConditions] = useState<string[]>([]);
+  const [chronicNotes, setChronicNotes] = useState('');
+  const [chronicCustom, setChronicCustom] = useState('');
+  const [chronicSaving, setChronicSaving] = useState(false);
+  const [chronicAdded, setChronicAdded] = useState<Set<string>>(new Set()); // Track phones already in chronic registry
+
+  const CHRONIC_CONDITIONS_LIST = [
+    'Diabetes (Type 1)', 'Diabetes (Type 2)', 'Hypertension', 'Hypothyroidism',
+    'Hyperthyroidism', 'Asthma', 'COPD', 'Heart Disease', 'Kidney Disease',
+    'Liver Disease', 'Arthritis', 'Epilepsy', 'Depression', 'Anxiety',
+    'Migraine', 'Anemia', 'Obesity', 'PCOD/PCOS', 'High Cholesterol', 'Gout',
+  ];
+
+  // Check which patients already exist in chronic care registry
+  useEffect(() => {
+    if (!doctorId && !auth?.currentUser?.uid) return;
+    const dId = doctorId || auth?.currentUser?.uid || '';
+    if (!dId || !db) return;
+    const checkChronic = async () => {
+      try {
+        const snap = await getDocs(collection(db!, 'doctors', dId, 'chronicPatients'));
+        const phones = new Set<string>();
+        snap.forEach(d => { const ph = d.data().phone; if (ph) phones.add(ph); });
+        setChronicAdded(phones);
+      } catch {}
+    };
+    checkChronic();
+  }, [doctorId]);
+
+  const handleAddToChronic = async () => {
+    if (!chronicPatient || chronicConditions.length === 0) {
+      toast.error('Select at least one condition');
+      return;
+    }
+    const dId = doctorId || auth?.currentUser?.uid || '';
+    if (!dId || !db) return;
+    setChronicSaving(true);
+    try {
+      await addDoc(collection(db!, 'doctors', dId, 'chronicPatients'), {
+        patientName: chronicPatient.name,
+        phone: chronicPatient.phone,
+        age: String(chronicPatient.age || ''),
+        gender: chronicPatient.gender === 'MALE' ? 'Male' : chronicPatient.gender === 'FEMALE' ? 'Female' : 'Other',
+        conditions: chronicConditions,
+        notes: chronicNotes.trim(),
+        addedAt: serverTimestamp(),
+      });
+      toast.success(`${chronicPatient.name} added to Chronic Care`);
+      setChronicAdded(prev => new Set(prev).add(chronicPatient.phone));
+      setChronicModalOpen(false);
+      setChronicPatient(null);
+      setChronicConditions([]);
+      setChronicNotes('');
+      setChronicCustom('');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to add to Chronic Care');
+    } finally { setChronicSaving(false); }
+  };
 
   // Get current doctor info from Firebase auth (expanded for DigitalRXMaker)
   const [doctorInfo, setDoctorInfo] = useState<{
@@ -2152,8 +2215,8 @@ export default function PatientDetails({
               })()}
             </div>
 
-            {/* Bottom Action Tabs - HISTORY, UPLOAD, LOCKER (Icons Only) */}
-            <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-gray-700/50">
+            {/* Bottom Action Tabs - HISTORY, UPLOAD, LOCKER, CHRONIC (Icons Only) */}
+            <div className="grid grid-cols-4 gap-2 mt-4 pt-4 border-t border-gray-700/50">
               <button
                 onClick={() => {
                   setSelectedPatient(patient);
@@ -2187,6 +2250,31 @@ export default function PatientDetails({
               >
                 <Lock className="w-5 h-5 text-gray-400 group-hover:text-amber-400" />
               </button>
+
+              {/* Add to Chronic Care */}
+              {activeAddOns.includes('chronic-care') && (
+                <button
+                  onClick={() => {
+                    if (chronicAdded.has(patient.phone)) {
+                      toast.info(`${patient.name} is already in your Chronic Care registry`);
+                      return;
+                    }
+                    setChronicPatient(patient);
+                    setChronicConditions([]);
+                    setChronicNotes('');
+                    setChronicCustom('');
+                    setChronicModalOpen(true);
+                  }}
+                  className={`h-12 rounded-lg flex items-center justify-center transition-colors group ${
+                    chronicAdded.has(patient.phone)
+                      ? 'bg-rose-500/20 border border-rose-500/40'
+                      : 'bg-gray-800/50 hover:bg-rose-500/10 border border-gray-700 hover:border-rose-500/30'
+                  }`}
+                  title={chronicAdded.has(patient.phone) ? "Already in Chronic Care" : "Add to Chronic Care Databank"}
+                >
+                  <Heart className={`w-5 h-5 ${chronicAdded.has(patient.phone) ? 'text-rose-400 fill-rose-400' : 'text-gray-400 group-hover:text-rose-400'}`} />
+                </button>
+              )}
             </div>
             </>
             )}
@@ -2246,6 +2334,100 @@ export default function PatientDetails({
           doctorName={doctorInfo.name}
         />
 
+
+        {/* Chronic Care Condition Picker Modal */}
+        {chronicModalOpen && chronicPatient && (
+          <div className="fixed inset-0 z-[70] bg-black/90 flex items-center justify-center p-4">
+            <div className="bg-[#0f172a] border border-zinc-600 rounded-2xl p-6 w-full max-w-md shadow-2xl max-h-[80vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    <Heart className="w-5 h-5 text-rose-400" /> Add to Chronic Care
+                  </h3>
+                  <p className="text-xs text-gray-400 mt-1">{chronicPatient.name} • {chronicPatient.phone}</p>
+                </div>
+                <button onClick={() => { setChronicModalOpen(false); setChronicPatient(null); }} className="p-1 hover:bg-zinc-700 rounded text-gray-400">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <p className="text-[10px] text-gray-500 uppercase mb-2">Select chronic conditions *</p>
+              <div className="flex flex-wrap gap-1.5 max-h-44 overflow-y-auto">
+                {CHRONIC_CONDITIONS_LIST.map(c => (
+                  <button
+                    key={c}
+                    onClick={() => setChronicConditions(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c])}
+                    className={`px-2.5 py-1 rounded-full text-[11px] border transition-colors ${
+                      chronicConditions.includes(c)
+                        ? 'bg-rose-500/20 border-rose-500/50 text-rose-400'
+                        : 'border-zinc-700 text-gray-500 hover:text-white hover:border-zinc-500'
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+
+              {/* Custom condition */}
+              <div className="flex gap-2 mt-3">
+                <input
+                  value={chronicCustom}
+                  onChange={e => setChronicCustom(e.target.value)}
+                  placeholder="Custom condition..."
+                  className="flex-1 bg-zinc-800 border border-zinc-700 text-white rounded-md px-3 py-1.5 text-xs"
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && chronicCustom.trim()) {
+                      if (!chronicConditions.includes(chronicCustom.trim())) setChronicConditions(prev => [...prev, chronicCustom.trim()]);
+                      setChronicCustom('');
+                    }
+                  }}
+                />
+                <button
+                  onClick={() => {
+                    if (chronicCustom.trim() && !chronicConditions.includes(chronicCustom.trim())) {
+                      setChronicConditions(prev => [...prev, chronicCustom.trim()]);
+                    }
+                    setChronicCustom('');
+                  }}
+                  className="px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-white rounded-md text-xs"
+                >+</button>
+              </div>
+
+              {chronicConditions.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {chronicConditions.map(c => (
+                    <span key={c} className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 text-[10px] flex items-center gap-1">
+                      {c}
+                      <button onClick={() => setChronicConditions(prev => prev.filter(x => x !== c))} className="hover:text-white">×</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Notes */}
+              <textarea
+                value={chronicNotes}
+                onChange={e => setChronicNotes(e.target.value)}
+                placeholder="Optional notes..."
+                rows={2}
+                className="w-full bg-zinc-800 border border-zinc-700 text-white rounded-md px-3 py-2 text-sm mt-3 resize-none"
+              />
+
+              <div className="flex gap-3 mt-4">
+                <button onClick={() => { setChronicModalOpen(false); setChronicPatient(null); }} className="flex-1 py-2 text-gray-400 hover:text-white rounded-lg transition-colors text-sm">
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddToChronic}
+                  disabled={chronicSaving || chronicConditions.length === 0}
+                  className="flex-1 py-2 bg-rose-500 hover:bg-rose-600 disabled:bg-zinc-700 disabled:text-gray-500 text-white font-bold rounded-lg transition-colors text-sm flex items-center justify-center gap-2"
+                >
+                  {chronicSaving ? 'Saving...' : <><Heart className="w-4 h-4" /> Add to Chronic Care</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* AI RX Reader Modal */}
         <DoctorAIRXUploadModal
