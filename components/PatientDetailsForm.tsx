@@ -606,6 +606,7 @@ export default function PatientDetailsForm({
             const bookingDoc = snapshot.docs[0];
             await updateDoc(bookingDoc.ref, {
               reminderScheduled: true,
+              reminderSent: true,
               reminderScheduledAt: serverTimestamp()
             });
           }

@@ -9,9 +9,12 @@ import {
   Edit2,
   Lock,
   Mail,
-  AlertCircle
+  AlertCircle,
+  UserPlus,
+  Trash2,
+  CheckCircle
 } from 'lucide-react';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, getDocs, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db, storage } from '../lib/firebase/config';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
@@ -45,10 +48,72 @@ export default function AdminProfileManager() {
     image: null as string | null
   });
 
+  // Partner Admin State
+  const [partnerAdmins, setPartnerAdmins] = useState<{ email: string; name: string; addedAt: string }[]>([]);
+  const [showAddPartner, setShowAddPartner] = useState(false);
+  const [partnerForm, setPartnerForm] = useState({ name: '', email: '' });
+  const [partnerSaving, setPartnerSaving] = useState(false);
+
   // Load super admin profile on mount
   useEffect(() => {
     loadSuperAdmin();
+    loadPartnerAdmins();
   }, []);
+
+  const loadPartnerAdmins = async () => {
+    try {
+      const snap = await getDocs(collection(db, 'admins'));
+      const partners = snap.docs.map(d => ({
+        email: d.id,
+        name: d.data().name || '',
+        addedAt: d.data().addedAt?.toDate?.()?.toLocaleDateString() || '',
+      }));
+      setPartnerAdmins(partners);
+    } catch (err) {
+      console.warn('Could not load partner admins:', err);
+    }
+  };
+
+  const handleAddPartner = async () => {
+    if (!partnerForm.name.trim() || !partnerForm.email.trim()) {
+      alert('Please fill in both name and email for the partner admin.');
+      return;
+    }
+    const email = partnerForm.email.trim().toLowerCase();
+    if (!email.includes('@') || !email.includes('.')) {
+      alert('Please enter a valid email address.');
+      return;
+    }
+    setPartnerSaving(true);
+    try {
+      await setDoc(doc(db, 'admins', email), {
+        isAuthorized: true,
+        name: partnerForm.name.trim(),
+        addedBy: superAdmin?.email || 'super_admin',
+        addedAt: serverTimestamp(),
+      });
+      alert(`✅ Partner admin "${partnerForm.name.trim()}" added successfully!\n\nThey can now login at:\nhealqr.com → Admin Login → Enter: ${email}`);
+      setPartnerForm({ name: '', email: '' });
+      setShowAddPartner(false);
+      await loadPartnerAdmins();
+    } catch (err: any) {
+      console.error('Failed to add partner admin:', err);
+      alert('Failed to add partner: ' + (err.message || 'Unknown error'));
+    }
+    setPartnerSaving(false);
+  };
+
+  const handleRemovePartner = async (email: string) => {
+    if (!confirm(`Remove admin access for ${email}?\n\nThey will not be able to login to the admin panel anymore.`)) return;
+    try {
+      await deleteDoc(doc(db, 'admins', email));
+      alert('Admin access removed.');
+      await loadPartnerAdmins();
+    } catch (err: any) {
+      console.error('Failed to remove partner:', err);
+      alert('Failed to remove: ' + (err.message || 'Unknown error'));
+    }
+  };
 
   const loadSuperAdmin = async () => {
     try {
@@ -455,6 +520,122 @@ export default function AdminProfileManager() {
                   </div>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Partner Admin Management */}
+        {!isFirstTimeLogin && (
+          <Card className="bg-zinc-900 border-zinc-800 mt-6">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <UserPlus className="w-6 h-6 text-amber-400" />
+                  <div>
+                    <h2 className="text-xl text-white">Partner Admin Access</h2>
+                    <p className="text-sm text-gray-400 mt-1">Add your partner so they can login with their own email</p>
+                  </div>
+                </div>
+                {!showAddPartner && (
+                  <Button
+                    onClick={() => setShowAddPartner(true)}
+                    className="bg-amber-600 hover:bg-amber-500 text-white"
+                  >
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Add New Admin
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              {/* Add Partner Form */}
+              {showAddPartner && (
+                <div className="bg-amber-900/20 border border-amber-700/30 rounded-xl p-5 mb-6">
+                  <h4 className="text-amber-400 font-medium mb-4 flex items-center gap-2">
+                    <UserPlus className="w-4 h-4" />
+                    New Partner Admin
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">Full Name *</label>
+                      <Input
+                        value={partnerForm.name}
+                        onChange={e => setPartnerForm(prev => ({ ...prev, name: e.target.value }))}
+                        className="bg-zinc-800 border-zinc-700 text-white"
+                        placeholder="Partner's full name"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">Login Email *</label>
+                      <Input
+                        type="email"
+                        value={partnerForm.email}
+                        onChange={e => setPartnerForm(prev => ({ ...prev, email: e.target.value }))}
+                        className="bg-zinc-800 border-zinc-700 text-white"
+                        placeholder="partner@email.com"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <Button
+                      onClick={handleAddPartner}
+                      disabled={partnerSaving}
+                      className="bg-amber-600 hover:bg-amber-500 text-white"
+                    >
+                      <Save className="w-4 h-4 mr-2" />
+                      {partnerSaving ? 'Adding...' : 'Add Partner Admin'}
+                    </Button>
+                    <Button
+                      onClick={() => { setShowAddPartner(false); setPartnerForm({ name: '', email: '' }); }}
+                      variant="outline"
+                      className="border-zinc-700 text-gray-400 hover:bg-zinc-800"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-3">
+                    After adding, the partner can go to healqr.com → Admin Login → enter their email → receive magic link → access admin panel.
+                  </p>
+                </div>
+              )}
+
+              {/* Existing Admins List */}
+              {partnerAdmins.length === 0 ? (
+                <div className="text-center py-6">
+                  <UserPlus className="w-10 h-10 text-gray-600 mx-auto mb-2" />
+                  <p className="text-gray-500 text-sm">No partner admins yet. Click "Add New Admin" to invite your partner.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <h4 className="text-sm text-gray-400 font-medium mb-2">Active Admin Accounts ({partnerAdmins.length})</h4>
+                  {partnerAdmins.map(partner => (
+                    <div key={partner.email} className="flex items-center justify-between p-4 bg-zinc-800/50 rounded-lg border border-zinc-700/50">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+                          <span className="text-amber-400 font-bold text-sm">{partner.name.charAt(0).toUpperCase()}</span>
+                        </div>
+                        <div>
+                          <p className="text-white font-medium">{partner.name}</p>
+                          <p className="text-gray-400 text-sm">{partner.email}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-emerald-400 flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3" /> Authorized
+                        </span>
+                        {partner.addedAt && <span className="text-xs text-gray-500">Added {partner.addedAt}</span>}
+                        <Button
+                          onClick={() => handleRemovePartner(partner.email)}
+                          variant="outline"
+                          className="border-red-700/50 text-red-400 hover:bg-red-900/30 h-8 px-2"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

@@ -1,57 +1,113 @@
-import { ClipboardList, Calendar, Users, Megaphone, TrendingUp, Activity, CheckCircle, XCircle, Clock, Download } from 'lucide-react';
-import { useState } from 'react';
+import { ClipboardList, Calendar, Users, TrendingUp, Activity, CheckCircle, XCircle, Clock, Download, RefreshCw } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
+import { db } from '../lib/firebase/config';
+import { collection, query, where, getDocs, Timestamp, orderBy, limit } from 'firebase/firestore';
+
+interface DailyStats {
+  totalBookings: number;
+  completedBookings: number;
+  cancelledBookings: number;
+  pendingBookings: number;
+  activeDoctors: number;
+  newDoctors: number;
+  newPatients: number;
+}
+
+interface DoctorBookingCount {
+  name: string;
+  bookings: number;
+}
 
 export default function AdminDailyWorkReport() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<DailyStats>({
+    totalBookings: 0, completedBookings: 0, cancelledBookings: 0,
+    pendingBookings: 0, activeDoctors: 0, newDoctors: 0, newPatients: 0,
+  });
+  const [topDoctors, setTopDoctors] = useState<DoctorBookingCount[]>([]);
 
-  // Mock data - will be fetched from Firebase
-  const dailyStats = {
-    date: selectedDate,
-    totalBookings: 89,
-    completedBookings: 67,
-    cancelledBookings: 12,
-    pendingBookings: 10,
-    newDoctorRegistrations: 5,
-    activeDoctors: 132,
-    adRevenue: 12540,
-    newPatients: 45,
-    returningPatients: 44,
+  const loadDayData = async (date: string) => {
+    setLoading(true);
+    try {
+      const dayStart = new Date(date + 'T00:00:00');
+      const dayEnd = new Date(date + 'T23:59:59');
+      const tsStart = Timestamp.fromDate(dayStart);
+      const tsEnd = Timestamp.fromDate(dayEnd);
+
+      // Bookings for selected day
+      const bookingsSnap = await getDocs(
+        query(collection(db, 'bookings'),
+          where('createdAt', '>=', tsStart),
+          where('createdAt', '<=', tsEnd))
+      );
+
+      let completed = 0, cancelled = 0, pending = 0;
+      const doctorMap: Record<string, { name: string; count: number }> = {};
+
+      bookingsSnap.docs.forEach(d => {
+        const data = d.data();
+        const status = (data.status || '').toLowerCase();
+        if (status === 'completed' || status === 'confirmed') completed++;
+        else if (status === 'cancelled') cancelled++;
+        else pending++;
+
+        const docId = data.doctorId || 'unknown';
+        const docName = data.doctorName || 'Unknown Doctor';
+        if (!doctorMap[docId]) doctorMap[docId] = { name: docName, count: 0 };
+        doctorMap[docId].count++;
+      });
+
+      // New doctors registered on this date
+      let newDocs = 0;
+      try {
+        const docSnap = await getDocs(
+          query(collection(db, 'doctors'),
+            where('createdAt', '>=', tsStart),
+            where('createdAt', '<=', tsEnd))
+        );
+        newDocs = docSnap.size;
+      } catch { /* index may not exist */ }
+
+      // New patients registered on this date
+      let newPats = 0;
+      try {
+        const patSnap = await getDocs(
+          query(collection(db, 'patients'),
+            where('createdAt', '>=', tsStart),
+            where('createdAt', '<=', tsEnd))
+        );
+        newPats = patSnap.size;
+      } catch { /* index may not exist */ }
+
+      // Total active doctors (all time)
+      let totalActiveDoctors = 0;
+      try {
+        const allDocsSnap = await getDocs(collection(db, 'doctors'));
+        totalActiveDoctors = allDocsSnap.size;
+      } catch { /* */ }
+
+      setStats({
+        totalBookings: bookingsSnap.size,
+        completedBookings: completed,
+        cancelledBookings: cancelled,
+        pendingBookings: pending,
+        activeDoctors: totalActiveDoctors,
+        newDoctors: newDocs,
+        newPatients: newPats,
+      });
+
+      // Sort doctors by booking count
+      const sorted = Object.values(doctorMap).sort((a, b) => b.count - a.count).slice(0, 10);
+      setTopDoctors(sorted);
+    } catch (err) {
+      console.error('Failed to load daily report:', err);
+    }
+    setLoading(false);
   };
 
-  const doctorActivity = [
-    { id: 1, name: 'Dr. Rajesh Kumar', bookings: 12, status: 'Active', lastSeen: '10 mins ago' },
-    { id: 2, name: 'Dr. Priya Sharma', bookings: 10, status: 'Active', lastSeen: '25 mins ago' },
-    { id: 3, name: 'Dr. Amit Patel', bookings: 9, status: 'Active', lastSeen: '1 hour ago' },
-    { id: 4, name: 'Dr. Sneha Reddy', bookings: 8, status: 'Active', lastSeen: '2 hours ago' },
-    { id: 5, name: 'Dr. Vikram Singh', bookings: 7, status: 'Idle', lastSeen: '5 hours ago' },
-  ];
-
-  const systemEvents = [
-    { id: 1, event: 'System backup completed', time: '06:00 AM', type: 'success' },
-    { id: 2, event: '5 new doctors registered', time: '09:30 AM', type: 'info' },
-    { id: 3, event: 'Peak booking hours started', time: '10:00 AM', type: 'info' },
-    { id: 4, event: 'Payment gateway hiccup resolved', time: '11:45 AM', type: 'warning' },
-    { id: 5, event: 'Database optimization completed', time: '02:30 PM', type: 'success' },
-    { id: 6, event: 'Notification batch sent (500+ users)', time: '04:00 PM', type: 'info' },
-  ];
-
-  const hourlyBreakdown = [
-    { hour: '6 AM', bookings: 2 },
-    { hour: '7 AM', bookings: 4 },
-    { hour: '8 AM', bookings: 8 },
-    { hour: '9 AM', bookings: 12 },
-    { hour: '10 AM', bookings: 15 },
-    { hour: '11 AM', bookings: 10 },
-    { hour: '12 PM', bookings: 8 },
-    { hour: '1 PM', bookings: 6 },
-    { hour: '2 PM', bookings: 9 },
-    { hour: '3 PM', bookings: 7 },
-    { hour: '4 PM', bookings: 5 },
-    { hour: '5 PM', bookings: 3 },
-  ];
-
-  const maxBookings = Math.max(...hourlyBreakdown.map(h => h.bookings));
+  useEffect(() => { loadDayData(selectedDate); }, [selectedDate]);
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -60,9 +116,8 @@ export default function AdminDailyWorkReport() {
         <div className="mb-8 flex items-start justify-between">
           <div>
             <h1 className="text-3xl mb-2">Daily Work Report</h1>
-            <p className="text-gray-400">Track daily platform activities and performance</p>
+            <p className="text-gray-400">Real-time platform activities for selected date</p>
           </div>
-
           <div className="flex gap-2">
             <input
               type="date"
@@ -70,189 +125,127 @@ export default function AdminDailyWorkReport() {
               onChange={(e) => setSelectedDate(e.target.value)}
               className="bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2 text-sm"
             />
-            <Button className="bg-emerald-500 hover:bg-emerald-600 text-white">
-              <Download className="w-4 h-4 mr-2" />
-              Export
+            <Button onClick={() => loadDayData(selectedDate)} className="bg-emerald-500 hover:bg-emerald-600 text-white">
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh
             </Button>
           </div>
         </div>
 
-        {/* Overview Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-gradient-to-br from-emerald-900/30 to-emerald-900/10 border border-emerald-700/30 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="bg-emerald-500/10 p-3 rounded-lg">
-                <Calendar className="w-6 h-6 text-emerald-500" />
-              </div>
-              <CheckCircle className="w-5 h-5 text-emerald-500" />
-            </div>
-            <h3 className="text-2xl mb-1">{dailyStats.totalBookings}</h3>
-            <p className="text-sm text-gray-400">Total Bookings</p>
-            <p className="text-xs text-emerald-500 mt-2">{dailyStats.completedBookings} completed</p>
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <RefreshCw className="w-8 h-8 text-emerald-400 animate-spin" />
           </div>
-
-          <div className="bg-gradient-to-br from-blue-900/30 to-blue-900/10 border border-blue-700/30 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="bg-blue-500/10 p-3 rounded-lg">
-                <Users className="w-6 h-6 text-blue-500" />
-              </div>
-              <Activity className="w-5 h-5 text-blue-500" />
-            </div>
-            <h3 className="text-2xl mb-1">{dailyStats.activeDoctors}</h3>
-            <p className="text-sm text-gray-400">Active Doctors</p>
-            <p className="text-xs text-blue-500 mt-2">+{dailyStats.newDoctorRegistrations} new today</p>
-          </div>
-
-          <div className="bg-gradient-to-br from-purple-900/30 to-purple-900/10 border border-purple-700/30 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="bg-purple-500/10 p-3 rounded-lg">
-                <Megaphone className="w-6 h-6 text-purple-500" />
-              </div>
-              <TrendingUp className="w-5 h-5 text-purple-500" />
-            </div>
-            <h3 className="text-2xl mb-1">₹{(dailyStats.adRevenue / 1000).toFixed(0)}k</h3>
-            <p className="text-sm text-gray-400">Ad Revenue Today</p>
-          </div>
-
-          <div className="bg-gradient-to-br from-orange-900/30 to-orange-900/10 border border-orange-700/30 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="bg-orange-500/10 p-3 rounded-lg">
-                <Users className="w-6 h-6 text-orange-500" />
-              </div>
-              <TrendingUp className="w-5 h-5 text-orange-500" />
-            </div>
-            <h3 className="text-2xl mb-1">{dailyStats.newPatients}</h3>
-            <p className="text-sm text-gray-400">New Patients</p>
-            <p className="text-xs text-orange-500 mt-2">{dailyStats.returningPatients} returning</p>
-          </div>
-        </div>
-
-        {/* Booking Status Breakdown */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-            <div className="flex items-center gap-2 mb-6">
-              <ClipboardList className="w-5 h-5 text-emerald-500" />
-              <h3 className="text-lg">Booking Status</h3>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-emerald-900/20 border border-emerald-700/30 rounded-lg">
-                <div className="flex items-center gap-3">
+        ) : (
+          <>
+            {/* Overview Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              <div className="bg-gradient-to-br from-emerald-900/30 to-emerald-900/10 border border-emerald-700/30 rounded-xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="bg-emerald-500/10 p-3 rounded-lg">
+                    <Calendar className="w-6 h-6 text-emerald-500" />
+                  </div>
                   <CheckCircle className="w-5 h-5 text-emerald-500" />
-                  <span className="text-sm text-white">Completed</span>
                 </div>
-                <span className="text-xl text-emerald-500">{dailyStats.completedBookings}</span>
+                <h3 className="text-2xl mb-1">{stats.totalBookings}</h3>
+                <p className="text-sm text-gray-400">Total Bookings</p>
+                <p className="text-xs text-emerald-500 mt-2">{stats.completedBookings} completed</p>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-red-900/20 border border-red-700/30 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <XCircle className="w-5 h-5 text-red-500" />
-                  <span className="text-sm text-white">Cancelled</span>
+              <div className="bg-gradient-to-br from-blue-900/30 to-blue-900/10 border border-blue-700/30 rounded-xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="bg-blue-500/10 p-3 rounded-lg">
+                    <Users className="w-6 h-6 text-blue-500" />
+                  </div>
+                  <Activity className="w-5 h-5 text-blue-500" />
                 </div>
-                <span className="text-xl text-red-500">{dailyStats.cancelledBookings}</span>
+                <h3 className="text-2xl mb-1">{stats.activeDoctors}</h3>
+                <p className="text-sm text-gray-400">Total Doctors</p>
+                <p className="text-xs text-blue-500 mt-2">+{stats.newDoctors} registered this day</p>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-yellow-900/20 border border-yellow-700/30 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <Clock className="w-5 h-5 text-yellow-500" />
-                  <span className="text-sm text-white">Pending</span>
+              <div className="bg-gradient-to-br from-purple-900/30 to-purple-900/10 border border-purple-700/30 rounded-xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="bg-purple-500/10 p-3 rounded-lg">
+                    <TrendingUp className="w-6 h-6 text-purple-500" />
+                  </div>
                 </div>
-                <span className="text-xl text-yellow-500">{dailyStats.pendingBookings}</span>
+                <h3 className="text-2xl mb-1">{stats.newPatients}</h3>
+                <p className="text-sm text-gray-400">New Patients</p>
+                <p className="text-xs text-purple-500 mt-2">Registered this day</p>
+              </div>
+
+              <div className="bg-gradient-to-br from-orange-900/30 to-orange-900/10 border border-orange-700/30 rounded-xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="bg-orange-500/10 p-3 rounded-lg">
+                    <ClipboardList className="w-6 h-6 text-orange-500" />
+                  </div>
+                </div>
+                <h3 className="text-2xl mb-1">{stats.cancelledBookings}</h3>
+                <p className="text-sm text-gray-400">Cancelled</p>
+                <p className="text-xs text-orange-500 mt-2">{stats.pendingBookings} pending</p>
               </div>
             </div>
-          </div>
 
-          <div className="lg:col-span-2 bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-            <div className="flex items-center gap-2 mb-6">
-              <Activity className="w-5 h-5 text-emerald-500" />
-              <h3 className="text-lg">Hourly Booking Distribution</h3>
-            </div>
-
-            <div className="space-y-2">
-              {hourlyBreakdown.map((item) => (
-                <div key={item.hour} className="flex items-center gap-4">
-                  <span className="text-sm text-gray-400 w-16">{item.hour}</span>
-                  <div className="flex-1 bg-zinc-800 rounded-full h-6 overflow-hidden">
-                    <div
-                      className="bg-gradient-to-r from-emerald-600 to-emerald-500 h-full flex items-center px-3"
-                      style={{ width: `${(item.bookings / maxBookings) * 100}%` }}
-                    >
-                      {item.bookings > 0 && (
-                        <span className="text-xs text-white">{item.bookings}</span>
-                      )}
+            {/* Booking Status + Top Doctors */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                <div className="flex items-center gap-2 mb-6">
+                  <ClipboardList className="w-5 h-5 text-emerald-500" />
+                  <h3 className="text-lg">Booking Status</h3>
+                </div>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-emerald-900/20 border border-emerald-700/30 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <CheckCircle className="w-5 h-5 text-emerald-500" />
+                      <span className="text-sm text-white">Completed / Confirmed</span>
                     </div>
+                    <span className="text-xl text-emerald-500">{stats.completedBookings}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-4 bg-red-900/20 border border-red-700/30 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <XCircle className="w-5 h-5 text-red-500" />
+                      <span className="text-sm text-white">Cancelled</span>
+                    </div>
+                    <span className="text-xl text-red-500">{stats.cancelledBookings}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-4 bg-yellow-900/20 border border-yellow-700/30 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Clock className="w-5 h-5 text-yellow-500" />
+                      <span className="text-sm text-white">Pending</span>
+                    </div>
+                    <span className="text-xl text-yellow-500">{stats.pendingBookings}</span>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
+              </div>
 
-        {/* Doctor Activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-            <div className="flex items-center gap-2 mb-6">
-              <Users className="w-5 h-5 text-emerald-500" />
-              <h3 className="text-lg">Top Active Doctors</h3>
-            </div>
-
-            <div className="space-y-3">
-              {doctorActivity.map((doctor) => (
-                <div key={doctor.id} className="flex items-center justify-between p-4 bg-zinc-800/50 rounded-lg">
-                  <div className="flex-1">
-                    <p className="text-sm text-white mb-1">{doctor.name}</p>
-                    <p className="text-xs text-gray-400">{doctor.lastSeen}</p>
-                  </div>
-                  <div className="text-right mr-4">
-                    <p className="text-sm text-emerald-500">{doctor.bookings} bookings</p>
-                  </div>
-                  <div>
-                    <span
-                      className={`text-xs px-2 py-1 rounded-full ${
-                        doctor.status === 'Active'
-                          ? 'bg-emerald-500/20 text-emerald-500'
-                          : 'bg-gray-500/20 text-gray-500'
-                      }`}
-                    >
-                      {doctor.status}
-                    </span>
-                  </div>
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                <div className="flex items-center gap-2 mb-6">
+                  <Users className="w-5 h-5 text-emerald-500" />
+                  <h3 className="text-lg">Top Doctors by Bookings</h3>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-            <div className="flex items-center gap-2 mb-6">
-              <Activity className="w-5 h-5 text-emerald-500" />
-              <h3 className="text-lg">System Events</h3>
-            </div>
-
-            <div className="space-y-3">
-              {systemEvents.map((event) => (
-                <div key={event.id} className="flex items-start gap-3 p-3 bg-zinc-800/50 rounded-lg">
-                  <div
-                    className={`p-2 rounded-lg ${
-                      event.type === 'success'
-                        ? 'bg-emerald-500/10'
-                        : event.type === 'warning'
-                        ? 'bg-yellow-500/10'
-                        : 'bg-blue-500/10'
-                    }`}
-                  >
-                    {event.type === 'success' && <CheckCircle className="w-4 h-4 text-emerald-500" />}
-                    {event.type === 'warning' && <Clock className="w-4 h-4 text-yellow-500" />}
-                    {event.type === 'info' && <Activity className="w-4 h-4 text-blue-500" />}
+                {topDoctors.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Users className="w-8 h-8 text-gray-600 mx-auto mb-2" />
+                    <p className="text-gray-500 text-sm">No bookings found for this date</p>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm text-white">{event.event}</p>
-                    <p className="text-xs text-gray-500 mt-1">{event.time}</p>
+                ) : (
+                  <div className="space-y-3">
+                    {topDoctors.map((doctor, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-3 bg-zinc-800/50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <span className="text-emerald-400 font-mono text-xs w-6">#{idx + 1}</span>
+                          <span className="text-sm text-white">{doctor.name}</span>
+                        </div>
+                        <span className="text-sm text-emerald-500 font-medium">{doctor.bookings} bookings</span>
+                      </div>
+                    ))}
                   </div>
-                </div>
-              ))}
+                )}
+              </div>
             </div>
-          </div>
-        </div>
+          </>
+        )}
       </div>
     </div>
   );

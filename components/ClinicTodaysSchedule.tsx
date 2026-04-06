@@ -268,7 +268,7 @@ function ChamberPatientDetailsLoader({
               prescriptionReviewed: data.prescriptionReviewed || false,
               isCancelled: isCancelledStatus,
               isMarkedSeen: data.isMarkedSeen || false,
-              reminderSent: data.reminderSent || false,
+              reminderSent: data.reminderSent || data.reminderScheduled || false,
               fcmNotificationSent: data.fcmNotificationSent || false,
               doctorId: data.doctorId,
               chamberId: data.chamberId,

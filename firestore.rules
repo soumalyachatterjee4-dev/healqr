@@ -661,9 +661,12 @@ service cloud.firestore {
       // This is safe because we only store email and authorization flag
       allow read: if true;
 
-      // Only authenticated admins can write
-      // In practice, this should be managed server-side or via Firebase Console
-      allow write: if false;
+      // Allow existing admins to add/remove partner admins
+      allow write: if isAuthenticated() && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
+
+      // Allow super admin (from adminProfiles) to bootstrap the first partner
+      allow create: if isAuthenticated() && exists(/databases/$(database)/documents/adminProfiles/super_admin)
+        && get(/databases/$(database)/documents/adminProfiles/super_admin).data.email == request.auth.token.email;
     }
 
     // ============================================
@@ -1267,6 +1270,52 @@ service cloud.firestore {
     // ============================================
 
     match /pharmaCompanies/{companyId}/pathologyExtractions/{extractionId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if false;
+    }
+
+    // ============================================
+    // PLATFORM HEALTH COLLECTION (Cloud Function writes, Admin reads)
+    // ============================================
+
+    match /platform_health/{reportId} {
+      allow read: if isAuthenticated() && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
+      allow write: if false; // Only Cloud Functions write
+    }
+
+    // ============================================
+    // ADMIN ALERTS COLLECTION (Cloud Function creates, Admin reads/resolves)
+    // ============================================
+
+    match /admin_alerts/{alertId} {
+      allow read: if isAuthenticated() && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
+      allow update: if isAuthenticated() && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
+      allow create, delete: if false; // Only Cloud Functions create
+    }
+
+    // ============================================
+    // ADMIN CONFIG COLLECTION (Admin read/write for dashboard settings)
+    // ============================================
+
+    match /admin_config/{configId} {
+      allow read, write: if isAuthenticated() && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
+    }
+
+    // ============================================
+    // DAILY HEALTH REPORTS (Cloud Function writes, Admin reads)
+    // ============================================
+
+    match /daily_health_reports/{reportId} {
+      allow read: if isAuthenticated() && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
+      allow write: if false; // Only Cloud Functions write
+    }
+
+    // ============================================
+    // RX EXTRACTION LOGS (Admin tracks who generated reports)
+    // ============================================
+
+    match /rxExtractionLogs/{logId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
       allow update, delete: if false;

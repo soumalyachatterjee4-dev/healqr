@@ -272,7 +272,7 @@ function PatientDetailsLoader({
               prescriptionReviewed: data.prescriptionReviewed || false,
               isCancelled: isCancelledStatus,
               isMarkedSeen: data.isMarkedSeen || false,
-              reminderSent: data.reminderSent || false,
+              reminderSent: data.reminderSent || data.reminderScheduled || false,
               followUpScheduled: data.followUpScheduled || false,
               reviewScheduled: data.reviewScheduled || false,
               tokenNumber: data.tokenNumber || `#${data.serialNo || 0}`,

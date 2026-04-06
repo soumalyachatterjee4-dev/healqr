@@ -138,7 +138,7 @@ export function TranslationProvider({ language, children }: TranslationProviderP
 
     if (hasNew) {
       if (batchTimerRef.current) clearTimeout(batchTimerRef.current);
-      batchTimerRef.current = setTimeout(flushBatch, 150);
+      batchTimerRef.current = setTimeout(flushBatch, 50);
     }
   }, [language]);
 
@@ -188,13 +188,21 @@ export function TranslationProvider({ language, children }: TranslationProviderP
       chunks.push(uniqueTexts.slice(i, i + MAX_BATCH_SIZE));
     }
 
-    for (const chunk of chunks) {
-      try {
-        const results = await aiTranslateBatch(chunk, lang, 'ui');
+    // Process all chunks in parallel for speed
+    observerRef.current?.disconnect();
 
-        // Disconnect observer while modifying DOM
-        observerRef.current?.disconnect();
+    try {
+      const chunkResults = await Promise.all(
+        chunks.map(chunk => aiTranslateBatch(chunk, lang, 'ui').catch(err => {
+          console.error('Auto-translation failed:', err);
+          chunk.forEach((t) => pendingTexts.delete(`${lang}::${t}`));
+          return null;
+        }))
+      );
 
+      chunkResults.forEach((results, ci) => {
+        if (!results) return;
+        const chunk = chunks[ci];
         results.forEach((result, i) => {
           const original = chunk[i];
           const cacheKey = `${lang}::${original}`;
@@ -215,19 +223,11 @@ export function TranslationProvider({ language, children }: TranslationProviderP
             (el as HTMLInputElement).placeholder = result.translated;
           }
         });
-
-        // Reconnect observer
-        if (containerRef.current && observerRef.current) {
-          observerRef.current.observe(containerRef.current, observerConfig);
-        }
-      } catch (error) {
-        console.error('Auto-translation failed:', error);
-        chunk.forEach((t) => pendingTexts.delete(`${lang}::${t}`));
-
-        // Reconnect observer even on error
-        if (containerRef.current && observerRef.current) {
-          observerRef.current.observe(containerRef.current, observerConfig);
-        }
+      });
+    } finally {
+      // Reconnect observer
+      if (containerRef.current && observerRef.current) {
+        observerRef.current.observe(containerRef.current, observerConfig);
       }
     }
   }, [language]);
@@ -256,7 +256,7 @@ export function TranslationProvider({ language, children }: TranslationProviderP
     // Delayed re-scan to catch texts from async React renders / data fetching
     const rescanTimer = setTimeout(() => {
       if (containerRef.current) collectTextNodes(containerRef.current);
-    }, 1500);
+    }, 800);
 
     // Watch for new content
     const observer = new MutationObserver((mutations) => {
@@ -287,7 +287,7 @@ export function TranslationProvider({ language, children }: TranslationProviderP
 
       if (hasNewNodes && textNodesQueue.current.length > 0) {
         if (batchTimerRef.current) clearTimeout(batchTimerRef.current);
-        batchTimerRef.current = setTimeout(flushBatch, 150);
+        batchTimerRef.current = setTimeout(flushBatch, 50);
       }
     });
 

@@ -21,4 +21,5 @@ exports.resolveLocationPincode = require('./resolveLocationPincode').resolveLoca
 exports.migrateClinicCodes = require('./migrateClinicCodes').migrateClinicCodes;
 exports.generateDemoBookings = require('./generateDemoBookings').generateDemoBookings;
 exports.aggregateRxTrends = aggregateRxTrends.aggregateRxTrends;
+exports.sendDailyHealthReport = require('./sendDailyHealthReport').sendDailyHealthReport;
 

@@ -179,23 +179,25 @@ export async function aiTranslateBatch(
     return texts.map(t => ({ translated: t, fromCache: false }));
   }
 
-  // Check which texts are already cached
+  // Check which texts are already cached (parallel IndexedDB reads)
   const results: (TranslationResult | null)[] = new Array(texts.length).fill(null);
   const uncachedTexts: { index: number; text: string }[] = [];
 
-  for (let i = 0; i < texts.length; i++) {
-    if (!texts[i] || !texts[i].trim()) {
-      results[i] = { translated: texts[i], fromCache: false };
-      continue;
+  const cacheChecks = texts.map((text, i) => {
+    if (!text || !text.trim()) {
+      results[i] = { translated: text, fromCache: false };
+      return Promise.resolve();
     }
-    const cacheKey = makeCacheKey(texts[i], targetLanguage, context);
-    const cached = await getCachedTranslation(cacheKey);
-    if (cached && cached !== texts[i]) {
-      results[i] = { translated: cached, fromCache: true };
-    } else {
-      uncachedTexts.push({ index: i, text: texts[i] });
-    }
-  }
+    const cacheKey = makeCacheKey(text, targetLanguage, context);
+    return getCachedTranslation(cacheKey).then(cached => {
+      if (cached && cached !== text) {
+        results[i] = { translated: cached, fromCache: true };
+      } else {
+        uncachedTexts.push({ index: i, text });
+      }
+    });
+  });
+  await Promise.all(cacheChecks);
 
   // If everything was cached, return immediately
   if (uncachedTexts.length === 0) {
@@ -212,15 +214,17 @@ export async function aiTranslateBatch(
     });
     const { translations } = response.data as { translations: string[] };
 
-    // Map results back and cache them
+    // Map results back and cache them (parallel writes)
+    const cacheWrites: Promise<void>[] = [];
     for (let i = 0; i < uncachedTexts.length; i++) {
       const translated = translations[i] || uncachedTexts[i].text;
       if (translated !== uncachedTexts[i].text) {
         const cacheKey = makeCacheKey(uncachedTexts[i].text, targetLanguage, context);
-        await setCachedTranslation(cacheKey, translated);
+        cacheWrites.push(setCachedTranslation(cacheKey, translated));
       }
       results[uncachedTexts[i].index] = { translated, fromCache: false };
     }
+    await Promise.all(cacheWrites);
   } catch (error) {
     console.warn('Cloud Function translation failed:', error);
     throw error;

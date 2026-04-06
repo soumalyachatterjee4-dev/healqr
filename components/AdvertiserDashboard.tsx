@@ -15,7 +15,7 @@ import {
   Heart
 } from 'lucide-react';
 import { AuthService } from '../lib/firebase/auth.service';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase/config';
 import healQRLogo from '../assets/healqr.logo.png';
 import AdvertiserCampaigns from './AdvertiserCampaigns';
@@ -34,6 +34,8 @@ export default function AdvertiserDashboard({ onLogout }: AdvertiserDashboardPro
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [activeCampaigns, setActiveCampaigns] = useState<any[]>([]);
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -62,14 +64,29 @@ export default function AdvertiserDashboard({ onLogout }: AdvertiserDashboardPro
           orderBy('createdAt', 'desc')
         );
         const snapshot = await getDocs(q);
-        const campaigns = snapshot.docs.map(doc => ({
-          id: doc.id,
-          name: `Campaign #${doc.id.slice(-4).toUpperCase()}`,
-          views: doc.data().stats?.impressions || 0,
-          totalViews: doc.data().viewBundle || 1000,
-          status: doc.data().status
+        const campaigns = snapshot.docs.map(d => ({
+          id: d.id,
+          name: `Campaign #${d.id.slice(-6).toUpperCase()}`,
+          views: d.data().stats?.impressions || 0,
+          totalViews: d.data().totalReach || d.data().viewBundle || 1000,
+          status: d.data().status
         }));
         setActiveCampaigns(campaigns);
+
+        // Fetch pending campaigns count
+        const pendingQ = query(
+          collection(db, 'advertiser_campaigns'),
+          where('advertiserId', '==', queryId),
+          where('status', '==', 'pending_review')
+        );
+        const pendingSnap = await getDocs(pendingQ);
+        setPendingCount(pendingSnap.size);
+
+        // Fetch wallet balance
+        const advDoc = await getDoc(doc(db, 'advertisers', queryId));
+        if (advDoc.exists()) {
+          setWalletBalance(advDoc.data().walletBalance || 0);
+        }
       } catch (error) {
         console.error("Error fetching campaigns:", error);
       } finally {
@@ -127,8 +144,11 @@ export default function AdvertiserDashboard({ onLogout }: AdvertiserDashboardPro
                     <Wallet className="w-6 h-6 text-purple-500" />
                   </div>
                 </div>
-                <div className="text-3xl font-bold text-white mb-1">₹0.00</div>
+                <div className="text-3xl font-bold text-white mb-1">₹{walletBalance.toLocaleString()}</div>
                 <div className="text-sm text-zinc-400">Wallet Balance</div>
+                {pendingCount > 0 && (
+                  <div className="text-xs text-amber-400 mt-1">{pendingCount} campaign{pendingCount > 1 ? 's' : ''} under review</div>
+                )}
               </div>
             </div>
 

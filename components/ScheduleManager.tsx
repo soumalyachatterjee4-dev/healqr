@@ -1698,7 +1698,7 @@ export default function ScheduleManager({
     }
 
     const chamberKey = String(id);
-    const chamber = demoSchedules.find(s => String(s.id) === chamberKey && (clinicLocationId ? String(s.clinicLocationId) === String(clinicLocationId) : true));
+    const chamber = demoSchedules.find(s => String(s.id) === chamberKey && (clinicLocationId ? String(s.clinicLocationId || '001') === String(clinicLocationId) : true));
     if (!chamber) return;
 
     const isCurrentlyActive = chamber.isActive !== false;
