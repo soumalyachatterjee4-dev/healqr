@@ -433,6 +433,10 @@ export default function PatientDetailsForm({
           verificationMethod: 'qr_scan', // QR bookings are always qr_scan
           verifiedByPatient: true, // QR bookings are pre-verified by scanning
           isWalkIn: false, // QR bookings are NOT walk-ins
+          // Referrer tracking
+          referrerId: sessionStorage.getItem('booking_referrer_id') || null,
+          referrerName: sessionStorage.getItem('booking_referrer_name') || null,
+          referrerRole: sessionStorage.getItem('booking_referrer_role') || null,
           createdAt: serverTimestamp()
         });
 
@@ -454,6 +458,32 @@ export default function PatientDetailsForm({
             }
           } catch (error) {
             console.error('Error updating scan record:', error);
+          }
+        }
+
+        // Track referral if booking came via referrer link
+        const bookingReferrerId = sessionStorage.getItem('booking_referrer_id');
+        if (bookingReferrerId) {
+          try {
+            const { increment } = await import('firebase/firestore');
+            // Add to referrer's history
+            await addDoc(collection(db, 'referrers', bookingReferrerId, 'referralHistory'), {
+              patientName: normalizedName,
+              patientPhone: `+91${formData.whatsappNumber}`,
+              doctorId,
+              doctorName,
+              doctorSpecialty: doctorSpecialty || '',
+              bookingId,
+              status: 'booked',
+              createdAt: serverTimestamp()
+            });
+            // Increment referrer's total count
+            await updateDoc(doc(db, 'referrers', bookingReferrerId), {
+              totalReferrals: increment(1)
+            });
+            sessionStorage.removeItem('booking_referrer_id');
+          } catch (refErr) {
+            console.error('Error tracking referral:', refErr);
           }
         }
 

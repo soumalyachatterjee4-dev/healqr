@@ -32,6 +32,7 @@ import AdminSendNotifications from './AdminSendNotifications';
 import AdminDiscountCards from './AdminDiscountCards';
 import AdminDailyWorkReport from './AdminDailyWorkReport';
 import AdminPlatformAnalytics from './AdminPlatformAnalytics';
+import AdminReferrerLeaderboard from './AdminReferrerLeaderboard';
 
 interface DoctorTestimonial {
   id: number;
@@ -73,7 +74,7 @@ type PageType = 'dashboard' | 'profile' | 'doctors' | 'clinics' | 'patients'
   | 'admin-pathology-trends' | 'qr-generator'
   | 'qr-generation' | 'qr-management' | 'health-tips' | 'send-notifications'
   | 'discount-cards' | 'daily-work-report' | 'roles-manager'
-  | 'platform-analytics';
+  | 'platform-analytics' | 'referrer-leaderboard';
 
 export default function AdminPanel({
   adminEmail, onLogout, onStartDemo, uploadedTestimonials = [],
@@ -167,6 +168,7 @@ export default function AdminPanel({
     'platform-analytics': 'Platform Analytics',
     'rx-trends': 'Rx Trends',
     'admin-pathology-trends': 'Pathology Trends',
+    'referrer-leaderboard': 'Referrer Leaderboard',
   };
 
   useEffect(() => {
@@ -282,6 +284,7 @@ export default function AdminPanel({
         {currentPage === 'platform-analytics' && <AdminPlatformAnalytics />}
         {currentPage === 'rx-trends' && <AdminRxTrends adminEmail={adminEmail} />}
         {currentPage === 'admin-pathology-trends' && <AdminPathologyTrends />}
+        {currentPage === 'referrer-leaderboard' && <AdminReferrerLeaderboard />}
       </div>
     </div>
   );

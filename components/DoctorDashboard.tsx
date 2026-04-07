@@ -23,7 +23,8 @@ import {
   Linkedin,
   Mail,
   MessageCircle,
-  BrainCircuit
+  BrainCircuit,
+  Send
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
@@ -177,8 +178,24 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
     }
   };
   const [shareMenuOpen, setShareMenuOpen] = useState(false);
+  const [referralSendingActive, setReferralSendingActive] = useState(true);
   const [reviewsOpen, setReviewsOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
+
+  // Load referral sending toggle
+  useEffect(() => {
+    (async () => {
+      const userId = localStorage.getItem('userId');
+      if (!userId) return;
+      const { db: fireDb } = await import('../lib/firebase/config');
+      if (!fireDb) return;
+      const { doc, getDoc } = await import('firebase/firestore');
+      const snap = await getDoc(doc(fireDb, 'doctors', userId));
+      if (snap.exists()) {
+        setReferralSendingActive(snap.data().referralSendingActive !== false);
+      }
+    })();
+  }, []);
 
   // Promo state
   const [showSocialKitPromo, setShowSocialKitPromo] = useState(true);
@@ -753,6 +770,44 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
         alert('Link copied to clipboard!');
         setShareMenuOpen(false);
         return;
+      case 'referral-link': {
+        // Generate referral link for external agents
+        setShareMenuOpen(false);
+        (async () => {
+          try {
+            const userId = localStorage.getItem('userId') || '';
+            const name = localStorage.getItem('healqr_user_name') || doctorName || 'Doctor';
+            const { db: fireDb } = await import('../lib/firebase/config');
+            if (!userId || !fireDb) { toast.error('Please log in first'); return; }
+            const { collection: col, query: q, where: w, getDocs: gd, addDoc: ad, serverTimestamp: st } = await import('firebase/firestore');
+            const existing = await gd(q(col(fireDb, 'referralLinks'), w('createdBy', '==', userId)));
+            let code: string;
+            if (!existing.empty) {
+              code = existing.docs[0].data().code;
+            } else {
+              code = Math.random().toString(36).substring(2, 8).toUpperCase();
+              await ad(col(fireDb, 'referralLinks'), {
+                code,
+                createdBy: userId,
+                createdByName: name,
+                createdByRole: 'doctor',
+                createdAt: st()
+              });
+            }
+            const link = `${window.location.origin}/?ref=${code}`;
+            try {
+              await navigator.clipboard.writeText(link);
+              toast.success('Referral link copied!', { description: link, duration: 5000 });
+            } catch {
+              toast('Your referral link:', { description: link, duration: 8000 });
+            }
+          } catch (err) {
+            console.error('Referral link error:', err);
+            toast.error('Failed to generate link');
+          }
+        })();
+        return;
+      }
     }
 
     if (shareUrl) {
@@ -1071,6 +1126,21 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
                   </div>
 
                   <div className="pt-3 border-t border-zinc-800">
+                    {referralSendingActive && (
+                    <button
+                      onClick={() => handleShare('referral-link')}
+                      className="flex items-center gap-3 w-full px-4 py-3 rounded-xl transition-all mb-3"
+                      style={{ background: 'linear-gradient(135deg, #92400e 0%, #c2410c 50%, #be123c 100%)', border: '1px solid #f59e0b55' }}
+                    >
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(251,191,36,0.3)' }}>
+                        <Send className="w-4 h-4 text-amber-200" />
+                      </div>
+                      <div className="text-left">
+                        <span className="text-sm font-bold text-amber-100">Generate Referral Link</span>
+                        <p className="text-[10px] text-amber-300/80">Share with pharmacists, receptionists & agents</p>
+                      </div>
+                    </button>
+                    )}
                     <div className="flex items-center gap-2 bg-zinc-950 rounded px-3 py-2">
                       <span className="text-gray-400 text-sm flex-1 truncate">{websiteUrl}</span>
                       <button

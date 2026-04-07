@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Send, Inbox, ToggleLeft, ToggleRight, X, ChevronLeft, Clock, CheckCircle, XCircle, User, ArrowRight } from 'lucide-react';
+import { Search, Send, Inbox, ToggleLeft, ToggleRight, X, ChevronLeft, Clock, CheckCircle, XCircle, User, ArrowRight, Menu, Users } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card } from './ui/card';
@@ -55,7 +55,7 @@ export default function DoctorReferralNetwork({ doctorName, email, onLogout, onM
   const [loadingToggles, setLoadingToggles] = useState(true);
 
   // Tab
-  const [activeTab, setActiveTab] = useState<'send' | 'incoming' | 'sent'>('send');
+  const [activeTab, setActiveTab] = useState<'send' | 'incoming' | 'sent' | 'external'>('send');
 
   // Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -74,6 +74,21 @@ export default function DoctorReferralNetwork({ doctorName, email, onLogout, onM
   // Referrals
   const [incomingReferrals, setIncomingReferrals] = useState<Referral[]>([]);
   const [sentReferrals, setSentReferrals] = useState<Referral[]>([]);
+
+  // External referrals (from referrer agents)
+  interface ExternalReferral {
+    id: string;
+    patientName: string;
+    patientPhone: string;
+    referrerName: string;
+    referrerRole: string;
+    bookingDate: string;
+    bookingTime: string;
+    status: string;
+    createdAt: any;
+  }
+  const [externalReferrals, setExternalReferrals] = useState<ExternalReferral[]>([]);
+  const [loadingExternal, setLoadingExternal] = useState(false);
 
   // Load toggle states from doctor doc
   useEffect(() => {
@@ -110,6 +125,40 @@ export default function DoctorReferralNetwork({ doctorName, email, onLogout, onM
     }, (err) => { console.error('Sent referrals listener error:', err); });
     return unsub;
   }, [doctorId]);
+
+  // Load external referrals (bookings with referrerId for this doctor)
+  const loadExternalReferrals = async () => {
+    if (!doctorId || !db) return;
+    setLoadingExternal(true);
+    try {
+      const q = query(
+        collection(db!, 'bookings'),
+        where('doctorId', '==', doctorId),
+        where('referrerId', '!=', null)
+      );
+      const snap = await getDocs(q);
+      const refs = snap.docs.map(d => {
+        const data = d.data();
+        return {
+          id: d.id,
+          patientName: data.patientName || 'Patient',
+          patientPhone: data.patientPhone || '',
+          referrerName: data.referrerName || 'Unknown',
+          referrerRole: data.referrerRole || 'Agent',
+          bookingDate: data.appointmentDate || data.bookingDate || '',
+          bookingTime: data.time || data.bookingTime || '',
+          status: data.status || 'confirmed',
+          createdAt: data.createdAt
+        };
+      });
+      refs.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+      setExternalReferrals(refs);
+    } catch (err) {
+      console.error('External referrals error:', err);
+    } finally {
+      setLoadingExternal(false);
+    }
+  };
 
   // Toggle accepting
   const toggleAccepting = async () => {
@@ -232,7 +281,7 @@ export default function DoctorReferralNetwork({ doctorName, email, onLogout, onM
   const pendingIncoming = incomingReferrals.filter(r => r.status === 'sent').length;
 
   return (
-    <div className="flex h-screen bg-[#0a0a0a]">
+    <div className="min-h-screen bg-[#0a0a0a] text-white">
       <DashboardSidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
@@ -243,22 +292,30 @@ export default function DoctorReferralNetwork({ doctorName, email, onLogout, onM
         activeAddOns={activeAddOns}
       />
 
-      <div className="flex-1 overflow-y-auto">
-        {/* Mobile Header */}
-        <div className="lg:hidden flex items-center justify-between p-4 border-b border-zinc-800">
-          <button onClick={() => setSidebarOpen(true)} className="p-2 hover:bg-zinc-800 rounded-lg text-gray-400">
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <h1 className="text-lg font-bold text-white">Referral Network</h1>
-          <div className="w-9" />
+      <div className="transition-all duration-300 lg:ml-64">
+        {/* Sticky Top Bar */}
+        <div className="border-b border-zinc-800 bg-[#0a0a0a]/80 backdrop-blur-sm sticky top-0 z-40">
+          <div className="px-4 lg:px-8 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 hover:bg-zinc-800 rounded-lg transition-colors">
+                <Menu className="w-6 h-6" />
+              </button>
+              <div className="hidden lg:block">
+                <h1 className="text-white text-xl font-bold">Referral Network</h1>
+                <p className="text-gray-400 text-sm mt-0.5">Refer patients to specialists and receive referrals from other doctors</p>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
-          {/* Page Header */}
-          <div>
-            <h1 className="text-2xl font-bold text-white">Referral Network</h1>
-            <p className="text-sm text-gray-400 mt-1">Refer patients to specialists and receive referrals from other doctors</p>
-          </div>
+        {/* Mobile Title */}
+        <div className="lg:hidden px-4 py-4 border-b border-zinc-800">
+          <h1 className="text-white text-lg font-bold">Referral Network</h1>
+          <p className="text-gray-400 text-xs mt-1">Refer patients to specialists and receive referrals from other doctors</p>
+        </div>
+
+        {/* Content */}
+        <div className="px-4 lg:px-8 py-6 space-y-6">
 
           {/* Toggle Controls */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -312,6 +369,12 @@ export default function DoctorReferralNetwork({ doctorName, email, onLogout, onM
               className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 ${activeTab === 'sent' ? 'bg-blue-500/20 text-blue-400' : 'text-gray-400 hover:text-white'}`}
             >
               <Clock className="w-4 h-4" /> Sent ({sentReferrals.length})
+            </button>
+            <button
+              onClick={() => { setActiveTab('external'); loadExternalReferrals(); }}
+              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 ${activeTab === 'external' ? 'bg-purple-500/20 text-purple-400' : 'text-gray-400 hover:text-white'}`}
+            >
+              <Users className="w-4 h-4" /> External {externalReferrals.length > 0 ? `(${externalReferrals.length})` : ''}
             </button>
           </div>
 
@@ -548,6 +611,49 @@ export default function DoctorReferralNetwork({ doctorName, email, onLogout, onM
                       )}
                       {ref.status === 'declined' && (
                         <p className="text-xs text-red-400 mt-1">✗ Dr. {ref.toDoctorName} has declined this referral</p>
+                      )}
+                    </div>
+                  </Card>
+                ))
+              )}
+            </div>
+          )}
+
+          {/* EXTERNAL REFERRALS TAB */}
+          {activeTab === 'external' && (
+            <div className="space-y-3">
+              <p className="text-xs text-gray-500">Patients referred to you by pharmacists, receptionists & other agents via referral links</p>
+              {loadingExternal ? (
+                <div className="text-center py-12 text-gray-500">Loading...</div>
+              ) : externalReferrals.length === 0 ? (
+                <Card className="bg-zinc-900/50 border-zinc-800 p-8 text-center">
+                  <Users className="w-10 h-10 text-zinc-700 mx-auto mb-3" />
+                  <p className="text-sm text-gray-500">No external referrals yet</p>
+                  <p className="text-xs text-gray-600 mt-1">Share your referral link from the Dashboard share button to get started</p>
+                </Card>
+              ) : (
+                externalReferrals.map(ref => (
+                  <Card key={ref.id} className="bg-zinc-900/50 border-zinc-800 p-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-white">{ref.patientName}</span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                          ref.status === 'confirmed' ? 'bg-emerald-500/20 text-emerald-400' :
+                          ref.status === 'completed' ? 'bg-blue-500/20 text-blue-400' :
+                          ref.status === 'cancelled' ? 'bg-red-500/20 text-red-400' :
+                          'bg-zinc-800 text-gray-400'
+                        }`}>
+                          {ref.status}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded text-[10px]">Ref: {ref.referrerName} ({ref.referrerRole})</span>
+                        {ref.bookingDate && <span className="text-gray-500">{ref.bookingDate}</span>}
+                        {ref.bookingTime && <span className="text-gray-500">{ref.bookingTime}</span>}
+                      </div>
+                      {ref.patientPhone && <p className="text-xs text-gray-500">{ref.patientPhone}</p>}
+                      {ref.createdAt?.toDate && (
+                        <p className="text-[10px] text-gray-600">{ref.createdAt.toDate().toLocaleString('en-IN')}</p>
                       )}
                     </div>
                   </Card>

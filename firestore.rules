@@ -1356,6 +1356,32 @@ service cloud.firestore {
     }
 
     // ============================================
+    // REFERRAL LINK SYSTEM
+    // ============================================
+
+    // Referral links created by any dashboard user
+    match /referralLinks/{linkId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update, delete: if false;
+    }
+
+    // Registered referrers (phone-based auth, NOT Firebase Auth)
+    match /referrers/{referrerId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if false;
+    }
+
+    // Referrer booking history (subcollection under referrers)
+    match /referrers/{referrerId}/referralHistory/{historyId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if false;
+    }
+
+    // ============================================
     // DEFAULT DENY
     // ============================================
 

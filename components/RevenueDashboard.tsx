@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import {
-  Menu, IndianRupee, Plus, Trash2, Save, X,
+  Menu, IndianRupee, Plus, Trash2, Save, X, Pencil, Check,
   Users, Calendar, Lock, ChevronLeft, ChevronRight, ArrowUpCircle, ArrowDownCircle,
   Stethoscope, FlaskConical, UserCheck
 } from 'lucide-react';
@@ -12,7 +12,7 @@ import DashboardSidebar from './DashboardSidebar';
 import { db } from '../lib/firebase/config';
 import {
   collection, query, where, getDocs, doc, getDoc, addDoc,
-  deleteDoc, serverTimestamp, orderBy
+  deleteDoc, updateDoc, serverTimestamp, orderBy
 } from 'firebase/firestore';
 import { toast } from 'sonner';
 
@@ -39,28 +39,11 @@ interface ManualEntry {
   category: string;
   description: string;
   amount: number;
+  method?: 'CASH' | 'UPI' | 'CHEQUE';
   createdAt?: any;
 }
 
-const CREDIT_CATEGORIES = [
-  'Lab Referral Commission',
-  'Procedure / Surgery Fee',
-  'Vaccination Fee',
-  'Certificate / Report Fee',
-  'Pharma Referral',
-  'Other Income',
-];
 
-const DEBIT_CATEGORIES = [
-  'Assistant / Staff Salary',
-  'Clinic Rent',
-  'Electricity / Utility',
-  'Medical Supplies',
-  'Equipment / Maintenance',
-  'Medicine Purchase',
-  'Tax / GST Payment',
-  'Other Expense',
-];
 
 export default function RevenueDashboard({ onMenuChange = () => {}, onLogout, activeAddOns = [] }: RevenueDashboardProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -74,8 +57,10 @@ export default function RevenueDashboard({ onMenuChange = () => {}, onLogout, ac
   const [manualEntries, setManualEntries] = useState<ManualEntry[]>([]);
   const [showAddEntry, setShowAddEntry] = useState<'credit' | 'debit' | null>(null);
   const [newEntry, setNewEntry] = useState<ManualEntry>({
-    date: '', type: 'credit', category: '', description: '', amount: 0
+    date: '', type: 'credit', category: '', description: '', amount: 0, method: 'CASH'
   });
+  const [editingFeeId, setEditingFeeId] = useState<string | null>(null);
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
 
   const [viewMode, setViewMode] = useState<'daily' | 'monthly'>('daily');
   const [monthlyData, setMonthlyData] = useState<{ date: string; credit: number; debit: number; patients: number }[]>([]);
@@ -151,12 +136,13 @@ export default function RevenueDashboard({ onMenuChange = () => {}, onLogout, ac
       setPatientEntries(patients);
 
       const entriesRef = collection(db, 'doctors', userId, 'revenueEntries');
-      const eq = query(entriesRef, where('date', '==', selectedDate), orderBy('createdAt', 'desc'));
+      const eq = query(entriesRef, where('date', '==', selectedDate));
       const eSnap = await getDocs(eq);
       const entries: ManualEntry[] = eSnap.docs.map(d => ({
         id: d.id,
         ...d.data() as Omit<ManualEntry, 'id'>
       }));
+      entries.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
       setManualEntries(entries);
 
     } catch (err) {
@@ -186,7 +172,19 @@ export default function RevenueDashboard({ onMenuChange = () => {}, onLogout, ac
         where('appointmentDate', '>=', firstDay),
         where('appointmentDate', '<=', lastDay)
       );
-      const bSnap = await getDocs(bq);
+
+      let bSnap;
+      try {
+        bSnap = await getDocs(bq);
+      } catch {
+        // Fallback: query by doctorId only then filter client-side
+        const fallbackQ = query(bookingsRef, where('doctorId', '==', userId));
+        const allSnap = await getDocs(fallbackQ);
+        bSnap = { docs: allSnap.docs.filter(d => {
+          const ad = d.data().appointmentDate;
+          return ad >= firstDay && ad <= lastDay;
+        }) };
+      }
 
       const dayMap = new Map<string, { credit: number; debit: number; patients: number }>();
 
@@ -207,14 +205,11 @@ export default function RevenueDashboard({ onMenuChange = () => {}, onLogout, ac
       });
 
       const entriesRef = collection(db, 'doctors', userId, 'revenueEntries');
-      const eq = query(entriesRef,
-        where('date', '>=', firstDay),
-        where('date', '<=', lastDay)
-      );
-      const eSnap = await getDocs(eq);
+      const eSnap = await getDocs(entriesRef);
 
       eSnap.docs.forEach(d => {
         const data = d.data() as ManualEntry;
+        if (data.date < firstDay || data.date > lastDay) return;
         if (!dayMap.has(data.date)) dayMap.set(data.date, { credit: 0, debit: 0, patients: 0 });
         const day = dayMap.get(data.date)!;
         if (data.type === 'credit') day.credit += data.amount;
@@ -234,7 +229,7 @@ export default function RevenueDashboard({ onMenuChange = () => {}, onLogout, ac
   };
 
   const handleSaveEntry = async () => {
-    if (!newEntry.category) { toast.error('Select a category'); return; }
+    if (!newEntry.category) { toast.error('Enter a purpose'); return; }
     if (!newEntry.amount || newEntry.amount <= 0) { toast.error('Enter a valid amount'); return; }
 
     const userId = localStorage.getItem('userId');
@@ -248,11 +243,12 @@ export default function RevenueDashboard({ onMenuChange = () => {}, onLogout, ac
         category: newEntry.category,
         description: newEntry.description.trim(),
         amount: newEntry.amount,
+        method: newEntry.method || 'CASH',
         createdAt: serverTimestamp(),
       });
       toast.success(`${showAddEntry === 'credit' ? 'Credit' : 'Debit'} entry saved`);
       setShowAddEntry(null);
-      setNewEntry({ date: '', type: 'credit', category: '', description: '', amount: 0 });
+      setNewEntry({ date: '', type: 'credit', category: '', description: '', amount: 0, method: 'CASH' });
       loadDailyData();
     } catch (err) {
       console.error('Save error:', err);
@@ -269,6 +265,43 @@ export default function RevenueDashboard({ onMenuChange = () => {}, onLogout, ac
       loadDailyData();
     } catch {
       toast.error('Failed to delete');
+    }
+  };
+
+  const handleUpdateEntry = async (entryId: string) => {
+    if (!newEntry.category) { toast.error('Enter a purpose'); return; }
+    if (!newEntry.amount || newEntry.amount <= 0) { toast.error('Enter a valid amount'); return; }
+    const userId = localStorage.getItem('userId');
+    if (!userId || !db) return;
+    try {
+      const entryRef = doc(db, 'doctors', userId, 'revenueEntries', entryId);
+      await updateDoc(entryRef, {
+        category: newEntry.category,
+        description: newEntry.description.trim(),
+        amount: newEntry.amount,
+        method: newEntry.method || 'CASH',
+      });
+      toast.success('Entry updated');
+      setEditingEntryId(null);
+      setNewEntry({ date: '', type: 'credit', category: '', description: '', amount: 0, method: 'CASH' });
+      loadDailyData();
+    } catch (err) {
+      console.error('Update error:', err);
+      toast.error('Failed to update');
+    }
+  };
+
+  const handleUpdateFee = async (bookingId: string, newFee: number) => {
+    setPatientEntries(prev => prev.map(p =>
+      p.bookingId === bookingId ? { ...p, fee: newFee } : p
+    ));
+    try {
+      if (db) {
+        const bookingRef = doc(db, 'bookings', bookingId);
+        await updateDoc(bookingRef, { consultationFee: newFee });
+      }
+    } catch (err) {
+      console.error('Fee update error:', err);
     }
   };
 
@@ -324,33 +357,52 @@ export default function RevenueDashboard({ onMenuChange = () => {}, onLogout, ac
         activeAddOns={activeAddOns}
       />
 
-      <main className="lg:pl-64 p-4 md:p-6 pt-16 lg:pt-6">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
+      <div className="transition-all duration-300 lg:ml-64">
+        {/* Top Bar — matches Schedule Manager */}
+        <div className="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-sm sticky top-0 z-40">
+          <div className="px-4 lg:px-8 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button className="lg:hidden p-2 hover:bg-zinc-800 rounded-lg transition-colors" onClick={() => setSidebarOpen(true)}>
+                <Menu className="w-6 h-6" />
+              </button>
+              <div className="hidden lg:flex items-center gap-3">
+                <div className="p-2 bg-emerald-500/20 rounded-lg">
+                  <IndianRupee className="w-6 h-6 text-emerald-400" />
+                </div>
+                <div>
+                  <h1 className="text-white text-xl font-bold">Revenue & Expenses</h1>
+                  <p className="text-gray-500 text-xs flex items-center gap-1"><Lock className="w-3 h-3" /> Private — Only visible to you</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex bg-zinc-800 rounded-lg p-0.5">
+              <button
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${viewMode === 'daily' ? 'bg-emerald-600 text-white' : 'text-gray-400'}`}
+                onClick={() => setViewMode('daily')}
+              >Daily</button>
+              <button
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${viewMode === 'monthly' ? 'bg-emerald-600 text-white' : 'text-gray-400'}`}
+                onClick={() => setViewMode('monthly')}
+              >Monthly</button>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Title */}
+        <div className="lg:hidden px-4 py-4 border-b border-zinc-800">
           <div className="flex items-center gap-3">
-            <button className="p-2 bg-zinc-800 rounded-lg lg:hidden" onClick={() => setSidebarOpen(true)}>
-              <Menu className="w-5 h-5 text-gray-300" />
-            </button>
             <div className="p-2 bg-emerald-500/20 rounded-lg">
-              <IndianRupee className="w-6 h-6 text-emerald-400" />
+              <IndianRupee className="w-5 h-5 text-emerald-400" />
             </div>
             <div>
-              <h1 className="text-xl md:text-2xl font-bold">Revenue & Expenses</h1>
+              <h1 className="text-white text-lg font-bold">Revenue & Expenses</h1>
               <p className="text-gray-500 text-xs flex items-center gap-1"><Lock className="w-3 h-3" /> Private — Only visible to you</p>
             </div>
           </div>
-
-          <div className="flex bg-zinc-800 rounded-lg p-0.5">
-            <button
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${viewMode === 'daily' ? 'bg-emerald-600 text-white' : 'text-gray-400'}`}
-              onClick={() => setViewMode('daily')}
-            >Daily</button>
-            <button
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${viewMode === 'monthly' ? 'bg-emerald-600 text-white' : 'text-gray-400'}`}
-              onClick={() => setViewMode('monthly')}
-            >Monthly</button>
-          </div>
         </div>
+
+        {/* Content */}
+        <div className="px-4 lg:px-8 py-6">
 
         {/* Date Navigator */}
         <div className="flex items-center gap-3 mb-5">
@@ -490,9 +542,9 @@ export default function RevenueDashboard({ onMenuChange = () => {}, onLogout, ac
                   size="sm"
                   variant="outline"
                   className="border-emerald-600 text-emerald-400 hover:bg-emerald-600/20 h-8 text-xs"
-                  onClick={() => { setShowAddEntry('credit'); setNewEntry({ date: selectedDate, type: 'credit', category: '', description: '', amount: 0 }); }}
+                  onClick={() => { setShowAddEntry('credit'); setNewEntry({ date: selectedDate, type: 'credit', category: '', description: '', amount: 0, method: 'CASH' }); }}
                 >
-                  <Plus className="w-3 h-3 mr-1" /> Add Income
+                  <Plus className="w-3 h-3 mr-1" /> Add Other Credit
                 </Button>
               </div>
 
@@ -531,7 +583,35 @@ export default function RevenueDashboard({ onMenuChange = () => {}, onLogout, ac
                               </td>
                               <td className="p-3 text-gray-300 text-xs">{p.chamberName}</td>
                               <td className="p-3 text-right">
-                                <span className="text-emerald-400 font-medium">₹{p.fee.toLocaleString('en-IN')}</span>
+                                {editingFeeId === p.bookingId ? (
+                                  <div className="flex items-center justify-end gap-1">
+                                    <span className="text-emerald-400 text-xs">₹</span>
+                                    <input
+                                      type="number"
+                                      autoFocus
+                                      value={p.fee || ''}
+                                      onChange={e => setPatientEntries(prev => prev.map(pe => pe.bookingId === p.bookingId ? { ...pe, fee: Number(e.target.value) } : pe))}
+                                      onKeyDown={e => { if (e.key === 'Enter') { handleUpdateFee(p.bookingId, p.fee); setEditingFeeId(null); } }}
+                                      className="w-20 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-right text-emerald-400 font-medium text-sm focus:outline-none focus:border-emerald-500"
+                                    />
+                                    <button
+                                      onClick={() => { handleUpdateFee(p.bookingId, p.fee); setEditingFeeId(null); }}
+                                      className="p-1 hover:bg-emerald-500/20 rounded"
+                                    >
+                                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    <span className="text-emerald-400 font-medium">₹{p.fee.toLocaleString('en-IN')}</span>
+                                    <button
+                                      onClick={() => setEditingFeeId(p.bookingId)}
+                                      className="p-1 hover:bg-zinc-700 rounded"
+                                    >
+                                      <Pencil className="w-3.5 h-3.5 text-gray-500 hover:text-emerald-400" />
+                                    </button>
+                                  </div>
+                                )}
                               </td>
                             </tr>
                           ))}
@@ -559,58 +639,133 @@ export default function RevenueDashboard({ onMenuChange = () => {}, onLogout, ac
                 </Card>
               )}
 
-              {/* Manual credit entries */}
-              {manualEntries.filter(e => e.type === 'credit').map(entry => (
-                <div key={entry.id} className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-lg p-3 mb-2">
-                  <FlaskConical className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-white text-sm">{entry.category}</p>
-                    {entry.description && <p className="text-gray-500 text-xs truncate">{entry.description}</p>}
-                  </div>
-                  <span className="text-emerald-400 font-medium">+₹{entry.amount.toLocaleString('en-IN')}</span>
-                  <button onClick={() => entry.id && handleDeleteEntry(entry.id)} className="p-1 hover:bg-red-500/20 rounded">
-                    <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                  </button>
+              {/* Manual credit entries (Other Credit) */}
+              {manualEntries.filter(e => e.type === 'credit').length > 0 && (
+                <div className="mt-3 mb-2">
+                  <p className="text-gray-400 text-xs uppercase tracking-wider mb-2">Other Credit Entries</p>
                 </div>
+              )}
+              {manualEntries.filter(e => e.type === 'credit').map(entry => (
+                editingEntryId === entry.id ? (
+                  <Card key={entry.id} className="bg-emerald-950/30 border-emerald-800/50 mb-2">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Pencil className="w-4 h-4 text-emerald-400" />
+                        <span className="text-emerald-400 font-medium text-sm">Edit Credit Entry</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="sm:col-span-2">
+                          <label className="text-gray-400 text-xs mb-1 block">Credit Purpose</label>
+                          <Input
+                            value={newEntry.category}
+                            onChange={e => setNewEntry(prev => ({ ...prev, category: e.target.value }))}
+                            className="bg-zinc-900 border-zinc-700 text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-gray-400 text-xs mb-1 block">Credit Amount</label>
+                          <Input
+                            type="number"
+                            value={newEntry.amount || ''}
+                            onChange={e => setNewEntry(prev => ({ ...prev, amount: Number(e.target.value) }))}
+                            className="bg-zinc-900 border-zinc-700 text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-gray-400 text-xs mb-1 block">Payment Method</label>
+                          <Select value={newEntry.method || 'CASH'} onValueChange={v => setNewEntry(prev => ({ ...prev, method: v as 'CASH' | 'UPI' | 'CHEQUE' }))}>
+                            <SelectTrigger className="bg-zinc-900 border-zinc-700 text-white">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-zinc-900 border-zinc-700">
+                              <SelectItem value="CASH" className="text-white">CASH</SelectItem>
+                              <SelectItem value="UPI" className="text-white">UPI</SelectItem>
+                              <SelectItem value="CHEQUE" className="text-white">CHEQUE</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 justify-end pt-1">
+                        <Button size="sm" variant="ghost" onClick={() => { setEditingEntryId(null); setNewEntry({ date: '', type: 'credit', category: '', description: '', amount: 0, method: 'CASH' }); }} className="text-gray-400 h-8">
+                          <X className="w-3 h-3 mr-1" /> Cancel
+                        </Button>
+                        <Button size="sm" onClick={() => handleUpdateEntry(entry.id!)} className="bg-emerald-600 hover:bg-emerald-700 h-8 text-white">
+                          <Save className="w-3 h-3 mr-1" /> Update
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div key={entry.id} className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-lg p-3 mb-2">
+                    <FlaskConical className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-sm">{entry.category}</p>
+                      {entry.description && <p className="text-gray-500 text-xs truncate">{entry.description}</p>}
+                    </div>
+                    {entry.method && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-gray-400 border border-zinc-700">
+                        {entry.method}
+                      </span>
+                    )}
+                    <span className="text-emerald-400 font-medium">+₹{entry.amount.toLocaleString('en-IN')}</span>
+                    <button onClick={() => { setEditingEntryId(entry.id!); setShowAddEntry(null); setNewEntry({ date: entry.date, type: 'credit', category: entry.category, description: entry.description, amount: entry.amount, method: entry.method || 'CASH' }); }} className="p-1 hover:bg-zinc-700 rounded">
+                      <Pencil className="w-3.5 h-3.5 text-gray-500 hover:text-emerald-400" />
+                    </button>
+                    <button onClick={() => entry.id && handleDeleteEntry(entry.id)} className="p-1 hover:bg-red-500/20 rounded">
+                      <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                    </button>
+                  </div>
+                )
               ))}
 
-              {/* Add credit form */}
+              {/* Add other credit form */}
               {showAddEntry === 'credit' && (
                 <Card className="bg-emerald-950/30 border-emerald-800/50 mt-3">
                   <CardContent className="p-4 space-y-3">
                     <div className="flex items-center gap-2 mb-1">
                       <ArrowUpCircle className="w-4 h-4 text-emerald-400" />
-                      <span className="text-emerald-400 font-medium text-sm">New Credit Entry</span>
+                      <span className="text-emerald-400 font-medium text-sm">Other Credit Entry</span>
                     </div>
-                    <Select value={newEntry.category} onValueChange={v => setNewEntry(prev => ({ ...prev, category: v }))}>
-                      <SelectTrigger className="bg-zinc-900 border-zinc-700 text-white">
-                        <SelectValue placeholder="Select category..." />
-                      </SelectTrigger>
-                      <SelectContent className="bg-zinc-900 border-zinc-700">
-                        {CREDIT_CATEGORIES.map(c => (
-                          <SelectItem key={c} value={c} className="text-white">{c}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      placeholder="Description (optional)"
-                      value={newEntry.description}
-                      onChange={e => setNewEntry(prev => ({ ...prev, description: e.target.value }))}
-                      className="bg-zinc-900 border-zinc-700 text-white"
-                    />
-                    <Input
-                      type="number"
-                      placeholder="Amount (₹)"
-                      value={newEntry.amount || ''}
-                      onChange={e => setNewEntry(prev => ({ ...prev, amount: Number(e.target.value) }))}
-                      className="bg-zinc-900 border-zinc-700 text-white"
-                    />
-                    <div className="flex gap-2 justify-end">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="sm:col-span-2">
+                        <label className="text-gray-400 text-xs mb-1 block">Credit Purpose</label>
+                        <Input
+                          placeholder="e.g., Lab Referral, Procedure Fee, Vaccination"
+                          value={newEntry.category}
+                          onChange={e => setNewEntry(prev => ({ ...prev, category: e.target.value }))}
+                          className="bg-zinc-900 border-zinc-700 text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-gray-400 text-xs mb-1 block">Credit Amount</label>
+                        <Input
+                          type="number"
+                          placeholder="₹ 0"
+                          value={newEntry.amount || ''}
+                          onChange={e => setNewEntry(prev => ({ ...prev, amount: Number(e.target.value) }))}
+                          className="bg-zinc-900 border-zinc-700 text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-gray-400 text-xs mb-1 block">Payment Method</label>
+                        <Select value={newEntry.method || 'CASH'} onValueChange={v => setNewEntry(prev => ({ ...prev, method: v as 'CASH' | 'UPI' | 'CHEQUE' }))}>
+                          <SelectTrigger className="bg-zinc-900 border-zinc-700 text-white">
+                            <SelectValue placeholder="Select method" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-zinc-900 border-zinc-700">
+                            <SelectItem value="CASH" className="text-white">CASH</SelectItem>
+                            <SelectItem value="UPI" className="text-white">UPI</SelectItem>
+                            <SelectItem value="CHEQUE" className="text-white">CHEQUE</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 justify-end pt-1">
                       <Button size="sm" variant="ghost" onClick={() => setShowAddEntry(null)} className="text-gray-400 h-8">
                         <X className="w-3 h-3 mr-1" /> Cancel
                       </Button>
-                      <Button size="sm" onClick={handleSaveEntry} className="bg-emerald-600 hover:bg-emerald-700 h-8">
-                        <Save className="w-3 h-3 mr-1" /> Save
+                      <Button size="sm" onClick={handleSaveEntry} className="bg-emerald-600 hover:bg-emerald-700 h-8 text-white">
+                        <Save className="w-3 h-3 mr-1" /> Save Credit Entry
                       </Button>
                     </div>
                   </CardContent>
@@ -629,7 +784,7 @@ export default function RevenueDashboard({ onMenuChange = () => {}, onLogout, ac
                   size="sm"
                   variant="outline"
                   className="border-red-600 text-red-400 hover:bg-red-600/20 h-8 text-xs"
-                  onClick={() => { setShowAddEntry('debit'); setNewEntry({ date: selectedDate, type: 'debit', category: '', description: '', amount: 0 }); }}
+                  onClick={() => { setShowAddEntry('debit'); setNewEntry({ date: selectedDate, type: 'debit', category: '', description: '', amount: 0, method: 'CASH' }); }}
                 >
                   <Plus className="w-3 h-3 mr-1" /> Add Expense
                 </Button>
@@ -644,20 +799,79 @@ export default function RevenueDashboard({ onMenuChange = () => {}, onLogout, ac
               )}
 
               {manualEntries.filter(e => e.type === 'debit').map(entry => (
-                <div key={entry.id} className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-lg p-3 mb-2">
-                  <ArrowDownCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-white text-sm">{entry.category}</p>
-                    {entry.description && <p className="text-gray-500 text-xs truncate">{entry.description}</p>}
+                editingEntryId === entry.id ? (
+                  <Card key={entry.id} className="bg-red-950/30 border-red-800/50 mb-2">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Pencil className="w-4 h-4 text-red-400" />
+                        <span className="text-red-400 font-medium text-sm">Edit Debit Entry</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="sm:col-span-2">
+                          <label className="text-gray-400 text-xs mb-1 block">Debit Purpose</label>
+                          <Input
+                            value={newEntry.category}
+                            onChange={e => setNewEntry(prev => ({ ...prev, category: e.target.value }))}
+                            className="bg-zinc-900 border-zinc-700 text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-gray-400 text-xs mb-1 block">Debit Amount</label>
+                          <Input
+                            type="number"
+                            value={newEntry.amount || ''}
+                            onChange={e => setNewEntry(prev => ({ ...prev, amount: Number(e.target.value) }))}
+                            className="bg-zinc-900 border-zinc-700 text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-gray-400 text-xs mb-1 block">Debit Method</label>
+                          <Select value={newEntry.method || 'CASH'} onValueChange={v => setNewEntry(prev => ({ ...prev, method: v as 'CASH' | 'UPI' | 'CHEQUE' }))}>
+                            <SelectTrigger className="bg-zinc-900 border-zinc-700 text-white">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-zinc-900 border-zinc-700">
+                              <SelectItem value="CASH" className="text-white">CASH</SelectItem>
+                              <SelectItem value="UPI" className="text-white">UPI</SelectItem>
+                              <SelectItem value="CHEQUE" className="text-white">CHEQUE</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 justify-end pt-1">
+                        <Button size="sm" variant="ghost" onClick={() => { setEditingEntryId(null); setNewEntry({ date: '', type: 'credit', category: '', description: '', amount: 0, method: 'CASH' }); }} className="text-gray-400 h-8">
+                          <X className="w-3 h-3 mr-1" /> Cancel
+                        </Button>
+                        <Button size="sm" onClick={() => handleUpdateEntry(entry.id!)} className="bg-emerald-600 hover:bg-emerald-700 h-8 text-white">
+                          <Save className="w-3 h-3 mr-1" /> Update
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div key={entry.id} className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-lg p-3 mb-2">
+                    <ArrowDownCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-sm">{entry.category}</p>
+                      {entry.description && <p className="text-gray-500 text-xs truncate">{entry.description}</p>}
+                    </div>
+                    {entry.method && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-gray-400 border border-zinc-700">
+                        {entry.method}
+                      </span>
+                    )}
+                    <span className="text-red-400 font-medium">-₹{entry.amount.toLocaleString('en-IN')}</span>
+                    <button onClick={() => { setEditingEntryId(entry.id!); setShowAddEntry(null); setNewEntry({ date: entry.date, type: 'debit', category: entry.category, description: entry.description, amount: entry.amount, method: entry.method || 'CASH' }); }} className="p-1 hover:bg-zinc-700 rounded">
+                      <Pencil className="w-3.5 h-3.5 text-gray-500 hover:text-red-400" />
+                    </button>
+                    <button onClick={() => entry.id && handleDeleteEntry(entry.id)} className="p-1 hover:bg-red-500/20 rounded">
+                      <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                    </button>
                   </div>
-                  <span className="text-red-400 font-medium">-₹{entry.amount.toLocaleString('en-IN')}</span>
-                  <button onClick={() => entry.id && handleDeleteEntry(entry.id)} className="p-1 hover:bg-red-500/20 rounded">
-                    <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                  </button>
-                </div>
+                )
               ))}
 
-              {/* Add debit form */}
+              {/* Add debit form — SS1 style */}
               {showAddEntry === 'debit' && (
                 <Card className="bg-red-950/30 border-red-800/50 mt-3">
                   <CardContent className="p-4 space-y-3">
@@ -665,35 +879,55 @@ export default function RevenueDashboard({ onMenuChange = () => {}, onLogout, ac
                       <ArrowDownCircle className="w-4 h-4 text-red-400" />
                       <span className="text-red-400 font-medium text-sm">New Debit Entry</span>
                     </div>
-                    <Select value={newEntry.category} onValueChange={v => setNewEntry(prev => ({ ...prev, category: v }))}>
-                      <SelectTrigger className="bg-zinc-900 border-zinc-700 text-white">
-                        <SelectValue placeholder="Select category..." />
-                      </SelectTrigger>
-                      <SelectContent className="bg-zinc-900 border-zinc-700">
-                        {DEBIT_CATEGORIES.map(c => (
-                          <SelectItem key={c} value={c} className="text-white">{c}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      placeholder="Description (e.g., Assistant name, bill ref)"
-                      value={newEntry.description}
-                      onChange={e => setNewEntry(prev => ({ ...prev, description: e.target.value }))}
-                      className="bg-zinc-900 border-zinc-700 text-white"
-                    />
-                    <Input
-                      type="number"
-                      placeholder="Amount (₹)"
-                      value={newEntry.amount || ''}
-                      onChange={e => setNewEntry(prev => ({ ...prev, amount: Number(e.target.value) }))}
-                      className="bg-zinc-900 border-zinc-700 text-white"
-                    />
-                    <div className="flex gap-2 justify-end">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="sm:col-span-2">
+                        <label className="text-gray-400 text-xs mb-1 block">Date</label>
+                        <Input
+                          type="date"
+                          value={selectedDate}
+                          readOnly
+                          className="bg-zinc-900 border-zinc-700 text-white"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="text-gray-400 text-xs mb-1 block">Debit Purpose</label>
+                        <Input
+                          placeholder="e.g., Office Rent, Marketing, Staff Salary"
+                          value={newEntry.category}
+                          onChange={e => setNewEntry(prev => ({ ...prev, category: e.target.value }))}
+                          className="bg-zinc-900 border-zinc-700 text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-gray-400 text-xs mb-1 block">Debit Amount</label>
+                        <Input
+                          type="number"
+                          placeholder="₹ 0"
+                          value={newEntry.amount || ''}
+                          onChange={e => setNewEntry(prev => ({ ...prev, amount: Number(e.target.value) }))}
+                          className="bg-zinc-900 border-zinc-700 text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-gray-400 text-xs mb-1 block">Debit Method</label>
+                        <Select value={newEntry.method || 'CASH'} onValueChange={v => setNewEntry(prev => ({ ...prev, method: v as 'CASH' | 'UPI' | 'CHEQUE' }))}>
+                          <SelectTrigger className="bg-zinc-900 border-zinc-700 text-white">
+                            <SelectValue placeholder="Select method" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-zinc-900 border-zinc-700">
+                            <SelectItem value="CASH" className="text-white">CASH</SelectItem>
+                            <SelectItem value="UPI" className="text-white">UPI</SelectItem>
+                            <SelectItem value="CHEQUE" className="text-white">CHEQUE</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 justify-end pt-1">
                       <Button size="sm" variant="ghost" onClick={() => setShowAddEntry(null)} className="text-gray-400 h-8">
                         <X className="w-3 h-3 mr-1" /> Cancel
                       </Button>
-                      <Button size="sm" onClick={handleSaveEntry} className="bg-red-600 hover:bg-red-700 h-8">
-                        <Save className="w-3 h-3 mr-1" /> Save
+                      <Button size="sm" onClick={handleSaveEntry} className="bg-emerald-600 hover:bg-emerald-700 h-8 text-white">
+                        <Save className="w-3 h-3 mr-1" /> Save Debit Entry
                       </Button>
                     </div>
                   </CardContent>
@@ -720,7 +954,8 @@ export default function RevenueDashboard({ onMenuChange = () => {}, onLogout, ac
             </Card>
           </>
         )}
-      </main>
+        </div>
+      </div>
     </div>
   );
 }

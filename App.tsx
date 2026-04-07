@@ -78,6 +78,8 @@ const VerifyWalkin = lazy(() => import("./components/VerifyWalkin"));
 const AdvertiserSignUp = lazy(() => import("./components/AdvertiserSignUp"));
 const AdvertiserLogin = lazy(() => import("./components/AdvertiserLogin"));
 const AdvertiserDashboard = lazy(() => import("./components/AdvertiserDashboard"));
+const ReferrerRegistration = lazy(() => import("./components/ReferrerRegistration"));
+const ReferrerDashboard = lazy(() => import("./components/ReferrerDashboard"));
 const AdvertiserGateway = lazy(() => import("./components/AdvertiserGateway"));
 const AdvertiserVerifyLogin = lazy(() => import("./components/AdvertiserVerifyLogin"));
 const UpgradePage = lazy(() => import("./components/UpgradePage"));
@@ -224,6 +226,8 @@ export default function App() {
     | "braindeck"
     | "pharma-cme"
     | "pharma-samples"
+    | "referrer-register"
+    | "referrer-dashboard"
   >(() => {
     // Initialize currentPage from localStorage to prevent flash/auto-logout on refresh
     const isClinic = localStorage.getItem('healqr_is_clinic') === 'true';
@@ -669,6 +673,35 @@ export default function App() {
           console.error("Error fetching RX", e);
         }
       }
+    }
+
+    // Handle Referrer Registration link (?ref=CODE)
+    const refCode = urlParams.get('ref');
+    if (refCode) {
+      // Check if already registered referrer
+      const existingId = localStorage.getItem('referrer_id');
+      const expiry = localStorage.getItem('referrer_session_expiry');
+      if (existingId && expiry && Date.now() < parseInt(expiry)) {
+        setCurrentPage('referrer-dashboard');
+      } else {
+        sessionStorage.setItem('referral_code', refCode);
+        setCurrentPage('referrer-register');
+      }
+      return;
+    }
+
+    // Handle Referrer Booking link (?refBy=REFERRER_ID) — store for booking flow
+    const refBy = urlParams.get('refBy');
+    if (refBy && db) {
+      sessionStorage.setItem('booking_referrer_id', refBy);
+      // Pre-load referrer name/role for the booking doc
+      try {
+        const refDoc = await getDoc(doc(db, 'referrers', refBy));
+        if (refDoc.exists()) {
+          sessionStorage.setItem('booking_referrer_name', refDoc.data().name || '');
+          sessionStorage.setItem('booking_referrer_role', refDoc.data().role || '');
+        }
+      } catch {}
     }
 
     // Handle Clinic QR Scan (ONLY if no doctor selected yet)
@@ -2723,6 +2756,26 @@ export default function App() {
             onMenuChange={menuChangeHandler}
             onLogout={handleLogout}
             activeAddOns={activeAddOns}
+          />
+        </Suspense>
+      )}
+
+      {currentPage === "referrer-register" && (
+        <Suspense fallback={<PageLoader />}>
+          <ReferrerRegistration
+            referralCode={sessionStorage.getItem('referral_code') || ''}
+            onSuccess={() => setCurrentPage('landing')}
+            onBack={() => setCurrentPage('landing')}
+          />
+        </Suspense>
+      )}
+
+      {currentPage === "referrer-dashboard" && (
+        <Suspense fallback={<PageLoader />}>
+          <ReferrerDashboard
+            referrerId={localStorage.getItem('referrer_id') || ''}
+            referrerPhone={localStorage.getItem('referrer_phone') || ''}
+            onLogout={() => setCurrentPage('landing')}
           />
         </Suspense>
       )}

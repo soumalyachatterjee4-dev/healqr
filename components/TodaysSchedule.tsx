@@ -288,6 +288,8 @@ function PatientDetailsLoader({
               vcPatientJoined: data.vcPatientJoined || false,
               vcCompleted: data.vcCompleted || false,
               vcLinkSentAt: data.vcLinkSentAt || null,
+              referrerName: data.referrerName || null,
+              referrerRole: data.referrerRole || null,
             };
           })
           // Filter out invalid patients (already filtered by date in query)

@@ -122,6 +122,7 @@ export default function AdminSidebar({ currentPage, onNavigate, onLogout, isOpen
         { id: 'platform-analytics', label: 'Platform Analytics', icon: TrendingUp },
         { id: 'rx-trends', label: 'Rx Trends', icon: Activity },
         { id: 'admin-pathology-trends', label: 'Pathology Trends', icon: Microscope },
+        { id: 'referrer-leaderboard', label: 'Referrer Leaderboard', icon: Users },
       ],
     },
   ];

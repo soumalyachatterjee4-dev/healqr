@@ -54,6 +54,8 @@ interface Patient {
   vcPatientJoined?: boolean;
   vcCompleted?: boolean;
   consultationStatus?: 'pending' | 'completed';
+  referrerName?: string;
+  referrerRole?: string;
 }
 
 interface PatientDetailsProps {
@@ -1753,6 +1755,11 @@ export default function PatientDetails({
                       <span className="flex items-center gap-1 px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded text-xs">
                         <CheckCircle2 className="w-3 h-3" />
                         Paid
+                      </span>
+                    )}
+                    {patient.referrerName && (
+                      <span className="flex items-center gap-1 px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs">
+                        Ref: {patient.referrerName} ({patient.referrerRole || 'Agent'})
                       </span>
                     )}
                   </div>

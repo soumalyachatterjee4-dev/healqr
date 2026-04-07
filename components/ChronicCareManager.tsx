@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Search, Plus, Trash2, Send, X, ChevronLeft, Heart, Filter, Users, Bell, MessageSquare, MessageCircle, ImagePlus, Trash } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Search, Plus, Trash2, Send, X, ChevronLeft, Heart, Filter, Users, Bell, MessageSquare, MessageCircle, ImagePlus, Trash, Menu, ChevronDown } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card } from './ui/card';
@@ -81,7 +81,22 @@ export default function ChronicCareManager({ doctorName, email, onLogout, onMenu
   const [searchingBookings, setSearchingBookings] = useState(false);
 
   // Filter
-  const [filterCondition, setFilterCondition] = useState('');
+  const [filterConditions, setFilterConditions] = useState<string[]>([]);
+  const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
+  const [showAllPatients, setShowAllPatients] = useState(false);
+  const filterRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!filterDropdownOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+        setFilterDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [filterDropdownOpen]);
 
   // Bulk message
   const [showBulkModal, setShowBulkModal] = useState(false);
@@ -371,15 +386,17 @@ export default function ChronicCareManager({ doctorName, email, onLogout, onMenu
     }
   };
 
-  const filteredPatients = filterCondition
-    ? patients.filter(p => p.conditions.includes(filterCondition))
+  const filteredPatients = filterConditions.length > 0
+    ? patients.filter(p => filterConditions.some(fc => p.conditions.includes(fc)))
     : patients;
+
+  const displayedPatients = showAllPatients ? filteredPatients : filteredPatients.slice(0, 5);
 
   // Get unique conditions from all patients
   const allConditions = [...new Set(patients.flatMap(p => p.conditions))].sort();
 
   return (
-    <div className="flex h-screen bg-[#0a0a0a]">
+    <div className="min-h-screen bg-[#0a0a0a] text-white">
       <DashboardSidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
@@ -390,25 +407,18 @@ export default function ChronicCareManager({ doctorName, email, onLogout, onMenu
         activeAddOns={activeAddOns}
       />
 
-      <div className="flex-1 overflow-y-auto">
-        <div className="lg:hidden flex items-center justify-between p-4 border-b border-zinc-800">
-          <button onClick={() => setSidebarOpen(true)} className="p-2 hover:bg-zinc-800 rounded-lg text-gray-400">
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <h1 className="text-lg font-bold text-white">Chronic Care</h1>
-          <div className="w-9" />
-        </div>
-
-        <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
-          {/* Header */}
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <div>
-              <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-                <Heart className="w-6 h-6 text-rose-400" /> Chronic Care Databank
-              </h1>
-              <p className="text-sm text-gray-400 mt-1">
-                {patients.length} patient{patients.length !== 1 ? 's' : ''} in your chronic care registry
-              </p>
+      <div className="transition-all duration-300 lg:ml-64">
+        {/* Sticky Top Bar */}
+        <div className="border-b border-zinc-800 bg-[#0a0a0a]/80 backdrop-blur-sm sticky top-0 z-40">
+          <div className="px-4 lg:px-8 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 hover:bg-zinc-800 rounded-lg transition-colors">
+                <Menu className="w-6 h-6" />
+              </button>
+              <div className="hidden lg:block">
+                <h1 className="text-white text-xl font-bold flex items-center gap-2"><Heart className="w-5 h-5 text-rose-400" /> Chronic Care</h1>
+                <p className="text-gray-400 text-sm mt-0.5">{patients.length} patient{patients.length !== 1 ? 's' : ''} in your chronic care registry</p>
+              </div>
             </div>
             <div className="flex gap-2">
               {selectedForBulk.size > 0 && (
@@ -421,22 +431,54 @@ export default function ChronicCareManager({ doctorName, email, onLogout, onMenu
               </Button>
             </div>
           </div>
+        </div>
+
+        {/* Mobile Title */}
+        <div className="lg:hidden px-4 py-4 border-b border-zinc-800">
+          <h1 className="text-white text-lg font-bold flex items-center gap-2"><Heart className="w-5 h-5 text-rose-400" /> Chronic Care Databank</h1>
+          <p className="text-gray-400 text-xs mt-1">{patients.length} patient{patients.length !== 1 ? 's' : ''} in your chronic care registry</p>
+        </div>
+
+        {/* Content */}
+        <div className="px-4 lg:px-8 py-6 space-y-6">
 
           {/* Filter + Select All Bar */}
           {patients.length > 0 && (
             <div className="flex items-center gap-3 flex-wrap">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 relative" ref={filterRef}>
                 <Filter className="w-4 h-4 text-gray-500" />
-                <select
-                  value={filterCondition}
-                  onChange={e => setFilterCondition(e.target.value)}
-                  className="bg-zinc-800 border border-zinc-700 text-white rounded-lg px-3 py-1.5 text-sm"
+                <button
+                  onClick={() => setFilterDropdownOpen(!filterDropdownOpen)}
+                  className="bg-zinc-800 border border-zinc-700 text-white rounded-lg px-3 py-1.5 text-sm flex items-center gap-2 min-w-[160px]"
                 >
-                  <option value="">All Conditions</option>
-                  {allConditions.map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
+                  <span className="truncate">{filterConditions.length === 0 ? 'All Conditions' : `${filterConditions.length} selected`}</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                </button>
+                {filterDropdownOpen && (
+                  <div className="absolute top-full left-6 mt-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl z-50 w-64 max-h-60 overflow-y-auto">
+                    <button
+                      onClick={() => { setFilterConditions([]); setFilterDropdownOpen(false); setShowAllPatients(false); }}
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-zinc-700 transition-colors ${filterConditions.length === 0 ? 'text-emerald-400 font-medium' : 'text-gray-300'}`}
+                    >
+                      All Conditions
+                    </button>
+                    {allConditions.map(c => (
+                      <button
+                        key={c}
+                        onClick={() => {
+                          setFilterConditions(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]);
+                          setShowAllPatients(false);
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-zinc-700 transition-colors flex items-center gap-2"
+                      >
+                        <span className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${filterConditions.includes(c) ? 'bg-emerald-500 border-emerald-500' : 'border-zinc-600'}`}>
+                          {filterConditions.includes(c) && <span className="text-white text-[10px]">✓</span>}
+                        </span>
+                        <span className={filterConditions.includes(c) ? 'text-white' : 'text-gray-300'}>{c}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <button
                 onClick={toggleSelectAll}
@@ -444,7 +486,7 @@ export default function ChronicCareManager({ doctorName, email, onLogout, onMenu
               >
                 {selectAll ? `Deselect All` : `Select All (${filteredPatients.length})`}
               </button>
-              <span className="text-[10px] text-gray-600">Showing {filteredPatients.length} of {patients.length}</span>
+              <span className="text-[10px] text-gray-600">Showing {displayedPatients.length} of {filteredPatients.length}</span>
             </div>
           )}
 
@@ -454,12 +496,12 @@ export default function ChronicCareManager({ doctorName, email, onLogout, onMenu
           ) : filteredPatients.length === 0 ? (
             <Card className="bg-zinc-900/50 border-zinc-800 p-8 text-center">
               <Heart className="w-10 h-10 text-zinc-700 mx-auto mb-3" />
-              <p className="text-sm text-gray-500">{filterCondition ? 'No patients with this condition' : 'No chronic patients added yet'}</p>
+              <p className="text-sm text-gray-500">{filterConditions.length > 0 ? 'No patients with selected conditions' : 'No chronic patients added yet'}</p>
               <p className="text-[10px] text-gray-600 mt-1">Add patients from your bookings or manually to start building your chronic care registry</p>
             </Card>
           ) : (
             <div className="space-y-2">
-              {filteredPatients.map(p => (
+              {displayedPatients.map(p => (
                 <Card
                   key={p.id}
                   className={`bg-zinc-900/50 border-zinc-800 p-4 transition-colors ${selectedForBulk.has(p.id) ? 'border-purple-500/50 bg-purple-500/5' : ''}`}
@@ -505,6 +547,22 @@ export default function ChronicCareManager({ doctorName, email, onLogout, onMenu
                   </div>
                 </Card>
               ))}
+              {!showAllPatients && filteredPatients.length > 5 && (
+                <button
+                  onClick={() => setShowAllPatients(true)}
+                  className="w-full py-3 text-center text-sm text-emerald-400 hover:text-emerald-300 bg-zinc-900/50 border border-zinc-800 rounded-lg hover:bg-zinc-800/50 transition-colors"
+                >
+                  Show All {filteredPatients.length} Patients
+                </button>
+              )}
+              {showAllPatients && filteredPatients.length > 5 && (
+                <button
+                  onClick={() => setShowAllPatients(false)}
+                  className="w-full py-3 text-center text-sm text-gray-500 hover:text-gray-400 bg-zinc-900/50 border border-zinc-800 rounded-lg hover:bg-zinc-800/50 transition-colors"
+                >
+                  Show Less
+                </button>
+              )}
             </div>
           )}
         </div>
