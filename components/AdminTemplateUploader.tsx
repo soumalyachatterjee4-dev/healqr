@@ -111,6 +111,7 @@ export default function AdminTemplateUploader() {
   });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessingImage, setIsProcessingImage] = useState(false);
 
@@ -432,6 +433,10 @@ export default function AdminTemplateUploader() {
       });
       setEditingId(id);
       setIsAdding(true);
+      // Scroll to form after state update
+      setTimeout(() => {
+        formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
     }
   };
 
@@ -585,7 +590,7 @@ export default function AdminTemplateUploader() {
           </div>
 
           {/* Action Buttons */}
-          {!isAdding && (
+          {!isAdding ? (
             <div className="flex flex-col sm:flex-row gap-3">
               <Button
                 onClick={() => {
@@ -651,11 +656,38 @@ export default function AdminTemplateUploader() {
                 </Button>
               )}
             </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button
+                onClick={() => {
+                  resetForm();
+                  setIsAdding(true);
+                  setFormData({ name: '', description: '', category: activeTab, imageFile: null, imageUrl: '', placements: [] });
+                  setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+                }}
+                className="bg-emerald-500 hover:bg-emerald-600 h-10 md:h-12 text-sm md:text-base w-full sm:w-auto"
+              >
+                <Plus className="w-4 h-4 md:w-5 md:h-5 mr-2" />
+                Create New Template
+              </Button>
+              <Button
+                onClick={() => {
+                  resetForm();
+                  setIsAdding(false);
+                }}
+                variant="outline"
+                className="border-zinc-700 h-10 md:h-12 text-sm md:text-base w-full sm:w-auto hover:bg-zinc-800"
+              >
+                <X className="w-4 h-4 md:w-5 md:h-5 mr-2" />
+                Close Form
+              </Button>
+            </div>
           )}
         </div>
 
         {/* Upload Form */}
         {isAdding && (
+          <div ref={formRef}>
           <Card className="bg-zinc-900 border-zinc-800 mb-6 md:mb-8">
             <CardHeader className="border-b border-zinc-800 p-4 md:p-6">
               <div className="flex items-center justify-between">
@@ -881,6 +913,7 @@ export default function AdminTemplateUploader() {
               </div>
             </CardContent>
           </Card>
+          </div>
         )}
 
         {/* Templates Tabs */}

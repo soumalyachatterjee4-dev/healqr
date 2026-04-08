@@ -1378,7 +1378,8 @@ service cloud.firestore {
     match /referrers/{referrerId}/referralHistory/{historyId} {
       allow read: if true;
       allow create: if true;
-      allow update, delete: if false;
+      allow update: if true;
+      allow delete: if false;
     }
 
     // ============================================

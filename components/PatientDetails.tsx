@@ -1,4 +1,4 @@
-import { ArrowLeft, Calendar, MapPin, Clock, Bell, Eye, Star, Apple, Phone, X, Check, RotateCcw, CheckCircle2, Video, Send, UserCircle, Sparkles, History, Upload, Lock, QrCode, FileText, Stethoscope, Loader2, MessageCircle, Heart } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Clock, Bell, Eye, Star, Apple, Phone, X, Check, RotateCcw, CheckCircle2, Video, Send, UserCircle, Sparkles, History, Upload, Lock, QrCode, FileText, Stethoscope, Loader2, MessageCircle, Heart, Users } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import FollowUpModal from './FollowUpModal';
 import CancellationModal from './CancellationModal';
@@ -203,6 +203,11 @@ export default function PatientDetails({
   const [followUpModalOpen, setFollowUpModalOpen] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
+
+  // Referrer info modal
+  const [showReferrerInfoModal, setShowReferrerInfoModal] = useState(false);
+  const [selectedReferrerInfo, setSelectedReferrerInfo] = useState<{ name: string; role: string; referrerId: string; organization?: string; phone?: string; currentMonthReferrals?: number } | null>(null);
+  const [referrerDetailsLoading, setReferrerDetailsLoading] = useState(false);
 
   // Assistant "Consultation Complete?" confirmation modal state
   const [assistantSeenModalOpen, setAssistantSeenModalOpen] = useState(false);
@@ -1275,10 +1280,46 @@ export default function PatientDetails({
         reviewScheduledAt: seenTimestamp,
         consultationStatus: 'completed',
         isCompleted: true,
+        referrerSeen: true,
         ...(rxUrl ? { digitalRxUrl: rxUrl } : {}),
         ...(dietUrl ? { dietChartUrl: dietUrl } : {}),
         ...(rxUrl && lastRxData ? { rxLastData: lastRxData } : {}),
       });
+
+      // ============================================
+      // 📋 UPDATE REFERRER HISTORY (if referred patient)
+      // ============================================
+      try {
+        const { getDoc: getBookingDoc } = await import('firebase/firestore');
+        const bookingSnap = await getBookingDoc(bookingRef);
+        const bookingData = bookingSnap.data();
+        if (bookingData?.referrerId) {
+          const { collection: colRef, query: qRef, where: whereRef, getDocs: getDocsRef, updateDoc: updateRefDoc } = await import('firebase/firestore');
+          // Find the referral history record and update status to 'seen'
+          const historyRef = colRef(fireDb!, 'referrers', bookingData.referrerId, 'referralHistory');
+          const histQ = qRef(historyRef, whereRef('bookingId', '==', patient.id));
+          const histSnap = await getDocsRef(histQ);
+          if (!histSnap.empty) {
+            const histDoc = histSnap.docs[0];
+            await updateRefDoc(docRef(fireDb!, 'referrers', bookingData.referrerId, 'referralHistory', histDoc.id), {
+              status: 'seen',
+              seenAt: seenTimestamp,
+            });
+          } else {
+            // Try matching by structured bookingId field
+            const histQ2 = qRef(historyRef, whereRef('bookingId', '==', patient.bookingId));
+            const histSnap2 = await getDocsRef(histQ2);
+            if (!histSnap2.empty) {
+              await updateRefDoc(docRef(fireDb!, 'referrers', bookingData.referrerId, 'referralHistory', histSnap2.docs[0].id), {
+                status: 'seen',
+                seenAt: seenTimestamp,
+              });
+            }
+          }
+        }
+      } catch (refTrackErr) {
+        console.error('Error updating referrer history:', refTrackErr);
+      }
 
       // Update local state
       setPatientStates((prev: any) => ({
@@ -1453,6 +1494,34 @@ export default function PatientDetails({
         cancelledBy: 'doctor'
       });
 
+      // Update referrer history if referred patient
+      try {
+        const { getDoc: gDoc, collection: cRef, query: qRef, where: wRef, getDocs: gDocs } = await import('firebase/firestore');
+        const bookSnap = await gDoc(doc(db!, 'bookings', patient.id));
+        const bData = bookSnap.data();
+        if (bData?.referrerId) {
+          const histRef = cRef(db!, 'referrers', bData.referrerId, 'referralHistory');
+          const histQ = qRef(histRef, wRef('bookingId', '==', patient.id));
+          const histSnap = await gDocs(histQ);
+          if (!histSnap.empty) {
+            await updateDoc(doc(db!, 'referrers', bData.referrerId, 'referralHistory', histSnap.docs[0].id), {
+              status: 'cancelled',
+              cancelledAt: new Date(),
+            });
+          } else {
+            // Try structured bookingId
+            const histQ2 = qRef(histRef, wRef('bookingId', '==', patient.bookingId));
+            const histSnap2 = await gDocs(histQ2);
+            if (!histSnap2.empty) {
+              await updateDoc(doc(db!, 'referrers', bData.referrerId, 'referralHistory', histSnap2.docs[0].id), {
+                status: 'cancelled',
+                cancelledAt: new Date(),
+              });
+            }
+          }
+        }
+      } catch (refErr) { console.error('Error updating referrer history on cancel:', refErr); }
+
       // ============================================
       // 🔔 SEND CANCELLATION NOTIFICATION
       // ============================================
@@ -1552,6 +1621,36 @@ export default function PatientDetails({
         restoredAt: new Date(),
       });
 
+      // Update referrer history if referred patient
+      try {
+        const { getDoc: gDoc, collection: cRef, query: qRef, where: wRef, getDocs: gDocs } = await import('firebase/firestore');
+        const bookSnap = await gDoc(doc(db!, 'bookings', patient.id));
+        const bData = bookSnap.data();
+        if (bData?.referrerId) {
+          const histRef = cRef(db!, 'referrers', bData.referrerId, 'referralHistory');
+          const histQ = qRef(histRef, wRef('bookingId', '==', patient.id));
+          const histSnap = await gDocs(histQ);
+          if (!histSnap.empty) {
+            await updateDoc(doc(db!, 'referrers', bData.referrerId, 'referralHistory', histSnap.docs[0].id), {
+              status: 'booked',
+              cancelledAt: null,
+              seenAt: null,
+            });
+          } else {
+            // Try structured bookingId
+            const histQ2 = qRef(histRef, wRef('bookingId', '==', patient.bookingId));
+            const histSnap2 = await gDocs(histQ2);
+            if (!histSnap2.empty) {
+              await updateDoc(doc(db!, 'referrers', bData.referrerId, 'referralHistory', histSnap2.docs[0].id), {
+                status: 'booked',
+                cancelledAt: null,
+                seenAt: null,
+              });
+            }
+          }
+        }
+      } catch (refErr) { console.error('Error updating referrer history on restore:', refErr); }
+
       // ============================================
       // 🔔 SEND RESTORATION NOTIFICATION
       // ============================================
@@ -1638,24 +1737,21 @@ export default function PatientDetails({
   return (
     <div className="min-h-screen bg-[#0a0f1a]">
       {/* Header */}
-      <div className="bg-[#0a0f1a] border-b border-gray-800 p-6">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 text-gray-400 hover:text-white mb-4"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-white">Patient Details</h1>
-            {doctorInfo.name && (
-              <p className="text-emerald-400 text-sm font-semibold mt-1">
-                Dr. {doctorInfo.name}
+      <div className="border-b border-zinc-800 bg-[#0a0a0a]/80 backdrop-blur-sm sticky top-0 z-40">
+        <div className="px-4 lg:px-8 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onBack}
+              className="p-2 text-gray-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors"
+            >
+              <ArrowLeft className="w-6 h-6" />
+            </button>
+            <div>
+              <h1 className="text-white text-xl font-bold">Patient Details</h1>
+              <p className="text-gray-400 text-sm mt-0.5">
+                View and manage patient notifications for selected chamber
               </p>
-            )}
-            <p className="text-gray-400 text-sm mt-1">
-              View and manage patient notifications for selected chamber
-            </p>
+            </div>
           </div>
         </div>
       </div>
@@ -1758,9 +1854,84 @@ export default function PatientDetails({
                       </span>
                     )}
                     {patient.referrerName && (
-                      <span className="flex items-center gap-1 px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs">
-                        Ref: {patient.referrerName} ({patient.referrerRole || 'Agent'})
-                      </span>
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          const rid = (patient as any).referrerId || '';
+                          // Read org/phone from booking data first (always available)
+                          const bookingOrg = (patient as any).referrerOrganization || '';
+                          const bookingPhone = (patient as any).referrerPhone || '';
+                          setSelectedReferrerInfo({
+                            name: patient.referrerName || '',
+                            role: patient.referrerRole || 'Agent',
+                            referrerId: rid,
+                            organization: bookingOrg || undefined,
+                            phone: bookingPhone || undefined,
+                          });
+                          setShowReferrerInfoModal(true);
+                          // Auto-load full details
+                          {
+                            setReferrerDetailsLoading(true);
+                            try {
+                              const { doc: dRef, getDoc: gDoc, collection: cRef, getDocs: gDocs } = await import('firebase/firestore');
+                              const { db: fDb } = await import('../lib/firebase/config');
+                              if (fDb) {
+                                let org = bookingOrg, phone = bookingPhone;
+                                let monthCount = 0;
+                                let foundReferrerId = rid;
+
+                                // Try direct doc lookup if rid exists
+                                if (rid) {
+                                  const refSnap = await gDoc(dRef(fDb, 'referrers', rid));
+                                  if (refSnap.exists()) {
+                                    const d = refSnap.data();
+                                    org = d.organization || org;
+                                    phone = d.phone || phone;
+                                    foundReferrerId = rid;
+                                  }
+                                }
+
+                                // If still no org/phone, scan collection by name
+                                if (!org && !phone) {
+                                  const allRefsSnap = await gDocs(cRef(fDb, 'referrers'));
+                                  const searchName = (patient.referrerName || '').toLowerCase().trim();
+                                  for (const refDoc of allRefsSnap.docs) {
+                                    const d = refDoc.data();
+                                    if ((d.name || '').toLowerCase().trim() === searchName) {
+                                      org = d.organization || '';
+                                      phone = d.phone || '';
+                                      foundReferrerId = refDoc.id;
+                                      break;
+                                    }
+                                  }
+                                }
+
+                                // Count current month referrals
+                                if (foundReferrerId) {
+                                  const now = new Date();
+                                  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+                                  const histRef = cRef(fDb, 'referrers', foundReferrerId, 'referralHistory');
+                                  const histSnap = await gDocs(histRef);
+                                  histSnap.forEach(hd => {
+                                    const ca = hd.data().createdAt;
+                                    if (ca?.toDate && ca.toDate() >= monthStart) monthCount++;
+                                  });
+                                }
+
+                                setSelectedReferrerInfo(prev => prev ? { ...prev, organization: org, phone, currentMonthReferrals: monthCount } : prev);
+                              }
+                            } catch (fetchErr) {
+                              console.error('Error fetching referrer details:', fetchErr);
+                            }
+                            setReferrerDetailsLoading(false);
+                          }
+                        }}
+                        className="flex items-center gap-1 px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded text-xs hover:bg-purple-500/30 transition-colors cursor-pointer"
+                        title="Tap to see referrer details"
+                      >
+                        <Users className="w-3 h-3" />
+                        Ref: {patient.referrerName}
+                      </button>
                     )}
                   </div>
 
@@ -2791,6 +2962,56 @@ export default function PatientDetails({
                 : []
           }
         /> */}
+
+        {/* Referrer Info Modal */}
+        {showReferrerInfoModal && selectedReferrerInfo && (
+          <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4" onClick={() => setShowReferrerInfoModal(false)}>
+            <div className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-sm p-6 space-y-4" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between">
+                <h3 className="text-white font-bold text-lg">Referrer Details</h3>
+                <button onClick={() => setShowReferrerInfoModal(false)} className="text-gray-400 hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-purple-500/20 flex items-center justify-center">
+                  <Users className="w-6 h-6 text-purple-400" />
+                </div>
+                <div>
+                  <p className="text-white font-medium">{selectedReferrerInfo.name}</p>
+                  <p className="text-purple-400 text-xs">{selectedReferrerInfo.role}</p>
+                </div>
+              </div>
+
+              {referrerDetailsLoading ? (
+                <p className="text-center text-gray-500 text-xs py-2">Loading details...</p>
+              ) : (
+                <div className="bg-zinc-800/50 rounded-lg p-3 space-y-2">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-500">Organization</span>
+                    <span className="text-white">{selectedReferrerInfo.organization || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-500">Mobile No</span>
+                    <span className="text-white">{selectedReferrerInfo.phone || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-500">This Month Referrals</span>
+                    <span className="text-emerald-400 font-bold">[{selectedReferrerInfo.currentMonthReferrals ?? 0}]</span>
+                  </div>
+                </div>
+              )}
+
+              <button
+                onClick={() => setShowReferrerInfoModal(false)}
+                className="w-full bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg py-2.5 text-sm font-medium"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

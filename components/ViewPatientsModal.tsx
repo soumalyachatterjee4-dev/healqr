@@ -155,12 +155,17 @@ export default function ViewPatientsModal({ isOpen, onClose, patients: initialPa
                 >
                   {/* First Line: Name and Badge */}
                   <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h4 className="text-white">{patient.patientName}</h4>
                       {patient.consultationType === 'video' && (
                         <Badge className="bg-red-500/20 text-red-400 border-red-500/30">
                           <Video className="w-3 h-3 mr-1" />
                           VC
+                        </Badge>
+                      )}
+                      {(patient as any).referrerName && (
+                        <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30 text-[10px]">
+                          Ref: {(patient as any).referrerName}
                         </Badge>
                       )}
                       {patient.bookingId && (

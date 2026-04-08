@@ -79,6 +79,7 @@ const AdvertiserSignUp = lazy(() => import("./components/AdvertiserSignUp"));
 const AdvertiserLogin = lazy(() => import("./components/AdvertiserLogin"));
 const AdvertiserDashboard = lazy(() => import("./components/AdvertiserDashboard"));
 const ReferrerRegistration = lazy(() => import("./components/ReferrerRegistration"));
+const ReferrerLogin = lazy(() => import("./components/ReferrerLogin"));
 const ReferrerDashboard = lazy(() => import("./components/ReferrerDashboard"));
 const AdvertiserGateway = lazy(() => import("./components/AdvertiserGateway"));
 const AdvertiserVerifyLogin = lazy(() => import("./components/AdvertiserVerifyLogin"));
@@ -227,6 +228,7 @@ export default function App() {
     | "pharma-cme"
     | "pharma-samples"
     | "referrer-register"
+    | "referrer-login"
     | "referrer-dashboard"
   >(() => {
     // Initialize currentPage from localStorage to prevent flash/auto-logout on refresh
@@ -614,6 +616,16 @@ export default function App() {
       setBookingLanguage(urlLanguage as Language);
     }
 
+    // Restore referrer dashboard session (persists across refresh)
+    if (!pageParam && !doctorId && !clinicId && !mode && !pathname.startsWith('/verify-visit') && !pathname.startsWith('/admin') && !pathname.startsWith('/master-access')) {
+      const refId = localStorage.getItem('referrer_id');
+      const refExpiry = localStorage.getItem('referrer_session_expiry');
+      if (refId && refExpiry && Date.now() < parseInt(refExpiry)) {
+        setCurrentPage('referrer-dashboard');
+        return;
+      }
+    }
+
     // Handle verify visit deep link
     if (pathname.startsWith('/verify-visit/')) {
       const bookingId = pathname.split('/verify-visit/')[1];
@@ -675,18 +687,27 @@ export default function App() {
       }
     }
 
-    // Handle Referrer Registration link (?ref=CODE)
-    const refCode = urlParams.get('ref');
-    if (refCode) {
-      // Check if already registered referrer
+    // Handle Referrer Registration / Login page links
+    if (pageParam === 'referrer-register') {
+      setCurrentPage('referrer-register');
+      return;
+    }
+    if (pageParam === 'referrer-login' || pageParam === 'referrer-dashboard') {
+      // Check if already logged in referrer
       const existingId = localStorage.getItem('referrer_id');
       const expiry = localStorage.getItem('referrer_session_expiry');
       if (existingId && expiry && Date.now() < parseInt(expiry)) {
         setCurrentPage('referrer-dashboard');
       } else {
-        sessionStorage.setItem('referral_code', refCode);
-        setCurrentPage('referrer-register');
+        setCurrentPage('referrer-login');
       }
+      return;
+    }
+
+    // Handle legacy ?ref=CODE links — redirect to registration
+    const refCode = urlParams.get('ref');
+    if (refCode) {
+      setCurrentPage('referrer-register');
       return;
     }
 
@@ -694,12 +715,14 @@ export default function App() {
     const refBy = urlParams.get('refBy');
     if (refBy && db) {
       sessionStorage.setItem('booking_referrer_id', refBy);
-      // Pre-load referrer name/role for the booking doc
+      // Pre-load referrer name/role/org/phone for the booking doc
       try {
         const refDoc = await getDoc(doc(db, 'referrers', refBy));
         if (refDoc.exists()) {
           sessionStorage.setItem('booking_referrer_name', refDoc.data().name || '');
           sessionStorage.setItem('booking_referrer_role', refDoc.data().role || '');
+          sessionStorage.setItem('booking_referrer_organization', refDoc.data().organization || '');
+          sessionStorage.setItem('booking_referrer_phone', refDoc.data().phone || '');
         }
       } catch {}
     }
@@ -2600,6 +2623,8 @@ export default function App() {
           onAdvertiserLogin={() => setCurrentPage("advertiser-login")}
           onAdvertiserGateway={() => setCurrentPage("advertiser-gateway")}
           onPharmaLogin={() => setCurrentPage("pharma-login")}
+          onReferrerRegister={() => setCurrentPage("referrer-register")}
+          onReferrerLogin={() => setCurrentPage("referrer-login")}
         />
       )}
 
@@ -2763,9 +2788,19 @@ export default function App() {
       {currentPage === "referrer-register" && (
         <Suspense fallback={<PageLoader />}>
           <ReferrerRegistration
-            referralCode={sessionStorage.getItem('referral_code') || ''}
-            onSuccess={() => setCurrentPage('landing')}
+            onSuccess={() => {}}
+            onSkip={() => setCurrentPage('landing')}
+            onLoginRedirect={() => setCurrentPage('referrer-login')}
+          />
+        </Suspense>
+      )}
+
+      {currentPage === "referrer-login" && (
+        <Suspense fallback={<PageLoader />}>
+          <ReferrerLogin
+            onLoginSuccess={() => setCurrentPage('referrer-dashboard')}
             onBack={() => setCurrentPage('landing')}
+            onRegister={() => setCurrentPage('referrer-register')}
           />
         </Suspense>
       )}
@@ -2775,7 +2810,13 @@ export default function App() {
           <ReferrerDashboard
             referrerId={localStorage.getItem('referrer_id') || ''}
             referrerPhone={localStorage.getItem('referrer_phone') || ''}
-            onLogout={() => setCurrentPage('landing')}
+            onLogout={() => {
+              const url = new URL(window.location.href);
+              url.searchParams.delete('page');
+              window.history.replaceState({}, '', url.pathname);
+              setCurrentPage('landing');
+            }}
+            onRegisterRedirect={() => setCurrentPage('referrer-register')}
           />
         </Suspense>
       )}

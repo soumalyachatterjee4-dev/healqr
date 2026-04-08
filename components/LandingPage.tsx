@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
-import { Video, User, AlertCircle, Star, Grid3x3, Smartphone, Clock, FileText, CheckCircle, TrendingUp, Bell, Users, Layout, ShoppingCart, Building2, MessageSquare, MonitorPlay, ShoppingBag, ScanLine, Twitter, Linkedin, Facebook, ArrowLeft, Sparkles } from 'lucide-react';
+import { Video, User, AlertCircle, Star, Grid3x3, Smartphone, Clock, FileText, CheckCircle, TrendingUp, Bell, Users, Layout, ShoppingCart, Building2, MessageSquare, MonitorPlay, ShoppingBag, ScanLine, Twitter, Linkedin, Facebook, ArrowLeft, Sparkles, QrCode } from 'lucide-react';
 import { collection, query, where, getDocs, getCountFromServer, Timestamp, orderBy, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase/config';
 import LandingSupportModal from './LandingSupportModal';
@@ -35,6 +35,8 @@ interface LandingPageProps {
   onAdvertiserLogin?: () => void;
   onAdvertiserGateway?: () => void;
   onPharmaLogin?: () => void;
+  onReferrerRegister?: () => void;
+  onReferrerLogin?: () => void;
 }
 
 export default function LandingPage({
@@ -52,7 +54,9 @@ export default function LandingPage({
   onAdvertiserSignUp,
   onAdvertiserLogin,
   onAdvertiserGateway,
-  onPharmaLogin
+  onPharmaLogin,
+  onReferrerRegister,
+  onReferrerLogin
 }: LandingPageProps) {
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [showAdvertiserModal, setShowAdvertiserModal] = useState(false);
@@ -217,7 +221,15 @@ export default function LandingPage({
           </div>
 
           {/* Right Side Actions */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
+            {/* Referrer QR Share Button */}
+            <button
+              onClick={onReferrerRegister}
+              className="w-10 h-10 bg-emerald-900/60 border border-emerald-700/40 rounded-md flex items-center justify-center hover:bg-emerald-800/80 transition-colors"
+              title="Become a Referrer"
+            >
+              <QrCode className="w-5 h-5 text-emerald-400" />
+            </button>
             {/* Video Library Icon */}
             <button
               onClick={onVideoLibrary}
@@ -779,6 +791,22 @@ export default function LandingPage({
                     className="text-gray-400 hover:text-emerald-500 transition-colors text-sm text-left"
                   >
                     API Docs
+                  </button>
+                </li>
+                <li>
+                  <button
+                    onClick={onReferrerRegister}
+                    className="text-gray-400 hover:text-emerald-500 transition-colors text-sm text-left"
+                  >
+                    Become a Referrer
+                  </button>
+                </li>
+                <li>
+                  <button
+                    onClick={onReferrerLogin}
+                    className="text-gray-400 hover:text-emerald-500 transition-colors text-sm text-left"
+                  >
+                    Referrer Dashboard
                   </button>
                 </li>
               </ul>

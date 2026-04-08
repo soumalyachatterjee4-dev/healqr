@@ -437,6 +437,8 @@ export default function PatientDetailsForm({
           referrerId: sessionStorage.getItem('booking_referrer_id') || null,
           referrerName: sessionStorage.getItem('booking_referrer_name') || null,
           referrerRole: sessionStorage.getItem('booking_referrer_role') || null,
+          referrerOrganization: sessionStorage.getItem('booking_referrer_organization') || null,
+          referrerPhone: sessionStorage.getItem('booking_referrer_phone') || null,
           createdAt: serverTimestamp()
         });
 
