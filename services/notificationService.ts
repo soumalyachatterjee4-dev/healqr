@@ -706,6 +706,116 @@ export const sendAppointmentCancelled = async (data: any) => {
   return result;
 };
 
+export const sendChamberRescheduled = async (data: {
+  patientPhone: string;
+  patientName: string;
+  doctorId: string;
+  doctorName: string;
+  doctorSpecialty?: string;
+  chamberName: string;
+  appointmentDate: string;
+  originalTime: string;
+  newTime: string;
+  bookingId: string;
+  language?: string;
+}) => {
+  const { userId, phone10 } = normalizePatientTarget(data.patientPhone);
+
+  const params = new URLSearchParams({
+    page: 'chamber-rescheduled',
+    patientName: data.patientName || '',
+    doctorName: data.doctorName || '',
+    specialty: data.doctorSpecialty || '',
+    chamber: data.chamberName || '',
+    date: data.appointmentDate || '',
+    originalTime: data.originalTime || '',
+    newTime: data.newTime || '',
+    language: data.language || 'english'
+  });
+
+  const result = await sendFCM({
+    userId,
+    title: `Schedule Changed - ${data.chamberName}`,
+    body: `Today's timing changed to ${data.newTime}. (Was ${data.originalTime})`,
+    data: {
+      type: 'chamber_rescheduled',
+      language: data.language || 'english',
+      scope: 'patient',
+      phone: phone10,
+      url: `https://teamhealqr.web.app/?${params.toString()}`,
+    },
+  });
+
+  // Save to notification history
+  const expiryDate = new Date();
+  expiryDate.setDate(expiryDate.getDate() + 120);
+
+  await saveNotificationHistory({
+    patientPhone: phone10,
+    patientName: data.patientName || 'Patient',
+    doctorName: data.doctorName || 'Doctor',
+    clinicName: data.chamberName,
+    chamber: data.chamberName,
+    notificationType: 'rescheduled',
+    bookingStatus: 'rescheduled',
+    notificationStatus: result?.success === false ? 'failed' : 'sent',
+    messageId: result?.messageId,
+    timestamp: new Date(),
+    consultationDate: data.appointmentDate || '',
+    consultationTime: data.newTime || '',
+    bookingId: data.bookingId,
+    message: `Timing changed from ${data.originalTime} to ${data.newTime}`,
+    doctorId: data.doctorId,
+    templateType: 'chamber_rescheduled',
+    templateData: {
+      greeting: `Hello ${data.patientName || 'there'}, 👋`,
+      mainMessage: `Your appointment timing has been changed from ${data.originalTime} to ${data.newTime}.`,
+      consultationDetails: {
+        date: data.appointmentDate || '',
+        originalTime: data.originalTime || '',
+        newTime: data.newTime || '',
+        chamber: data.chamberName || ''
+      },
+    },
+    doctorSpecialty: data.doctorSpecialty,
+    expiresAt: expiryDate,
+    isExpired: false,
+    readStatus: false,
+    userActions: { opened: false }
+  });
+
+  // Store in patient_notifications collection
+  try {
+    await storePatientNotification({
+      patientPhone: phone10,
+      patientName: data.patientName || 'Patient',
+      type: 'chamber_rescheduled' as any,
+      title: `🔄 Schedule Changed - ${data.chamberName}`,
+      message: `Timing changed from ${data.originalTime} to ${data.newTime} for ${data.appointmentDate}`,
+      bookingId: data.bookingId || '',
+      doctorId: data.doctorId,
+      doctorName: data.doctorName || 'Doctor',
+      doctorSpecialty: data.doctorSpecialty,
+      chamberName: data.chamberName,
+      appointmentDate: data.appointmentDate,
+      appointmentTime: data.newTime,
+      fcmAttempted: true,
+      fcmSuccess: result?.success !== false,
+      fcmError: result?.error,
+      metadata: {
+        templateUrl: `https://teamhealqr.web.app/?${params.toString()}`,
+        originalTime: data.originalTime,
+        newTime: data.newTime,
+        language: data.language || 'english'
+      }
+    });
+  } catch (error) {
+    console.error('❌ Failed to store reschedule notification:', error);
+  }
+
+  return result;
+};
+
 export const sendAppointmentRestored = async (data: any) => {
   const { userId, phone10 } = normalizePatientTarget(data.patientPhone);
 

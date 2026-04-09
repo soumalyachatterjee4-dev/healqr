@@ -34,6 +34,8 @@ interface DoctorChamber {
   booked: number;
   schedule: string;
   doctorId?: string;
+  rescheduledStartTime?: string;
+  rescheduledEndTime?: string;
 }
 
 interface DoctorSchedule {
@@ -1007,8 +1009,26 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
                 const [startHour, startMin] = (chamber.startTime || '00:00').split(':').map(Number);
                 const startMinutes = startHour * 60 + startMin;
 
+                // Check for today's reschedule
+                let rescheduledStartTime: string | undefined;
+                let rescheduledEndTime: string | undefined;
+                if (chamber.todayReschedule && chamber.todayReschedule.date === todayStr) {
+                  rescheduledStartTime = chamber.todayReschedule.startTime;
+                  rescheduledEndTime = chamber.todayReschedule.endTime;
+                }
+
+                // Use effective time for sorting
+                const effectiveStart = rescheduledStartTime || chamber.startTime;
+                const [effHour, effMin] = (effectiveStart || '00:00').split(':').map(Number);
+                const effectiveStartMinutes = effHour * 60 + effMin;
+
                 let isExpired = false;
-                if (chamber.endTime) {
+                if (rescheduledEndTime) {
+                  const [endHour, endMin] = rescheduledEndTime.split(':').map(Number);
+                  const chamberEndTime = new Date(now);
+                  chamberEndTime.setHours(endHour, endMin, 0, 0);
+                  isExpired = chamberEndTime < now;
+                } else if (chamber.endTime) {
                   const [endHour, endMin] = chamber.endTime.split(':').map(Number);
                   const chamberEndTime = new Date(now);
                   chamberEndTime.setHours(endHour, endMin, 0, 0);
@@ -1027,10 +1047,12 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
                   customDate: chamber.customDate,
                   isActive: chamber.isActive !== false,
                   blockedDates: chamber.blockedDates || [],
-                  startMinutes,
+                  startMinutes: effectiveStartMinutes,
                   isExpired,
                   booked: qrBookedCount,
                   schedule: scheduleText,
+                  rescheduledStartTime,
+                  rescheduledEndTime
                 } as DoctorChamber;
               })
             );
@@ -1216,9 +1238,23 @@ export default function ClinicTodaysSchedule({ onMenuChange, onLogout }: ClinicT
                                   </div>
                                   <div className="flex items-center gap-2 mb-3">
                                     <Clock className="w-4 h-4 text-gray-400" />
-                                    <span className="text-white text-sm">
-                                      {chamber.startTime} - {chamber.endTime}
-                                    </span>
+                                    {chamber.rescheduledStartTime && chamber.rescheduledEndTime ? (
+                                      <div className="flex flex-col">
+                                        <span className="text-sm text-red-400 line-through">
+                                          {chamber.startTime} - {chamber.endTime}
+                                        </span>
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-sm text-emerald-400 font-medium">
+                                            {chamber.rescheduledStartTime} - {chamber.rescheduledEndTime}
+                                          </span>
+                                          <span className="text-xs bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded">RESCHEDULED</span>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <span className="text-white text-sm">
+                                        {chamber.startTime} - {chamber.endTime}
+                                      </span>
+                                    )}
                                     {chamber.isExpired && (
                                       <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs">
                                         Time Over

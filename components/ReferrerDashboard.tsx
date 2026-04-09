@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, LogOut, QrCode, Clock, Users, User, Download, Share2, CalendarDays, UserPlus } from 'lucide-react';
+import { Search, LogOut, QrCode, Clock, Users, User, Download, Share2, CalendarDays, UserPlus, IndianRupee } from 'lucide-react';
 import HealthTipBanner from './HealthTipBanner';
 import QRCode from 'react-qr-code';
 import { Button } from './ui/button';
@@ -37,6 +37,12 @@ interface ReferralRecord {
   createdAt: any;
   status: string;
   seenAt?: any;
+  referrerPayment?: {
+    amount: number;
+    date: string;
+    note: string;
+    paidAt: any;
+  };
 }
 
 export default function ReferrerDashboard({ referrerId, referrerPhone, onLogout, onRegisterRedirect }: ReferrerDashboardProps) {
@@ -489,6 +495,19 @@ export default function ReferrerDashboard({ referrerId, referrerPhone, onLogout,
                         <p className="text-emerald-400/70 text-[10px] mt-1">
                           ✓ Consultation done on {r.seenAt.toDate().toLocaleDateString('en-IN')}
                         </p>
+                      )}
+                      {r.referrerPayment && (
+                        <div className="flex items-center gap-2 mt-1 pt-1 border-t border-zinc-800">
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold flex items-center gap-1">
+                            <IndianRupee className="w-3 h-3" /> {r.referrerPayment.amount} Received
+                          </span>
+                          {r.referrerPayment.date && (
+                            <span className="text-[10px] text-gray-500">on {r.referrerPayment.date}</span>
+                          )}
+                          {r.referrerPayment.note && (
+                            <span className="text-[10px] text-gray-600">• {r.referrerPayment.note}</span>
+                          )}
+                        </div>
                       )}
                     </CardContent>
                   </Card>

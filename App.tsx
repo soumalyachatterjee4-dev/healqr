@@ -63,6 +63,7 @@ const FollowUpNotification = lazy(() => import("./components/FollowUpNotificatio
 const ReviewRequestNotification = lazy(() => import("./components/ReviewRequestNotification"));
 const AppointmentReminderNotification = lazy(() => import("./components/AppointmentReminderNotification"));
 const AppointmentCancelledNotification = lazy(() => import("./components/AppointmentCancelledNotification"));
+const ChamberRescheduledNotification = lazy(() => import("./components/ChamberRescheduledNotification"));
 const AppointmentRestoredNotification = lazy(() => import("./components/AppointmentRestoredNotification"));
 const AdminAlertNotification = lazy(() => import("./components/AdminAlertNotification"));
 const TestingUtilities = lazy(() => import("./components/TestingUtilities"));
@@ -93,6 +94,7 @@ const ClinicDashboard = lazy(() => import("./components/ClinicDashboard"));
 const PatientLogin = lazy(() => import("./components/PatientLogin"));
 const PatientDashboardNew = lazy(() => import("./components/PatientDashboardNew"));
 const MonthlyPlanner = lazy(() => import("./components/MonthlyPlanner"));
+const DataManagement = lazy(() => import("./components/DataManagement"));
 const DoctorPatientChatManager = lazy(() => import("./components/DoctorPatientChatManager"));
 const PatientChatInterface = lazy(() => import("./components/PatientChatInterface"));
 const VideoConsultationManager = lazy(() => import("./components/VideoConsultationManager"));
@@ -193,6 +195,7 @@ export default function App() {
     | "review-request"
     | "appointment-reminder"
     | "appointment-cancelled"
+    | "chamber-rescheduled"
     | "appointment-restored"
     | "admin-alert"
     | "verify-walkin"
@@ -215,6 +218,7 @@ export default function App() {
     | "patient-dashboard"
     | "patient-history"
     | "monthly-planner"
+    | "data-management"
     | "patient-chat"
     | "doctor-patient-chat"
     | "video-consultation"
@@ -950,6 +954,29 @@ export default function App() {
       });
       setCurrentPage('appointment-cancelled');
     }
+    // Chamber rescheduled routing
+    else if (pageParam === 'chamber-rescheduled') {
+      const patientName = urlParams.get('patientName') || '';
+      const doctorName = urlParams.get('doctorName') || '';
+      const specialty = urlParams.get('specialty') || '';
+      const chamber = urlParams.get('chamber') || '';
+      const date = urlParams.get('date') || '';
+      const originalTime = urlParams.get('originalTime') || '';
+      const newTime = urlParams.get('newTime') || '';
+      const language = urlParams.get('language') || 'english';
+
+      setNotifData({
+        patientName,
+        doctorName,
+        specialization: specialty,
+        date,
+        time: newTime,
+        message: chamber,
+        reason: originalTime,
+        language
+      });
+      setCurrentPage('chamber-rescheduled');
+    }
     // Restoration routing
     else if (pageParam === 'restoration' || pageParam === 'appointment-restored') {
       const bookingId = urlParams.get('bookingId') || '';
@@ -1252,6 +1279,7 @@ export default function App() {
         pageParam === 'appointment-reminder' ||
         pageParam === 'appointment-cancelled' ||
         pageParam === 'cancellation' ||
+        pageParam === 'chamber-rescheduled' ||
         pageParam === 'appointment-restored' ||
         pageParam === 'restoration' ||
         pageParam === 'admin-alert' ||
@@ -1715,6 +1743,7 @@ export default function App() {
             currentPageParam === 'appointment-reminder' ||
             currentPageParam === 'appointment-cancelled' ||
             currentPageParam === 'cancellation' ||
+            currentPageParam === 'chamber-rescheduled' ||
             currentPageParam === 'appointment-restored' ||
             currentPageParam === 'restoration' ||
             currentPageParam === 'admin-alert' ||
@@ -2108,6 +2137,18 @@ export default function App() {
     // For VC bookings with specific time slots, use the VC time
     if (consultationType === 'video' && vcStartTime) {
       setSelectedSlot(`${vcStartTime} - ${vcEndTime || vcStartTime}`);
+    } else if (consultationType === 'chamber' && chamberId) {
+      // For chamber bookings, use rescheduled time if available
+      const chamberData = doctorChambers.find(c => c.id === chamberId) as any;
+      if (chamberData) {
+        const now = new Date();
+        const todayStr = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+        if (chamberData.todayReschedule && chamberData.todayReschedule.date === todayStr) {
+          setSelectedSlot(`${chamberData.todayReschedule.startTime} - ${chamberData.todayReschedule.endTime}`);
+        } else if (chamberData.startTime && chamberData.endTime) {
+          setSelectedSlot(`${chamberData.startTime} - ${chamberData.endTime}`);
+        }
+      }
     }
     setCurrentPage("booking-patient-details");
   };
@@ -2483,6 +2524,8 @@ export default function App() {
       setCurrentPage("ai-diet-chart");
     else if (menu === "monthly-planner")
       setCurrentPage("monthly-planner");
+    else if (menu === "data-management")
+      setCurrentPage("data-management");
     else if (menu === "braindeck")
       setCurrentPage("braindeck");
     else if (menu === "pharma-cme")
@@ -2567,6 +2610,7 @@ export default function App() {
       currentPage === 'consultation-completed' || currentPage === 'follow-up' ||
       currentPage === 'review-request' || currentPage === 'appointment-reminder' ||
       currentPage === 'appointment-cancelled' || currentPage === 'appointment-restored' ||
+      currentPage === 'chamber-rescheduled' ||
       currentPage === 'rx-updated' || currentPage === 'verify-walkin' ||
       currentPage === 'patient-review-submission'
     ) {
@@ -2899,6 +2943,19 @@ export default function App() {
         </Suspense>
       )}
 
+      {currentPage === "data-management" && (
+        <Suspense fallback={<PageLoader />}>
+          <DataManagement
+            mode="doctor"
+            doctorName={userName}
+            email={userEmail}
+            onLogout={handleLogout}
+            onMenuChange={menuChangeHandler}
+            activeAddOns={activeAddOns}
+          />
+        </Suspense>
+      )}
+
       {currentPage === "schedule-manager" && (
         <ScheduleManager
           doctorName={userName}
@@ -3160,10 +3217,16 @@ export default function App() {
             doctorName: bookingDoctorName || userName,
             date: selectedDate || new Date(),
             time: (() => {
-              // Find selected chamber to get time range
+              // Find selected chamber to get time range (use rescheduled time if available)
               if (selectedChamber && doctorChambers.length > 0) {
-                const chamber = doctorChambers.find(c => c.chamberName === selectedChamber);
+                const chamber = doctorChambers.find(c => c.chamberName === selectedChamber) as any;
                 if (chamber && chamber.startTime && chamber.endTime) {
+                  // Check for today's reschedule
+                  const now = new Date();
+                  const todayStr = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+                  if (chamber.todayReschedule && chamber.todayReschedule.date === todayStr) {
+                    return `${chamber.todayReschedule.startTime} - ${chamber.todayReschedule.endTime}`;
+                  }
                   return `${chamber.startTime} - ${chamber.endTime}`;
                 }
               }
@@ -3278,6 +3341,19 @@ export default function App() {
           cancelledDate={notifData?.date || ''}
           cancellationTime={notifData?.time || ''}
           cancellationReason="Your appointment has been cancelled"
+        />
+      )}
+
+      {currentPage === "chamber-rescheduled" && (
+        <ChamberRescheduledNotification
+          language={(notifData?.language || 'english') as Language}
+          patientName={notifData?.patientName || 'Patient'}
+          doctorName={notifData?.doctorName || 'Doctor'}
+          specialization={notifData?.specialization || ''}
+          chamberName={notifData?.message || 'Chamber'}
+          date={notifData?.date || ''}
+          originalTime={notifData?.reason || ''}
+          newTime={notifData?.time || ''}
         />
       )}
 

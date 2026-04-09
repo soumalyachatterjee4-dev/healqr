@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Send, Inbox, X, Clock, CheckCircle, XCircle, User, ArrowRight, Menu, Users, CalendarDays, Eye, Share2, UserPlus } from 'lucide-react';
+import { Search, Send, Inbox, X, Clock, CheckCircle, XCircle, User, ArrowRight, Menu, Users, CalendarDays, Eye, Share2, UserPlus, IndianRupee, Edit3 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card } from './ui/card';
@@ -61,6 +61,12 @@ interface ExternalReferral {
   referrerSeen: boolean;
   createdAt: any;
   markedSeenAt?: any;
+  referrerPayment?: {
+    amount: number;
+    date: string;
+    note: string;
+    paidAt: any;
+  };
 }
 
 export default function DoctorReferralNetwork({ doctorName, email, onLogout, onMenuChange, activeAddOns }: DoctorReferralNetworkProps) {
@@ -97,6 +103,13 @@ export default function DoctorReferralNetwork({ doctorName, email, onLogout, onM
   const [showReferrerModal, setShowReferrerModal] = useState(false);
   const [selectedReferrer, setSelectedReferrer] = useState<ExternalReferral | null>(null);
 
+  // Payment form state
+  const [showPaymentForm, setShowPaymentForm] = useState<string | null>(null); // booking id
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentDate, setPaymentDate] = useState('');
+  const [paymentNote, setPaymentNote] = useState('');
+  const [savingPayment, setSavingPayment] = useState(false);
+
   // Real-time sent referrals
   useEffect(() => {
     if (!doctorId || !db) return;
@@ -117,22 +130,80 @@ export default function DoctorReferralNetwork({ doctorName, email, onLogout, onM
     return unsub;
   }, [doctorId]);
 
+  // Background sync: create missing referralHistory docs for referrer bookings
+  const syncMissingReferralHistory = async (refs: ExternalReferral[]) => {
+    if (!db) return;
+    // Build a cache of referrer name → id
+    const referrerCache: Record<string, string> = {};
+    try {
+      const allReferrers = await getDocs(collection(db!, 'referrers'));
+      for (const rd of allReferrers.docs) {
+        const name = (rd.data().name || '').toUpperCase();
+        if (name) referrerCache[name] = rd.id;
+      }
+    } catch { return; }
+
+    for (const ref of refs) {
+      let rid = ref.referrerId;
+      if (!rid) {
+        rid = referrerCache[(ref.referrerName || '').toUpperCase()] || '';
+      }
+      if (!rid) continue;
+
+      try {
+        // Check if history doc exists for this booking
+        const histQ = query(
+          collection(db!, 'referrers', rid, 'referralHistory'),
+          where('bookingId', '==', ref.id)
+        );
+        const histSnap = await getDocs(histQ);
+        if (!histSnap.empty) continue;
+
+        // Also check by patient name
+        const allHist = await getDocs(collection(db!, 'referrers', rid, 'referralHistory'));
+        let found = false;
+        for (const h of allHist.docs) {
+          if ((h.data().patientName || '').toUpperCase() === (ref.patientName || '').toUpperCase()) {
+            found = true;
+            break;
+          }
+        }
+        if (found) continue;
+
+        // Create missing history doc
+        await addDoc(collection(db!, 'referrers', rid, 'referralHistory'), {
+          patientName: ref.patientName,
+          patientPhone: ref.patientPhone || '',
+          doctorId: doctorId,
+          doctorName: doctorName,
+          doctorSpecialty: '',
+          bookingId: ref.id,
+          status: ref.isMarkedSeen ? 'seen' : 'booked',
+          createdAt: ref.createdAt || serverTimestamp(),
+          ...(ref.isMarkedSeen && ref.markedSeenAt ? { seenAt: ref.markedSeenAt } : {}),
+          ...(ref.referrerPayment ? { referrerPayment: ref.referrerPayment } : {}),
+        });
+      } catch {}
+    }
+  };
+
   // Load external referrals (patients referred via referrer agents)
   const loadExternalReferrals = async () => {
     if (!doctorId || !db) return;
     setLoadingExternal(true);
     try {
-      // Get bookings with referrerId that have been marked seen
+      // Get all bookings for this doctor, then filter for those with referrerId client-side
       const q = query(
         collection(db!, 'bookings'),
-        where('doctorId', '==', doctorId),
-        where('referrerId', '!=', null)
+        where('doctorId', '==', doctorId)
       );
       const snap = await getDocs(q);
       const refs: ExternalReferral[] = [];
 
       for (const d of snap.docs) {
         const data = d.data();
+        // Skip bookings without a referrer
+        if (!data.referrerId && !data.referrerName) continue;
         // Fetch referrer details
         let referrerOrg = '';
         let referrerPhone = '';
@@ -162,11 +233,15 @@ export default function DoctorReferralNetwork({ doctorName, email, onLogout, onM
           referrerSeen: data.referrerSeen || false,
           createdAt: data.createdAt,
           markedSeenAt: data.markedSeenAt,
+          referrerPayment: data.referrerPayment || undefined,
         });
       }
 
       refs.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
       setExternalReferrals(refs);
+
+      // Background sync: ensure all referrer bookings have history docs
+      syncMissingReferralHistory(refs);
     } catch (err) {
       console.error('External referrals error:', err);
     } finally {
@@ -287,6 +362,129 @@ export default function DoctorReferralNetwork({ doctorName, email, onLogout, onM
     };
     const s = map[status] || map.sent;
     return <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${s.bg} ${s.text}`}>{s.label}</span>;
+  };
+
+  // Save/update payment for a referrer booking
+  const savePayment = async (bookingId: string, referrerId: string, referrerName: string, patientNameVal: string) => {
+    if (!paymentAmount || !paymentDate) {
+      toast.error('Amount and date are required');
+      return;
+    }
+    setSavingPayment(true);
+    try {
+      const paymentData = {
+        referrerPayment: {
+          amount: parseFloat(paymentAmount),
+          date: paymentDate,
+          note: paymentNote.trim(),
+          paidAt: serverTimestamp(),
+        }
+      };
+      // Update booking doc
+      await updateDoc(doc(db!, 'bookings', bookingId), paymentData);
+
+      // Also update referrer's history subcollection
+      let resolvedReferrerId = referrerId;
+
+      // If referrerId is empty, find referrer by name
+      if (!resolvedReferrerId && referrerName) {
+        try {
+          const refSnap = await getDocs(collection(db!, 'referrers'));
+          const nameUpper = referrerName.toUpperCase();
+          for (const rd of refSnap.docs) {
+            const rName = (rd.data().name || '').toUpperCase();
+            if (rName === nameUpper) {
+              resolvedReferrerId = rd.id;
+              break;
+            }
+          }
+        } catch {}
+      }
+
+      if (resolvedReferrerId) {
+        try {
+          // Try by bookingId first
+          let histQ = query(
+            collection(db!, 'referrers', resolvedReferrerId, 'referralHistory'),
+            where('bookingId', '==', bookingId)
+          );
+          let histSnap = await getDocs(histQ);
+
+          // Fallback: find by patientName if bookingId didn't match
+          if (histSnap.empty && patientNameVal) {
+            const allHist = await getDocs(collection(db!, 'referrers', resolvedReferrerId, 'referralHistory'));
+            let found = false;
+            for (const h of allHist.docs) {
+              const hData = h.data();
+              if ((hData.patientName || '').toUpperCase() === patientNameVal.toUpperCase()) {
+                await updateDoc(h.ref, paymentData);
+                found = true;
+                break;
+              }
+            }
+            // If no history doc found at all, create one
+            if (!found) {
+              // Get booking data for full record
+              const bookingDoc = await getDoc(doc(db!, 'bookings', bookingId));
+              const bData = bookingDoc.data() || {};
+              await addDoc(collection(db!, 'referrers', resolvedReferrerId, 'referralHistory'), {
+                patientName: patientNameVal,
+                patientPhone: bData.patientPhone || '',
+                doctorId: doctorId,
+                doctorName: doctorName,
+                doctorSpecialty: bData.doctorSpecialty || '',
+                bookingId: bookingId,
+                status: bData.isMarkedSeen ? 'seen' : 'booked',
+                createdAt: bData.createdAt || serverTimestamp(),
+                ...(bData.isMarkedSeen && bData.markedSeenAt ? { seenAt: bData.markedSeenAt } : {}),
+                ...paymentData,
+              });
+            }
+          } else {
+            if (histSnap.empty) {
+              // No match by bookingId and no patientName — create fresh
+              const bookingDoc = await getDoc(doc(db!, 'bookings', bookingId));
+              const bData = bookingDoc.data() || {};
+              await addDoc(collection(db!, 'referrers', resolvedReferrerId, 'referralHistory'), {
+                patientName: patientNameVal,
+                patientPhone: bData.patientPhone || '',
+                doctorId: doctorId,
+                doctorName: doctorName,
+                doctorSpecialty: bData.doctorSpecialty || '',
+                bookingId: bookingId,
+                status: bData.isMarkedSeen ? 'seen' : 'booked',
+                createdAt: bData.createdAt || serverTimestamp(),
+                ...(bData.isMarkedSeen && bData.markedSeenAt ? { seenAt: bData.markedSeenAt } : {}),
+                ...paymentData,
+              });
+            } else {
+              for (const h of histSnap.docs) {
+                await updateDoc(h.ref, paymentData);
+              }
+            }
+          }
+        } catch (e) { console.error('History sync error:', e); }
+      }
+
+      toast.success('Payment details saved');
+      setShowPaymentForm(null);
+      setPaymentAmount('');
+      setPaymentDate('');
+      setPaymentNote('');
+      loadExternalReferrals();
+    } catch (err) {
+      console.error('Payment save error:', err);
+      toast.error('Failed to save payment');
+    } finally {
+      setSavingPayment(false);
+    }
+  };
+
+  const openPaymentForm = (ref: ExternalReferral) => {
+    setShowPaymentForm(ref.id);
+    setPaymentAmount(ref.referrerPayment?.amount?.toString() || '');
+    setPaymentDate(ref.referrerPayment?.date || '');
+    setPaymentNote(ref.referrerPayment?.note || '');
   };
 
   const getRegistrationQRUrl = () => `${window.location.origin}/?page=referrer-register`;
@@ -627,7 +825,7 @@ export default function DoctorReferralNetwork({ doctorName, email, onLogout, onM
                               <Eye className="w-3 h-3" /> Seen
                             </span>
                           )}
-                          {statusBadge(ref.status)}
+                          {statusBadge(ref.isMarkedSeen ? 'completed' : ref.status)}
                         </div>
                       </div>
 
@@ -658,6 +856,86 @@ export default function DoctorReferralNetwork({ doctorName, email, onLogout, onM
                       {ref.createdAt?.toDate && (
                         <p className="text-[10px] text-gray-600">Booked: {ref.createdAt.toDate().toLocaleString('en-IN')}</p>
                       )}
+
+                      {/* Payment section */}
+                      <div className="border-t border-zinc-800 pt-2 mt-2">
+                        {ref.referrerPayment ? (
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold flex items-center gap-1">
+                                <IndianRupee className="w-3 h-3" /> {ref.referrerPayment.amount} Paid
+                              </span>
+                              {ref.referrerPayment.date && (
+                                <span className="text-[10px] text-gray-500">on {ref.referrerPayment.date}</span>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => openPaymentForm(ref)}
+                              className="text-[10px] text-amber-400 hover:text-amber-300 flex items-center gap-1"
+                            >
+                              <Edit3 className="w-3 h-3" /> Edit
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => openPaymentForm(ref)}
+                            className="text-[10px] text-purple-400 hover:text-purple-300 flex items-center gap-1"
+                          >
+                            <IndianRupee className="w-3 h-3" /> Mark Payment
+                          </button>
+                        )}
+
+                        {/* Inline payment form */}
+                        {showPaymentForm === ref.id && (
+                          <div className="mt-2 space-y-2 bg-zinc-800/50 rounded-lg p-3">
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <Label className="text-[10px] text-gray-400">Amount (₹)*</Label>
+                                <Input
+                                  type="number"
+                                  value={paymentAmount}
+                                  onChange={e => setPaymentAmount(e.target.value)}
+                                  placeholder="500"
+                                  className="h-7 text-xs bg-zinc-900 border-zinc-700"
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-[10px] text-gray-400">Date*</Label>
+                                <Input
+                                  type="date"
+                                  value={paymentDate}
+                                  onChange={e => setPaymentDate(e.target.value)}
+                                  className="h-7 text-xs bg-zinc-900 border-zinc-700"
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <Label className="text-[10px] text-gray-400">Note (optional)</Label>
+                              <Input
+                                value={paymentNote}
+                                onChange={e => setPaymentNote(e.target.value)}
+                                placeholder="e.g. Cash / UPI / Bank transfer"
+                                className="h-7 text-xs bg-zinc-900 border-zinc-700"
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                onClick={() => savePayment(ref.id, ref.referrerId, ref.referrerName, ref.patientName)}
+                                disabled={savingPayment}
+                                className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 flex-1"
+                              >
+                                {savingPayment ? 'Saving...' : (ref.referrerPayment ? 'Update Payment' : 'Submit Payment')}
+                              </Button>
+                              <Button
+                                onClick={() => { setShowPaymentForm(null); setPaymentAmount(''); setPaymentDate(''); setPaymentNote(''); }}
+                                className="h-7 text-xs bg-zinc-700 hover:bg-zinc-600"
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </Card>
                 ))

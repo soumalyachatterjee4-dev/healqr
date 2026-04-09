@@ -22,7 +22,8 @@ import {
   Check,
   LogOut,
   BookOpen,
-  Package
+  Package,
+  Database
 } from 'lucide-react';
 import healqrLogo from '../assets/healqr.logo.png';
 import { useState, useEffect } from 'react';
@@ -93,7 +94,7 @@ export default function ClinicSidebar({
   // Branch managers get a restricted set of pages
   const branchAllowedPages = [
     'dashboard', 'doctors', 'qr-manager', 'schedule-manager', 'todays-schedule',
-    'advance-booking', 'analytics', 'reports', 'social-kit', 'monthly-planner',
+    'advance-booking', 'analytics', 'reports', 'social-kit', 'monthly-planner', 'data-management',
     'assistant', 'lab-referral', 'ai-diet', 'ai-rx', 'video-consult',
     'pharma-cme', 'pharma-samples'
   ];
@@ -127,6 +128,7 @@ export default function ClinicSidebar({
       title: 'GENERAL TOOLS',
       items: [
         { id: 'monthly-planner', label: 'Monthly Planner', icon: CalendarPlus },
+        { id: 'data-management', label: 'Data Management', icon: Database },
       ]
     },
     {

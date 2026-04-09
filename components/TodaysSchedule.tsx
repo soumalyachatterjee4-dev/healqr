@@ -10,7 +10,8 @@ import {
   Menu,
   ArrowLeft,
   MapPin,
-  Video
+  Video,
+  RefreshCw
 } from 'lucide-react';
 import { addDoctorNotification } from '../services/doctorNotificationService';
 import { useState, useEffect } from 'react';
@@ -403,8 +404,17 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
     blockedDates: string[];
     isExpired: boolean;
     startMinutes: number;
+    rescheduledStartTime?: string;
+    rescheduledEndTime?: string;
   }>>([]);
   const [loading, setLoading] = useState(true);
+
+  // Reschedule state
+  const [rescheduleChamberId, setRescheduleChamberId] = useState<number | null>(null);
+  const [rescheduleStart, setRescheduleStart] = useState('');
+  const [rescheduleEnd, setRescheduleEnd] = useState('');
+  const [showRescheduleConfirm, setShowRescheduleConfirm] = useState(false);
+  const [savingReschedule, setSavingReschedule] = useState(false);
 
   // Date change detection for auto-refresh at midnight
   const [currentDate, setCurrentDate] = useState(new Date().toDateString());
@@ -566,17 +576,24 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
               clinicCode: chamber.clinicCode, // Needed to distinguish Linked vs Alternative
               startMinutes, // For sorting
               isExpired, // For sorting expired to bottom
+              // Reschedule: check if todayReschedule matches today's date
+              rescheduledStartTime: chamber.todayReschedule?.date === todayStr ? chamber.todayReschedule.startTime : undefined,
+              rescheduledEndTime: chamber.todayReschedule?.date === todayStr ? chamber.todayReschedule.endTime : undefined,
             } as any;
           })
         );
 
-        // Sort chambers: active by start time ascending, then expired by start time ascending at bottom
+        // Sort chambers: by effective start time (rescheduled time takes priority)
         const sortedChambers = chambersWithBookings.sort((a, b) => {
           // Expired chambers go to bottom
           if (a.isExpired && !b.isExpired) return 1;
           if (!a.isExpired && b.isExpired) return -1;
-          // Both active or both expired: sort by start time ascending
-          return (a.startMinutes || 0) - (b.startMinutes || 0);
+          // Use rescheduled time if available for sorting
+          const aTime = a.rescheduledStartTime || a.startTime;
+          const bTime = b.rescheduledStartTime || b.startTime;
+          const [aH, aM] = (aTime || '00:00').split(':').map(Number);
+          const [bH, bM] = (bTime || '00:00').split(':').map(Number);
+          return (aH * 60 + aM) - (bH * 60 + bM);
         });
 
         // 🚫 FILTER OUT CLINIC CHAMBERS IF CLINIC IS OFF TODAY
@@ -1210,6 +1227,134 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
     setShowPatientDetails(true);
   };
 
+  // Reschedule chamber for today
+  const handleOpenReschedule = (chamber: typeof chambers[0]) => {
+    setRescheduleChamberId(chamber.id);
+    setRescheduleStart(chamber.rescheduledStartTime || chamber.startTime);
+    setRescheduleEnd(chamber.rescheduledEndTime || chamber.endTime);
+  };
+
+  const handleConfirmReschedule = async () => {
+    if (!rescheduleChamberId || !rescheduleStart || !rescheduleEnd) return;
+    if (rescheduleStart >= rescheduleEnd) {
+      toast.error('Start time must be before end time');
+      return;
+    }
+
+    setSavingReschedule(true);
+    try {
+      const userId = localStorage.getItem('userId');
+      if (!userId) return;
+
+      const { db } = await import('../lib/firebase/config');
+      const { doc, getDoc, updateDoc } = await import('firebase/firestore');
+
+      const now = new Date();
+      const todayStr = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+
+      const doctorRef = doc(db!, 'doctors', userId);
+      const doctorSnap = await getDoc(doctorRef);
+      if (!doctorSnap.exists()) return;
+
+      const doctorData = doctorSnap.data();
+      const updatedChambers = doctorData.chambers.map((c: any) => {
+        if (c.id === rescheduleChamberId) {
+          return {
+            ...c,
+            todayReschedule: {
+              date: todayStr,
+              startTime: rescheduleStart,
+              endTime: rescheduleEnd,
+              originalStartTime: c.startTime,
+              originalEndTime: c.endTime,
+            },
+          };
+        }
+        return c;
+      });
+
+      await updateDoc(doctorRef, { chambers: updatedChambers });
+
+      // Update local state
+      setChambers(prev => {
+        const updated = prev.map(ch => {
+          if (ch.id === rescheduleChamberId) {
+            return { ...ch, rescheduledStartTime: rescheduleStart, rescheduledEndTime: rescheduleEnd };
+          }
+          return ch;
+        });
+        // Re-sort by effective time
+        return updated.sort((a, b) => {
+          if (a.isExpired && !b.isExpired) return 1;
+          if (!a.isExpired && b.isExpired) return -1;
+          const aTime = a.rescheduledStartTime || a.startTime;
+          const bTime = b.rescheduledStartTime || b.startTime;
+          const [aH, aM] = (aTime || '00:00').split(':').map(Number);
+          const [bH, bM] = (bTime || '00:00').split(':').map(Number);
+          return (aH * 60 + aM) - (bH * 60 + bM);
+        });
+      });
+
+      // Send reschedule notification to all booked patients for this chamber today
+      try {
+        const { collection, query, where, getDocs } = await import('firebase/firestore');
+        const bookingsRef = collection(db!, 'bookings');
+        const chamberBookingsQuery = query(
+          bookingsRef,
+          where('chamberId', '==', rescheduleChamberId),
+          where('appointmentDate', '==', todayStr)
+        );
+        const bookingsSnap = await getDocs(chamberBookingsQuery);
+
+        const chamber = chambers.find(c => c.id === rescheduleChamberId);
+        const chamberName = chamber?.name || 'Chamber';
+        const docSpecialty = localStorage.getItem('healqr_specialty') || '';
+
+        // Add doctor notification for record
+        await addDoctorNotification(userId, {
+          type: 'chamber_rescheduled',
+          title: `${chamberName} Rescheduled`,
+          message: `Time changed from ${chamber?.startTime}-${chamber?.endTime} to ${rescheduleStart}-${rescheduleEnd} for today`,
+          priority: 'high',
+        });
+
+        // Notify each booked patient with proper template notification
+        const { sendChamberRescheduled } = await import('../services/notificationService');
+        for (const bookingDoc of bookingsSnap.docs) {
+          const booking = bookingDoc.data();
+          try {
+            if (!booking.patientPhone) continue;
+            await sendChamberRescheduled({
+              patientPhone: booking.patientPhone,
+              patientName: booking.patientName || 'Patient',
+              doctorId: userId,
+              doctorName: doctorName || 'Doctor',
+              doctorSpecialty: docSpecialty,
+              chamberName,
+              appointmentDate: todayStr,
+              originalTime: `${chamber?.startTime} - ${chamber?.endTime}`,
+              newTime: `${rescheduleStart} - ${rescheduleEnd}`,
+              bookingId: bookingDoc.id,
+            });
+          } catch (fcmErr) {
+            console.warn('Notification send failed for patient:', fcmErr);
+          }
+        }
+      } catch (err) {
+        console.error('Notification error:', err);
+      }
+
+      setShowRescheduleConfirm(false);
+      setRescheduleChamberId(null);
+      toast.success(`Chamber rescheduled to ${rescheduleStart} - ${rescheduleEnd} for today`);
+    } catch (err) {
+      console.error('Reschedule error:', err);
+      toast.error('Failed to reschedule chamber');
+    } finally {
+      setSavingReschedule(false);
+    }
+  };
+
   const handleAddPatient = () => {
     setAddPatientModalOpen(true);
   };
@@ -1499,13 +1644,83 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
                     <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
                     <span>{chamber.address}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-gray-400 text-sm mb-4">
+
+                  {/* Chamber Time Display */}
+                  <div className="flex items-center gap-2 text-gray-400 text-sm mb-2">
                     <Clock className="w-4 h-4 flex-shrink-0" />
-                    <span>{chamber.startTime} - {chamber.endTime}</span>
+                    {chamber.rescheduledStartTime ? (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="line-through text-red-400">{chamber.startTime} - {chamber.endTime}</span>
+                        <span className="text-emerald-400 font-semibold">{chamber.rescheduledStartTime} - {chamber.rescheduledEndTime}</span>
+                        <Badge className="bg-amber-500/20 text-amber-400 text-[10px] border-amber-500/30">RESCHEDULED</Badge>
+                      </div>
+                    ) : (
+                      <span>{chamber.startTime} - {chamber.endTime}</span>
+                    )}
                     {chamber.isExpired && (
                       <Badge className="bg-red-600 text-white text-xs ml-2">CHAMBER TIME OVER</Badge>
                     )}
                   </div>
+
+                  {/* Reschedule Toggle */}
+                  {isActiveToday && !chamber.isExpired && (
+                    <div className="mb-2">
+                      {rescheduleChamberId === chamber.id ? (
+                        <div className="bg-zinc-900/80 border border-zinc-700 rounded-lg p-3 space-y-3">
+                          <div className="flex items-center gap-2 text-xs text-amber-400 font-medium">
+                            <RefreshCw className="w-3.5 h-3.5" />
+                            Reschedule for today only
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-[10px] text-gray-500 block mb-1">New Start</label>
+                              <input
+                                type="time"
+                                value={rescheduleStart}
+                                onChange={e => setRescheduleStart(e.target.value)}
+                                className="w-full h-9 px-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm focus:border-emerald-500 outline-none [color-scheme:dark]"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-gray-500 block mb-1">New End</label>
+                              <input
+                                type="time"
+                                value={rescheduleEnd}
+                                onChange={e => setRescheduleEnd(e.target.value)}
+                                className="w-full h-9 px-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm focus:border-emerald-500 outline-none [color-scheme:dark]"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => setShowRescheduleConfirm(true)}
+                              disabled={!rescheduleStart || !rescheduleEnd || rescheduleStart >= rescheduleEnd}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-8 flex-1"
+                            >
+                              Save
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setRescheduleChamberId(null)}
+                              className="border-zinc-700 text-gray-400 text-xs h-8"
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handleOpenReschedule(chamber)}
+                          className="flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          {chamber.rescheduledStartTime ? 'Change Reschedule' : 'Reschedule for today'}
+                        </button>
+                      )}
+                    </div>
+                  )}
 
                   {/* Booking Status */}
                   <div className="bg-gray-700/30 rounded-lg p-4">
@@ -1597,6 +1812,51 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
         chamber={selectedChamber}
         onConfirm={handleConfirmReactivation}
       />
+
+      {/* Reschedule Confirmation Modal */}
+      {showRescheduleConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4">
+          <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6 max-w-sm w-full space-y-4">
+            <div className="flex items-center gap-2 text-amber-400">
+              <RefreshCw className="w-5 h-5" />
+              <h3 className="text-lg font-bold">Confirm Reschedule</h3>
+            </div>
+            <div className="space-y-2 text-sm">
+              <p className="text-gray-400">
+                Chamber: <span className="text-white font-medium">{chambers.find(c => c.id === rescheduleChamberId)?.name}</span>
+              </p>
+              <p className="text-gray-400">
+                Original: <span className="text-red-400 line-through">{chambers.find(c => c.id === rescheduleChamberId)?.startTime} - {chambers.find(c => c.id === rescheduleChamberId)?.endTime}</span>
+              </p>
+              <p className="text-gray-400">
+                New Time: <span className="text-emerald-400 font-semibold">{rescheduleStart} - {rescheduleEnd}</span>
+              </p>
+            </div>
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
+              <p className="text-amber-400 text-xs">
+                ⚠️ This applies to today only. All booked patients will be notified about the time change.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <Button
+                onClick={handleConfirmReschedule}
+                disabled={savingReschedule}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                {savingReschedule ? '⏳ Saving...' : 'Confirm'}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowRescheduleConfirm(false)}
+                disabled={savingReschedule}
+                className="flex-1 border-zinc-700 text-gray-400"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

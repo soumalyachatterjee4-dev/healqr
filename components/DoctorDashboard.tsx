@@ -24,7 +24,8 @@ import {
   Mail,
   MessageCircle,
   BrainCircuit,
-  Send
+  Send,
+  Database
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
@@ -38,6 +39,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import BirthdayCardNotification from './BirthdayCardNotification';
 import DashboardPromoDisplay from './DashboardPromoDisplay';
 import SocialMediaPromoBanner from './SocialMediaPromoBanner';
+import DataExportBanner from './DataExportBanner';
 import { sendPatientListViaWhatsApp } from '../services/whatsappService';
 import { toast } from 'sonner';
 
@@ -224,6 +226,8 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
     isExpired?: boolean;
     manualClinicId?: string | null;
     clinicCode?: string | null;
+    rescheduledStartTime?: string;
+    rescheduledEndTime?: string;
   }>>([]);
 
   // Notifications State
@@ -601,6 +605,27 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
               isExpired = chamberEndTime < now;
             }
 
+            // Check for today's reschedule
+            let rescheduledStartTime: string | undefined;
+            let rescheduledEndTime: string | undefined;
+            if (chamber.todayReschedule && chamber.todayReschedule.date === todayStr) {
+              rescheduledStartTime = chamber.todayReschedule.startTime;
+              rescheduledEndTime = chamber.todayReschedule.endTime;
+            }
+
+            // Use effective time for sorting (rescheduled > original)
+            const effectiveStart = rescheduledStartTime || chamber.startTime;
+            const [effHour, effMin] = (effectiveStart || '00:00').split(':').map(Number);
+            const effectiveStartMinutes = effHour * 60 + effMin;
+
+            // Check expiry against effective end time
+            if (rescheduledEndTime) {
+              const [rEndHour, rEndMin] = rescheduledEndTime.split(':').map(Number);
+              const rescheduledEndDate = new Date(now);
+              rescheduledEndDate.setHours(rEndHour, rEndMin, 0, 0);
+              isExpired = rescheduledEndDate < now;
+            }
+
             return {
               id: chamber.id,
               name: chamber.chamberName,
@@ -611,11 +636,13 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
               booked: qrBookedCount, // Only QR bookings (Walk-ins shown separately)
               capacity: chamber.maxCapacity,
               isActive: chamber.isActive !== false,
-              startMinutes, // For sorting
+              startMinutes: effectiveStartMinutes, // For sorting
               isExpired, // For sorting expired to bottom
               manualClinicId: chamber.manualClinicId || null,
                clinicCode: chamber.clinicCode || null,
-               clinicPhone: chamber.clinicPhone || null
+               clinicPhone: chamber.clinicPhone || null,
+               rescheduledStartTime,
+               rescheduledEndTime
              };
           })
         );
@@ -1016,7 +1043,9 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
       date: 'today',
       booked: chamber.booked,
       capacity: chamber.capacity,
-      isExpired: (chamber as any).isExpired
+      isExpired: (chamber as any).isExpired,
+      rescheduledStartTime: chamber.rescheduledStartTime,
+      rescheduledEndTime: chamber.rescheduledEndTime
     }));
 
   const hasChambers = upcomingChambers.length > 0;
@@ -1244,6 +1273,9 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
           {/* Single Column Layout */}
           <div className="max-w-4xl mx-auto space-y-6 md:space-y-8">
 
+            {/* Data Export Reminder Banner */}
+            <DataExportBanner mode="doctor" onNavigate={() => onMenuChange?.('data-management')} />
+
             <div style={{ background: 'linear-gradient(to bottom right, rgb(16, 185, 129), rgb(5, 150, 105))' }} className="text-white rounded-xl p-6 relative overflow-hidden">
                <div className="flex flex-col md:flex-row gap-6 md:gap-8 relative z-10">
                  {/* Left Side (40%) - Booking Info */}
@@ -1409,9 +1441,23 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
                         {/* Schedule Time */}
                         <div className="flex items-center gap-2 mb-3">
                           <Clock className="w-4 h-4 text-gray-400 shrink-0" />
-                          <p className="text-sm text-gray-300">
-                            {chamber.startTime} to {chamber.endTime}
-                          </p>
+                          {chamber.rescheduledStartTime && chamber.rescheduledEndTime ? (
+                            <div className="flex flex-col">
+                              <p className="text-sm text-red-400 line-through">
+                                {chamber.startTime} to {chamber.endTime}
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm text-emerald-400 font-medium">
+                                  {chamber.rescheduledStartTime} to {chamber.rescheduledEndTime}
+                                </p>
+                                <span className="text-xs bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded">RESCHEDULED</span>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-300">
+                              {chamber.startTime} to {chamber.endTime}
+                            </p>
+                          )}
                           {chamber.isExpired && (
                             <Badge className="bg-red-600 text-white text-xs ml-2">CHAMBER TIME OVER</Badge>
                           )}

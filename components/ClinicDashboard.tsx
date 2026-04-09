@@ -43,6 +43,8 @@ import ClinicAnalytics from './ClinicAnalytics';
 import ClinicReports from './ClinicReports';
 import ClinicSocialMediaKit from './ClinicSocialMediaKit';
 import ClinicMonthlyPlanner from './ClinicMonthlyPlanner';
+import DataManagement from './DataManagement';
+import DataExportBanner from './DataExportBanner';
 import ClinicPreviewCenter from './ClinicPreviewCenter';
 import ClinicAssistantAccessManager from './ClinicAssistantAccessManager';
 import ClinicLabReferralManager from './ClinicLabReferralManager';
@@ -133,7 +135,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
   // Branch managers restricted pages
   const branchAllowedPages = [
     'dashboard', 'doctors', 'qr-manager', 'schedule-manager', 'todays-schedule',
-    'advance-booking', 'analytics', 'reports', 'social-kit', 'monthly-planner',
+    'advance-booking', 'analytics', 'reports', 'social-kit', 'monthly-planner', 'data-management',
     'assistant', 'lab-referral', 'ai-diet', 'ai-rx', 'video-consult'
   ];
 
@@ -669,6 +671,39 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
     );
   }
 
+  // Render Data Management inside sidebar layout
+  if (activeMenu === 'data-management') {
+    const branches = (clinicData?.locations || []).filter((_: any, i: number) => i > 0).map((loc: any) => ({
+      id: loc.id,
+      name: loc.name || `Branch ${loc.id}`,
+    }));
+    return (
+      <div className="min-h-screen bg-black text-white flex flex-col lg:flex-row">
+        <ClinicSidebar
+          activeMenu={activeMenu}
+          onMenuChange={(menu) => { handleMenuChange(menu); setMobileMenuOpen(false); }}
+          onLogout={handleLogout}
+          isOpen={mobileMenuOpen}
+          onClose={() => setMobileMenuOpen(false)}
+          isAssistant={isAssistant}
+          assistantAllowedPages={assistantAllowedPages}
+          isLocationManager={isLocationManager}
+        />
+        <div className="flex-1 lg:ml-64">
+          <DataManagement
+            mode="clinic"
+            clinicName={clinicData?.clinicName || ''}
+            email={clinicData?.email || ''}
+            onLogout={handleLogout}
+            onMenuChange={handleMenuChange}
+            clinicId={resolvedClinicId}
+            branches={branches}
+          />
+        </div>
+      </div>
+    );
+  }
+
   // Render Preview Centre if menu is active
   if (activeMenu === 'preview') {
     return (
@@ -816,7 +851,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
   // Handle unimplemented features
   const implementedMenus = [
     'dashboard', 'profile', 'qr-manager', 'schedule', 'schedule-manager',
-    'todays-schedule', 'doctors', 'braindeck', 'video-consult', 'advance-booking', 'analytics', 'reports', 'social-kit', 'monthly-planner', 'preview', 'assistant',
+    'todays-schedule', 'doctors', 'braindeck', 'video-consult', 'advance-booking', 'analytics', 'reports', 'social-kit', 'monthly-planner', 'data-management', 'preview', 'assistant',
     'lab-referral', 'templates', 'emergency', 'ai-diet', 'ai-rx', 'pharma-cme', 'pharma-samples'
   ];
 
@@ -1020,6 +1055,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
               </div>
 
               {/* Social Media Kit Card - Green Banner */}
+              <DataExportBanner mode="clinic" onNavigate={() => handleMenuChange('data-management')} />
               <div
                 className="rounded-2xl p-6 relative overflow-hidden shadow-xl"
                 style={{ background: 'linear-gradient(to bottom right, rgb(16, 185, 129), rgb(5, 150, 105))' }}

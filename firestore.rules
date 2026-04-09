@@ -111,6 +111,16 @@ service cloud.firestore {
       match /supportMessages/{messageId} {
         allow read, write: if isAuthenticated();
       }
+
+      // ============================================
+      // DOWNLOAD HISTORY SUBCOLLECTION
+      // ============================================
+      match /downloadHistory/{historyId} {
+        allow read, write: if isAuthenticated() && (
+          request.auth.uid == clinicId ||
+          (request.auth.token.email in get(/databases/$(database)/documents/clinics/$(clinicId)).data.locationEmails)
+        );
+      }
     }
 
     // ============================================
@@ -219,6 +229,13 @@ service cloud.firestore {
       // REVENUE ENTRIES SUBCOLLECTION
       // ============================================
       match /revenueEntries/{entryId} {
+        allow read, write: if isOwner(doctorId);
+      }
+
+      // ============================================
+      // DOWNLOAD HISTORY SUBCOLLECTION
+      // ============================================
+      match /downloadHistory/{historyId} {
         allow read, write: if isOwner(doctorId);
       }
     }

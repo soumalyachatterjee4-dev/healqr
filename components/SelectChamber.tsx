@@ -224,13 +224,23 @@ export default function SelectChamber({
 
         if (doctorSnap.exists()) {
           const doctorData = doctorSnap.data();
-          // Update chambers with blockedDates from Firestore
+          // Update chambers with blockedDates and todayReschedule from Firestore
+          const todayStr = new Date(selectedDate.getTime() - selectedDate.getTimezoneOffset() * 60000).toISOString().split('T')[0];
           chambersWithBlockedDates = chambers.map(chamber => {
             const firestoreChamber = doctorData.chambers?.find((c: any) => c.id === chamber.id);
             const blockedDates = firestoreChamber?.blockedDates || [];
+            // Check for today's reschedule
+            let rescheduledStartTime: string | undefined;
+            let rescheduledEndTime: string | undefined;
+            if (firestoreChamber?.todayReschedule && firestoreChamber.todayReschedule.date === todayStr) {
+              rescheduledStartTime = firestoreChamber.todayReschedule.startTime;
+              rescheduledEndTime = firestoreChamber.todayReschedule.endTime;
+            }
             return {
               ...chamber,
-              blockedDates
+              blockedDates,
+              rescheduledStartTime,
+              rescheduledEndTime
             };
           });
         }
@@ -266,8 +276,9 @@ export default function SelectChamber({
               }).length;
 
 
-              // Convert start time to minutes for sorting
-              const [startHour, startMin] = (chamber.startTime || '00:00').split(':').map(Number);
+              // Convert start time to minutes for sorting (use rescheduled time if available)
+              const effectiveStart = (chamber as any).rescheduledStartTime || chamber.startTime;
+              const [startHour, startMin] = (effectiveStart || '00:00').split(':').map(Number);
               const startMinutes = startHour * 60 + startMin;
 
               return {
@@ -278,7 +289,8 @@ export default function SelectChamber({
               };
             } catch (error) {
               console.error(`❌ Error loading bookings for ${chamber.chamberName}:`, error);
-              const [startHour, startMin] = (chamber.startTime || '00:00').split(':').map(Number);
+              const effectiveStart = (chamber as any).rescheduledStartTime || chamber.startTime;
+              const [startHour, startMin] = (effectiveStart || '00:00').split(':').map(Number);
               const startMinutes = startHour * 60 + startMin;
               return {
                 ...chamber,
@@ -516,8 +528,9 @@ export default function SelectChamber({
                   .map((chamber) => {
                     // Check if chamber end time has passed on selected date
                     let isExpired = false;
-                    if (chamber.endTime && selectedDate) {
-                      const [endHour, endMin] = chamber.endTime.split(':').map(Number);
+                    const effectiveEndTime = (chamber as any).rescheduledEndTime || chamber.endTime;
+                    if (effectiveEndTime && selectedDate) {
+                      const [endHour, endMin] = effectiveEndTime.split(':').map(Number);
                       const chamberEndTime = new Date(selectedDate);
                       chamberEndTime.setHours(endHour, endMin, 0, 0);
                       isExpired = chamberEndTime < new Date();
@@ -618,7 +631,21 @@ export default function SelectChamber({
                         </div>
                         <p className="text-sm text-gray-400 mb-1">{chamber.chamberAddress}</p>
                         <div className="flex items-center gap-2">
-                          <p className="text-sm text-gray-400">{chamber.startTime} - {chamber.endTime}</p>
+                          {(chamber as any).rescheduledStartTime && (chamber as any).rescheduledEndTime ? (
+                            <div className="flex flex-col">
+                              <p className="text-sm text-red-400 line-through">
+                                {chamber.startTime} - {chamber.endTime}
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm text-emerald-400 font-medium">
+                                  {(chamber as any).rescheduledStartTime} - {(chamber as any).rescheduledEndTime}
+                                </p>
+                                <span className="text-xs bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded">RESCHEDULED</span>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-400">{chamber.startTime} - {chamber.endTime}</p>
+                          )}
                           {isExpired && (
                             <Badge className="bg-red-600 text-white text-xs">CHAMBER TIME OVER</Badge>
                           )}
@@ -753,7 +780,10 @@ export default function SelectChamber({
               } else if (selectedChamber) {
                 // Call onChamberSelect if provided (clinic QR flow), otherwise onContinue (doctor QR flow)
                 if (onChamberSelect) {
-                  onChamberSelect(selectedChamber.id, selectedChamber.chamberName, selectedChamber.startTime, selectedChamber.endTime);
+                  // Pass rescheduled time if available, otherwise original time
+                  const effectiveStart = (selectedChamber as any).rescheduledStartTime || selectedChamber.startTime;
+                  const effectiveEnd = (selectedChamber as any).rescheduledEndTime || selectedChamber.endTime;
+                  onChamberSelect(selectedChamber.id, selectedChamber.chamberName, effectiveStart, effectiveEnd);
                 } else {
                   onContinue?.(selectedChamber.chamberName, 'chamber', selectedChamber.id);
                 }

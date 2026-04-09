@@ -30,7 +30,7 @@ export interface StoredNotification {
   patientGender?: string;
 
   // Notification Metadata
-  type: 'consultation_completed' | 'booking_confirmed' | 'appointment_reminder' | 'booking_cancelled' | 'booking_restored' | 'follow_up' | 'review_request' | 'prescription_ready' | 'video_call_link' | 'rx_updated' | 'chronic_care';
+  type: 'consultation_completed' | 'booking_confirmed' | 'appointment_reminder' | 'booking_cancelled' | 'booking_restored' | 'follow_up' | 'review_request' | 'prescription_ready' | 'video_call_link' | 'rx_updated' | 'chronic_care' | 'chamber_rescheduled';
   title: string;
   message: string;
 

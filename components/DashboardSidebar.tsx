@@ -24,7 +24,8 @@ import {
   BookOpen,
   Package,
   Heart,
-  IndianRupee
+  IndianRupee,
+  Database
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import healqrLogo from '../assets/healqr.logo.png';
@@ -150,6 +151,7 @@ export default function DashboardSidebar({
 
   const generalTools = [
     { id: 'monthly-planner', label: 'Monthly Planner', icon: Calendar },
+    { id: 'data-management', label: 'Data Management', icon: Database },
   ];
 
   const freeAddOnPages = [
