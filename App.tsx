@@ -31,6 +31,7 @@ const AdvanceBooking = lazy(() => import("./components/AdvanceBooking"));
 const PatientDetails = lazy(() => import("./components/PatientDetails"));
 const PreviewCenter = lazy(() => import("./components/PreviewCenter"));
 const Analytics = lazy(() => import("./components/Analytics"));
+const PatientRetentionAnalytics = lazy(() => import("./components/PatientRetentionAnalytics"));
 const DoctorReports = lazy(() => import("./components/DoctorReports"));
 const RevenueDashboard = lazy(() => import("./components/RevenueDashboard"));
 const LanguageSelection = lazy(() => import("./components/LanguageSelection"));
@@ -2487,6 +2488,7 @@ export default function App() {
     else if (menu === "emergency-button")
       setCurrentPage("emergency-button");
     else if (menu === "analytics") setCurrentPage("analytics");
+    else if (menu === "retention-analytics") setCurrentPage("retention-analytics");
     else if (menu === "reports") setCurrentPage("reports");
     else if (menu === "revenue-dashboard") setCurrentPage("revenue-dashboard");
     else if (menu === "upgrade") setCurrentPage("upgrade");
@@ -3016,6 +3018,14 @@ export default function App() {
 
       {currentPage === "analytics" && (
         <Analytics
+          onLogout={handleLogout}
+          onMenuChange={menuChangeHandler}
+          activeAddOns={activeAddOns}
+        />
+      )}
+
+      {currentPage === "retention-analytics" && (
+        <PatientRetentionAnalytics
           onLogout={handleLogout}
           onMenuChange={menuChangeHandler}
           activeAddOns={activeAddOns}

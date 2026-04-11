@@ -9,7 +9,7 @@ import { sendAIRXNotification } from '../utils/cloudFunctions';
 // Direct Gemini API (client-side key for browser calls)
 const GEMINI_MODEL = 'gemini-2.5-flash';
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
-const GEMINI_API_KEY = 'AIzaSyAEXO21T32uegMq4U57OnSDuBdA6CC_OOc';
+const GEMINI_API_KEY = 'AIzaSyDW2QP3LsJLivp__s7a03mpGdyWHZnXa0w';
 
 const MAX_PAGES = 5;
 

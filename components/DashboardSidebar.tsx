@@ -25,7 +25,8 @@ import {
   Package,
   Heart,
   IndianRupee,
-  Database
+  Database,
+  Target
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import healqrLogo from '../assets/healqr.logo.png';
@@ -144,6 +145,7 @@ export default function DashboardSidebar({
     { id: 'todays-schedule', label: "Today's Schedule", icon: Calendar },
     { id: 'advance-booking', label: 'Advance Booking', icon: CalendarClock },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'retention-analytics', label: 'Patient Retention', icon: Target },
     { id: 'reports', label: 'Reports', icon: FileText },
     { id: 'revenue-dashboard', label: 'Revenue', icon: IndianRupee },
     { id: 'social-kit', label: 'Social Kit & Offers', icon: Share2 },
