@@ -1281,6 +1281,7 @@ export default function PatientDetails({
         consultationStatus: 'completed',
         isCompleted: true,
         referrerSeen: true,
+        inChamber: false,
         ...(rxUrl ? { digitalRxUrl: rxUrl } : {}),
         ...(dietUrl ? { dietChartUrl: dietUrl } : {}),
         ...(rxUrl && lastRxData ? { rxLastData: lastRxData } : {}),
@@ -2018,8 +2019,47 @@ export default function PatientDetails({
                   const isSeen = state?.isMarkedSeen;
                   const isCancelled = state?.isCancelled;
 
+                  const isInChamber = (patient as any).inChamber === true;
+
                   return (
                     <div className="space-y-2">
+                      {/* Send to Chamber Checkbox */}
+                      {!isSeen && !isCancelled && (
+                        <label
+                          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all cursor-pointer ${
+                            isInChamber
+                              ? 'bg-blue-500/15 border border-blue-500/30'
+                              : 'bg-gray-800/50 border border-gray-700 hover:border-blue-500/40'
+                          }`}
+                          onClick={async (e) => {
+                            e.preventDefault();
+                            try {
+                              const bookingRef = doc(db, 'bookings', patient.id);
+                              await updateDoc(bookingRef, {
+                                inChamber: !isInChamber,
+                                ...((!isInChamber) ? { inChamberAt: serverTimestamp() } : { inChamberAt: null }),
+                              });
+                              toast.success(isInChamber ? 'Removed from chamber' : 'Sent to chamber');
+                            } catch (err) {
+                              console.error('Failed to update inChamber:', err);
+                              toast.error('Failed to update');
+                            }
+                          }}
+                        >
+                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all flex-shrink-0 ${
+                            isInChamber ? 'bg-blue-500 border-blue-500' : 'border-gray-500 bg-transparent'
+                          }`}>
+                            {isInChamber && <Check className="w-3 h-3 text-white" />}
+                          </div>
+                          <div className="flex-1">
+                            <span className={`text-sm font-medium ${isInChamber ? 'text-blue-400' : 'text-gray-300'}`}>
+                              {isInChamber ? 'In Chamber' : 'Send to Chamber'}
+                            </span>
+                          </div>
+                          {isInChamber && <Stethoscope className="w-5 h-5 text-blue-400 flex-shrink-0" />}
+                        </label>
+                      )}
+
                       {/* Assistant Checkbox */}
                       <label
                         className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${

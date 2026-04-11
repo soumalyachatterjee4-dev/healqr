@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Users, Calendar, MapPin, TrendingUp, Building2, RefreshCw, Shield, Lock, FileText, Brain } from 'lucide-react';
+import { Users, Calendar, MapPin, TrendingUp, Building2, RefreshCw, Shield, Lock, FileText, Brain, Download, Clock, FlaskConical, Microscope, Target } from 'lucide-react';
 import { db } from '../lib/firebase/config';
 import { collection, getDocs, doc, getDoc, query, where, Timestamp } from 'firebase/firestore';
 import { getLocationFromPincode } from '../utils/pincodeMapping';
+import { getOpenWindows, getNextWindow } from '../utils/downloadWindow';
 
 interface PharmaDashboardProps {
   companyId: string;
@@ -310,6 +311,64 @@ export default function PharmaDashboard({ companyId, companyName }: PharmaDashbo
         <Lock className="w-5 h-5 mr-2" />
         Data is encrypted
       </div>
+
+      {/* Download Window Banner */}
+      {(() => {
+        const openWindows = getOpenWindows();
+        const nextWin = getNextWindow();
+        if (openWindows.length > 0) {
+          return (
+            <div className="w-full rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 p-4 shadow-lg">
+              <div className="flex items-center gap-3 mb-3">
+                <Download className="w-6 h-6 text-white" />
+                <div>
+                  <p className="text-white font-bold text-base">Free Download Window Open!</p>
+                  <p className="text-emerald-100 text-xs">
+                    {openWindows.map(w => `${w.monthLabel} — ${w.daysLeft} day${w.daysLeft !== 1 ? 's' : ''} left`).join(' | ')}
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="bg-white/15 rounded-lg p-2.5 flex items-center gap-2">
+                  <Target className="w-4 h-4 text-emerald-200" />
+                  <div>
+                    <p className="text-white text-xs font-medium">Doctor Insights</p>
+                    <p className="text-emerald-200 text-[10px]">Chamber & Demographics CSV</p>
+                  </div>
+                </div>
+                <div className="bg-white/15 rounded-lg p-2.5 flex items-center gap-2">
+                  <FlaskConical className="w-4 h-4 text-emerald-200" />
+                  <div>
+                    <p className="text-white text-xs font-medium">Rx Trends</p>
+                    <p className="text-emerald-200 text-[10px]">Extract product data CSV</p>
+                  </div>
+                </div>
+                <div className="bg-white/15 rounded-lg p-2.5 flex items-center gap-2">
+                  <Microscope className="w-4 h-4 text-emerald-200" />
+                  <div>
+                    <p className="text-white text-xs font-medium">Pathology Trends</p>
+                    <p className="text-emerald-200 text-[10px]">Extract test data CSV</p>
+                  </div>
+                </div>
+              </div>
+              <p className="text-emerald-200 text-[10px] mt-2 text-center">Download before Day 7 — after that, reports are locked until next month</p>
+            </div>
+          );
+        }
+        return (
+          <div className="w-full rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 flex items-center gap-3">
+            <Clock className="w-5 h-5 text-amber-400 shrink-0" />
+            <div>
+              <p className="text-amber-400 font-medium text-sm">No free download window open</p>
+              {nextWin && (
+                <p className="text-gray-400 text-xs">
+                  {nextWin.monthLabel} data (Doctor Insights, Rx Trends, Pathology) will be available for free download from {nextWin.opensOn.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </p>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Stat Cards - White + Blue */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

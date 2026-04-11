@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Users, BarChart3, FileText,
   LogOut, X, ChevronDown, ChevronRight, Building2,
-  MessageSquare, Hospital, FlaskConical, UserCheck, BookOpen, Package, Microscope
+  MessageSquare, Hospital, FlaskConical, UserCheck, BookOpen, Package, Microscope, Target
 } from 'lucide-react';
 import healqrLogo from '../assets/healqr.logo.png';
 import { useState } from 'react';
@@ -27,6 +27,7 @@ export default function PharmaSidebar({ currentPage, onNavigate, onLogout, isOpe
 
   const analyticsItems = [
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'doctor-insights', label: 'Doctor Insights', icon: Target },
     { id: 'rx-trends', label: 'Rx Trends', icon: FlaskConical },
     { id: 'pathology-trends', label: 'Pathology Trends', icon: Microscope },
     { id: 'onboarding', label: 'Onboarding Tracker', icon: UserCheck },

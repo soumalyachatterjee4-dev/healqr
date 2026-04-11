@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { FlaskConical, Download, Lock, TrendingUp, MapPin, Stethoscope, BarChart3, AlertTriangle, RefreshCw, Calendar, ChevronDown, X, Send, Unlock } from 'lucide-react';
+import { FlaskConical, Download, Lock, TrendingUp, MapPin, Stethoscope, BarChart3, AlertTriangle, RefreshCw, Calendar, ChevronDown, X, Send, Unlock, Clock } from 'lucide-react';
 import { db } from '../lib/firebase/config';
 import { collection, getDocs, query, where, doc, getDoc, addDoc, updateDoc, serverTimestamp, orderBy, Timestamp } from 'firebase/firestore';
 import { getZoneFromState } from '../utils/pincodeMapping';
+import { checkDateRangeStatus, getOpenWindows, getNextWindow } from '../utils/downloadWindow';
 
 interface PharmaRxTrendsProps {
   companyId: string;
@@ -362,14 +363,15 @@ export default function PharmaRxTrends({ companyId }: PharmaRxTrendsProps) {
     return rxSet.size;
   }, [moleculeData]);
 
-  // ---- Period status check ----
+  // ---- Period status check (monthly window) ----
   function checkPeriodStatus(from: string, to: string): 'free' | 'locked' | 'partial' {
-    if (!nextFreeDate) return 'free'; // Never extracted
-    const fromD = new Date(from);
-    const toD = new Date(to);
-    if (fromD >= nextFreeDate) return 'free';
-    if (toD < nextFreeDate) return 'locked';
-    return 'partial';
+    const status = checkDateRangeStatus(from, to);
+    if (status === 'free') return 'free';
+    if (status === 'current-month') return 'locked';
+    // Check if approved via admin
+    const approved = getApprovedRequest(from, to);
+    if (approved) return 'free';
+    return 'locked';
   }
 
   // Check for approved unlock request covering the date range
@@ -386,20 +388,9 @@ export default function PharmaRxTrends({ companyId }: PharmaRxTrendsProps) {
     const approved = getApprovedRequest(fromDate, toDate);
 
     if (status === 'free') {
-      // Check if they could include more free data by extending fromDate to nextFreeDate
-      if (nextFreeDate && new Date(fromDate) > nextFreeDate) {
-        setModalType('free-suggest');
-        setShowModal(true);
-      } else {
-        doExtract('free');
-      }
-    } else if (approved) {
-      doExtract('approved', approved.id);
-    } else if (status === 'locked') {
-      setModalType('locked');
-      setShowModal(true);
+      doExtract(approved ? 'approved' : 'free', approved?.id);
     } else {
-      setModalType('partial');
+      setModalType('locked');
       setShowModal(true);
     }
   };
@@ -613,27 +604,32 @@ export default function PharmaRxTrends({ companyId }: PharmaRxTrendsProps) {
       </div>
 
       {/* Free Period Banner */}
-      <div className={`rounded-xl p-4 border flex items-center gap-3 ${
-        nextFreeDate ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-purple-500/10 border-purple-500/30'
-      }`}>
-        <Calendar className={`w-5 h-5 ${nextFreeDate ? 'text-emerald-400' : 'text-purple-400'}`} />
-        <div>
-          {nextFreeDate ? (
-            <>
-              <p className="text-sm font-medium text-emerald-400">
-                Next free extraction available from: {nextFreeDate.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-              </p>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Data locked up to: {lastLockedDate?.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-              </p>
-            </>
-          ) : (
-            <p className="text-sm font-medium text-purple-400">
-              All data available for free extraction — no previous downloads
-            </p>
-          )}
-        </div>
-      </div>
+      {(() => {
+        const openWindows = getOpenWindows();
+        const nextWin = getNextWindow();
+        if (openWindows.length > 0) {
+          return (
+            <div className="rounded-xl p-4 border flex items-center gap-3 bg-emerald-500/10 border-emerald-500/30">
+              <Calendar className="w-5 h-5 text-emerald-400" />
+              <div>
+                <p className="text-sm font-medium text-emerald-400">Free extraction window open!</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {openWindows.map(w => `${w.monthLabel} data (${w.daysLeft}d left)`).join(', ')} — download before window expires
+                </p>
+              </div>
+            </div>
+          );
+        }
+        return (
+          <div className="rounded-xl p-4 border flex items-center gap-3 bg-amber-500/10 border-amber-500/30">
+            <Clock className="w-5 h-5 text-amber-400" />
+            <div>
+              <p className="text-sm font-medium text-amber-400">No free extraction window open</p>
+              {nextWin && <p className="text-xs text-gray-500 mt-0.5">{nextWin.monthLabel} data available from {nextWin.opensOn.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

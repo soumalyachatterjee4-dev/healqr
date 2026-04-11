@@ -112,6 +112,7 @@ const PharmaPortal = lazy(() => import("./components/PharmaPortal"));
 const PharmaSignUp = lazy(() => import("./components/PharmaSignUp"));
 const DoctorCMEViewer = lazy(() => import("./components/DoctorCMEViewer"));
 const DoctorSampleRequest = lazy(() => import("./components/DoctorSampleRequest"));
+const ClinicQueueDisplay = lazy(() => import("./components/ClinicQueueDisplay"));
 // AIChatBot is imported directly at the top (not lazy)
 
 // Loading Component
@@ -235,6 +236,7 @@ export default function App() {
     | "referrer-register"
     | "referrer-login"
     | "referrer-dashboard"
+    | "queue-display"
   >(() => {
     // Initialize currentPage from localStorage to prevent flash/auto-logout on refresh
     const isClinic = localStorage.getItem('healqr_is_clinic') === 'true';
@@ -693,6 +695,10 @@ export default function App() {
     }
 
     // Handle Referrer Registration / Login page links
+    if (pageParam === 'queue-display') {
+      setCurrentPage('queue-display');
+      return;
+    }
     if (pageParam === 'referrer-register') {
       setCurrentPage('referrer-register');
       return;
@@ -1297,7 +1303,7 @@ export default function App() {
       const isAdvertiserPage = currentPage === 'advertiser-login' || currentPage === 'advertiser-signup' || currentPage === 'advertiser-verify' || pageParam === 'advertiser-login' || pageParam === 'advertiser-signup' || pageParam === 'advertiser-verify';
       const isPharmaPage = currentPage === 'pharma-login' || currentPage === 'pharma-verify' || currentPage === 'pharma-portal' || currentPage === 'pharma-signup' || pageParam === 'pharma-login' || pageParam === 'pharma-verify' || pageParam === 'pharma-portal' || pageParam === 'pharma-signup';
 
-      if (isVerificationLink || isBookingMode || hasBookingDoctorId || isNotificationPage || isVerifyVisit || isOnVerifyLoginPage || isOnVerifyEmailPage || isOnAssistantLoginPage || isOnMasterAccessLoginPage || isClinicPage || isAdvertiserPage || isPharmaPage || currentPage === 'verify-email' || currentPage === 'verify-login' || currentPage === 'assistant-login' || currentPage === 'master-access-login' || currentPage === 'temp-doctor-login' || currentPage === 'temp-doctor-dashboard' || currentPage === 'admin-verify' || currentPage === 'verify-walkin' || currentPage.startsWith('booking-')) {
+      if (isVerificationLink || isBookingMode || hasBookingDoctorId || isNotificationPage || isVerifyVisit || isOnVerifyLoginPage || isOnVerifyEmailPage || isOnAssistantLoginPage || isOnMasterAccessLoginPage || isClinicPage || isAdvertiserPage || isPharmaPage || currentPage === 'verify-email' || currentPage === 'verify-login' || currentPage === 'assistant-login' || currentPage === 'master-access-login' || currentPage === 'temp-doctor-login' || currentPage === 'temp-doctor-dashboard' || currentPage === 'admin-verify' || currentPage === 'verify-walkin' || currentPage === 'queue-display' || currentPage.startsWith('booking-')) {
         setIsAuthInitialized(true);
         return;
       }
@@ -2847,6 +2853,14 @@ export default function App() {
             onLoginSuccess={() => setCurrentPage('referrer-dashboard')}
             onBack={() => setCurrentPage('landing')}
             onRegister={() => setCurrentPage('referrer-register')}
+          />
+        </Suspense>
+      )}
+
+      {currentPage === "queue-display" && (
+        <Suspense fallback={<PageLoader />}>
+          <ClinicQueueDisplay
+            clinicId={new URLSearchParams(window.location.search).get('clinicId') || ''}
           />
         </Suspense>
       )}

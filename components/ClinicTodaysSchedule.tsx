@@ -286,6 +286,7 @@ function ChamberPatientDetailsLoader({
               vcPatientJoined: data.vcPatientJoined || false,
               vcCompleted: data.vcCompleted || false,
               vcLinkSentAt: data.vcLinkSentAt || null,
+              inChamber: data.inChamber || false,
             };
           });
 
@@ -355,6 +356,7 @@ function ChamberPatientDetailsLoader({
             digitalRxUrl: data.digitalRxUrl || '',
             dietChartUrl: data.dietChartUrl || '',
             isWalkIn: true,
+            inChamber: data.inChamber || false,
             };
           });
 

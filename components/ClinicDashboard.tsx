@@ -41,6 +41,8 @@ import DashboardPromoDisplay from './DashboardPromoDisplay';
 import ClinicAdvanceBooking from './ClinicAdvanceBooking';
 import ClinicAnalytics from './ClinicAnalytics';
 import ClinicReports from './ClinicReports';
+import ClinicRetentionAnalytics from './ClinicRetentionAnalytics';
+import ClinicQueueSetup from './ClinicQueueSetup';
 import ClinicSocialMediaKit from './ClinicSocialMediaKit';
 import ClinicMonthlyPlanner from './ClinicMonthlyPlanner';
 import DataManagement from './DataManagement';
@@ -642,6 +644,29 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
         onMenuChange={handleMenuChange}
         onLogout={handleLogout}
         clinicId={resolvedClinicId}
+      />
+    );
+  }
+
+  // Render Patient Retention Analytics
+  if (activeMenu === 'patient-retention') {
+    return (
+      <ClinicRetentionAnalytics
+        clinicId={resolvedClinicId}
+        onMenuChange={handleMenuChange}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  // Render Queue Display Setup
+  if (activeMenu === 'queue-display') {
+    return (
+      <ClinicQueueSetup
+        clinicId={resolvedClinicId}
+        clinicName={displayClinicName}
+        onMenuChange={handleMenuChange}
+        onLogout={handleLogout}
       />
     );
   }

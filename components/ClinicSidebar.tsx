@@ -23,7 +23,9 @@ import {
   LogOut,
   BookOpen,
   Package,
-  Database
+  Database,
+  Target,
+  Monitor
 } from 'lucide-react';
 import healqrLogo from '../assets/healqr.logo.png';
 import { useState, useEffect } from 'react';
@@ -94,7 +96,7 @@ export default function ClinicSidebar({
   // Branch managers get a restricted set of pages
   const branchAllowedPages = [
     'dashboard', 'doctors', 'qr-manager', 'schedule-manager', 'todays-schedule',
-    'advance-booking', 'analytics', 'reports', 'social-kit', 'monthly-planner', 'data-management',
+    'advance-booking', 'analytics', 'reports', 'patient-retention', 'queue-display', 'social-kit', 'monthly-planner', 'data-management',
     'assistant', 'lab-referral', 'ai-diet', 'ai-rx', 'video-consult',
     'pharma-cme', 'pharma-samples'
   ];
@@ -120,6 +122,8 @@ export default function ClinicSidebar({
         { id: 'advance-booking', label: 'Advance Booking', icon: CalendarRange },
         { id: 'analytics', label: 'Analytics', icon: BarChart3 },
         { id: 'reports', label: 'Reports', icon: Bell },
+        { id: 'patient-retention', label: 'Patient Retention', icon: Target },
+        { id: 'queue-display', label: 'Queue Display', icon: Monitor },
         { id: 'social-kit', label: 'Social Kit & Offers', icon: Share2 },
       ]
     },
@@ -196,7 +200,7 @@ export default function ClinicSidebar({
                     onClose();
                   }
                 }}
-                className={`w-full flex items-center justify-between px-4 py-2 rounded-lg transition-all duration-200 group text-left ${
+                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-lg transition-all duration-200 group text-left ${
                   !accessible
                     ? 'text-slate-600 cursor-not-allowed opacity-50'
                     : activeMenu === item.id
@@ -206,9 +210,9 @@ export default function ClinicSidebar({
                       : 'text-slate-400 hover:bg-blue-500/10 hover:text-blue-200'
                 }`}
               >
-                <div className="flex items-center gap-2.5 min-w-0">
+                <div className="flex items-center gap-3 min-w-0">
                   <item.icon className="w-4 h-4 shrink-0" />
-                  <span className="text-[12px] font-normal whitespace-nowrap">{item.label}</span>
+                  <span className="text-[13px] font-normal whitespace-nowrap">{item.label}</span>
                 </div>
                 {!accessible ? (
                   <Lock className="w-3 h-3 text-slate-600 shrink-0" />
