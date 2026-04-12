@@ -27,7 +27,8 @@ import {
   IndianRupee,
   Database,
   Target,
-  Monitor
+  Monitor,
+  Megaphone
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import healqrLogo from '../assets/healqr.logo.png';
@@ -152,6 +153,8 @@ export default function DashboardSidebar({
     { id: 'billing-receipt', label: 'Billing & Receipts', icon: FileText },
     { id: 'queue-display', label: 'Queue Display', icon: Monitor },
     { id: 'staff-attendance', label: 'Staff Attendance', icon: Users },
+    { id: 'inventory-manager', label: 'Inventory', icon: Package },
+    { id: 'patient-broadcast', label: 'Patient Broadcast', icon: Megaphone },
     { id: 'social-kit', label: 'Social Kit & Offers', icon: Share2 },
   ];
 

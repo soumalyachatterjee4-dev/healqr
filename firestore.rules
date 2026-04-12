@@ -240,6 +240,27 @@ service cloud.firestore {
       }
 
       // ============================================
+      // INVENTORY SUBCOLLECTION
+      // ============================================
+      match /inventory/{itemId} {
+        allow read, write: if isOwner(doctorId);
+      }
+
+      // ============================================
+      // STOCK LOGS SUBCOLLECTION
+      // ============================================
+      match /stockLogs/{logId} {
+        allow read, write: if isOwner(doctorId);
+      }
+
+      // ============================================
+      // BROADCAST LOGS SUBCOLLECTION
+      // ============================================
+      match /broadcastLogs/{logId} {
+        allow read, write: if isOwner(doctorId);
+      }
+
+      // ============================================
       // DOWNLOAD HISTORY SUBCOLLECTION
       // ============================================
       match /downloadHistory/{historyId} {

@@ -263,6 +263,20 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
+          "fieldPath": "doctorId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "appointmentDate",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "bookings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
           "fieldPath": "clinicId",
           "order": "ASCENDING"
         },

@@ -39,6 +39,8 @@ const LeaveApply = lazy(() => import("./components/LeaveApply"));
 const DoctorReports = lazy(() => import("./components/DoctorReports"));
 const RevenueDashboard = lazy(() => import("./components/RevenueDashboard"));
 const BillingReceipt = lazy(() => import("./components/BillingReceipt"));
+const InventoryManager = lazy(() => import("./components/InventoryManager"));
+const PatientBroadcast = lazy(() => import("./components/PatientBroadcast"));
 const LanguageSelection = lazy(() => import("./components/LanguageSelection"));
 const BookingMiniWebsite = lazy(() => import("./components/BookingMiniWebsite"));
 const SelectDate = lazy(() => import("./components/SelectDate"));
@@ -171,6 +173,8 @@ export default function App() {
     | "reports"
     | "revenue-dashboard"
     | "billing-receipt"
+    | "inventory-manager"
+    | "patient-broadcast"
     | "template-uploader"
     | "reminder-notifications"
     | "booking-language"
@@ -1879,6 +1883,8 @@ export default function App() {
             'reports',
             'revenue-dashboard',
             'billing-receipt',
+            'inventory-manager',
+            'patient-broadcast',
             'upgrade',
             'purchase-history',
             'template-uploader',
@@ -1906,6 +1912,8 @@ export default function App() {
             'reports',
             'revenue-dashboard',
             'billing-receipt',
+            'inventory-manager',
+            'patient-broadcast',
             'upgrade',
             'purchase-history',
             'template-uploader',
@@ -2513,6 +2521,8 @@ export default function App() {
     else if (menu === "reports") setCurrentPage("reports");
     else if (menu === "revenue-dashboard") setCurrentPage("revenue-dashboard");
     else if (menu === "billing-receipt") setCurrentPage("billing-receipt");
+    else if (menu === "inventory-manager") setCurrentPage("inventory-manager");
+    else if (menu === "patient-broadcast") setCurrentPage("patient-broadcast");
     else if (menu === "upgrade") setCurrentPage("upgrade");
     else if (menu === "purchase-history")
       setCurrentPage("purchase-history");
@@ -3110,6 +3120,26 @@ export default function App() {
           onMenuChange={menuChangeHandler}
           activeAddOns={activeAddOns}
         />
+      )}
+
+      {currentPage === "inventory-manager" && (
+        <Suspense fallback={<PageLoader />}>
+          <InventoryManager
+            onLogout={handleLogout}
+            onMenuChange={menuChangeHandler}
+            activeAddOns={activeAddOns}
+          />
+        </Suspense>
+      )}
+
+      {currentPage === "patient-broadcast" && (
+        <Suspense fallback={<PageLoader />}>
+          <PatientBroadcast
+            onLogout={handleLogout}
+            onMenuChange={menuChangeHandler}
+            activeAddOns={activeAddOns}
+          />
+        </Suspense>
       )}
 
       {currentPage === "template-uploader" && (
