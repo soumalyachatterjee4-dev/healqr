@@ -43,6 +43,7 @@ import ClinicAnalytics from './ClinicAnalytics';
 import ClinicReports from './ClinicReports';
 import ClinicRetentionAnalytics from './ClinicRetentionAnalytics';
 import ClinicQueueSetup from './ClinicQueueSetup';
+import StaffAttendance from './StaffAttendance';
 import ClinicSocialMediaKit from './ClinicSocialMediaKit';
 import ClinicMonthlyPlanner from './ClinicMonthlyPlanner';
 import DataManagement from './DataManagement';
@@ -663,6 +664,19 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
   if (activeMenu === 'queue-display') {
     return (
       <ClinicQueueSetup
+        clinicId={resolvedClinicId}
+        clinicName={displayClinicName}
+        onMenuChange={handleMenuChange}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  // Render Staff Attendance
+  if (activeMenu === 'staff-attendance') {
+    return (
+      <StaffAttendance
+        mode="clinic"
         clinicId={resolvedClinicId}
         clinicName={displayClinicName}
         onMenuChange={handleMenuChange}

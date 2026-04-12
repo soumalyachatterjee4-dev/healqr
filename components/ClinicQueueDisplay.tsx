@@ -5,7 +5,8 @@ import {
 } from 'lucide-react';
 
 interface QueueDisplayProps {
-  clinicId: string;
+  clinicId?: string;
+  doctorId?: string;
 }
 
 interface QueuePatient {
@@ -61,7 +62,7 @@ const DOCTOR_COLORS = [
 
 const SCREEN_DURATION = 10000; // 10 seconds per screen
 
-export default function ClinicQueueDisplay({ clinicId }: QueueDisplayProps) {
+export default function ClinicQueueDisplay({ clinicId, doctorId }: QueueDisplayProps) {
   const [chambers, setChambers] = useState<ChamberInfo[]>([]);
   const [clinicName, setClinicName] = useState('');
   const [clinicAddress, setClinicAddress] = useState('');
@@ -123,7 +124,7 @@ export default function ClinicQueueDisplay({ clinicId }: QueueDisplayProps) {
 
   // Real-time data
   useEffect(() => {
-    if (!clinicId) return;
+    if (!clinicId && !doctorId) return;
     let unsubBookings: (() => void) | null = null;
     let chamberRefreshId: ReturnType<typeof setInterval> | null = null;
 
@@ -136,41 +137,56 @@ export default function ClinicQueueDisplay({ clinicId }: QueueDisplayProps) {
         const { db } = await import('../lib/firebase/config');
         const { collection, query, where, onSnapshot, doc, getDoc } = await import('firebase/firestore');
 
-        // Load clinic info
-        const clinicDoc = await getDoc(doc(db, 'clinics', clinicId));
-        const clinicData = clinicDoc.exists() ? clinicDoc.data() : null;
-        setClinicName(clinicData?.clinicName || clinicData?.name || 'Clinic');
-        setClinicAddress(clinicData?.address || '');
-
-        // Load linked doctor details + their chambers
-        const linkedDoctors = clinicData?.linkedDoctors || [];
-        const linkedDoctorsDetails = clinicData?.linkedDoctorsDetails || [];
-
         const allDocIds = new Set<string>();
-        for (const detail of linkedDoctorsDetails) {
-          const docId = detail.doctorId || detail.uid;
-          if (docId) allDocIds.add(docId);
-        }
-        for (const docId of linkedDoctors) allDocIds.add(docId);
 
-        // Fetch each doctor's chamber data
-        for (const docId of allDocIds) {
-          try {
-            const doctorDoc = await getDoc(doc(db, 'doctors', docId));
-            const doctorData = doctorDoc.exists() ? doctorDoc.data() : null;
-            const detail = linkedDoctorsDetails.find((d: any) => (d.doctorId || d.uid) === docId);
-            doctorDetailsRef.set(docId, {
-              name: detail?.name || detail?.doctorName || doctorData?.name || doctorData?.doctorName || 'Doctor',
-              specialty: (detail?.specialties || [detail?.specialty] || doctorData?.specialties || [doctorData?.specialty]).filter(Boolean).join(', ') || 'General',
-              chambers: doctorData?.chambers || []
-            });
-          } catch {
-            const detail = linkedDoctorsDetails.find((d: any) => (d.doctorId || d.uid) === docId);
-            doctorDetailsRef.set(docId, {
-              name: detail?.name || detail?.doctorName || 'Doctor',
-              specialty: 'General',
-              chambers: []
-            });
+        if (doctorId && !clinicId) {
+          // === DOCTOR MODE: Load single doctor's data ===
+          const doctorDoc = await getDoc(doc(db, 'doctors', doctorId));
+          const doctorData = doctorDoc.exists() ? doctorDoc.data() : null;
+          const name = doctorData?.name || doctorData?.doctorName || 'Doctor';
+          const specialties = doctorData?.specialties || [doctorData?.specialty];
+          setClinicName(`Dr. ${name}`);
+          setClinicAddress(specialties.filter(Boolean).join(', ') || 'General');
+          allDocIds.add(doctorId);
+          doctorDetailsRef.set(doctorId, {
+            name,
+            specialty: specialties.filter(Boolean).join(', ') || 'General',
+            chambers: doctorData?.chambers || []
+          });
+        } else if (clinicId) {
+          // === CLINIC MODE: Load clinic + linked doctors ===
+          const clinicDoc = await getDoc(doc(db, 'clinics', clinicId));
+          const clinicData = clinicDoc.exists() ? clinicDoc.data() : null;
+          setClinicName(clinicData?.clinicName || clinicData?.name || 'Clinic');
+          setClinicAddress(clinicData?.address || '');
+
+          const linkedDoctors = clinicData?.linkedDoctors || [];
+          const linkedDoctorsDetails = clinicData?.linkedDoctorsDetails || [];
+
+          for (const detail of linkedDoctorsDetails) {
+            const docId = detail.doctorId || detail.uid;
+            if (docId) allDocIds.add(docId);
+          }
+          for (const docId of linkedDoctors) allDocIds.add(docId);
+
+          for (const docId of allDocIds) {
+            try {
+              const doctorDoc = await getDoc(doc(db, 'doctors', docId));
+              const doctorData = doctorDoc.exists() ? doctorDoc.data() : null;
+              const detail = linkedDoctorsDetails.find((d: any) => (d.doctorId || d.uid) === docId);
+              doctorDetailsRef.set(docId, {
+                name: detail?.name || detail?.doctorName || doctorData?.name || doctorData?.doctorName || 'Doctor',
+                specialty: (detail?.specialties || [detail?.specialty] || doctorData?.specialties || [doctorData?.specialty]).filter(Boolean).join(', ') || 'General',
+                chambers: doctorData?.chambers || []
+              });
+            } catch {
+              const detail = linkedDoctorsDetails.find((d: any) => (d.doctorId || d.uid) === docId);
+              doctorDetailsRef.set(docId, {
+                name: detail?.name || detail?.doctorName || 'Doctor',
+                specialty: 'General',
+                chambers: []
+              });
+            }
           }
         }
 
@@ -181,9 +197,10 @@ export default function ClinicQueueDisplay({ clinicId }: QueueDisplayProps) {
 
         const rebuildScheduledChambers = () => {
           scheduledChambersRef.length = 0;
-          doctorDetailsRef.forEach((info, docId) => {
+          doctorDetailsRef.forEach((info, dId) => {
             (info.chambers || []).forEach((ch: any) => {
-              if (ch.clinicId !== clinicId && ch.clinicCode !== clinicId) return;
+              // In clinic mode, filter to this clinic's chambers only
+              if (clinicId && ch.clinicId !== clinicId && ch.clinicCode !== clinicId) return;
               let scheduledToday = false;
               if (ch.frequency === 'Daily') scheduledToday = true;
               else if (ch.frequency === 'Custom' && ch.customDate === todayStr) scheduledToday = true;
@@ -191,7 +208,7 @@ export default function ClinicQueueDisplay({ clinicId }: QueueDisplayProps) {
               else if (ch.days) scheduledToday = ch.days.some((d: string) => d.includes(todayStr));
               if (scheduledToday && ch.blockedDates && ch.blockedDates.includes(todayStr)) scheduledToday = false;
               if (scheduledToday) {
-                scheduledChambersRef.push({ chamber: ch, doctorId: docId, doctorName: info.name, specialty: info.specialty });
+                scheduledChambersRef.push({ chamber: ch, doctorId: dId, doctorName: info.name, specialty: info.specialty });
               }
             });
           });
@@ -202,7 +219,9 @@ export default function ClinicQueueDisplay({ clinicId }: QueueDisplayProps) {
 
         // Listen to today's bookings
         const bookingsRef = collection(db, 'bookings');
-        const q = query(bookingsRef, where('clinicId', '==', clinicId), where('appointmentDate', '==', todayStr));
+        const q = clinicId
+          ? query(bookingsRef, where('clinicId', '==', clinicId), where('appointmentDate', '==', todayStr))
+          : query(bookingsRef, where('doctorId', '==', doctorId), where('appointmentDate', '==', todayStr));
 
         unsubBookings = onSnapshot(q, (snap) => {
           const allBookings: QueuePatient[] = [];
@@ -250,8 +269,8 @@ export default function ClinicQueueDisplay({ clinicId }: QueueDisplayProps) {
 
             return {
               id: sc.chamber.id || idx,
-              name: sc.chamber.chamberName || clinicData?.clinicName || 'Chamber',
-              address: sc.chamber.chamberAddress || clinicData?.address || '',
+              name: sc.chamber.chamberName || 'Chamber',
+              address: sc.chamber.chamberAddress || '',
               startTime,
               endTime,
               maxCapacity: sc.chamber.maxCapacity || 20,
@@ -312,7 +331,7 @@ export default function ClinicQueueDisplay({ clinicId }: QueueDisplayProps) {
       if (unsubBookings) unsubBookings();
       if (chamberRefreshId) clearInterval(chamberRefreshId);
     };
-  }, [clinicId, playChime, buildScreenSequence]);
+  }, [clinicId, doctorId, playChime, buildScreenSequence]);
 
   // Auto-rotate screens — use ref for stable access to latest screens array
   useEffect(() => {

@@ -16,11 +16,21 @@ initErrorMonitoring();
 // ============================================
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
+    // Register FCM service worker
     navigator.serviceWorker.register('/firebase-messaging-sw.js')
       .then((registration) => {
       })
       .catch((err) => {
-        console.error('❌ Service Worker registration failed:', err);
+        console.error('❌ FCM Service Worker registration failed:', err);
+      });
+
+    // Register offline caching service worker
+    navigator.serviceWorker.register('/sw.js')
+      .then((registration) => {
+        console.log('✅ Offline SW registered');
+      })
+      .catch((err) => {
+        console.error('❌ Offline SW registration failed:', err);
       });
   });
 }

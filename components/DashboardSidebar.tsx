@@ -26,7 +26,8 @@ import {
   Heart,
   IndianRupee,
   Database,
-  Target
+  Target,
+  Monitor
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import healqrLogo from '../assets/healqr.logo.png';
@@ -148,6 +149,9 @@ export default function DashboardSidebar({
     { id: 'retention-analytics', label: 'Patient Retention', icon: Target },
     { id: 'reports', label: 'Reports', icon: FileText },
     { id: 'revenue-dashboard', label: 'Revenue', icon: IndianRupee },
+    { id: 'billing-receipt', label: 'Billing & Receipts', icon: FileText },
+    { id: 'queue-display', label: 'Queue Display', icon: Monitor },
+    { id: 'staff-attendance', label: 'Staff Attendance', icon: Users },
     { id: 'social-kit', label: 'Social Kit & Offers', icon: Share2 },
   ];
 

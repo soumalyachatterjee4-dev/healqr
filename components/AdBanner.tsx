@@ -15,6 +15,11 @@ interface Ad {
   title?: string;
   clicks: number;
   impressions: number;
+  // A/B Testing fields
+  abTestEnabled?: boolean;
+  imageUrlB?: string;
+  variantAStats?: { impressions: number; clicks: number };
+  variantBStats?: { impressions: number; clicks: number };
 }
 
 interface AdBannerProps {
@@ -26,6 +31,7 @@ interface AdBannerProps {
 export default function AdBanner({ language = 'english', placement = 'booking_flow', className = '' }: AdBannerProps) {
   const [ad, setAd] = useState<Ad | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeVariant, setActiveVariant] = useState<'A' | 'B'>('A');
 
   useEffect(() => {
     fetchAd();
@@ -55,10 +61,14 @@ export default function AdBanner({ language = 'english', placement = 'booking_fl
         if (ads.length > 0) {
           // Randomly select one ad if multiple available
           const selectedAd = ads[Math.floor(Math.random() * ads.length)];
+
+          // A/B Testing: pick variant randomly (50/50 split)
+          const variant: 'A' | 'B' = (selectedAd.abTestEnabled && selectedAd.imageUrlB) ? (Math.random() < 0.5 ? 'A' : 'B') : 'A';
+          setActiveVariant(variant);
           setAd(selectedAd);
 
-          // Track impression
-          await trackImpression(selectedAd.id);
+          // Track impression (overall + per-variant)
+          await trackImpression(selectedAd.id, selectedAd.abTestEnabled ? variant : undefined);
         }
       }
     } catch (error) {
@@ -68,12 +78,13 @@ export default function AdBanner({ language = 'english', placement = 'booking_fl
     }
   };
 
-  const trackImpression = async (adId: string) => {
+  const trackImpression = async (adId: string, variant?: 'A' | 'B') => {
     try {
       const adRef = doc(db, 'advertisements', adId);
-      await updateDoc(adRef, {
-        impressions: increment(1)
-      });
+      const updates: Record<string, any> = { impressions: increment(1) };
+      if (variant === 'A') updates['variantAStats.impressions'] = increment(1);
+      if (variant === 'B') updates['variantBStats.impressions'] = increment(1);
+      await updateDoc(adRef, updates);
     } catch (error) {
       console.error('Error tracking impression:', error);
     }
@@ -83,11 +94,14 @@ export default function AdBanner({ language = 'english', placement = 'booking_fl
     if (!ad) return;
 
     try {
-      // Track click
+      // Track click (overall + per-variant)
       const adRef = doc(db, 'advertisements', ad.id);
-      await updateDoc(adRef, {
-        clicks: increment(1)
-      });
+      const updates: Record<string, any> = { clicks: increment(1) };
+      if (ad.abTestEnabled) {
+        if (activeVariant === 'A') updates['variantAStats.clicks'] = increment(1);
+        if (activeVariant === 'B') updates['variantBStats.clicks'] = increment(1);
+      }
+      await updateDoc(adRef, updates);
 
       // Open link if provided
       if (ad.link) {
@@ -134,7 +148,7 @@ export default function AdBanner({ language = 'english', placement = 'booking_fl
       >
         <div className="relative">
           <img
-            src={ad.imageUrl}
+            src={activeVariant === 'B' && ad.imageUrlB ? ad.imageUrlB : ad.imageUrl}
             alt={ad.title || "Health Card Advertisement"}
             className="w-full h-auto object-cover"
           />

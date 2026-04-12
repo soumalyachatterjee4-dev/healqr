@@ -102,12 +102,13 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
   const [loadingDoctors, setLoadingDoctors] = useState(true);
   const [bookingCounts, setBookingCounts] = useState<Record<string, number>>({});
 
-  // Step 1: Territory (State -> Pincodes -> Specialties)
-  const [selectedState, setSelectedState] = useState<string>('');
+  // Step 1: Territory (States -> Pincodes -> Specialties)
+  const [selectedStates, setSelectedStates] = useState<string[]>([]);
   const [selectedPincodes, setSelectedPincodes] = useState<string[]>([]);
   const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
   const [pincodeSearch, setPincodeSearch] = useState('');
   const [specialtySearch, setSpecialtySearch] = useState('');
+  const [stateSearch, setStateSearch] = useState('');
 
   // Step 2: Templates
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([]);
@@ -124,6 +125,13 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
   const [isDragging, setIsDragging] = useState(false);
   const [adType, setAdType] = useState<'static' | 'video'>('static');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // A/B Testing
+  const [abTestEnabled, setAbTestEnabled] = useState(false);
+  const [uploadedFileB, setUploadedFileB] = useState<File | null>(null);
+  const [previewUrlB, setPreviewUrlB] = useState<string | null>(null);
+  const [isDraggingB, setIsDraggingB] = useState(false);
+  const fileInputRefB = useRef<HTMLInputElement>(null);
 
   // Coupon
   const [couponCode, setCouponCode] = useState('');
@@ -189,38 +197,38 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
     return [...states].sort();
   }, [allDoctors]);
 
-  // ── Available pincodes for selected state ──
+  // ── Available pincodes for selected states ──
   const availablePincodes = useMemo(() => {
-    if (!selectedState) return [];
+    if (selectedStates.length === 0) return [];
     return [...new Set(
-      allDoctors.filter(d => d.state === selectedState).map(d => d.pincode).filter(Boolean)
+      allDoctors.filter(d => selectedStates.includes(d.state)).map(d => d.pincode).filter(Boolean)
     )].sort();
-  }, [allDoctors, selectedState]);
+  }, [allDoctors, selectedStates]);
 
-  // ── Available specialties for selected state + pincodes ──
+  // ── Available specialties for selected states + pincodes ──
   const availableSpecialties = useMemo(() => {
     const ids = new Set<string>();
     allDoctors
       .filter(d => {
-        if (selectedState && d.state !== selectedState) return false;
+        if (selectedStates.length > 0 && !selectedStates.includes(d.state)) return false;
         if (selectedPincodes.length > 0 && !selectedPincodes.includes(d.pincode)) return false;
         return true;
       })
       .forEach(d => d.specialties.forEach(s => ids.add(s)));
     return [...ids].sort();
-  }, [allDoctors, selectedState, selectedPincodes]);
+  }, [allDoctors, selectedStates, selectedPincodes]);
 
   // ── Filtered doctors based on complete selection ──
   const filteredDoctors = useMemo(() => {
     return allDoctors.filter(d => {
-      if (selectedState && d.state !== selectedState) return false;
+      if (selectedStates.length > 0 && !selectedStates.includes(d.state)) return false;
       if (selectedPincodes.length > 0 && !selectedPincodes.includes(d.pincode)) return false;
       if (selectedSpecialties.length > 0) {
         if (!d.specialties.some(s => selectedSpecialties.includes(s))) return false;
       }
       return true;
     });
-  }, [allDoctors, selectedState, selectedPincodes, selectedSpecialties]);
+  }, [allDoctors, selectedStates, selectedPincodes, selectedSpecialties]);
 
   const doctorCount = filteredDoctors.length;
 
@@ -284,7 +292,7 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
   };
   const removeCoupon = () => { setCouponCode(''); setDiscountPercentage(0); setIsCouponApplied(false); setCouponError(''); };
 
-  // ── File handling ──
+  // ── File handling (Variant A) ──
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
     setUploadedFile(file); setPreviewUrl(URL.createObjectURL(file));
@@ -296,9 +304,22 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
   };
   const removeFile = () => { setUploadedFile(null); if (previewUrl) URL.revokeObjectURL(previewUrl); setPreviewUrl(null); };
 
+  // ── File handling (Variant B) ──
+  const handleFileSelectB = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    setUploadedFileB(file); setPreviewUrlB(URL.createObjectURL(file));
+  };
+  const handleDropB = (e: React.DragEvent) => {
+    e.preventDefault(); setIsDraggingB(false);
+    const file = e.dataTransfer.files[0];
+    if (file) { setUploadedFileB(file); setPreviewUrlB(URL.createObjectURL(file)); }
+  };
+  const removeFileB = () => { setUploadedFileB(null); if (previewUrlB) URL.revokeObjectURL(previewUrlB); setPreviewUrlB(null); };
+
   // ── Submit ──
   const handleSubmit = async () => {
     if (!uploadedFile) { toast.error('Please upload a creative'); return; }
+    if (abTestEnabled && !uploadedFileB) { toast.error('Please upload Variant B creative for A/B test'); return; }
     if (!auth?.currentUser) { toast.error('Please log in to continue'); return; }
     if (!storage) { toast.error('Storage not initialized'); return; }
     setIsSubmitting(true);
@@ -307,12 +328,24 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
       const fileRef = ref(storage, storagePath);
       await uploadBytes(fileRef, uploadedFile);
       const creativeUrl = await getDownloadURL(fileRef);
+
+      // Upload Variant B if A/B test enabled
+      let creativeUrlB = '';
+      let creativeFileNameB = '';
+      if (abTestEnabled && uploadedFileB) {
+        const storagePathB = `campaigns/${auth.currentUser.uid}/${Date.now()}_B_${uploadedFileB.name}`;
+        const fileRefB = ref(storage, storagePathB);
+        await uploadBytes(fileRefB, uploadedFileB);
+        creativeUrlB = await getDownloadURL(fileRefB);
+        creativeFileNameB = uploadedFileB.name;
+      }
+
       await addDoc(collection(db, 'advertiser_campaigns'), {
         advertiserId: auth.currentUser.uid,
         advertiserEmail: auth.currentUser.email || localStorage.getItem('healqr_advertiser_email') || '',
         createdAt: serverTimestamp(),
         status: 'pending_review',
-        state: selectedState || 'All States',
+        states: selectedStates.length > 0 ? selectedStates : ['All States'],
         pincodes: selectedPincodes.length > 0 ? selectedPincodes : availablePincodes,
         specialties: selectedSpecialties.length > 0 ? selectedSpecialties : availableSpecialties,
         templates: selectedTemplateIds,
@@ -321,6 +354,9 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
         dailyImpressions,
         totalCampaignImpressions,
         adType, creativeUrl, creativeFileName: uploadedFile.name,
+        // A/B Testing fields
+        abTestEnabled,
+        ...(abTestEnabled ? { creativeUrlB, creativeFileNameB, variantAStats: { impressions: 0, clicks: 0 }, variantBStats: { impressions: 0, clicks: 0 } } : {}),
         subtotal,
         discountPercentage: isCouponApplied ? discountPercentage : 0,
         couponCode: isCouponApplied ? couponCode : '',
@@ -342,10 +378,10 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
   // ── Step validation ──
   const canProceed = () => {
     switch (step) {
-      case 1: return !loadingDoctors && selectedState !== '';
+      case 1: return !loadingDoctors && selectedStates.length > 0;
       case 2: return selectedTemplateIds.length > 0;
       case 3: return reach >= 1000 && selectedDuration > 0;
-      case 4: return !!uploadedFile;
+      case 4: return !!uploadedFile && (!abTestEnabled || !!uploadedFileB);
       default: return false;
     }
   };
@@ -364,11 +400,14 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
             Our team will verify your ad creative and targeting within <span className="text-white font-semibold">24 hours</span>.
           </p>
           <div className="bg-black/50 border border-zinc-800 rounded-xl p-4 text-left space-y-2">
-            <div className="flex justify-between text-sm"><span className="text-zinc-500">State</span><span className="text-white">{selectedState}</span></div>
+            <div className="flex justify-between text-sm"><span className="text-zinc-500">States</span><span className="text-white">{selectedStates.join(', ')}</span></div>
             <div className="flex justify-between text-sm"><span className="text-zinc-500">Target Doctors</span><span className="text-white">{doctorCount}</span></div>
             <div className="flex justify-between text-sm"><span className="text-zinc-500">Templates</span><span className="text-white">{selectedTemplateIds.length}</span></div>
             <div className="flex justify-between text-sm"><span className="text-zinc-500">Duration</span><span className="text-white">{selectedDuration} days</span></div>
             <div className="flex justify-between text-sm"><span className="text-zinc-500">Total Impressions</span><span className="text-white">{totalCampaignImpressions.toLocaleString()}</span></div>
+            {abTestEnabled && (
+              <div className="flex justify-between text-sm"><span className="text-zinc-500">A/B Testing</span><span className="text-amber-400">Enabled (50/50 split)</span></div>
+            )}
             <div className="border-t border-zinc-800 pt-2 mt-2 flex justify-between font-bold">
               <span className="text-white">Amount Paid</span><span className="text-emerald-400">{'\u20B9'}{totalAmount.toLocaleString()}</span>
             </div>
@@ -426,38 +465,57 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
               {/* State Selection */}
               <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
                 <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
-                  <MapPin className="w-5 h-5 text-emerald-500" /> Select State
+                  <MapPin className="w-5 h-5 text-emerald-500" /> Select States
                 </h3>
-                <p className="text-zinc-400 text-sm mb-4">Choose the state where you want your ads to reach doctors.</p>
+                <p className="text-zinc-400 text-sm mb-4">Choose one or more states where you want your ads to reach doctors.</p>
                 {loadingDoctors ? (
                   <div className="flex items-center justify-center py-12">
                     <div className="animate-spin w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full" />
                     <span className="ml-3 text-zinc-400">Loading doctor network...</span>
                   </div>
                 ) : (
-                  <div className="relative">
-                    <select
-                      value={selectedState}
-                      onChange={(e) => { setSelectedState(e.target.value); setSelectedPincodes([]); setSelectedSpecialties([]); }}
-                      className="w-full bg-black border border-zinc-700 rounded-xl px-4 py-3 text-white appearance-none cursor-pointer focus:outline-none focus:border-emerald-500 transition-colors"
-                    >
-                      <option value="">-- Select a State --</option>
-                      {availableStates.map(st => {
-                        const count = allDoctors.filter(d => d.state === st).length;
-                        return <option key={st} value={st}>{st} ({count} doctors)</option>;
-                      })}
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
-                  </div>
+                  <>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex gap-2">
+                        {selectedStates.length > 0 && (
+                          <button onClick={() => { setSelectedStates([]); setSelectedPincodes([]); setSelectedSpecialties([]); }} className="text-xs text-red-400 hover:text-red-300 px-2 py-1">Clear</button>
+                        )}
+                        <button
+                          onClick={() => { setSelectedStates(selectedStates.length === availableStates.length ? [] : [...availableStates]); setSelectedPincodes([]); setSelectedSpecialties([]); }}
+                          className="text-xs text-emerald-500 hover:text-emerald-400 px-2 py-1"
+                        >{selectedStates.length === availableStates.length ? 'Deselect All' : 'Select All'}</button>
+                      </div>
+                    </div>
+                    <div className="relative mb-3">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                      <input type="text" placeholder="Search states..." value={stateSearch}
+                        onChange={(e) => setStateSearch(e.target.value)}
+                        className="w-full bg-black border border-zinc-700 rounded-lg pl-10 pr-4 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500" />
+                    </div>
+                    <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                      {availableStates
+                        .filter(st => st.toLowerCase().includes(stateSearch.toLowerCase()))
+                        .map(st => {
+                          const count = allDoctors.filter(d => d.state === st).length;
+                          return (
+                            <button key={st} onClick={() => { setSelectedStates(prev => prev.includes(st) ? prev.filter(s => s !== st) : [...prev, st]); setSelectedPincodes([]); setSelectedSpecialties([]); }}
+                              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${selectedStates.includes(st) ? 'bg-emerald-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}>
+                              {st} ({count})
+                            </button>
+                          );
+                        })}
+                    </div>
+                    {selectedStates.length > 0 && <p className="text-xs text-emerald-400 mt-2">{selectedStates.length} of {availableStates.length} states selected</p>}
+                  </>
                 )}
               </div>
 
               {/* Pincodes — shown after state selection */}
-              {selectedState && (
+              {selectedStates.length > 0 && (
                 <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 animate-in slide-in-from-bottom-3 duration-300">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                      <MapPin className="w-5 h-5 text-blue-500" /> Available Pincodes in {selectedState}
+                      <MapPin className="w-5 h-5 text-blue-500" /> Available Pincodes in {selectedStates.length === 1 ? selectedStates[0] : `${selectedStates.length} states`}
                     </h3>
                     <div className="flex gap-2">
                       {selectedPincodes.length > 0 && (
@@ -491,7 +549,7 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
               )}
 
               {/* Specialties — shown after state selection */}
-              {selectedState && (
+              {selectedStates.length > 0 && (
                 <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 animate-in slide-in-from-bottom-3 duration-300">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-white flex items-center gap-2">
@@ -530,7 +588,7 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
               )}
 
               {/* Stats summary — shown after state selection */}
-              {selectedState && !loadingDoctors && (
+              {selectedStates.length > 0 && !loadingDoctors && (
                 <div className="grid grid-cols-2 gap-4 animate-in fade-in duration-300">
                   <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
                     <div className="flex items-center gap-2 text-zinc-400 text-sm mb-2">
@@ -538,7 +596,7 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
                     </div>
                     <div className="text-4xl font-bold text-white">{doctorCount}</div>
                     <div className="text-xs text-zinc-500 mt-1">
-                      {selectedState}{selectedPincodes.length > 0 ? ` \u2022 ${selectedPincodes.length} pincodes` : ''}{selectedSpecialties.length > 0 ? ` \u2022 ${selectedSpecialties.length} specialties` : ''}
+                      {selectedStates.join(', ')}{selectedPincodes.length > 0 ? ` \u2022 ${selectedPincodes.length} pincodes` : ''}{selectedSpecialties.length > 0 ? ` \u2022 ${selectedSpecialties.length} specialties` : ''}
                     </div>
                   </div>
                   <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
@@ -834,7 +892,7 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
 
               <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
                 <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <UploadCloud className="w-5 h-5 text-emerald-500" /> Upload Creative
+                  <UploadCloud className="w-5 h-5 text-emerald-500" /> Upload Creative {abTestEnabled && <span className="text-xs text-amber-400 font-normal">(Variant A)</span>}
                 </h3>
                 {!uploadedFile ? (
                   <div className={`border-2 border-dashed rounded-xl p-8 text-center transition-all ${
@@ -874,6 +932,71 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
                         {adType === 'video'
                           ? <video src={previewUrl} controls className="max-h-[300px] w-full object-contain" />
                           : <img src={previewUrl} alt="Preview" className="max-h-[300px] w-full object-contain" />}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* A/B Testing Toggle */}
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                      <BarChart3 className="w-5 h-5 text-amber-500" /> A/B Testing
+                    </h3>
+                    <p className="text-zinc-400 text-sm mt-1">Upload a second creative to split-test which performs better. Traffic is split 50/50.</p>
+                  </div>
+                  <button
+                    onClick={() => { setAbTestEnabled(!abTestEnabled); if (abTestEnabled) removeFileB(); }}
+                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${abTestEnabled ? 'bg-amber-500' : 'bg-zinc-700'}`}
+                  >
+                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${abTestEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+
+                {abTestEnabled && (
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-amber-400 mb-3">Variant B Creative</label>
+                    {!uploadedFileB ? (
+                      <div className={`border-2 border-dashed rounded-xl p-6 text-center transition-all ${
+                        isDraggingB ? 'border-amber-500 bg-amber-500/10' : 'border-zinc-700 hover:border-zinc-600 bg-black/50'
+                      }`}
+                        onDrop={handleDropB}
+                        onDragOver={(e) => { e.preventDefault(); setIsDraggingB(true); }}
+                        onDragLeave={() => setIsDraggingB(false)}>
+                        <div className="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-3">
+                          {adType === 'video' ? <FileVideo className="w-6 h-6 text-zinc-400" /> : <FileImage className="w-6 h-6 text-zinc-400" />}
+                        </div>
+                        <p className="text-zinc-400 text-sm mb-3">Upload Variant B {adType === 'video' ? 'video' : 'image'}</p>
+                        <input type="file" ref={fileInputRefB} className="hidden" accept={adType === 'video' ? 'video/*' : 'image/*'} onChange={handleFileSelectB} />
+                        <button onClick={() => fileInputRefB.current?.click()} className="px-5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-sm font-medium transition-colors">
+                          Browse Files
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="bg-black border border-amber-500/30 rounded-xl overflow-hidden">
+                        <div className="p-3 border-b border-zinc-800 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="p-1.5 bg-amber-500/10 rounded-lg">
+                              {adType === 'video' ? <FileVideo className="w-4 h-4 text-amber-400" /> : <FileImage className="w-4 h-4 text-amber-400" />}
+                            </div>
+                            <div>
+                              <div className="text-white font-medium text-sm">{uploadedFileB.name}</div>
+                              <div className="text-zinc-500 text-xs">{(uploadedFileB.size / 1024 / 1024).toFixed(2)} MB</div>
+                            </div>
+                          </div>
+                          <button onClick={removeFileB} className="p-1.5 hover:bg-red-500/10 text-zinc-400 hover:text-red-500 rounded-lg transition-colors">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                        {previewUrlB && (
+                          <div className="relative aspect-video bg-black flex items-center justify-center">
+                            {adType === 'video'
+                              ? <video src={previewUrlB} controls className="max-h-[200px] w-full object-contain" />
+                              : <img src={previewUrlB} alt="Variant B Preview" className="max-h-[200px] w-full object-contain" />}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -948,7 +1071,7 @@ export default function AdvertiserCreateCampaign({ onBack }: { onBack: () => voi
                 <div className="flex items-center gap-2 mb-2"><Users className="w-4 h-4 text-emerald-500" /><span className="text-zinc-400 text-sm">Target Doctors</span></div>
                 <div className="text-3xl font-bold text-white">{loadingDoctors ? '...' : doctorCount}</div>
                 <div className="text-xs text-zinc-500 mt-1">
-                  {selectedState ? `${selectedState}${selectedPincodes.length > 0 ? ` \u2022 ${selectedPincodes.length} pins` : ''}` : 'Select a state'}
+                  {selectedStates.length > 0 ? `${selectedStates.length === 1 ? selectedStates[0] : `${selectedStates.length} states`}${selectedPincodes.length > 0 ? ` \u2022 ${selectedPincodes.length} pins` : ''}` : 'Select states'}
                 </div>
               </div>
 

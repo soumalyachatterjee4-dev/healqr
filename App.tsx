@@ -14,6 +14,7 @@ import { getSessionPersistence } from "./utils/sessionPersistence";
 import type { Language } from "./utils/translations";
 // AIChatBot � direct import, always visible
 import AIChatBot from './components/AIChatBot';
+import OfflineIndicator from './components/OfflineIndicator';
 import type { PatientFormData } from "./components/PatientDetailsForm";
 import { TranslationProvider } from "./components/TranslationProvider";
 import AssistantAccessManager from "./components/AssistantAccessManager";
@@ -32,8 +33,12 @@ const PatientDetails = lazy(() => import("./components/PatientDetails"));
 const PreviewCenter = lazy(() => import("./components/PreviewCenter"));
 const Analytics = lazy(() => import("./components/Analytics"));
 const PatientRetentionAnalytics = lazy(() => import("./components/PatientRetentionAnalytics"));
+const DoctorQueueSetup = lazy(() => import("./components/DoctorQueueSetup"));
+const StaffAttendance = lazy(() => import("./components/StaffAttendance"));
+const LeaveApply = lazy(() => import("./components/LeaveApply"));
 const DoctorReports = lazy(() => import("./components/DoctorReports"));
 const RevenueDashboard = lazy(() => import("./components/RevenueDashboard"));
+const BillingReceipt = lazy(() => import("./components/BillingReceipt"));
 const LanguageSelection = lazy(() => import("./components/LanguageSelection"));
 const BookingMiniWebsite = lazy(() => import("./components/BookingMiniWebsite"));
 const SelectDate = lazy(() => import("./components/SelectDate"));
@@ -165,6 +170,7 @@ export default function App() {
     | "analytics"
     | "reports"
     | "revenue-dashboard"
+    | "billing-receipt"
     | "template-uploader"
     | "reminder-notifications"
     | "booking-language"
@@ -237,6 +243,7 @@ export default function App() {
     | "referrer-login"
     | "referrer-dashboard"
     | "queue-display"
+    | "leave-apply"
   >(() => {
     // Initialize currentPage from localStorage to prevent flash/auto-logout on refresh
     const isClinic = localStorage.getItem('healqr_is_clinic') === 'true';
@@ -697,6 +704,10 @@ export default function App() {
     // Handle Referrer Registration / Login page links
     if (pageParam === 'queue-display') {
       setCurrentPage('queue-display');
+      return;
+    }
+    if (pageParam === 'leave-apply') {
+      setCurrentPage('leave-apply');
       return;
     }
     if (pageParam === 'referrer-register') {
@@ -1303,7 +1314,7 @@ export default function App() {
       const isAdvertiserPage = currentPage === 'advertiser-login' || currentPage === 'advertiser-signup' || currentPage === 'advertiser-verify' || pageParam === 'advertiser-login' || pageParam === 'advertiser-signup' || pageParam === 'advertiser-verify';
       const isPharmaPage = currentPage === 'pharma-login' || currentPage === 'pharma-verify' || currentPage === 'pharma-portal' || currentPage === 'pharma-signup' || pageParam === 'pharma-login' || pageParam === 'pharma-verify' || pageParam === 'pharma-portal' || pageParam === 'pharma-signup';
 
-      if (isVerificationLink || isBookingMode || hasBookingDoctorId || isNotificationPage || isVerifyVisit || isOnVerifyLoginPage || isOnVerifyEmailPage || isOnAssistantLoginPage || isOnMasterAccessLoginPage || isClinicPage || isAdvertiserPage || isPharmaPage || currentPage === 'verify-email' || currentPage === 'verify-login' || currentPage === 'assistant-login' || currentPage === 'master-access-login' || currentPage === 'temp-doctor-login' || currentPage === 'temp-doctor-dashboard' || currentPage === 'admin-verify' || currentPage === 'verify-walkin' || currentPage === 'queue-display' || currentPage.startsWith('booking-')) {
+      if (isVerificationLink || isBookingMode || hasBookingDoctorId || isNotificationPage || isVerifyVisit || isOnVerifyLoginPage || isOnVerifyEmailPage || isOnAssistantLoginPage || isOnMasterAccessLoginPage || isClinicPage || isAdvertiserPage || isPharmaPage || currentPage === 'verify-email' || currentPage === 'verify-login' || currentPage === 'assistant-login' || currentPage === 'master-access-login' || currentPage === 'temp-doctor-login' || currentPage === 'temp-doctor-dashboard' || currentPage === 'admin-verify' || currentPage === 'verify-walkin' || currentPage === 'queue-display' || currentPage === 'leave-apply' || currentPage.startsWith('booking-')) {
         setIsAuthInitialized(true);
         return;
       }
@@ -1867,6 +1878,7 @@ export default function App() {
             'analytics',
             'reports',
             'revenue-dashboard',
+            'billing-receipt',
             'upgrade',
             'purchase-history',
             'template-uploader',
@@ -1893,6 +1905,7 @@ export default function App() {
             'analytics',
             'reports',
             'revenue-dashboard',
+            'billing-receipt',
             'upgrade',
             'purchase-history',
             'template-uploader',
@@ -2495,8 +2508,11 @@ export default function App() {
       setCurrentPage("emergency-button");
     else if (menu === "analytics") setCurrentPage("analytics");
     else if (menu === "retention-analytics") setCurrentPage("retention-analytics");
+    else if (menu === "queue-display") setCurrentPage("doctor-queue-setup");
+    else if (menu === "staff-attendance") setCurrentPage("staff-attendance");
     else if (menu === "reports") setCurrentPage("reports");
     else if (menu === "revenue-dashboard") setCurrentPage("revenue-dashboard");
+    else if (menu === "billing-receipt") setCurrentPage("billing-receipt");
     else if (menu === "upgrade") setCurrentPage("upgrade");
     else if (menu === "purchase-history")
       setCurrentPage("purchase-history");
@@ -2861,7 +2877,14 @@ export default function App() {
         <Suspense fallback={<PageLoader />}>
           <ClinicQueueDisplay
             clinicId={new URLSearchParams(window.location.search).get('clinicId') || ''}
+            doctorId={new URLSearchParams(window.location.search).get('doctorId') || ''}
           />
+        </Suspense>
+      )}
+
+      {currentPage === "leave-apply" && (
+        <Suspense fallback={<PageLoader />}>
+          <LeaveApply />
         </Suspense>
       )}
 
@@ -3046,6 +3069,23 @@ export default function App() {
         />
       )}
 
+      {currentPage === "doctor-queue-setup" && (
+        <DoctorQueueSetup
+          onLogout={handleLogout}
+          onMenuChange={menuChangeHandler}
+          activeAddOns={activeAddOns}
+        />
+      )}
+
+      {currentPage === "staff-attendance" && (
+        <StaffAttendance
+          mode="doctor"
+          onLogout={handleLogout}
+          onMenuChange={menuChangeHandler}
+          activeAddOns={activeAddOns}
+        />
+      )}
+
       {currentPage === "reports" && (
         <DoctorReports
           onLogout={handleLogout}
@@ -3058,6 +3098,14 @@ export default function App() {
 
       {currentPage === "revenue-dashboard" && (
         <RevenueDashboard
+          onLogout={handleLogout}
+          onMenuChange={menuChangeHandler}
+          activeAddOns={activeAddOns}
+        />
+      )}
+
+      {currentPage === "billing-receipt" && (
+        <BillingReceipt
           onLogout={handleLogout}
           onMenuChange={menuChangeHandler}
           activeAddOns={activeAddOns}
@@ -3810,6 +3858,7 @@ export default function App() {
           },
         }}
       />
+      <OfflineIndicator />
     </Suspense>
   );
 }

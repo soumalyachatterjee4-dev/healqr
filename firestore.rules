@@ -233,6 +233,13 @@ service cloud.firestore {
       }
 
       // ============================================
+      // BILLING RECEIPTS SUBCOLLECTION
+      // ============================================
+      match /receipts/{receiptId} {
+        allow read, write: if isOwner(doctorId);
+      }
+
+      // ============================================
       // DOWNLOAD HISTORY SUBCOLLECTION
       // ============================================
       match /downloadHistory/{historyId} {
@@ -1373,6 +1380,14 @@ service cloud.firestore {
     }
 
     // ============================================
+    // API KEYS (Admin manages, cloud functions validate)
+    // ============================================
+
+    match /apiKeys/{keyId} {
+      allow read, write: if isAdmin();
+    }
+
+    // ============================================
     // REFERRAL LINK SYSTEM
     // ============================================
 
@@ -1396,6 +1411,50 @@ service cloud.firestore {
       allow read: if true;
       allow create: if true;
       allow update: if true;
+      allow delete: if false;
+    }
+
+    // ============================================
+    // STAFF MEMBERS COLLECTION
+    // ============================================
+
+    match /staffMembers/{staffId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    // ============================================
+    // STAFF ATTENDANCE COLLECTION
+    // ============================================
+
+    match /staffAttendance/{recordId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    // ============================================
+    // LEAVE REQUESTS COLLECTION
+    // ============================================
+
+    match /leaveRequests/{requestId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    // ============================================
+    // STAFF ROSTERS COLLECTION
+    // ============================================
+
+    match /staffRosters/{rosterId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
       allow delete: if false;
     }
 

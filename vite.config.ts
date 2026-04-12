@@ -11,12 +11,13 @@ export default defineConfig({
     {
       name: 'copy-sw',
       closeBundle() {
-        // Copy service worker to dist after build
+        // Copy service workers to dist after build
         try {
           copyFileSync('public/firebase-messaging-sw.js', 'dist/firebase-messaging-sw.js');
-          console.log('✅ Service worker copied to dist/');
+          copyFileSync('public/sw.js', 'dist/sw.js');
+          console.log('✅ Service workers copied to dist/');
         } catch (err) {
-          console.error('❌ Failed to copy service worker:', err);
+          console.error('❌ Failed to copy service workers:', err);
         }
       }
     }

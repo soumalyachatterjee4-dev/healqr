@@ -7,7 +7,7 @@
 
 import { initializeApp, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth, setPersistence, browserLocalPersistence } from 'firebase/auth';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import { getFirestore, Firestore, enableIndexedDbPersistence } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { getFunctions, Functions } from 'firebase/functions';
 
@@ -67,6 +67,17 @@ if (isFirebaseConfigured) {
         .catch((error) => {
           console.warn('⚠️ Could not set auth persistence:', error);
         });
+    }
+
+    // Enable Firestore offline persistence
+    if (db) {
+      enableIndexedDbPersistence(db).catch((err) => {
+        if (err.code === 'failed-precondition') {
+          console.warn('⚠️ Firestore persistence failed: multiple tabs open');
+        } else if (err.code === 'unimplemented') {
+          console.warn('⚠️ Firestore persistence not supported in this browser');
+        }
+      });
     }
 
   } catch (error: any) {

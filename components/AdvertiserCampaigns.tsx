@@ -126,7 +126,7 @@ export default function AdvertiserCampaigns() {
                       <h4 className="font-medium text-white">Campaign #{campaign.id.slice(-6).toUpperCase()}</h4>
                       <div className="flex items-center gap-3 text-xs text-zinc-500 mt-0.5">
                         <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {createdDate}</span>
-                        <span>{campaign.zone || 'All Zones'} / {campaign.state || 'All States'}</span>
+                        <span>{campaign.zone || 'All Zones'} / {Array.isArray(campaign.states) ? campaign.states.join(', ') : (campaign.state || 'All States')}</span>
                       </div>
                     </div>
                   </div>

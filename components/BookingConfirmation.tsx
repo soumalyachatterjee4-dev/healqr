@@ -629,6 +629,34 @@ export default function BookingConfirmation({
             </div>
           </div>
 
+          {/* Track Queue Position Link */}
+          <div
+            onClick={() => {
+              const phone = patientData.whatsappNumber?.replace(/\D/g, '').slice(-10);
+              const url = `${window.location.origin}/?page=patient-login&phone=${phone}`;
+              window.location.href = url;
+            }}
+            className="bg-gradient-to-r from-cyan-500/20 to-cyan-600/20 border border-cyan-500/40 rounded-2xl p-4 mb-2 cursor-pointer hover:border-cyan-400 transition-all"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-cyan-500/30 rounded-xl flex items-center justify-center">
+                <svg className="w-6 h-6 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <p className="text-cyan-300 font-semibold text-sm">Track Your Queue Position</p>
+                <p className="text-gray-400 text-xs">Login to Patient Portal to see live token status & estimated wait time</p>
+              </div>
+              <svg className="w-5 h-5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          </div>
+          <p className="text-center text-xs text-gray-500 mb-4 px-2">
+            📱 <span className="text-cyan-400/80 font-medium">healqr.com</span> → Patient Login → Enter your mobile number to track queue anytime
+          </p>
+
           <div className="flex gap-3 mb-4">
             <Button onClick={handleShare} disabled={isSharing} className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white">
               {isSharing ? (
