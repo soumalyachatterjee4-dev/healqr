@@ -1319,7 +1319,7 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
         });
 
         // Notify each booked patient with proper template notification
-        const { sendChamberRescheduled } = await import('../services/notificationService');
+        const { sendChamberRescheduled, scheduleBookingReminder } = await import('../services/notificationService');
         for (const bookingDoc of bookingsSnap.docs) {
           const booking = bookingDoc.data();
           try {
@@ -1336,6 +1336,23 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
               newTime: `${rescheduleStart} - ${rescheduleEnd}`,
               bookingId: bookingDoc.id,
             });
+
+            // Re-schedule the 1-hour-before reminder with new time
+            try {
+              const newStartDate = new Date();
+              const [rsH, rsM] = rescheduleStart.split(':').map(Number);
+              newStartDate.setHours(rsH, rsM, 0, 0);
+              await scheduleBookingReminder({
+                patientPhone: booking.patientPhone,
+                patientName: booking.patientName || 'Patient',
+                doctorName: doctorName || 'Doctor',
+                appointmentDate: todayStr,
+                appointmentTimeStr: rescheduleStart,
+                location: chamberName,
+                appointmentTime: newStartDate.toISOString(),
+                bookingCreatedAt: booking.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+              });
+            } catch (_) { /* reminder reschedule non-blocking */ }
           } catch (fcmErr) {
             console.warn('Notification send failed for patient:', fcmErr);
           }

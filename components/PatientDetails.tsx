@@ -487,8 +487,6 @@ export default function PatientDetails({
     loadDoctorInfo();
   }, [doctorId, chamberName, chamberAddress, scheduleTime, patients]);
 
-  // Push reminders temporarily disabled while notification system is rebuilt.
-
   // Auto-check for unmarked patients: Send admin alert after chamber end time
   useEffect(() => {
     const checkUnmarkedPatients = async () => {

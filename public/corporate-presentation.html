@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HealQR — Corporate Presentation</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+  
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  :root {
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --surface2: #1c1c1c;
+    --border: #262626;
+    --text: #fafafa;
+    --text-muted: #a1a1aa;
+    --emerald: #10b981;
+    --emerald-dim: #065f46;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --blue: #3b82f6;
+    --purple: #8b5cf6;
+    --cyan: #06b6d4;
+    --pink: #ec4899;
+  }
+  
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  .slide {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    width: 100vw;
+    padding: 40px 60px;
+    position: absolute;
+    top: 0; left: 0;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+  }
+  .slide.active { display: flex; opacity: 1; }
+
+  .nav-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0; right: 0;
+    height: 56px;
+    background: rgba(10,10,10,0.95);
+    backdrop-filter: blur(20px);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 30px;
+    z-index: 100;
+  }
+  .nav-bar button {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+  }
+  .nav-bar button:hover { background: var(--emerald-dim); border-color: var(--emerald); }
+  .nav-bar button:disabled { opacity: 0.3; cursor: default; }
+  .nav-bar button:disabled:hover { background: var(--surface2); border-color: var(--border); }
+  .slide-counter { color: var(--text-muted); font-size: 13px; font-weight: 500; }
+  .section-label { color: var(--emerald); font-size: 11px; font-weight: 600; letter-spacing: 1px; }
+  .progress-bar {
+    position: fixed;
+    top: 0; left: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--emerald), var(--cyan));
+    transition: width 0.4s ease;
+    z-index: 100;
+  }
+
+  .slide-tag {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--emerald);
+    margin-bottom: 16px;
+  }
+  .slide-title {
+    font-size: clamp(32px, 4vw, 56px);
+    font-weight: 800;
+    line-height: 1.15;
+    margin-bottom: 20px;
+    text-align: center;
+    max-width: 950px;
+  }
+  .slide-subtitle {
+    font-size: clamp(16px, 2vw, 22px);
+    font-weight: 400;
+    color: var(--text-muted);
+    line-height: 1.6;
+    text-align: center;
+    max-width: 750px;
+    margin-bottom: 30px;
+  }
+  .highlight { color: var(--emerald); }
+  .highlight-amber { color: var(--amber); }
+  .highlight-blue { color: var(--blue); }
+  .highlight-red { color: var(--red); }
+  .highlight-purple { color: var(--purple); }
+  .highlight-cyan { color: var(--cyan); }
+  .highlight-pink { color: var(--pink); }
+
+  .cards-grid {
+    display: grid;
+    gap: 16px;
+    width: 100%;
+    max-width: 1100px;
+  }
+  .cards-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+  .cards-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+  .cards-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+  .cards-grid.cols-5 { grid-template-columns: repeat(5, 1fr); }
+  
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+  }
+  .card-icon { font-size: 28px; margin-bottom: 12px; }
+  .card-title { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+  .card-text { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+  .card-highlight { border-color: var(--emerald); background: linear-gradient(135deg, rgba(16,185,129,0.08), transparent); }
+  .card-amber { border-color: var(--amber); background: linear-gradient(135deg, rgba(245,158,11,0.08), transparent); }
+  .card-red { border-color: var(--red); background: linear-gradient(135deg, rgba(239,68,68,0.08), transparent); }
+  .card-blue { border-color: var(--blue); background: linear-gradient(135deg, rgba(59,130,246,0.08), transparent); }
+  .card-purple { border-color: var(--purple); background: linear-gradient(135deg, rgba(139,92,246,0.08), transparent); }
+  .card-pink { border-color: var(--pink); background: linear-gradient(135deg, rgba(236,72,153,0.08), transparent); }
+
+  .stat-row {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin: 20px 0;
+  }
+  .stat-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 32px;
+    text-align: center;
+    min-width: 160px;
+  }
+  .stat-value { font-size: 36px; font-weight: 800; }
+  .stat-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .compliance-table {
+    width: 100%;
+    max-width: 1000px;
+    border-collapse: collapse;
+    margin-top: 10px;
+  }
+  .compliance-table th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .compliance-table td {
+    padding: 14px 16px;
+    font-size: 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .compliance-table tr:last-child td { border-bottom: none; }
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .badge-green { background: rgba(16,185,129,0.15); color: var(--emerald); }
+  .badge-amber { background: rgba(245,158,11,0.15); color: var(--amber); }
+
+  .flow-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin: 20px 0;
+  }
+  .flow-step {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 24px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .flow-arrow { color: var(--emerald); font-size: 20px; font-weight: 700; }
+
+  .check-list { list-style: none; max-width: 700px; width: 100%; }
+  .check-list li {
+    padding: 12px 0;
+    font-size: 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .check-list li:last-child { border-bottom: none; }
+  .check-icon { color: var(--emerald); font-size: 18px; flex-shrink: 0; margin-top: 2px; }
+  .check-list .item-text { color: var(--text-muted); }
+  .check-list .item-text strong { color: var(--text); }
+
+  .logo-area { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; }
+  .logo-text {
+    font-size: 28px;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--emerald), var(--cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .slide-footer {
+    position: absolute;
+    bottom: 70px;
+    font-size: 12px;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+  }
+
+  .persistent-header {
+    position: absolute;
+    top: 16px;
+    left: 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    z-index: 50;
+  }
+  .persistent-header img {
+    height: 36px;
+    object-fit: contain;
+  }
+  .persistent-header .tagline {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+  .persistent-header .tagline span {
+    color: var(--emerald);
+  }
+
+  .divider-line {
+    width: 80px;
+    height: 3px;
+    background: var(--emerald);
+    border-radius: 2px;
+    margin: 16px 0;
+  }
+
+  .section-divider {
+    background: linear-gradient(135deg, var(--surface), var(--bg));
+    border-bottom: 2px solid var(--emerald);
+    position: relative;
+  }
+  .section-divider .section-num {
+    font-size: 140px;
+    font-weight: 900;
+    opacity: 0.04;
+    position: absolute;
+    right: 60px;
+    bottom: 80px;
+    line-height: 1;
+  }
+
+  @media print {
+    .nav-bar, .progress-bar { display: none !important; }
+    .slide { display: flex !important; opacity: 1 !important; position: relative !important; page-break-after: always; height: auto; min-height: 100vh; }
+  }
+  @media (max-width: 768px) {
+    .slide { padding: 24px 20px; }
+    .cards-grid.cols-3, .cards-grid.cols-4, .cards-grid.cols-5 { grid-template-columns: repeat(2, 1fr); }
+    .stat-row { gap: 10px; }
+    .stat-box { min-width: 120px; padding: 14px 20px; }
+    .stat-value { font-size: 28px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="progress-bar" id="progress"></div>
+
+<!-- PERSISTENT LOGO + TAGLINE ON EVERY SLIDE -->
+<div class="persistent-header">
+  <img src="/healqr.logo.png" alt="healQR">
+  <div class="tagline"><span>हर घर</span> healQR</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- PART A: CORPORATE PITCH (Slides 1-11)                 -->
+<!-- Always present these                                   -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<!-- SLIDE 1: TITLE -->
+<div class="slide active" id="slide-1">
+  <div style="margin-bottom:20px;">
+    <img src="/healqr.logo.png" alt="healQR" style="height:120px;object-fit:contain;">
+  </div>
+  <div class="slide-title" style="font-size:clamp(36px,5vw,64px);">
+    <span class="highlight">हर घर healQR</span>
+  </div>
+  <div class="slide-subtitle" style="font-size:clamp(16px,2vw,22px);max-width:700px;">
+    "Scan. Book. Heal — Instantly."
+  </div>
+  <div style="display:flex;gap:16px;margin-top:16px;flex-wrap:wrap;justify-content:center;">
+    <div style="font-size:13px;color:var(--text-muted);background:var(--surface);padding:8px 18px;border-radius:8px;border:1px solid var(--border);">🌐 www.healqr.com</div>
+    <div style="font-size:13px;color:var(--text-muted);background:var(--surface);padding:8px 18px;border-radius:8px;border:1px solid var(--border);">📅 April 2026</div>
+    <div style="font-size:13px;color:var(--text-muted);background:var(--surface);padding:8px 18px;border-radius:8px;border:1px solid var(--border);">🇮🇳 Made in India</div>
+  </div>
+  <div class="slide-footer">CONFIDENTIAL — FOR AUTHORIZED STAKEHOLDERS ONLY</div>
+</div>
+
+<!-- SLIDE 2: MISSION & VISION -->
+<div class="slide" id="slide-2">
+  <div class="slide-tag">Our Mission</div>
+  <div class="slide-title" style="font-size:clamp(28px,3.5vw,48px);">
+    Digitize every doctor's<br><span class="highlight">patient booking — without an app</span>
+  </div>
+  <div class="divider-line" style="margin:16px auto;"></div>
+  <div class="slide-subtitle" style="max-width:800px;">
+    India has <strong style="color:var(--text);">13+ lakh registered doctors</strong> and <strong style="color:var(--text);">520+ crore OPD visits/year</strong> (5.2 billion). Most still run on paper registers, phone-call bookings, and manual queues. HealQR changes this with one simple tool every doctor already has — <strong style="color:var(--emerald);">a QR code</strong>.
+  </div>
+  <div class="cards-grid cols-3" style="max-width:900px;">
+    <div class="card card-highlight" style="text-align:center;">
+      <div class="card-icon">📱</div>
+      <div class="card-title">No App Download</div>
+      <div class="card-text">Patient scans QR → books appointment in browser. Works on any phone.</div>
+    </div>
+    <div class="card card-highlight" style="text-align:center;">
+      <div class="card-icon">🔐</div>
+      <div class="card-title">No Password</div>
+      <div class="card-text">Email magic link for doctors. Phone OTP for patients. Zero friction.</div>
+    </div>
+    <div class="card card-highlight" style="text-align:center;">
+      <div class="card-icon">💰</div>
+      <div class="card-title">No Subscription</div>
+      <div class="card-text">Free for doctors. Free for patients. Revenue from 3rd party ads only.</div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 3: THE PROBLEM -->
+<div class="slide" id="slide-3">
+  <div class="slide-tag">The Problem</div>
+  <div class="slide-title" style="font-size:clamp(26px,3.2vw,44px);">
+    Why India's OPD System is <span class="highlight-red">Broken</span>
+  </div>
+  <div class="cards-grid cols-2" style="max-width:900px;">
+    <div class="card card-red">
+      <div class="card-icon">📋</div>
+      <div class="card-title">Paper-Based Chaos</div>
+      <div class="card-text" style="font-size:14px;">Most doctors use paper registers. No digital records. No patient history tracking. Prescriptions get lost. Handwriting is illegible.</div>
+    </div>
+    <div class="card card-red">
+      <div class="card-icon">📞</div>
+      <div class="card-title">Phone-Call Bottleneck</div>
+      <div class="card-text" style="font-size:14px;">Patients call the clinic, wait on hold, get busy signals. Receptionists juggle calls + walk-ins. Appointments get double-booked.</div>
+    </div>
+    <div class="card card-red">
+      <div class="card-icon">⏱️</div>
+      <div class="card-title">Waiting Room Hell</div>
+      <div class="card-text" style="font-size:14px;">Patients arrive early, wait 2-3 hours, have no idea when their turn is. No queue visibility. No cancellation notification.</div>
+    </div>
+    <div class="card card-red">
+      <div class="card-icon">�</div>
+      <div class="card-title">App-Based Booking Trap</div>
+      <div class="card-text" style="font-size:14px;">Existing booking apps require <strong style="color:var(--red)">both doctor AND patient to download the app</strong>. Doctors pay monthly subscriptions. Patients abandon after one use. The platform owns the data — not the doctor.</div>
+    </div>
+  </div>
+  <div style="margin-top:24px;padding:14px 28px;background:var(--surface);border:1px solid var(--red);border-radius:12px;text-align:center;max-width:900px;">
+    <span style="font-size:16px;font-weight:600;color:var(--red);">Result:</span>
+    <span style="font-size:15px;color:var(--text-muted);"> Wasted time, lost patients, doctor pays for someone else's platform, zero data ownership.</span>
+  </div>
+</div>
+
+<!-- SLIDE 4: THE SOLUTION -->
+<div class="slide" id="slide-4">
+  <div class="slide-tag">The Solution</div>
+  <div class="slide-title" style="font-size:clamp(26px,3.2vw,44px);">
+    One QR Code <span class="highlight">→</span> Complete Digital Practice
+  </div>
+  <div class="slide-subtitle">
+    Doctor gets a QR code. Patient scans it. Everything else is automatic.
+  </div>
+  <div class="flow-row">
+    <div class="flow-step" style="border-color:var(--emerald);">🏷️ Doctor gets QR</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">📱 Patient scans</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">📋 Books appointment</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">🔔 Gets notifications</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step" style="border-color:var(--emerald);">💊 Digital Rx + Receipt</div>
+  </div>
+  <div class="cards-grid cols-4" style="max-width:1000px;margin-top:16px;">
+    <div class="card card-highlight" style="text-align:center;padding:18px;">
+      <div style="font-size:28px;margin-bottom:8px;">👨‍⚕️</div>
+      <div class="card-title">For Doctors</div>
+      <div class="card-text">33-page dashboard: Rx, billing, inventory, staff, analytics, AI tools</div>
+    </div>
+    <div class="card card-blue" style="text-align:center;padding:18px;">
+      <div style="font-size:28px;margin-bottom:8px;">🏥</div>
+      <div class="card-title">For Clinics</div>
+      <div class="card-text">Multi-branch management, queue display, retention analytics, master access</div>
+    </div>
+    <div class="card card-purple" style="text-align:center;padding:18px;">
+      <div style="font-size:28px;margin-bottom:8px;">🧑</div>
+      <div class="card-title">For Patients</div>
+      <div class="card-text">Book via QR, live queue, digital Rx, diet charts, push notifications</div>
+    </div>
+    <div class="card card-amber" style="text-align:center;padding:18px;">
+      <div style="font-size:28px;margin-bottom:8px;">💊</div>
+      <div class="card-title">For Pharma</div>
+      <div class="card-text">Anonymous Rx trends, doctor insights, CME, sample requests, onboarding</div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 5: PLATFORM ARCHITECTURE -->
+<div class="slide" id="slide-5">
+  <div class="slide-tag">Platform Architecture</div>
+  <div class="slide-title" style="font-size:clamp(26px,3.2vw,42px);">
+    <span class="highlight-cyan">10 Stakeholders</span>, One Ecosystem
+  </div>
+  <div class="cards-grid cols-5" style="max-width:1100px;">
+    <div class="card card-highlight" style="text-align:center;padding:16px;">
+      <div style="font-size:24px;">👨‍⚕️</div>
+      <div class="card-title" style="font-size:13px;margin-top:6px;">Doctor</div>
+      <div class="card-text" style="font-size:11px;">33 pages<br>Email login</div>
+    </div>
+    <div class="card card-blue" style="text-align:center;padding:16px;">
+      <div style="font-size:24px;">🏥</div>
+      <div class="card-title" style="font-size:13px;margin-top:6px;">Clinic</div>
+      <div class="card-text" style="font-size:11px;">29 pages<br>Multi-branch</div>
+    </div>
+    <div class="card card-amber" style="text-align:center;padding:16px;">
+      <div style="font-size:24px;">👑</div>
+      <div class="card-title" style="font-size:13px;margin-top:6px;">Master Access</div>
+      <div class="card-text" style="font-size:11px;">9 pages<br>Cross-branch</div>
+    </div>
+    <div class="card" style="text-align:center;padding:16px;">
+      <div style="font-size:24px;">🏢</div>
+      <div class="card-title" style="font-size:13px;margin-top:6px;">Branch Mgr</div>
+      <div class="card-text" style="font-size:11px;">26 pages<br>Restricted</div>
+    </div>
+    <div class="card" style="text-align:center;padding:16px;">
+      <div style="font-size:24px;">🔑</div>
+      <div class="card-title" style="font-size:13px;margin-top:6px;">Assistant</div>
+      <div class="card-text" style="font-size:11px;">Configurable<br>PIN login</div>
+    </div>
+    <div class="card card-purple" style="text-align:center;padding:16px;">
+      <div style="font-size:24px;">🧑</div>
+      <div class="card-title" style="font-size:13px;margin-top:6px;">Patient</div>
+      <div class="card-text" style="font-size:11px;">4 tabs + booking<br>Phone OTP</div>
+    </div>
+    <div class="card" style="text-align:center;padding:16px;">
+      <div style="font-size:24px;">🤝</div>
+      <div class="card-title" style="font-size:13px;margin-top:6px;">Referrer</div>
+      <div class="card-text" style="font-size:11px;">2 tabs<br>Phone OTP</div>
+    </div>
+    <div class="card card-pink" style="text-align:center;padding:16px;">
+      <div style="font-size:24px;">📢</div>
+      <div class="card-title" style="font-size:13px;margin-top:6px;">Advertiser</div>
+      <div class="card-text" style="font-size:11px;">6 pages<br>Geo-targeted</div>
+    </div>
+    <div class="card card-red" style="text-align:center;padding:16px;">
+      <div style="font-size:24px;">⚙️</div>
+      <div class="card-title" style="font-size:13px;margin-top:6px;">Admin</div>
+      <div class="card-text" style="font-size:11px;">30 pages<br>AI PM + Analytics</div>
+    </div>
+    <div class="card card-amber" style="text-align:center;padding:16px;">
+      <div style="font-size:24px;">💊</div>
+      <div class="card-title" style="font-size:13px;margin-top:6px;">Pharma</div>
+      <div class="card-text" style="font-size:11px;">13 pages<br>Rx Trends + CME</div>
+    </div>
+  </div>
+  <div style="margin-top:20px;padding:12px 24px;background:var(--surface);border:1px solid var(--border);border-radius:10px;font-size:14px;color:var(--text-muted);text-align:center;max-width:800px;">
+    🌐 <strong style="color:var(--text);">31 languages</strong> (22 Indian + 9 International) · <strong style="color:var(--text);">4 AI services</strong> (Gemini 2.5 Flash) · <strong style="color:var(--text);">150+ feature pages</strong> · <strong style="color:var(--text);">PWA + Offline mode</strong>
+  </div>
+</div>
+
+<!-- SLIDE 6: DOCTOR DASHBOARD FEATURES -->
+<div class="slide" id="slide-6">
+  <div class="slide-tag">For Doctors & Clinics</div>
+  <div class="slide-title" style="font-size:clamp(26px,3.2vw,42px);">
+    A Complete <span class="highlight">Digital Practice</span> — Free
+  </div>
+  <div class="cards-grid cols-4" style="max-width:1050px;">
+    <div class="card" style="padding:18px;text-align:center;">
+      <div style="font-size:22px;">📋</div>
+      <div class="card-title" style="font-size:13px;margin-top:6px;">Digital Rx Maker</div>
+      <div class="card-text" style="font-size:11px;">Watermark, header, footer, auto-send to patient</div>
+    </div>
+    <div class="card" style="padding:18px;text-align:center;">
+      <div style="font-size:22px;">📊</div>
+      <div class="card-title" style="font-size:13px;margin-top:6px;">Analytics</div>
+      <div class="card-text" style="font-size:11px;">Bookings, scans, retention, revenue charts</div>
+    </div>
+    <div class="card" style="padding:18px;text-align:center;">
+      <div style="font-size:22px;">💰</div>
+      <div class="card-title" style="font-size:13px;margin-top:6px;">Revenue & Billing</div>
+      <div class="card-text" style="font-size:11px;">Ledger, PDF receipts, WhatsApp sharing</div>
+    </div>
+    <div class="card" style="padding:18px;text-align:center;">
+      <div style="font-size:22px;">📦</div>
+      <div class="card-title" style="font-size:13px;margin-top:6px;">Inventory</div>
+      <div class="card-text" style="font-size:11px;">Stock in/out, expiry alerts, 9 categories</div>
+    </div>
+    <div class="card" style="padding:18px;text-align:center;">
+      <div style="font-size:22px;">👥</div>
+      <div class="card-title" style="font-size:13px;margin-top:6px;">Staff & Payroll</div>
+      <div class="card-text" style="font-size:11px;">Attendance, leave, salary auto-calc</div>
+    </div>
+    <div class="card" style="padding:18px;text-align:center;">
+      <div style="font-size:22px;">📺</div>
+      <div class="card-title" style="font-size:13px;margin-top:6px;">Queue Display</div>
+      <div class="card-text" style="font-size:11px;">Airport-style TV/tablet, live tokens</div>
+    </div>
+    <div class="card" style="padding:18px;text-align:center;">
+      <div style="font-size:22px;">🤖</div>
+      <div class="card-title" style="font-size:13px;margin-top:6px;">AI Rx Reader</div>
+      <div class="card-text" style="font-size:11px;">Scan handwritten Rx → digital</div>
+    </div>
+    <div class="card" style="padding:18px;text-align:center;">
+      <div style="font-size:22px;">🥗</div>
+      <div class="card-title" style="font-size:13px;margin-top:6px;">AI Diet Charts</div>
+      <div class="card-text" style="font-size:11px;">Gemini-powered, patient-specific</div>
+    </div>
+    <div class="card" style="padding:18px;text-align:center;">
+      <div style="font-size:22px;">📢</div>
+      <div class="card-title" style="font-size:13px;margin-top:6px;">Broadcast</div>
+      <div class="card-text" style="font-size:11px;">FCM + WhatsApp, 5 templates</div>
+    </div>
+    <div class="card" style="padding:18px;text-align:center;">
+      <div style="font-size:22px;">🔁</div>
+      <div class="card-title" style="font-size:13px;margin-top:6px;">Referral Network</div>
+      <div class="card-text" style="font-size:11px;">Doctor-to-doctor + external referrers</div>
+    </div>
+    <div class="card" style="padding:18px;text-align:center;">
+      <div style="font-size:22px;">❤️</div>
+      <div class="card-title" style="font-size:13px;margin-top:6px;">Chronic Care</div>
+      <div class="card-text" style="font-size:11px;">Registry, bulk notify, camp posters</div>
+    </div>
+    <div class="card" style="padding:18px;text-align:center;">
+      <div style="font-size:22px;">🎥</div>
+      <div class="card-title" style="font-size:13px;margin-top:6px;">Video Consult</div>
+      <div class="card-text" style="font-size:11px;">VC slots, link sharing, tracking</div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 7: PHARMA BENEFITS -->
+<div class="slide" id="slide-7">
+  <div class="slide-tag">For Pharma Partners</div>
+  <div class="slide-title" style="font-size:clamp(26px,3.2vw,42px);">
+    What <span class="highlight-amber">Pharma Companies</span> Get
+  </div>
+  <div class="slide-subtitle">
+    MRs' effort is the golden pillar of pharma establishment. HealQR complements their proven effort with <strong style="color:var(--emerald)">gold standard digital reports from the source</strong> — replacing expensive 3rd-party market research with direct, anonymized Rx intelligence.
+  </div>
+  <div class="cards-grid cols-2" style="max-width:900px;">
+    <div class="card card-amber">
+      <div class="card-icon">📊</div>
+      <div class="card-title">Anonymous Rx Trends — From Source</div>
+      <div class="card-text" style="font-size:14px;">
+        See which molecules are prescribed, in which specialties, in which regions. <strong style="color:var(--amber);">Direct from prescribing doctors</strong> — not bought from 3rd-party research agencies. No middlemen, no delay, no guesswork.<br><br>
+        <strong style="color:var(--amber);">100% anonymous</strong> — aggregated by molecule, state, pincode.
+      </div>
+    </div>
+    <div class="card card-amber">
+      <div class="card-icon">🧪</div>
+      <div class="card-title">Pathology Trends</div>
+      <div class="card-text" style="font-size:14px;">
+        Diagnostic test patterns across regions. Understand which tests are ordered and where.<br><br>
+        <strong style="color:var(--amber);">Aggregated view only</strong> — no individual records.
+      </div>
+    </div>
+    <div class="card card-amber">
+      <div class="card-icon">📚</div>
+      <div class="card-title">CME Content Delivery</div>
+      <div class="card-text" style="font-size:14px;">
+        Upload Continuing Medical Education content that appears on doctor dashboards.<br><br>
+        Direct, ethical knowledge sharing — <strong style="color:var(--amber);">doctor chooses to view</strong>.
+      </div>
+    </div>
+    <div class="card card-amber">
+      <div class="card-icon">💊</div>
+      <div class="card-title">Sample Request Management</div>
+      <div class="card-text" style="font-size:14px;">
+        Doctors request samples digitally. Track fulfillment, manage inventory.<br><br>
+        <strong style="color:var(--amber);">Doctor-initiated</strong> — no pushy MR visits.
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:16px;padding:12px 24px;background:var(--surface);border:1px solid var(--amber);border-radius:10px;text-align:center;max-width:900px;">
+    <span style="font-size:14px;">+ Doctor Insights · Onboarding Tracker · Dashboard Templates · My Doctors / My Clinics portal</span>
+  </div>
+</div>
+
+<!-- SLIDE 8: QR DISTRIBUTION MODEL -->
+<div class="slide" id="slide-8">
+  <div class="slide-tag">Go-To-Market</div>
+  <div class="slide-title" style="font-size:clamp(26px,3.2vw,42px);">
+    <span class="highlight-blue">QR Distribution</span> via Pharma Network
+  </div>
+  <div class="slide-subtitle">
+    MRs' effort is the golden pillar of pharma establishment — their decades of dedication are proven and irreplaceable. HealQR <strong style="color:var(--emerald)">complements their proven effort with gold standard digital intelligence from the source</strong>. QR cards become part of the MR's existing toolkit.
+  </div>
+  <div class="flow-row">
+    <div class="flow-step" style="border-color:var(--blue);">💊 Pharma Company</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">📦 QR Cards Printed</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">🧑‍💼 MR Distributes</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">👨‍⚕️ Doctor Activates</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step" style="border-color:var(--emerald);">📱 Patients Book</div>
+  </div>
+  <div class="cards-grid cols-3" style="max-width:900px;margin-top:20px;">
+    <div class="card card-blue" style="text-align:center;">
+      <div class="card-icon">🏭</div>
+      <div class="card-title">Pharma Benefit</div>
+      <div class="card-text">Gold standard digital reports from SOURCE complement MR's gold standard field effort. No 3rd-party research dependency. CME + sample management built-in.</div>
+    </div>
+    <div class="card card-highlight" style="text-align:center;">
+      <div class="card-icon">👨‍⚕️</div>
+      <div class="card-title">Doctor Benefit</div>
+      <div class="card-text">Full data ownership. Free digital practice. No setup cost. Complete control over patient records.</div>
+    </div>
+    <div class="card card-purple" style="text-align:center;">
+      <div class="card-icon">🧑</div>
+      <div class="card-title">Patient Benefit</div>
+      <div class="card-text">24×7 seamless booking. Live queue. Digital Rx. 31 languages. Push notifications. No app needed.</div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 9: THREE ABSOLUTE RULES -->
+<div class="slide" id="slide-9">
+  <div class="slide-tag">Our Ethics — Non-Negotiable</div>
+  <div class="slide-title" style="font-size:clamp(26px,3.2vw,44px);">
+    HealQR's <span class="highlight-red">Three Absolute Rules</span>
+  </div>
+  <div class="slide-subtitle">Hardcoded into every layer — server, client, AI, and analytics</div>
+  <div class="cards-grid cols-3" style="max-width:900px;">
+    <div class="card card-red" style="text-align:center;">
+      <div class="card-icon">🚫</div>
+      <div class="card-title" style="font-size:20px;">ZERO Data Selling</div>
+      <div class="card-text" style="font-size:14px;">
+        Patient data is <strong style="color:var(--red);">never sold, shared, or mined</strong>.<br>Not to pharma. Not to insurers. Not to anyone.
+      </div>
+    </div>
+    <div class="card card-red" style="text-align:center;">
+      <div class="card-icon">⚕️</div>
+      <div class="card-title" style="font-size:20px;">ZERO Treatment Interference</div>
+      <div class="card-text" style="font-size:14px;">
+        HealQR is a <strong style="color:var(--red);">digital booking platform only</strong>.<br>We never influence, suggest, or modify medical treatment.
+      </div>
+    </div>
+    <div class="card card-red" style="text-align:center;">
+      <div class="card-icon">🤖</div>
+      <div class="card-title" style="font-size:20px;">ZERO AI Medical Advice</div>
+      <div class="card-text" style="font-size:14px;">
+        Our AI chatbot is <strong style="color:var(--red);">restricted server-side</strong>.<br>Cannot give medical advice or reveal patient data.
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:24px;padding:12px 24px;background:var(--surface);border:1px solid var(--border);border-radius:10px;font-size:13px;color:var(--text-muted);">
+    🔐 These rules are enforced in code — they cannot be overridden by any user, admin, or configuration.
+  </div>
+</div>
+
+<!-- SLIDE 10: REVENUE MODEL -->
+<div class="slide" id="slide-10">
+  <div class="slide-tag">Revenue Model</div>
+  <div class="slide-title" style="font-size:clamp(26px,3.2vw,44px);">
+    How HealQR <span class="highlight">Sustains Itself</span>
+  </div>
+  <div class="slide-subtitle" style="max-width:700px;font-size:clamp(18px,2.2vw,24px);">
+    Our only revenue path is <strong style="color:var(--emerald);">3rd-party patient-facing advertising</strong> — which carries no medical guidance whatsoever. All ads are platform-served, geo-targeted, and clearly marked.
+  </div>
+  <div class="cards-grid cols-3" style="max-width:900px;margin-top:10px;">
+    <div class="card card-highlight" style="text-align:center;">
+      <div class="card-icon">📢</div>
+      <div class="card-title">Advertiser Campaigns</div>
+      <div class="card-text">Geo-targeted by State → Pincode → Specialty. View-based bundles. Full analytics.</div>
+    </div>
+    <div class="card" style="text-align:center;">
+      <div class="card-icon">🏷️</div>
+      <div class="card-title">Health Tips Sponsorship</div>
+      <div class="card-text">Brands sponsor health awareness content. Doctor-approved, patient-facing.</div>
+    </div>
+    <div class="card" style="text-align:center;">
+      <div class="card-icon">🔬</div>
+      <div class="card-title">Market Research (Aggregate)</div>
+      <div class="card-text">Anonymized, pincode-level data. No PII. No individual records.</div>
+    </div>
+  </div>
+  <div style="margin-top:24px;display:flex;gap:16px;justify-content:center;flex-wrap:wrap;">
+    <div style="padding:12px 20px;background:rgba(239,68,68,0.1);border:1px solid var(--red);border-radius:10px;font-size:14px;">
+      <span style="color:var(--red);font-weight:700;">✕</span> <span style="color:var(--text-muted);">No patient data selling — ever</span>
+    </div>
+    <div style="padding:12px 20px;background:rgba(239,68,68,0.1);border:1px solid var(--red);border-radius:10px;font-size:14px;">
+      <span style="color:var(--red);font-weight:700;">✕</span> <span style="color:var(--text-muted);">No medical guidance in ads</span>
+    </div>
+    <div style="padding:12px 20px;background:rgba(239,68,68,0.1);border:1px solid var(--red);border-radius:10px;font-size:14px;">
+      <span style="color:var(--red);font-weight:700;">✕</span> <span style="color:var(--text-muted);">No doctor subscription fees</span>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 11: SECTION DIVIDER — DPDP -->
+<div class="slide section-divider" id="slide-11">
+  <div class="slide-tag" style="color:var(--amber);">Part B — Compliance Deep Dive</div>
+  <div class="slide-title" style="font-size:clamp(30px,4vw,52px);">
+    <span class="highlight-amber">DPDP Act 2023</span><br>Compliance Framework
+  </div>
+  <div class="slide-subtitle" style="max-width:800px;">
+    <strong style="color:var(--amber);">Digital Personal Data Protection (DPDP) Act, 2023</strong> — India's landmark data privacy law.<br>How HealQR protects patient data at every technical layer — encryption, consent, access control, anonymization.
+  </div>
+  <div style="padding:12px 24px;background:var(--surface);border:1px solid var(--amber);border-radius:10px;font-size:13px;color:var(--text-muted);text-align:center;">
+    ⚡ The following slides detail our technical DPDP compliance — available on request
+  </div>
+  <div class="section-num">B</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- PART B: DPDP COMPLIANCE DEEP DIVE (Slides 12-22)      -->
+<!-- Show if asked / if pharma wants details                -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<!-- SLIDE 12: WHAT IS DPDP -->
+<div class="slide" id="slide-12">
+  <div class="slide-tag">Background</div>
+  <div class="slide-title" style="font-size:clamp(28px,3.5vw,46px);">
+    What is the <span class="highlight">DPDP Act 2023</span>?
+  </div>
+  <div class="slide-subtitle" style="max-width:800px;">
+    India's first comprehensive data privacy law — 6 core principles
+  </div>
+  <div class="cards-grid cols-3" style="max-width:900px;">
+    <div class="card card-highlight"><div class="card-icon">📋</div><div class="card-title">Purpose Limitation</div><div class="card-text">Collect data only for a specific, clear purpose.</div></div>
+    <div class="card card-highlight"><div class="card-icon">🤝</div><div class="card-title">Informed Consent</div><div class="card-text">Clear, informed consent before processing.</div></div>
+    <div class="card card-highlight"><div class="card-icon">🔒</div><div class="card-title">Security Safeguards</div><div class="card-text">Reasonable security measures to protect data.</div></div>
+    <div class="card card-highlight"><div class="card-icon">📉</div><div class="card-title">Data Minimization</div><div class="card-text">Collect only what is necessary.</div></div>
+    <div class="card card-highlight"><div class="card-icon">🗑️</div><div class="card-title">Right to Erasure</div><div class="card-text">Data principals can request deletion.</div></div>
+    <div class="card card-highlight"><div class="card-icon">🚫</div><div class="card-title">No Unauthorized Sharing</div><div class="card-text">Cannot sell or disclose without consent.</div></div>
+  </div>
+</div>
+
+<!-- SLIDE 13: ENCRYPTION -->
+<div class="slide" id="slide-13">
+  <div class="slide-tag">§8(4) — Security Safeguards</div>
+  <div class="slide-title" style="font-size:clamp(26px,3.2vw,42px);"><span class="highlight">AES-256 Encryption</span> on Patient Data</div>
+  <div class="slide-subtitle">5 sensitive fields encrypted client-side before reaching the database</div>
+  <div class="flow-row">
+    <div class="flow-step">📱 Patient books</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step" style="border-color:var(--emerald);">🔐 AES-256 encrypts</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">☁️ Encrypted in Firestore</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step" style="border-color:var(--emerald);">🔓 Decrypted by authorized doctor</div>
+  </div>
+  <div class="cards-grid cols-3" style="max-width:800px;margin-top:16px;">
+    <div class="card" style="text-align:center;padding:16px;"><div class="card-title highlight">Patient Name</div><div class="card-text">→ patientName_encrypted</div></div>
+    <div class="card" style="text-align:center;padding:16px;"><div class="card-title highlight">Phone Number</div><div class="card-text">→ whatsappNumber_encrypted</div></div>
+    <div class="card" style="text-align:center;padding:16px;"><div class="card-title highlight">Age</div><div class="card-text">→ age_encrypted</div></div>
+    <div class="card" style="text-align:center;padding:16px;"><div class="card-title highlight">Gender</div><div class="card-text">→ gender_encrypted</div></div>
+    <div class="card" style="text-align:center;padding:16px;"><div class="card-title highlight">Purpose of Visit</div><div class="card-text">→ purposeOfVisit_encrypted</div></div>
+    <div class="card card-highlight" style="text-align:center;padding:16px;"><div class="card-title" style="color:var(--amber);">🗑️ Plaintext Deleted</div><div class="card-text">Originals removed from document</div></div>
+  </div>
+  <div style="margin-top:16px;font-size:13px;color:var(--text-muted);">+ HTTPS/TLS 1.3 in transit · Google-managed encryption at rest · Sentry PII scrubbing</div>
+</div>
+
+<!-- SLIDE 14: CONSENT -->
+<div class="slide" id="slide-14">
+  <div class="slide-tag">§6 — Consent of Data Principal</div>
+  <div class="slide-title" style="font-size:clamp(26px,3.2vw,42px);"><span class="highlight-blue">Informed Consent</span> at Every Touchpoint</div>
+  <div class="cards-grid cols-2" style="max-width:900px;">
+    <div class="card card-blue"><div class="card-icon">📋</div><div class="card-title">Patient Booking Consent</div><div class="card-text" style="font-size:14px;"><strong>Consent 1:</strong> "I accept notifications during this treatment procedure"<br><br><strong>Consent 2:</strong> "I understand HealQR is only a booking platform"<br><br><span style="color:var(--emerald);">✓ Required before submission</span></div></div>
+    <div class="card card-blue"><div class="card-icon">📱</div><div class="card-title">FCM Notification Opt-In</div><div class="card-text" style="font-size:14px;">Browser-native permission dialog. If not granted → no token saved, no notifications sent.<br><br><span style="color:var(--emerald);">✓ Opt-in only, never forced</span></div></div>
+    <div class="card card-blue"><div class="card-icon">📜</div><div class="card-title">Doctor Privacy Policy</div><div class="card-text" style="font-size:14px;">Dedicated DoctorPrivacyPolicy modal shown during sign-up.<br><br><span style="color:var(--emerald);">✓ Shown before account creation</span></div></div>
+    <div class="card card-blue"><div class="card-icon">⚖️</div><div class="card-title">Public Policy Pages</div><div class="card-text" style="font-size:14px;">Privacy Policy, Terms of Service, Refund Policy — accessible from landing page.<br><br><span style="color:var(--emerald);">✓ No login required</span></div></div>
+  </div>
+</div>
+
+<!-- SLIDE 15: DATA MINIMIZATION -->
+<div class="slide" id="slide-15">
+  <div class="slide-tag">§4(2) — Data Minimization</div>
+  <div class="slide-title" style="font-size:clamp(26px,3.2vw,42px);">We Collect <span class="highlight">Only What's Necessary</span></div>
+  <div class="cards-grid cols-2" style="max-width:800px;">
+    <div class="card card-highlight">
+      <div class="card-title" style="color:var(--emerald);font-size:18px;">✅ What We Collect</div>
+      <div class="card-text" style="font-size:15px;line-height:2.2;"><strong>Patient Name</strong> (required)<br><strong>WhatsApp Number</strong> (required)<br><strong>Consent</strong> (required)<br>Age <span style="color:var(--text-muted);">(optional)</span><br>Gender <span style="color:var(--text-muted);">(optional)</span><br>Purpose of Visit <span style="color:var(--text-muted);">(optional)</span></div>
+    </div>
+    <div class="card card-red">
+      <div class="card-title" style="color:var(--red);font-size:18px;">🚫 What We DON'T Collect</div>
+      <div class="card-text" style="font-size:15px;line-height:2.2;">No Aadhaar Number<br>No Home Address<br>No Email ID<br>No Date of Birth<br>No Insurance Details<br>No Medical History at Booking</div>
+    </div>
+  </div>
+  <div style="margin-top:20px;padding:14px 24px;background:var(--surface);border:1px solid var(--border);border-radius:10px;font-size:14px;color:var(--text-muted);max-width:800px;text-align:center;">
+    📊 6 fields total — 3 optional. Absolute minimum for a healthcare booking.
+  </div>
+</div>
+
+<!-- SLIDE 16: ACCESS CONTROL -->
+<div class="slide" id="slide-16">
+  <div class="slide-tag">§8(4) — Role-Based Security</div>
+  <div class="slide-title" style="font-size:clamp(24px,3vw,40px);"><span class="highlight-purple">Role-Based Access Control</span></div>
+  <table class="compliance-table">
+    <thead><tr><th>Stakeholder</th><th>Auth Method</th><th>Data Access Scope</th><th>Patient PII?</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Doctor</strong></td><td>Email Magic Link</td><td>Own patients only (decrypted)</td><td><span class="badge badge-green">Own patients</span></td></tr>
+      <tr><td><strong>Clinic Owner</strong></td><td>Email Magic Link</td><td>All branches, per-doctor restriction</td><td><span class="badge badge-green">Restricted</span></td></tr>
+      <tr><td><strong>Assistant</strong></td><td>Token + 6-digit PIN</td><td>Allowed pages only</td><td><span class="badge badge-amber">ReadOnly</span></td></tr>
+      <tr><td><strong>Patient</strong></td><td>Phone + OTP</td><td>Own records only</td><td><span class="badge badge-green">Self only</span></td></tr>
+      <tr><td><strong>Advertiser</strong></td><td>Email Magic Link</td><td>Aggregated campaign metrics</td><td><span class="badge badge-green">ZERO PII</span></td></tr>
+      <tr><td><strong>Pharma</strong></td><td>Email Magic Link</td><td>Anonymized Rx trends</td><td><span class="badge badge-green">ZERO PII</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- SLIDE 17: DATA MASKING -->
+<div class="slide" id="slide-17">
+  <div class="slide-tag">§8(3) — Data Sharing Restrictions</div>
+  <div class="slide-title" style="font-size:clamp(26px,3.2vw,42px);"><span class="highlight-amber">Bidirectional Data Masking</span></div>
+  <div class="slide-subtitle">Doctors and clinics can restrict data visibility from each other</div>
+  <div class="cards-grid cols-2" style="max-width:900px;">
+    <div class="card card-amber"><div class="card-icon">👨‍⚕️ → 🏥</div><div class="card-title">Doctor Restricts Clinic</div><div class="card-text" style="font-size:14px;">Doctor self-restricts QR data from specific clinics. Names show <strong>"S***"</strong>, phones show <strong>"******7890"</strong>.</div></div>
+    <div class="card card-amber"><div class="card-icon">🏥 → 👨‍⚕️</div><div class="card-title">Clinic Restricts Doctor</div><div class="card-text" style="font-size:14px;">Clinic toggles per-doctor data restriction. Masked in Schedule, Reports, and Data Export.</div></div>
+  </div>
+  <div class="cards-grid cols-3" style="max-width:900px;margin-top:16px;">
+    <div class="card" style="text-align:center;padding:16px;"><div class="card-title" style="color:var(--cyan);">Export Masking</div><div class="card-text">Excel exports auto-mask restricted fields</div></div>
+    <div class="card" style="text-align:center;padding:16px;"><div class="card-title" style="color:var(--cyan);">Report Masking</div><div class="card-text">maskName() + maskPhone() at display level</div></div>
+    <div class="card" style="text-align:center;padding:16px;"><div class="card-title" style="color:var(--cyan);">Schedule Masking</div><div class="card-text">Restricted bookings show masked names</div></div>
+  </div>
+</div>
+
+<!-- SLIDE 18: ANONYMOUS ANALYTICS -->
+<div class="slide" id="slide-18">
+  <div class="slide-tag">§17 — Anonymized Data</div>
+  <div class="slide-title" style="font-size:clamp(26px,3.2vw,42px);">Analytics = <span class="highlight">Anonymous by Design</span></div>
+  <div class="slide-subtitle">PII-stripped at the source — not anonymized after the fact</div>
+  <div class="cards-grid cols-2" style="max-width:900px;">
+    <div class="card card-highlight"><div class="card-icon">💊</div><div class="card-title">Rx Trends (Pharma)</div><div class="card-text" style="font-size:14px;"><strong>Contains:</strong> Medicine name, type, dosage, specialty, state, pincode<br><br><strong style="color:var(--red);">Excluded:</strong> Patient name, phone, doctor name, doctor ID<br><br>Default: <strong>Aggregated</strong> (counts by molecule)</div></div>
+    <div class="card card-highlight"><div class="card-icon">📊</div><div class="card-title">Advertiser Market Research</div><div class="card-text" style="font-size:14px;"><strong>Contains:</strong> Pincode-level aggregated booking counts, specialty distribution<br><br><strong style="color:var(--red);">Excluded:</strong> Doctor names, patient info, individual identifiers<br><br>Visibility: <strong>Pincode-level only</strong></div></div>
+  </div>
+  <div style="margin-top:20px;padding:14px 24px;background:var(--surface);border:1px solid var(--border);border-radius:10px;font-size:14px;color:var(--text-muted);max-width:900px;text-align:center;">
+    🤖 AI PM: "No patient PII is ever sent to external AI. Only anonymized, aggregated data."
+  </div>
+</div>
+
+<!-- SLIDE 19: AUTH SECURITY -->
+<div class="slide" id="slide-19">
+  <div class="slide-tag">§8(4) — Authentication</div>
+  <div class="slide-title" style="font-size:clamp(26px,3.2vw,42px);"><span class="highlight-cyan">Passwordless Authentication</span></div>
+  <div class="slide-subtitle">No passwords stored = no passwords stolen</div>
+  <div class="cards-grid cols-4" style="max-width:1000px;">
+    <div class="card" style="text-align:center;padding:20px 16px;"><div style="font-size:32px;margin-bottom:10px;">👨‍⚕️</div><div class="card-title">Doctors</div><div class="card-text">Email Magic Link</div></div>
+    <div class="card" style="text-align:center;padding:20px 16px;"><div style="font-size:32px;margin-bottom:10px;">🏥</div><div class="card-title">Clinics</div><div class="card-text">Email Magic Link</div></div>
+    <div class="card" style="text-align:center;padding:20px 16px;"><div style="font-size:32px;margin-bottom:10px;">🧑</div><div class="card-title">Patients</div><div class="card-text">Phone + OTP</div></div>
+    <div class="card" style="text-align:center;padding:20px 16px;"><div style="font-size:32px;margin-bottom:10px;">🔑</div><div class="card-title">Assistants</div><div class="card-text">Token + PIN</div></div>
+  </div>
+  <ul class="check-list" style="margin-top:20px;">
+    <li><span class="check-icon">✓</span><span class="item-text"><strong>Zero password storage</strong> — eliminates brute-force attacks</span></li>
+    <li><span class="check-icon">✓</span><span class="item-text"><strong>Firestore Security Rules</strong> — server-enforced on every operation</span></li>
+    <li><span class="check-icon">✓</span><span class="item-text"><strong>Multi-layer admin auth</strong> — Firebase Auth + admins collection + page permissions</span></li>
+    <li><span class="check-icon">✓</span><span class="item-text"><strong>Sentry PII scrubbing</strong> — email and IP stripped from error reports</span></li>
+  </ul>
+</div>
+
+<!-- SLIDE 20: AI SAFEGUARDS -->
+<div class="slide" id="slide-20">
+  <div class="slide-tag">AI Governance</div>
+  <div class="slide-title" style="font-size:clamp(26px,3.2vw,42px);">AI with <span class="highlight-amber">Hard Safety Limits</span></div>
+  <div class="slide-subtitle">Gemini 2.5 Flash — 4 AI services, each server-restricted</div>
+  <div class="cards-grid cols-2" style="max-width:900px;">
+    <div class="card card-amber"><div class="card-icon">🤖</div><div class="card-title">AI Chatbot — Triple Lock</div><div class="card-text" style="font-size:14px;line-height:1.8;"><strong style="color:var(--red);">Rule 1:</strong> ZERO medical advice<br><strong style="color:var(--red);">Rule 2:</strong> ZERO data sharing<br><strong style="color:var(--red);">Rule 3:</strong> ZERO identity trust<br><br><span style="color:var(--text-muted);">Server-side enforcement — cannot be bypassed</span></div></div>
+    <div class="card card-amber"><div class="card-icon">🧠</div><div class="card-title">AI Services — PII Boundary</div><div class="card-text" style="font-size:14px;line-height:1.8;"><strong>AI Rx Reader:</strong> No patient name in prompt<br><strong>AI Diet Chart:</strong> Condition-based, no PII<br><strong>AI PM:</strong> Aggregated data only<br><strong>Translation:</strong> UI text only — no patient data</div></div>
+  </div>
+</div>
+
+<!-- SLIDE 21: COMPLIANCE MATRIX -->
+<div class="slide" id="slide-21">
+  <div class="slide-tag">Compliance Summary</div>
+  <div class="slide-title" style="font-size:clamp(24px,3vw,38px);">DPDP <span class="highlight">Section-by-Section</span></div>
+  <table class="compliance-table" style="margin-top:10px;">
+    <thead><tr><th>Section</th><th>Requirement</th><th>Implementation</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td><strong>§4</strong></td><td>Purpose Limitation</td><td>3 required fields only</td><td><span class="badge badge-green">✓</span></td></tr>
+      <tr><td><strong>§5</strong></td><td>Notice</td><td>Privacy Policy, ToS, DoctorPrivacyPolicy</td><td><span class="badge badge-green">✓</span></td></tr>
+      <tr><td><strong>§6</strong></td><td>Consent</td><td>2 checkboxes + FCM opt-in + policy</td><td><span class="badge badge-green">✓</span></td></tr>
+      <tr><td><strong>§8(3)</strong></td><td>No Sharing</td><td>Bidirectional masking, no data selling</td><td><span class="badge badge-green">✓</span></td></tr>
+      <tr><td><strong>§8(4)</strong></td><td>Security</td><td>AES-256, RBAC, Firestore rules, passwordless</td><td><span class="badge badge-green">✓</span></td></tr>
+      <tr><td><strong>§8(7)</strong></td><td>Retention</td><td>Auto-purge planned Phase 2</td><td><span class="badge badge-amber">Planned</span></td></tr>
+      <tr><td><strong>§10</strong></td><td>Grievance</td><td>In-app support chat</td><td><span class="badge badge-green">✓</span></td></tr>
+      <tr><td><strong>§12</strong></td><td>Erasure</td><td>Admin deletion; self-service Phase 2</td><td><span class="badge badge-amber">Planned</span></td></tr>
+      <tr><td><strong>§17</strong></td><td>Anonymized</td><td>Rx Trends, Market Research — PII-free</td><td><span class="badge badge-green">✓</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- SLIDE 22: CLOSING -->
+<div class="slide" id="slide-22">
+  <div style="margin-bottom:20px;">
+    <img src="/healqr.logo.png" alt="healqr" style="height:100px;object-fit:contain;">
+  </div>
+  <div class="slide-title" style="font-size:clamp(30px,4vw,52px);">
+    Privacy is not a feature.<br><span class="highlight">It's our architecture.</span>
+  </div>
+  <div class="slide-subtitle" style="max-width:600px;">
+    Every line of code, every database rule, every AI prompt — designed to protect patient dignity and data.
+  </div>
+  <div class="stat-row" style="margin-top:10px;">
+    <div class="stat-box"><div class="stat-value" style="color:var(--emerald);">0</div><div class="stat-label">Passwords Stored</div></div>
+    <div class="stat-box"><div class="stat-value" style="color:var(--red);">0</div><div class="stat-label">Data Sold</div></div>
+    <div class="stat-box"><div class="stat-value" style="color:var(--red);">0</div><div class="stat-label">AI Medical Advice</div></div>
+    <div class="stat-box"><div class="stat-value" style="color:var(--red);">0</div><div class="stat-label">PII to Advertisers</div></div>
+  </div>
+  <div style="display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin-top:24px;">
+    <div style="padding:14px 28px;background:var(--surface);border:1px solid var(--border);border-radius:10px;text-align:center;">
+      <div style="font-size:13px;color:var(--text-muted);">Website</div>
+      <div style="font-size:16px;font-weight:600;color:var(--emerald);">www.healqr.com</div>
+    </div>
+    <div style="padding:14px 28px;background:var(--surface);border:1px solid var(--border);border-radius:10px;text-align:center;">
+      <div style="font-size:13px;color:var(--text-muted);">Contact</div>
+      <div style="font-size:16px;font-weight:600;color:var(--emerald);">support@healqr.com</div>
+    </div>
+    <div style="padding:14px 28px;background:var(--surface);border:1px solid var(--border);border-radius:10px;text-align:center;">
+      <div style="font-size:13px;color:var(--text-muted);">Vision</div>
+      <div style="font-size:16px;font-weight:600;color:var(--emerald);">हर घर HealQR</div>
+    </div>
+  </div>
+  <div class="slide-footer">© 2026 HealQR. All rights reserved. CONFIDENTIAL.</div>
+</div>
+
+<!-- NAVIGATION -->
+<div class="nav-bar">
+  <button id="prevBtn" onclick="prevSlide()" disabled>← Previous</button>
+  <div style="text-align:center;">
+    <span class="slide-counter" id="counter">1 / 22</span><br>
+    <span class="section-label" id="sectionLabel">PART A — CORPORATE PITCH</span>
+  </div>
+  <button id="nextBtn" onclick="nextSlide()">Next →</button>
+</div>
+
+<script>
+  let current = 1;
+  const total = 22;
+  
+  function getSection(n) {
+    if (n <= 10) return 'PART A — CORPORATE PITCH';
+    if (n === 11) return 'SECTION DIVIDER';
+    return 'PART B — DPDP COMPLIANCE';
+  }
+  
+  function showSlide(n) {
+    document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+    document.getElementById(`slide-${n}`).classList.add('active');
+    document.getElementById('counter').textContent = `${n} / ${total}`;
+    document.getElementById('sectionLabel').textContent = getSection(n);
+    document.getElementById('prevBtn').disabled = (n === 1);
+    document.getElementById('nextBtn').disabled = (n === total);
+    document.getElementById('progress').style.width = `${(n / total) * 100}%`;
+  }
+  
+  function nextSlide() { if (current < total) { current++; showSlide(current); } }
+  function prevSlide() { if (current > 1) { current--; showSlide(current); } }
+  
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); nextSlide(); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); prevSlide(); }
+    if (e.key === 'Home') { e.preventDefault(); current = 1; showSlide(1); }
+    if (e.key === 'End') { e.preventDefault(); current = total; showSlide(total); }
+  });
+  
+  let touchStartX = 0;
+  document.addEventListener('touchstart', (e) => { touchStartX = e.touches[0].clientX; });
+  document.addEventListener('touchend', (e) => {
+    const diff = touchStartX - e.changedTouches[0].clientX;
+    if (Math.abs(diff) > 50) { diff > 0 ? nextSlide() : prevSlide(); }
+  });
+  
+  showSlide(1);
+</script>
+</body>
+</html>

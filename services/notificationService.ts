@@ -112,7 +112,7 @@ export const scheduleConsultationConfirmation = async (data: any) => {
       consultationDate: data.consultationDate,
       consultationTime: data.consultationTime,
       phone: phone10,
-      url: `https://healqr-27726.web.app/?${params.toString()}`,
+      url: `https://healqr.com/?${params.toString()}`,
     },
   });
 
@@ -175,8 +175,8 @@ export const sendConsultationCompleted = async (data: any) => {
       consultationTime: data.consultationTime,
       phone: phone10,
       url: data.rxUrl || data.dietUrl
-        ? `https://teamhealqr.web.app/?page=consultation-completed&bookingId=${data.bookingId}&rxUrl=${encodeURIComponent(data.rxUrl || '')}&dietUrl=${encodeURIComponent(data.dietUrl || '')}&doctorName=${encodeURIComponent(data.doctorName)}&patientName=${encodeURIComponent(data.patientName)}&clinicName=${encodeURIComponent(data.clinicName || '')}&consultationDate=${encodeURIComponent(data.consultationDate || '')}&consultationTime=${encodeURIComponent(data.consultationTime || '')}`
-        : `https://healqr-27726.web.app/?${params.toString()}`,
+        ? `https://healqr.com/?page=consultation-completed&bookingId=${data.bookingId}&rxUrl=${encodeURIComponent(data.rxUrl || '')}&dietUrl=${encodeURIComponent(data.dietUrl || '')}&doctorName=${encodeURIComponent(data.doctorName)}&patientName=${encodeURIComponent(data.patientName)}&clinicName=${encodeURIComponent(data.clinicName || '')}&consultationDate=${encodeURIComponent(data.consultationDate || '')}&consultationTime=${encodeURIComponent(data.consultationTime || '')}`
+        : `https://healqr.com/?${params.toString()}`,
     },
   });
 
@@ -296,7 +296,7 @@ export const sendConsultationCompleted = async (data: any) => {
 export const sendRxUpdatedNotification = async (data: any) => {
   const { userId, phone10 } = normalizePatientTarget(data.patientPhone);
 
-  const deepLinkUrl = `https://teamhealqr.web.app/?page=rx-updated&rxUrl=${encodeURIComponent(data.rxUrl || '')}&doctorName=${encodeURIComponent(data.doctorName || '')}&patientName=${encodeURIComponent(data.patientName || '')}&clinicName=${encodeURIComponent(data.clinicName || '')}&consultationDate=${encodeURIComponent(data.consultationDate || '')}&consultationTime=${encodeURIComponent(data.consultationTime || '')}&language=${encodeURIComponent(data.language || 'english')}`;
+  const deepLinkUrl = `https://healqr.com/?page=rx-updated&rxUrl=${encodeURIComponent(data.rxUrl || '')}&doctorName=${encodeURIComponent(data.doctorName || '')}&patientName=${encodeURIComponent(data.patientName || '')}&clinicName=${encodeURIComponent(data.clinicName || '')}&consultationDate=${encodeURIComponent(data.consultationDate || '')}&consultationTime=${encodeURIComponent(data.consultationTime || '')}&language=${encodeURIComponent(data.language || 'english')}`;
 
   const result = await sendFCM({
     userId,
@@ -417,7 +417,7 @@ export const scheduleReviewRequest = async (data: any, seenAt: Date) => {
       bookingId: data.bookingId,
       phone: phone10,
       // Deep link to review request template with language
-      url: `https://healqr-27726.web.app/?page=review-request&patientName=${encodeURIComponent(data.patientName)}&doctorName=${encodeURIComponent(data.doctorName)}&date=${encodeURIComponent(data.consultationDate)}&language=${encodeURIComponent(data.language || 'english')}`,
+      url: `https://healqr.com/?page=review-request&patientName=${encodeURIComponent(data.patientName)}&doctorName=${encodeURIComponent(data.doctorName)}&date=${encodeURIComponent(data.consultationDate)}&language=${encodeURIComponent(data.language || 'english')}`,
     },
   });
 
@@ -493,7 +493,7 @@ export const sendFollowUp = async (data: any) => {
       isPermanentCommitment: 'true', // Flag to bypass subscription checks in cloud function
       doctorId: data.doctorId, // For subscription validation bypass
       // Deep link to follow-up template with language
-      url: `https://healqr-27726.web.app/?page=follow-up&doctorId=${data.doctorId}&patientName=${encodeURIComponent(data.patientName)}&doctorName=${encodeURIComponent(data.doctorName)}&message=${encodeURIComponent(data.customMessage || '')}&date=${encodeURIComponent(data.followUpDate)}&language=${encodeURIComponent(data.language || 'english')}`,
+      url: `https://healqr.com/?page=follow-up&doctorId=${data.doctorId}&patientName=${encodeURIComponent(data.patientName)}&doctorName=${encodeURIComponent(data.doctorName)}&message=${encodeURIComponent(data.customMessage || '')}&date=${encodeURIComponent(data.followUpDate)}&language=${encodeURIComponent(data.language || 'english')}`,
     },
   });
 
@@ -578,7 +578,7 @@ export const sendFollowUp = async (data: any) => {
       fcmToken: result?.fcmToken,
       // Store full template URL for viewing
       metadata: {
-        templateUrl: `https://healqr-27726.web.app/?${followUpParams.toString()}`,
+        templateUrl: `https://healqr.com/?${followUpParams.toString()}`,
         followUpMessage: data.customMessage,
         language: data.language || 'english'
       }
@@ -612,7 +612,7 @@ export const sendAppointmentCancelled = async (data: any) => {
       language: data.language || 'english',
       scope: data.scope || 'patient',
       phone: phone10,
-      url: `https://healqr-27726.web.app/?${params.toString()}`,
+      url: `https://healqr.com/?${params.toString()}`,
     },
   });
 
@@ -693,7 +693,7 @@ export const sendAppointmentCancelled = async (data: any) => {
       fcmToken: result?.fcmToken,
       // Store full template URL for viewing
       metadata: {
-        templateUrl: `https://healqr-27726.web.app/?${params.toString()}`,
+        templateUrl: `https://healqr.com/?${params.toString()}`,
         cancellationReason: data.message,
         language: data.language || 'english'
       }
@@ -742,7 +742,7 @@ export const sendChamberRescheduled = async (data: {
       language: data.language || 'english',
       scope: 'patient',
       phone: phone10,
-      url: `https://teamhealqr.web.app/?${params.toString()}`,
+      url: `https://healqr.com/?${params.toString()}`,
     },
   });
 
@@ -803,7 +803,7 @@ export const sendChamberRescheduled = async (data: {
       fcmSuccess: result?.success !== false,
       fcmError: result?.error,
       metadata: {
-        templateUrl: `https://teamhealqr.web.app/?${params.toString()}`,
+        templateUrl: `https://healqr.com/?${params.toString()}`,
         originalTime: data.originalTime,
         newTime: data.newTime,
         language: data.language || 'english'
@@ -841,7 +841,7 @@ export const sendAppointmentRestored = async (data: any) => {
       language: data.language || 'english',
       scope: data.scope || 'patient',
       phone: phone10,
-      url: `https://healqr-27726.web.app/?${params.toString()}`,
+      url: `https://healqr.com/?${params.toString()}`,
     },
   });
 
@@ -921,7 +921,7 @@ export const sendAppointmentRestored = async (data: any) => {
       fcmToken: result?.fcmToken,
       // Store full template URL for viewing
       metadata: {
-        templateUrl: `https://healqr-27726.web.app/?${params.toString()}`,
+        templateUrl: `https://healqr.com/?${params.toString()}`,
         restorationReason: data.message,
         language: data.language || 'english'
       }
@@ -1047,7 +1047,7 @@ export const sendAppointmentReminder = async (data: any, bookingCreatedAt: Date)
       language: data.language || 'english',
       appointmentTime: data.appointmentTime || '',
       phone: phone10,
-      url: `https://healqr-27726.web.app/?${params.toString()}`,
+      url: `https://healqr.com/?${params.toString()}`,
     },
   });
 
@@ -1104,7 +1104,7 @@ export const scheduleBookingReminder = async (data: any) => {
       appointmentTime: data.appointmentTime || '',
       phone: phone10,
       // Deep link to reminder template
-      url: `https://healqr-27726.web.app/?page=appointment-reminder&patientName=${encodeURIComponent(data.patientName)}&doctorName=${encodeURIComponent(data.doctorName)}&date=${encodeURIComponent(data.appointmentDate)}&time=${encodeURIComponent(data.appointmentTimeStr || '')}&location=${encodeURIComponent(data.location || '')}`,
+      url: `https://healqr.com/?page=appointment-reminder&patientName=${encodeURIComponent(data.patientName)}&doctorName=${encodeURIComponent(data.doctorName)}&date=${encodeURIComponent(data.appointmentDate)}&time=${encodeURIComponent(data.appointmentTimeStr || '')}&location=${encodeURIComponent(data.location || '')}`,
     },
   });
 };
@@ -1129,7 +1129,7 @@ export const sendVideoCallLink = async (data: any) => {
       language: data.language || 'english',
       bookingId: data.bookingId,
       phone: phone10,
-      url: `https://healqr-27726.web.app/?${params.toString()}`,
+      url: `https://healqr.com/?${params.toString()}`,
     },
   });
 
@@ -1160,7 +1160,7 @@ export const sendVideoCallLink = async (data: any) => {
       fcmError: result?.error,
       fcmToken: result?.fcmToken,
       metadata: {
-        templateUrl: `https://healqr-27726.web.app/?${params.toString()}`,
+        templateUrl: `https://healqr.com/?${params.toString()}`,
         language: data.language || 'english'
       }
     });
@@ -1215,7 +1215,7 @@ export const scheduleVideoCallLink = async (data: any, appointmentTime: Date) =>
       language: data.language || 'english',
       bookingId: data.bookingId,
       phone: phone10,
-      url: `https://healqr-27726.web.app/?${params.toString()}`,
+      url: `https://healqr.com/?${params.toString()}`,
     },
   });
 
@@ -1290,7 +1290,7 @@ export const sendAdminAlert = async (data: {
       unmarkedCount: data.unmarkedPatients.length.toString(),
       unmarkedPatients: JSON.stringify(data.unmarkedPatients),
       // Deep link to admin alert template
-      url: `https://healqr-27726.web.app/?page=admin-alert&doctorName=${encodeURIComponent(data.doctorName)}&eventType=${encodeURIComponent(data.eventType || 'System Alert')}&severity=${encodeURIComponent(data.severity || 'High')}`,
+      url: `https://healqr.com/?page=admin-alert&doctorName=${encodeURIComponent(data.doctorName)}&eventType=${encodeURIComponent(data.eventType || 'System Alert')}&severity=${encodeURIComponent(data.severity || 'High')}`,
     },
   });
 };
