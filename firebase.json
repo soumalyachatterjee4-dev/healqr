@@ -98,6 +98,14 @@
     ],
     "rewrites": [
       {
+        "source": "/dr/**",
+        "destination": "/index.html"
+      },
+      {
+        "source": "/clinic/**",
+        "destination": "/index.html"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

@@ -45,7 +45,7 @@ export default function ReviewCard({ doctorName, patientName, rating, date, comm
   return (
     <div 
       id="review-card" 
-      className="w-full max-w-[400px] mx-auto bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 sm:p-8 shadow-2xl border border-gray-700"
+      className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 sm:p-8 shadow-2xl border border-gray-700 flex flex-col"
       style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
     >
       {/* Header */}
@@ -75,7 +75,7 @@ export default function ReviewCard({ doctorName, patientName, rating, date, comm
       </div>
 
       {/* Review */}
-      <div className="mb-6">
+      <div className="mb-6 flex-1">
         <p className="text-gray-400 text-sm mb-2">Review:</p>
         <p className="text-white leading-relaxed">{comment}</p>
       </div>

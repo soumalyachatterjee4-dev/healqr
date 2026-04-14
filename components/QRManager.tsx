@@ -60,6 +60,13 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Slug registration state
+  const [currentSlug, setCurrentSlug] = useState<string>('');
+  const [slugInput, setSlugInput] = useState('');
+  const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid' | 'saving' | 'saved'>('idle');
+  const [isEditingSlug, setIsEditingSlug] = useState(false);
+  const slugCheckTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Preset download sizes
   const downloadSizes: DownloadSize[] = [
     { name: '1" × 1"', width: 300, height: 300, description: 'Small sticker' },
@@ -88,9 +95,9 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
         return;
       }
 
-      // Set personalized QR URL with doctor UID FIRST (before loading other data)
-      const bookingUrl = `https://teamhealqr.web.app?doctorId=${userId}`;
-      setQrUrl(bookingUrl);
+      // Set fallback QR URL with doctor UID (will be overridden if slug exists)
+      const fallbackUrl = `https://teamhealqr.web.app?doctorId=${userId}`;
+      setQrUrl(fallbackUrl);
 
       const { db } = await import('../lib/firebase/config');
       if (!db) {
@@ -104,6 +111,14 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
       if (doctorDoc.exists()) {
         const data = doctorDoc.data();
 
+        // Use clean slug URL if doctor has registered a slug
+        if (data.profileSlug) {
+          const slugUrl = `https://healqr.com/dr/${data.profileSlug}`;
+          setQrUrl(slugUrl);
+          setCurrentSlug(data.profileSlug);
+          setSlugInput(data.profileSlug);
+        }
+
         // Set assigned activation QR code
         if (data.activationQrCode) {
           setAssignedQrCode(data.activationQrCode);
@@ -116,6 +131,103 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
       }
     } catch (error) {
       console.error('❌ Error loading subscription data:', error);
+    }
+  };
+
+  // Slug validation helper
+  const isValidSlug = (slug: string): boolean => {
+    return /^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$/.test(slug) && !slug.includes('--');
+  };
+
+  const generateSlugFromName = (name: string): string => {
+    return name
+      .toLowerCase()
+      .replace(/^dr\.?\s*/i, 'dr-')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 50);
+  };
+
+  // Check slug availability (debounced)
+  const checkSlugAvailability = (slug: string) => {
+    if (slugCheckTimeout.current) clearTimeout(slugCheckTimeout.current);
+
+    if (!slug || slug === currentSlug) {
+      setSlugStatus('idle');
+      return;
+    }
+
+    if (!isValidSlug(slug)) {
+      setSlugStatus('invalid');
+      return;
+    }
+
+    setSlugStatus('checking');
+    slugCheckTimeout.current = setTimeout(async () => {
+      try {
+        const { db } = await import('../lib/firebase/config');
+        if (!db) return;
+        const { collection, query, where, getDocs } = await import('firebase/firestore');
+        // Check doctors collection
+        const doctorQ = query(collection(db, 'doctors'), where('profileSlug', '==', slug));
+        const doctorSnap = await getDocs(doctorQ);
+        if (!doctorSnap.empty) { setSlugStatus('taken'); return; }
+        // Also check clinics collection to prevent cross-collision
+        const clinicQ = query(collection(db, 'clinics'), where('profileSlug', '==', slug));
+        const clinicSnap = await getDocs(clinicQ);
+        setSlugStatus(clinicSnap.empty ? 'available' : 'taken');
+      } catch {
+        setSlugStatus('idle');
+      }
+    }, 500);
+  };
+
+  // Save slug to Firestore
+  const saveSlug = async () => {
+    const slug = slugInput.trim().toLowerCase();
+    if (!isValidSlug(slug) || slug === currentSlug) return;
+
+    setSlugStatus('saving');
+    try {
+      const userId = localStorage.getItem('userId');
+      if (!userId) return;
+
+      const { db } = await import('../lib/firebase/config');
+      if (!db) return;
+
+      // Double-check availability before saving
+      const { collection, query, where, getDocs, doc, updateDoc } = await import('firebase/firestore');
+      const doctorQ = query(collection(db, 'doctors'), where('profileSlug', '==', slug));
+      const doctorSnap = await getDocs(doctorQ);
+      if (!doctorSnap.empty) {
+        setSlugStatus('taken');
+        toast.error('This URL was just claimed by someone else. Try another.');
+        return;
+      }
+      const clinicQ = query(collection(db, 'clinics'), where('profileSlug', '==', slug));
+      const clinicSnap = await getDocs(clinicQ);
+      if (!clinicSnap.empty) {
+        setSlugStatus('taken');
+        toast.error('This URL is taken by a clinic. Try another.');
+        return;
+      }
+
+      // Save to doctor document
+      await updateDoc(doc(db, 'doctors', userId), {
+        profileSlug: slug,
+        profileSlugCreatedAt: new Date()
+      });
+
+      setCurrentSlug(slug);
+      setQrUrl(`https://healqr.com/dr/${slug}`);
+      setSlugStatus('saved');
+      setIsEditingSlug(false);
+      toast.success('Your personal URL has been set!');
+    } catch (error) {
+      console.error('Error saving slug:', error);
+      toast.error('Failed to save URL. Please try again.');
+      setSlugStatus('idle');
     }
   };
 
@@ -640,6 +752,93 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
                       </div>
                     </div>
                   </div>
+                </div>
+
+                {/* Claim Your Custom URL */}
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                  <h3 className="text-emerald-400 mb-4 flex items-center gap-2">
+                    <Zap className="w-5 h-5" />
+                    {currentSlug ? 'Your Custom URL' : 'Claim Your Custom URL'}
+                  </h3>
+
+                  {!isEditingSlug && currentSlug ? (
+                    <div>
+                      <div className="bg-black border border-emerald-500/30 rounded-lg p-4 mb-3">
+                        <p className="text-emerald-400 text-sm">healqr.com/dr/<span className="font-bold">{currentSlug}</span></p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => { setIsEditingSlug(true); setSlugStatus('idle'); }}
+                        className="text-gray-400 border-zinc-700 hover:bg-zinc-800"
+                      >
+                        Change URL
+                      </Button>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="text-gray-400 text-sm mb-3">
+                        Get a clean, shareable URL instead of a long ID link.
+                      </p>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-gray-500 text-sm whitespace-nowrap">healqr.com/dr/</span>
+                        <Input
+                          value={slugInput}
+                          onChange={(e) => {
+                            const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+                            setSlugInput(val);
+                            checkSlugAvailability(val);
+                          }}
+                          placeholder={generateSlugFromName(doctorName)}
+                          className="bg-black border-zinc-700 text-white h-9 text-sm"
+                          maxLength={50}
+                        />
+                      </div>
+                      {slugStatus === 'checking' && (
+                        <p className="text-yellow-400 text-xs mt-1">Checking availability...</p>
+                      )}
+                      {slugStatus === 'available' && (
+                        <p className="text-emerald-400 text-xs mt-1">✓ Available!</p>
+                      )}
+                      {slugStatus === 'taken' && (
+                        <p className="text-red-400 text-xs mt-1">✗ Already taken. Try another.</p>
+                      )}
+                      {slugStatus === 'invalid' && (
+                        <p className="text-red-400 text-xs mt-1">Use only lowercase letters, numbers, and hyphens (3-50 chars).</p>
+                      )}
+                      <div className="flex gap-2 mt-3">
+                        <Button
+                          onClick={saveSlug}
+                          disabled={slugStatus !== 'available'}
+                          className="bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 h-9 text-sm"
+                        >
+                          {slugStatus === 'saving' ? 'Saving...' : 'Claim URL'}
+                        </Button>
+                        {currentSlug && (
+                          <Button
+                            variant="ghost"
+                            onClick={() => { setIsEditingSlug(false); setSlugInput(currentSlug); setSlugStatus('idle'); }}
+                            className="text-gray-400 h-9 text-sm"
+                          >
+                            Cancel
+                          </Button>
+                        )}
+                        {!currentSlug && !slugInput && (
+                          <Button
+                            variant="ghost"
+                            onClick={() => {
+                              const suggested = generateSlugFromName(doctorName);
+                              setSlugInput(suggested);
+                              checkSlugAvailability(suggested);
+                            }}
+                            className="text-emerald-400 h-9 text-sm"
+                          >
+                            Suggest for me
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* QR Customization */}

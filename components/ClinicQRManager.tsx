@@ -51,6 +51,13 @@ export default function ClinicQRManager({ onMenuChange, onLogout, profileData }:
   const [qrUrl, setQrUrl] = useState('https://teamhealqr.web.app');
 
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
+
+  // Slug registration state
+  const [currentSlug, setCurrentSlug] = useState<string>('');
+  const [slugInput, setSlugInput] = useState('');
+  const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid' | 'saving' | 'saved'>('idle');
+  const [isEditingSlug, setIsEditingSlug] = useState(false);
+  const slugCheckTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Preset download sizes
@@ -105,6 +112,14 @@ export default function ClinicQRManager({ onMenuChange, onLogout, profileData }:
         const data = clinicDoc.data();
         setSubscriptionData(data);
 
+        // Use clean slug URL if clinic has registered a slug
+        if (data.profileSlug) {
+          const slugUrl = `https://healqr.com/clinic/${data.profileSlug}`;
+          setQrUrl(slugUrl);
+          setCurrentSlug(data.profileSlug);
+          setSlugInput(data.profileSlug);
+        }
+
         // Set assigned activation QR code
         if (data.qrNumber) {
           setAssignedQrCode(data.qrNumber);
@@ -115,6 +130,104 @@ export default function ClinicQRManager({ onMenuChange, onLogout, profileData }:
       console.error('❌ Error loading subscription data:', error);
     } finally {
       setLoadingSubscription(false);
+    }
+  };
+
+  // Slug validation helper
+  const isValidSlug = (slug: string): boolean => {
+    return /^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$/.test(slug) && !slug.includes('--');
+  };
+
+  const generateSlugFromName = (name: string): string => {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 50);
+  };
+
+  // Check slug availability (debounced) — checks BOTH clinics and doctors to avoid collision
+  const checkSlugAvailability = (slug: string) => {
+    if (slugCheckTimeout.current) clearTimeout(slugCheckTimeout.current);
+
+    if (!slug || slug === currentSlug) {
+      setSlugStatus('idle');
+      return;
+    }
+
+    if (!isValidSlug(slug)) {
+      setSlugStatus('invalid');
+      return;
+    }
+
+    setSlugStatus('checking');
+    slugCheckTimeout.current = setTimeout(async () => {
+      try {
+        const { db } = await import('../lib/firebase/config');
+        if (!db) return;
+        const { collection, query, where, getDocs } = await import('firebase/firestore');
+        // Check clinics collection
+        const clinicQ = query(collection(db, 'clinics'), where('profileSlug', '==', slug));
+        const clinicSnap = await getDocs(clinicQ);
+        if (!clinicSnap.empty) { setSlugStatus('taken'); return; }
+        // Also check doctors collection to prevent cross-collision
+        const doctorQ = query(collection(db, 'doctors'), where('profileSlug', '==', slug));
+        const doctorSnap = await getDocs(doctorQ);
+        setSlugStatus(doctorSnap.empty ? 'available' : 'taken');
+      } catch {
+        setSlugStatus('idle');
+      }
+    }, 500);
+  };
+
+  // Save slug to Firestore
+  const saveSlug = async () => {
+    const slug = slugInput.trim().toLowerCase();
+    if (!isValidSlug(slug) || slug === currentSlug) return;
+
+    setSlugStatus('saving');
+    try {
+      const userId = localStorage.getItem('userId');
+      if (!userId) return;
+      const isLocationManager = localStorage.getItem('healqr_is_location_manager') === 'true';
+      const parentClinicId = localStorage.getItem('healqr_parent_clinic_id');
+      const clinicIdForSlug = (isLocationManager && parentClinicId) ? parentClinicId : userId;
+
+      const { db } = await import('../lib/firebase/config');
+      if (!db) return;
+
+      // Double-check availability
+      const { collection, query, where, getDocs, doc, updateDoc } = await import('firebase/firestore');
+      const clinicQ = query(collection(db, 'clinics'), where('profileSlug', '==', slug));
+      const clinicSnap = await getDocs(clinicQ);
+      if (!clinicSnap.empty) {
+        setSlugStatus('taken');
+        toast.error('This URL was just claimed. Try another.');
+        return;
+      }
+      const doctorQ = query(collection(db, 'doctors'), where('profileSlug', '==', slug));
+      const doctorSnap = await getDocs(doctorQ);
+      if (!doctorSnap.empty) {
+        setSlugStatus('taken');
+        toast.error('This URL is taken by a doctor. Try another.');
+        return;
+      }
+
+      await updateDoc(doc(db, 'clinics', clinicIdForSlug), {
+        profileSlug: slug,
+        profileSlugCreatedAt: new Date()
+      });
+
+      setCurrentSlug(slug);
+      setQrUrl(`https://healqr.com/clinic/${slug}`);
+      setSlugStatus('saved');
+      setIsEditingSlug(false);
+      toast.success('Your clinic URL has been set!');
+    } catch (error) {
+      console.error('Error saving slug:', error);
+      toast.error('Failed to save URL. Please try again.');
+      setSlugStatus('idle');
     }
   };
 
@@ -613,6 +726,93 @@ export default function ClinicQRManager({ onMenuChange, onLogout, profileData }:
                       </div>
                     </div>
                   </div>
+                </div>
+
+                {/* Claim Your Custom URL */}
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                  <h3 className="text-blue-400 mb-4 flex items-center gap-2">
+                    <Zap className="w-5 h-5" />
+                    {currentSlug ? 'Your Custom URL' : 'Claim Your Custom URL'}
+                  </h3>
+
+                  {!isEditingSlug && currentSlug ? (
+                    <div>
+                      <div className="bg-black border border-blue-500/30 rounded-lg p-4 mb-3">
+                        <p className="text-blue-400 text-sm">healqr.com/clinic/<span className="font-bold">{currentSlug}</span></p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => { setIsEditingSlug(true); setSlugStatus('idle'); }}
+                        className="text-gray-400 border-zinc-700 hover:bg-zinc-800"
+                      >
+                        Change URL
+                      </Button>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="text-gray-400 text-sm mb-3">
+                        Get a clean, shareable URL for your clinic.
+                      </p>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-gray-500 text-sm whitespace-nowrap">healqr.com/clinic/</span>
+                        <Input
+                          value={slugInput}
+                          onChange={(e) => {
+                            const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+                            setSlugInput(val);
+                            checkSlugAvailability(val);
+                          }}
+                          placeholder={generateSlugFromName(clinicName)}
+                          className="bg-black border-zinc-700 text-white h-9 text-sm"
+                          maxLength={50}
+                        />
+                      </div>
+                      {slugStatus === 'checking' && (
+                        <p className="text-yellow-400 text-xs mt-1">Checking availability...</p>
+                      )}
+                      {slugStatus === 'available' && (
+                        <p className="text-blue-400 text-xs mt-1">✓ Available!</p>
+                      )}
+                      {slugStatus === 'taken' && (
+                        <p className="text-red-400 text-xs mt-1">✗ Already taken. Try another.</p>
+                      )}
+                      {slugStatus === 'invalid' && (
+                        <p className="text-red-400 text-xs mt-1">Use only lowercase letters, numbers, and hyphens (3-50 chars).</p>
+                      )}
+                      <div className="flex gap-2 mt-3">
+                        <Button
+                          onClick={saveSlug}
+                          disabled={slugStatus !== 'available'}
+                          className="bg-blue-500 hover:bg-blue-600 disabled:opacity-40 h-9 text-sm"
+                        >
+                          {slugStatus === 'saving' ? 'Saving...' : 'Claim URL'}
+                        </Button>
+                        {currentSlug && (
+                          <Button
+                            variant="ghost"
+                            onClick={() => { setIsEditingSlug(false); setSlugInput(currentSlug); setSlugStatus('idle'); }}
+                            className="text-gray-400 h-9 text-sm"
+                          >
+                            Cancel
+                          </Button>
+                        )}
+                        {!currentSlug && !slugInput && (
+                          <Button
+                            variant="ghost"
+                            onClick={() => {
+                              const suggested = generateSlugFromName(clinicName);
+                              setSlugInput(suggested);
+                              checkSlugAvailability(suggested);
+                            }}
+                            className="text-blue-400 h-9 text-sm"
+                          >
+                            Suggest for me
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* QR Customization */}

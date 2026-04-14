@@ -121,6 +121,56 @@ service cloud.firestore {
           (request.auth.token.email in get(/databases/$(database)/documents/clinics/$(clinicId)).data.locationEmails)
         );
       }
+
+      // ============================================
+      // REVENUE ENTRIES SUBCOLLECTION
+      // ============================================
+      match /revenueEntries/{entryId} {
+        allow read, write: if isAuthenticated() && (
+          request.auth.uid == clinicId ||
+          (request.auth.token.email in get(/databases/$(database)/documents/clinics/$(clinicId)).data.locationEmails)
+        );
+      }
+
+      // ============================================
+      // BILLING RECEIPTS SUBCOLLECTION
+      // ============================================
+      match /receipts/{receiptId} {
+        allow read, write: if isAuthenticated() && (
+          request.auth.uid == clinicId ||
+          (request.auth.token.email in get(/databases/$(database)/documents/clinics/$(clinicId)).data.locationEmails)
+        );
+      }
+
+      // ============================================
+      // INVENTORY SUBCOLLECTION
+      // ============================================
+      match /inventory/{itemId} {
+        allow read, write: if isAuthenticated() && (
+          request.auth.uid == clinicId ||
+          (request.auth.token.email in get(/databases/$(database)/documents/clinics/$(clinicId)).data.locationEmails)
+        );
+      }
+
+      // ============================================
+      // STOCK LOGS SUBCOLLECTION
+      // ============================================
+      match /stockLogs/{logId} {
+        allow read, write: if isAuthenticated() && (
+          request.auth.uid == clinicId ||
+          (request.auth.token.email in get(/databases/$(database)/documents/clinics/$(clinicId)).data.locationEmails)
+        );
+      }
+
+      // ============================================
+      // BROADCAST LOGS SUBCOLLECTION
+      // ============================================
+      match /broadcastLogs/{logId} {
+        allow read, write: if isAuthenticated() && (
+          request.auth.uid == clinicId ||
+          (request.auth.token.email in get(/databases/$(database)/documents/clinics/$(clinicId)).data.locationEmails)
+        );
+      }
     }
 
     // ============================================
@@ -269,15 +319,15 @@ service cloud.firestore {
     }
 
     // ============================================
-    // REFERRALS COLLECTION (Doctor-to-Doctor)
+    // REFERRALS COLLECTION (Doctor-to-Doctor / Clinic)
     // ============================================
     match /referrals/{referralId} {
-      // Any authenticated doctor can read/list referrals (queries filter by doctorId)
-      allow read: if isDoctor();
-      // Any doctor can create a referral
-      allow create: if isDoctor();
-      // Only the receiving doctor can update status
-      allow update: if isDoctor();
+      // Any authenticated doctor or clinic can read/list referrals (queries filter by ID)
+      allow read: if isDoctor() || (isAuthenticated() && exists(/databases/$(database)/documents/clinics/$(request.auth.uid)));
+      // Any doctor or clinic can create a referral
+      allow create: if isDoctor() || (isAuthenticated() && exists(/databases/$(database)/documents/clinics/$(request.auth.uid)));
+      // Doctor or clinic can update status
+      allow update: if isDoctor() || (isAuthenticated() && exists(/databases/$(database)/documents/clinics/$(request.auth.uid)));
       allow delete: if false;
     }
 

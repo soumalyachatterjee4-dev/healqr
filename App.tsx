@@ -660,6 +660,148 @@ export default function App() {
       }
     }
 
+    // Handle /clinic/{slug} clean URL — look up clinic by profileSlug
+    if (pathname.startsWith('/clinic/') && !clinicId) {
+      const slug = pathname.split('/clinic/')[1]?.split('/')[0]?.split('?')[0]?.toLowerCase();
+      if (slug && db) {
+        try {
+          const { collection, query, where, getDocs, addDoc, serverTimestamp } = await import('firebase/firestore');
+          const clinicsRef = collection(db, 'clinics');
+          const slugQuery = query(clinicsRef, where('profileSlug', '==', slug));
+          const slugSnapshot = await getDocs(slugQuery);
+
+          if (!slugSnapshot.empty) {
+            const actualClinicId = slugSnapshot.docs[0].id;
+            sessionStorage.setItem('booking_clinic_id', actualClinicId);
+            sessionStorage.setItem('booking_source', 'clinic_url');
+
+            // Track URL visit
+            try {
+              await addDoc(collection(db, 'qrScans'), {
+                scannedBy: 'clinic',
+                clinicId: actualClinicId,
+                timestamp: serverTimestamp(),
+                scanSessionId: `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                completed: false,
+                source: 'slug_url'
+              });
+            } catch (error) {
+              console.error('Error tracking clinic slug URL visit:', error);
+            }
+
+            setCurrentPage('clinic-booking-flow');
+            setIsAuthInitialized(true);
+            return;
+          } else {
+            console.error('No clinic found with slug:', slug);
+            setIsAuthInitialized(true);
+          }
+        } catch (error) {
+          console.error('Error looking up clinic slug:', error);
+          setIsAuthInitialized(true);
+        }
+      }
+    }
+
+    // Handle /dr/{slug} clean URL — look up doctor by profileSlug
+    if (pathname.startsWith('/dr/') && !isScanningDoctor) {
+      const slug = pathname.split('/dr/')[1]?.split('/')[0]?.split('?')[0]?.toLowerCase();
+      if (slug && db) {
+        setIsScanningDoctor(true);
+        sessionStorage.setItem('booking_source', 'doctor_url');
+        try {
+          const { collection, query, where, getDocs } = await import('firebase/firestore');
+          const doctorsRef = collection(db, 'doctors');
+          const slugQuery = query(doctorsRef, where('profileSlug', '==', slug));
+          const slugSnapshot = await getDocs(slugQuery);
+
+          if (!slugSnapshot.empty) {
+            const doctorDoc = slugSnapshot.docs[0];
+            const actualDoctorId = doctorDoc.id;
+            const data = doctorDoc.data();
+            sessionStorage.setItem('booking_doctor_id', actualDoctorId);
+
+            // Track URL visit
+            const scanSessionId = `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            sessionStorage.setItem('scan_session_id', scanSessionId);
+            try {
+              const { addDoc, serverTimestamp } = await import('firebase/firestore');
+              await addDoc(collection(db, 'qrScans'), {
+                scannedBy: 'doctor',
+                doctorId: actualDoctorId,
+                timestamp: serverTimestamp(),
+                scanSessionId: scanSessionId,
+                completed: false,
+                source: 'slug_url'
+              });
+            } catch (error) {
+              console.error('Error tracking slug URL visit:', error);
+            }
+
+            // Load doctor data
+            setBookingDoctorName(data.name || '');
+            setBookingDoctorSpecialty(data.specialities?.[0] || '');
+            setBookingDoctorPhoto(data.profileImage || '');
+            setBookingDoctorDegrees(data.degrees || []);
+            setBookingDoctorUseDrPrefix(data.useDrPrefix !== false);
+
+            if (data.chambers && data.chambers.length > 0) {
+              setDoctorChambers(data.chambers);
+              try {
+                const clinicPeriods = await loadClinicSchedules(data.chambers, db);
+                setClinicPlannedOffPeriods(clinicPeriods);
+              } catch (e) {
+                console.error('Error loading clinic schedules (slug):', e);
+                setClinicPlannedOffPeriods([]);
+              }
+            } else {
+              setClinicPlannedOffPeriods([]);
+            }
+
+            if (data.vcTimeSlots && Array.isArray(data.vcTimeSlots)) {
+              setDoctorVcTimeSlots(data.vcTimeSlots);
+            }
+
+            setMaxAdvanceDays(data.maxAdvanceBookingDays || 30);
+            setGlobalBookingEnabled(data.globalBookingEnabled !== false);
+
+            if (data.plannedOffPeriods && Array.isArray(data.plannedOffPeriods)) {
+              const periods = data.plannedOffPeriods.map((p: any) => ({
+                startDate: p.startDate,
+                endDate: p.endDate,
+                status: p.status || 'active',
+                appliesTo: p.appliesTo || 'doctor',
+                clinicId: p.clinicId,
+                clinicName: p.clinicName,
+                doctorId: p.doctorId,
+                doctorName: p.doctorName
+              }));
+              setPlannedOffPeriods(periods);
+            }
+
+            if (data.schedules && Array.isArray(data.schedules)) {
+              setDoctorSchedules(data.schedules);
+            }
+
+            // Go directly to mini website (language selection comes after "Book Now")
+            setCurrentPage('booking-mini-website');
+            setIsScanningDoctor(false);
+            setIsAuthInitialized(true);
+            return;
+          } else {
+            console.error('No doctor found with slug:', slug);
+            setIsScanningDoctor(false);
+            setIsAuthInitialized(true);
+            // Fall through to landing page
+          }
+        } catch (error) {
+          console.error('Error looking up doctor slug:', error);
+          setIsScanningDoctor(false);
+          setIsAuthInitialized(true);
+        }
+      }
+    }
+
     // Handle Patient RX deep link (AI RX Notification Click)
     if (pathname.startsWith('/patient/rx/')) {
       const notificationId = pathname.split('/patient/rx/')[1];
@@ -1238,9 +1380,9 @@ export default function App() {
         }
       }
 
-      // Only go to booking language if NOT a deep link
+      // Only go to booking flow if NOT a deep link
       if (pageParam !== 'review') {
-        setCurrentPage('booking-language');
+        setCurrentPage('booking-mini-website');
       }
       return;
     }
@@ -1292,6 +1434,8 @@ export default function App() {
       const urlParams = new URLSearchParams(window.location.search);
       const isVerificationLink = urlParams.get('mode') === 'signIn' && urlParams.get('oobCode');
       const hasBookingDoctorId = urlParams.get('doctorId') || sessionStorage.getItem('booking_doctor_id');
+      const hasBookingClinicId = urlParams.get('clinicId') || sessionStorage.getItem('booking_clinic_id');
+      const isSlugUrl = window.location.pathname.startsWith('/dr/') || window.location.pathname.startsWith('/clinic/');
       const pageParam = urlParams.get('page');
       const isNotificationPage = pageParam && (
         pageParam === 'consultation-completed' ||
@@ -1318,8 +1462,12 @@ export default function App() {
       const isAdvertiserPage = currentPage === 'advertiser-login' || currentPage === 'advertiser-signup' || currentPage === 'advertiser-verify' || pageParam === 'advertiser-login' || pageParam === 'advertiser-signup' || pageParam === 'advertiser-verify';
       const isPharmaPage = currentPage === 'pharma-login' || currentPage === 'pharma-verify' || currentPage === 'pharma-portal' || currentPage === 'pharma-signup' || pageParam === 'pharma-login' || pageParam === 'pharma-verify' || pageParam === 'pharma-portal' || pageParam === 'pharma-signup';
 
-      if (isVerificationLink || isBookingMode || hasBookingDoctorId || isNotificationPage || isVerifyVisit || isOnVerifyLoginPage || isOnVerifyEmailPage || isOnAssistantLoginPage || isOnMasterAccessLoginPage || isClinicPage || isAdvertiserPage || isPharmaPage || currentPage === 'verify-email' || currentPage === 'verify-login' || currentPage === 'assistant-login' || currentPage === 'master-access-login' || currentPage === 'temp-doctor-login' || currentPage === 'temp-doctor-dashboard' || currentPage === 'admin-verify' || currentPage === 'verify-walkin' || currentPage === 'queue-display' || currentPage === 'leave-apply' || currentPage.startsWith('booking-')) {
-        setIsAuthInitialized(true);
+      if (isVerificationLink || isBookingMode || hasBookingDoctorId || hasBookingClinicId || isSlugUrl || isNotificationPage || isVerifyVisit || isOnVerifyLoginPage || isOnVerifyEmailPage || isOnAssistantLoginPage || isOnMasterAccessLoginPage || isClinicPage || isAdvertiserPage || isPharmaPage || currentPage === 'verify-email' || currentPage === 'verify-login' || currentPage === 'assistant-login' || currentPage === 'master-access-login' || currentPage === 'temp-doctor-login' || currentPage === 'temp-doctor-dashboard' || currentPage === 'admin-verify' || currentPage === 'verify-walkin' || currentPage === 'queue-display' || currentPage === 'leave-apply' || currentPage.startsWith('booking-') || currentPage === 'clinic-booking-flow') {
+        // For slug URLs, don't set isAuthInitialized yet — let handleUrlParams finish first
+        // so the user sees PageLoader instead of a flash of the landing page
+        if (!isSlugUrl) {
+          setIsAuthInitialized(true);
+        }
         return;
       }
 
@@ -2147,7 +2295,7 @@ export default function App() {
   const handleLanguageSelect = (language: Language) => {
     setBookingLanguage(language);
     setPreviewLanguage(null);
-    setCurrentPage("booking-mini-website");
+    setCurrentPage("booking-select-date");
   };
 
   const handleDateSelection = (date: Date) => {
@@ -2975,7 +3123,7 @@ export default function App() {
             if (auth?.currentUser?.uid) {
               sessionStorage.setItem('booking_doctor_id', auth.currentUser.uid);
             }
-            setCurrentPage("booking-language");
+            setCurrentPage("booking-mini-website");
           }}
           activeAddOns={activeAddOns}
           initialTab={qrManagerInitialTab}
@@ -3175,14 +3323,7 @@ export default function App() {
           onContinue={handleLanguageSelect}
           onLanguagePreview={(lang) => setPreviewLanguage(lang)}
           onBack={() => {
-            // Clear booking session data
-            sessionStorage.removeItem('booking_doctor_id');
-            if (isTestBookingMode) {
-              setIsTestBookingMode(false);
-              setCurrentPage("qr-manager");
-            } else {
-              setCurrentPage("landing");
-            }
+            setCurrentPage("booking-mini-website");
           }}
           doctorName={bookingDoctorName}
           doctorSpecialty={bookingDoctorSpecialty}
@@ -3196,9 +3337,12 @@ export default function App() {
         <BookingMiniWebsite
           language={bookingLanguage}
           onBookNow={() =>
-            setCurrentPage("booking-select-date")
+            setCurrentPage("booking-language")
           }
-          onBack={() => setCurrentPage("booking-language")}
+          onBack={isTestBookingMode ? () => {
+            setIsTestBookingMode(false);
+            setCurrentPage("qr-manager");
+          } : undefined}
           uploadedReviews={uploadedReviews}
         />
       )}
@@ -3207,7 +3351,7 @@ export default function App() {
         <SelectDate
           language={bookingLanguage}
           onContinue={handleDateSelection}
-          onBack={() => setCurrentPage("booking-mini-website")}
+          onBack={() => setCurrentPage("booking-language")}
           maxAdvanceDays={maxAdvanceDays}
           plannedOffPeriods={plannedOffPeriods}
           clinicPlannedOffPeriods={clinicPlannedOffPeriods}
@@ -3349,8 +3493,8 @@ export default function App() {
               setIsTestBookingMode(false);
               setCurrentPage("qr-manager");
             } else {
-              // In real booking, go back to language selection
-              setCurrentPage("booking-language");
+              // In real booking, go back to doctor mini website
+              setCurrentPage("booking-mini-website");
             }
             // Reset all booking states
             setSelectedDate(null);

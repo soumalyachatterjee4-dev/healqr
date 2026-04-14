@@ -62,7 +62,7 @@ export default function ClinicBookingFlow() {
     return `${hours12}:${String(minutes).padStart(2, '0')} ${period}`;
   };
 
-  const [currentStep, setCurrentStep] = useState<BookingStep>('language');
+  const [currentStep, setCurrentStep] = useState<BookingStep>('clinic-website');
   const [language, setLanguage] = useState<Language>('english');
 
   const [selectedDoctor, setSelectedDoctor] = useState<SelectedDoctor | null>(null);
@@ -83,9 +83,9 @@ export default function ClinicBookingFlow() {
   useEffect(() => {
     const loadClinicData = async () => {
       try {
-        // Get clinic ID from URL parameter
+        // Get clinic ID from URL parameter or sessionStorage (slug URL sets it in sessionStorage)
         const urlParams = new URLSearchParams(window.location.search);
-        const clinicId = urlParams.get('clinicId');
+        const clinicId = urlParams.get('clinicId') || sessionStorage.getItem('booking_clinic_id');
 
         if (!clinicId) {
           console.error('No clinic ID found in URL');
@@ -95,7 +95,7 @@ export default function ClinicBookingFlow() {
 
         // Store in session storage
         sessionStorage.setItem('booking_clinic_id', clinicId);
-        sessionStorage.setItem('booking_source', 'clinic_qr'); // Mark as clinic QR booking
+        sessionStorage.setItem('booking_source', sessionStorage.getItem('booking_source') || 'clinic_qr');
 
         // Track QR scan immediately (separate from booking)
         const scanSessionId = `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -220,27 +220,24 @@ export default function ClinicBookingFlow() {
     const savedLanguage = sessionStorage.getItem('booking_language');
     if (savedLanguage) {
       setLanguage(savedLanguage as Language);
-      setCurrentStep('clinic-website');
     }
   }, []);
 
   const handleLanguageSelect = (lang: Language) => {
     setLanguage(lang);
     sessionStorage.setItem('booking_language', lang);
-    setCurrentStep('clinic-website');
+    // After language, proceed to location or doctor search
+    const clinicLocations = clinic?.locations || [];
+    if (clinicLocations.length > 1) {
+      setCurrentStep('location');
+    } else {
+      setCurrentStep('doctor-search');
+    }
   };
 
   const handleBookNow = () => {
-    const clinicLocations = clinic?.locations || [];
-
-    // If clinic has multiple locations, always show location selection
-    if (clinicLocations.length > 1) {
-      setCurrentStep('location');
-      return;
-    }
-
-    // One location or none - proceed directly
-    setCurrentStep('doctor-search');
+    // Book Now goes to language selection first
+    setCurrentStep('language');
   };
 
   const handleLocationSelect = (location: { id: string; name: string }) => {
@@ -406,10 +403,13 @@ export default function ClinicBookingFlow() {
   const handleBack = () => {
     switch (currentStep) {
       case 'clinic-website':
-        setCurrentStep('language');
+        // Exit booking flow
+        break;
+      case 'language':
+        setCurrentStep('clinic-website');
         break;
       case 'location':
-        setCurrentStep('clinic-website');
+        setCurrentStep('language');
         break;
       case 'doctor-search': {
         const clinicLocations = clinic?.locations || [];
@@ -421,7 +421,7 @@ export default function ClinicBookingFlow() {
         if (clinicLocations.length > 1) {
           setCurrentStep('location');
         } else {
-          setCurrentStep('clinic-website');
+          setCurrentStep('language');
         }
         break;
       }
@@ -471,23 +471,23 @@ export default function ClinicBookingFlow() {
 
   // Render current step
   switch (currentStep) {
-    case 'language':
-      return (
-        <LanguageSelection
-          onContinue={handleLanguageSelect}
-          doctorName={clinic.name}
-          doctorPhoto={clinic.logoUrl}
-          useDrPrefix={false}
-          themeColor="blue"
-        />
-      );
-
     case 'clinic-website':
       return (
         <ClinicBookingMiniWebsite
           onBookNow={handleBookNow}
-          onBack={() => setCurrentStep('language')}
           language={language}
+        />
+      );
+
+    case 'language':
+      return (
+        <LanguageSelection
+          onContinue={handleLanguageSelect}
+          onBack={() => setCurrentStep('clinic-website')}
+          doctorName={clinic.name}
+          doctorPhoto={clinic.logoUrl}
+          useDrPrefix={false}
+          themeColor="blue"
         />
       );
 
@@ -553,7 +553,7 @@ export default function ClinicBookingFlow() {
 
       return (
         <BookingFlowLayout
-          onBack={() => setCurrentStep('clinic-website')}
+          onBack={() => setCurrentStep('language')}
           doctorName={clinic.name}
           doctorPhoto={clinic.logoUrl}
           useDrPrefix={false}

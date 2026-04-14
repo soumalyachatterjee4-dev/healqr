@@ -21,6 +21,11 @@ import {
   Settings,
   Instagram,
   Facebook,
+  Twitter,
+  Linkedin,
+  Mail,
+  MessageCircle,
+  Send,
   ArrowRight,
   Sparkles,
   Video
@@ -59,6 +64,11 @@ import ClinicVideoConsultationManager from './ClinicVideoConsultationManager';
 import VideoLibrary from './VideoLibrary';
 import ClinicCMEViewer from './ClinicCMEViewer';
 import ClinicSampleRequest from './ClinicSampleRequest';
+import ClinicRevenueDashboard from './ClinicRevenueDashboard';
+import ClinicBillingReceipt from './ClinicBillingReceipt';
+import ClinicInventoryManager from './ClinicInventoryManager';
+import ClinicPatientBroadcast from './ClinicPatientBroadcast';
+import ClinicReferralNetwork from './ClinicReferralNetwork';
 import UnifiedChatWidget from './UnifiedChatWidget';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 
@@ -138,7 +148,8 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
   // Branch managers restricted pages
   const branchAllowedPages = [
     'dashboard', 'doctors', 'qr-manager', 'schedule-manager', 'todays-schedule',
-    'advance-booking', 'analytics', 'reports', 'social-kit', 'monthly-planner', 'data-management',
+    'advance-booking', 'analytics', 'reports', 'revenue-dashboard', 'billing-receipt', 'inventory-manager', 'patient-broadcast',
+    'patient-retention', 'queue-display', 'staff-attendance', 'social-kit', 'monthly-planner', 'data-management',
     'assistant', 'lab-referral', 'ai-diet', 'ai-rx', 'video-consult'
   ];
 
@@ -541,6 +552,8 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
     }
   };
 
+  const websiteUrl = 'https://www.healqr.com';
+
   const copyClinicCode = () => {
     // Branch managers: copy their branch clinic code
     let code = clinicData?.clinicCode || '';
@@ -555,6 +568,78 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
     if (code) {
       navigator.clipboard.writeText(code);
       toast.success('Clinic code copied to clipboard!');
+      setShareMenuOpen(false);
+    }
+  };
+
+  const handleShare = (platform: string) => {
+    const shareText = 'Book your medical appointments online with HealQR - Quick, Easy & Secure';
+    const encodedUrl = encodeURIComponent(websiteUrl);
+    const encodedText = encodeURIComponent(shareText);
+
+    let shareUrl = '';
+
+    switch (platform) {
+      case 'facebook':
+        shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`;
+        break;
+      case 'twitter':
+        shareUrl = `https://twitter.com/intent/tweet?url=${encodedUrl}&text=${encodedText}`;
+        break;
+      case 'linkedin':
+        shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`;
+        break;
+      case 'whatsapp':
+        shareUrl = `https://wa.me/?text=${encodedText}%20${encodedUrl}`;
+        break;
+      case 'email':
+        shareUrl = `mailto:?subject=${encodedText}&body=Check out HealQR: ${websiteUrl}`;
+        break;
+      case 'copy':
+        navigator.clipboard.writeText(websiteUrl);
+        toast.success('Link copied to clipboard!');
+        setShareMenuOpen(false);
+        return;
+      case 'referral-link': {
+        setShareMenuOpen(false);
+        (async () => {
+          try {
+            const userId = resolvedClinicId;
+            const name = clinicData?.name || 'Clinic';
+            if (!userId || !db) { toast.error('Please log in first'); return; }
+            const { collection: col, query: q, where: w, getDocs: gd, addDoc: ad, serverTimestamp: st } = await import('firebase/firestore');
+            const existing = await gd(q(col(db, 'referralLinks'), w('createdBy', '==', userId)));
+            let code: string;
+            if (!existing.empty) {
+              code = existing.docs[0].data().code;
+            } else {
+              code = Math.random().toString(36).substring(2, 8).toUpperCase();
+              await ad(col(db, 'referralLinks'), {
+                code,
+                createdBy: userId,
+                createdByName: name,
+                createdByRole: 'clinic',
+                createdAt: st()
+              });
+            }
+            const link = `${window.location.origin}/?ref=${code}`;
+            try {
+              await navigator.clipboard.writeText(link);
+              toast.success('Referral link copied!', { description: link, duration: 5000 });
+            } catch {
+              toast('Your referral link:', { description: link, duration: 8000 });
+            }
+          } catch (err) {
+            console.error('Referral link error:', err);
+            toast.error('Failed to generate link');
+          }
+        })();
+        return;
+      }
+    }
+
+    if (shareUrl) {
+      window.open(shareUrl, '_blank', 'width=600,height=400');
       setShareMenuOpen(false);
     }
   };
@@ -654,6 +739,56 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
     return (
       <ClinicRetentionAnalytics
         clinicId={resolvedClinicId}
+        onMenuChange={handleMenuChange}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  // Render Revenue Dashboard
+  if (activeMenu === 'revenue-dashboard') {
+    return (
+      <ClinicRevenueDashboard
+        onMenuChange={handleMenuChange}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  // Render Billing & Receipts
+  if (activeMenu === 'billing-receipt') {
+    return (
+      <ClinicBillingReceipt
+        onMenuChange={handleMenuChange}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  // Render Inventory Manager
+  if (activeMenu === 'inventory-manager') {
+    return (
+      <ClinicInventoryManager
+        onMenuChange={handleMenuChange}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  // Render Patient Broadcast
+  if (activeMenu === 'patient-broadcast') {
+    return (
+      <ClinicPatientBroadcast
+        onMenuChange={handleMenuChange}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  // Render Referral Network
+  if (activeMenu === 'referral-network') {
+    return (
+      <ClinicReferralNetwork
         onMenuChange={handleMenuChange}
         onLogout={handleLogout}
       />
@@ -986,19 +1121,101 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
             {/* Share Button */}
             <Popover open={shareMenuOpen} onOpenChange={setShareMenuOpen}>
               <PopoverTrigger asChild>
-                <button className="flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 transition-colors">
-                  <Share2 className="w-4 h-4 text-blue-500" />
-                  <span className="text-sm hidden md:inline">Share</span>
+                <button className="w-9 h-9 md:w-10 md:h-10 bg-zinc-900 hover:bg-zinc-800 rounded-lg flex items-center justify-center transition-colors">
+                  <Share2 className="w-4 h-4 md:w-5 md:h-5 text-gray-400" />
                 </button>
               </PopoverTrigger>
-              <PopoverContent className="w-56 bg-zinc-900 border-zinc-700 text-white">
-                <button
-                  onClick={copyClinicCode}
-                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-zinc-800 transition-colors text-left"
-                >
-                  <Copy className="w-4 h-4 text-blue-500" />
-                  <span className="text-sm">Copy Clinic Code</span>
-                </button>
+              <PopoverContent className="w-72 p-4 bg-zinc-900 border-zinc-800" align="end">
+                <div className="space-y-3">
+                  <div className="mb-3">
+                    <h3 className="text-white mb-1">Share HealQR</h3>
+                    <p className="text-gray-400 text-sm">Share www.healqr.com with others</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => handleShare('facebook')}
+                      className="flex items-center gap-2 px-3 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-lg transition-colors"
+                    >
+                      <Facebook className="w-4 h-4" />
+                      <span className="text-sm">Facebook</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleShare('twitter')}
+                      className="flex items-center gap-2 px-3 py-2 bg-sky-600/20 hover:bg-sky-600/30 text-sky-400 rounded-lg transition-colors"
+                    >
+                      <Twitter className="w-4 h-4" />
+                      <span className="text-sm">Twitter</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleShare('linkedin')}
+                      className="flex items-center gap-2 px-3 py-2 bg-blue-700/20 hover:bg-blue-700/30 text-blue-400 rounded-lg transition-colors"
+                    >
+                      <Linkedin className="w-4 h-4" />
+                      <span className="text-sm">LinkedIn</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleShare('whatsapp')}
+                      className="flex items-center gap-2 px-3 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-400 rounded-lg transition-colors"
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                      <span className="text-sm">WhatsApp</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleShare('email')}
+                      className="flex items-center gap-2 px-3 py-2 bg-gray-700/20 hover:bg-gray-700/30 text-gray-400 rounded-lg transition-colors"
+                    >
+                      <Mail className="w-4 h-4" />
+                      <span className="text-sm">Email</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleShare('copy')}
+                      className="flex items-center gap-2 px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 rounded-lg transition-colors"
+                    >
+                      <Copy className="w-4 h-4" />
+                      <span className="text-sm">Copy Link</span>
+                    </button>
+                  </div>
+
+                  <div className="pt-3 border-t border-zinc-800">
+                    <button
+                      onClick={() => handleShare('referral-link')}
+                      className="flex items-center gap-3 w-full px-4 py-3 rounded-xl transition-all mb-3"
+                      style={{ background: 'linear-gradient(135deg, #92400e 0%, #c2410c 50%, #be123c 100%)', border: '1px solid #f59e0b55' }}
+                    >
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(251,191,36,0.3)' }}>
+                        <Send className="w-4 h-4 text-amber-200" />
+                      </div>
+                      <div className="text-left">
+                        <span className="text-sm font-bold text-amber-100">Generate Referral Link</span>
+                        <p className="text-[10px] text-amber-300/80">Share with pharmacists, receptionists & agents</p>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={copyClinicCode}
+                      className="flex items-center gap-3 w-full px-4 py-2 rounded-lg bg-blue-600/10 hover:bg-blue-600/20 transition-colors mb-3"
+                    >
+                      <Copy className="w-4 h-4 text-blue-400" />
+                      <span className="text-sm text-blue-300">Copy Clinic Code</span>
+                    </button>
+
+                    <div className="flex items-center gap-2 bg-zinc-950 rounded px-3 py-2">
+                      <span className="text-gray-400 text-sm flex-1 truncate">{websiteUrl}</span>
+                      <button
+                        onClick={() => handleShare('copy')}
+                        className="text-emerald-500 hover:text-emerald-400"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </PopoverContent>
             </Popover>
 
