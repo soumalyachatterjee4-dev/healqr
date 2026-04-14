@@ -940,10 +940,6 @@ export default function ClinicMasterAccess({ onBack, clinicId }: MasterAccessPro
           <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 rounded-lg hover:bg-zinc-800 text-zinc-400">
             <Menu className="w-5 h-5" />
           </button>
-          <button onClick={onBack} className="flex items-center gap-1 text-zinc-400 hover:text-white transition-colors text-sm">
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </button>
           <div className="ml-auto flex items-center gap-2 text-lg font-bold text-amber-400">
             <Crown className="w-5 h-5" />
             Master Access
@@ -1826,11 +1822,12 @@ export default function ClinicMasterAccess({ onBack, clinicId }: MasterAccessPro
 
                           {/* Show access token and PIN */}
                           {assistant.accessToken && (
-                            <div className="mt-3 bg-zinc-800/50 border border-zinc-700/50 rounded-lg p-3 flex flex-wrap items-center gap-4">
-                              <div className="flex-1 min-w-[200px]">
+                            <div className="mt-3 bg-zinc-800/50 border border-zinc-700/50 rounded-lg p-3 space-y-3">
+                              <div className="min-w-0">
                                 <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Login Link</p>
-                                <p className="text-xs text-zinc-400 truncate">{`${window.location.origin}/assistant-login?token=${assistant.accessToken}`}</p>
+                                <p className="text-xs text-zinc-400 break-all">{`${window.location.origin}/assistant-login?token=${assistant.accessToken}`}</p>
                               </div>
+                              <div className="flex flex-wrap items-center gap-4">
                               <button
                                 onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/assistant-login?token=${assistant.accessToken}`); toast.success('Link copied'); }}
                                 className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1"
@@ -1851,6 +1848,7 @@ export default function ClinicMasterAccess({ onBack, clinicId }: MasterAccessPro
                                   </button>
                                 </>
                               )}
+                              </div>
                             </div>
                           )}
                         </div>
