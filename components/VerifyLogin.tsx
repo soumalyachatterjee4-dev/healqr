@@ -54,6 +54,7 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
       // ✅ CRITICAL: Clear stale session flags BEFORE signing in
       // This prevents onAuthStateChanged from reading leftover flags and routing to wrong dashboard
       localStorage.removeItem('healqr_is_clinic');
+      localStorage.removeItem('healqr_is_lab');
       localStorage.removeItem('healqr_is_assistant');
       localStorage.removeItem('healqr_assistant_pages');
       localStorage.removeItem('healqr_assistant_doctor_id');
@@ -158,6 +159,74 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
                 console.error('❌ User tried to login as clinic but no clinic, branch, or assistant found');
                 await auth.signOut();
                 throw new Error('This email is not registered as a Clinic, Branch Manager, or Assistant. Please use the Doctor Login or Register as a Clinic.');
+              }
+            }
+          }
+        } else if (loginType === 'lab') {
+          // ✅ LAB LOGIN FLOW: Lab Owner check
+          const labDocRef = doc(db, 'labs', user.uid);
+          const labDoc = await getDoc(labDocRef);
+
+          if (labDoc.exists()) {
+            const labData = labDoc.data();
+            localStorage.setItem('userId', user.uid);
+            localStorage.setItem('healqr_user_email', email);
+            localStorage.setItem('healqr_authenticated', 'true');
+            localStorage.setItem('healqr_is_lab', 'true');
+            localStorage.removeItem('healqr_is_clinic');
+            localStorage.removeItem('healqr_is_assistant');
+            if (labData.name || labData.labName) {
+              localStorage.setItem('healqr_user_name', labData.name || labData.labName);
+            }
+          } else {
+            // Not found by UID — fallback: query labs by email (handles edge case where doc ID ≠ uid)
+            const labsByEmailQuery = query(collection(db, 'labs'), where('email', '==', email), limit(1));
+            const labsByEmailSnap = await getDocs(labsByEmailQuery);
+
+            if (!labsByEmailSnap.empty) {
+              const labData = labsByEmailSnap.docs[0].data();
+              const labDocId = labsByEmailSnap.docs[0].id;
+              localStorage.setItem('userId', labDocId);
+              localStorage.setItem('healqr_user_email', email);
+              localStorage.setItem('healqr_authenticated', 'true');
+              localStorage.setItem('healqr_is_lab', 'true');
+              localStorage.removeItem('healqr_is_clinic');
+              localStorage.removeItem('healqr_is_assistant');
+              if (labData.name || labData.labName) {
+                localStorage.setItem('healqr_user_name', labData.name || labData.labName);
+              }
+            } else {
+              // Not a lab owner — check if lab assistant
+              const assistantsRef = collection(db, 'assistants');
+              const labAssistantQuery = query(
+                assistantsRef,
+                where('assistantEmail', '==', email),
+                where('isActive', '==', true),
+                where('isLab', '==', true),
+                limit(1)
+              );
+              const labAssistantSnap = await getDocs(labAssistantQuery);
+
+              if (!labAssistantSnap.empty) {
+                const assistantData = labAssistantSnap.docs[0].data();
+                localStorage.setItem('healqr_is_assistant', 'true');
+                localStorage.setItem('healqr_assistant_pages', JSON.stringify(assistantData.allowedPages || ['dashboard']));
+                localStorage.setItem('healqr_assistant_doctor_id', assistantData.doctorId);
+                localStorage.setItem('userId', assistantData.doctorId);
+                localStorage.setItem('healqr_authenticated', 'true');
+                localStorage.setItem('healqr_user_email', email);
+                localStorage.setItem('healqr_is_lab', 'true');
+                localStorage.removeItem('healqr_is_clinic');
+              } else {
+                console.warn('⚠️ No lab registration found for this email. Redirecting to lab signup.');
+                await auth.signOut();
+                setStatus('error');
+                setMessage('This email is not yet registered as a Lab. Redirecting you to Lab Sign Up...');
+                // Redirect to lab signup instead of dead-ending — don't throw (avoids onError → landing flash)
+                setTimeout(() => {
+                  window.location.href = '/?page=lab-signup';
+                }, 2500);
+                return;
               }
             }
           }
@@ -267,7 +336,8 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
       setStatus('success');
       const isAssistant = localStorage.getItem('healqr_is_assistant');
       const isClinic = localStorage.getItem('healqr_is_clinic');
-      setMessage(isAssistant ? 'Assistant access granted!' : isClinic ? 'Clinic login successful!' : 'Login successful!');
+      const isLab = localStorage.getItem('healqr_is_lab');
+      setMessage(isAssistant ? 'Assistant access granted!' : isLab ? 'Lab login successful!' : isClinic ? 'Clinic login successful!' : 'Login successful!');
 
 
       // Immediately redirect to clean URL - App.tsx will handle routing based on localStorage

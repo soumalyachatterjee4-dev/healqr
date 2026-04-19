@@ -39,7 +39,7 @@ service cloud.firestore {
       // 2. Unauthenticated virtual QR generation during clinic/doctor signup
       allow create: if (isAuthenticated() && request.auth.token.admin == true) ||
                       (isAuthenticated() && exists(/databases/$(database)/documents/admins/$(request.auth.token.email))) ||
-                      (request.resource.data.qrType == 'virtual' && request.resource.data.generatedBy in ['clinic-signup', 'doctor-signup', 'self-signup']);
+                      (request.resource.data.qrType == 'virtual' && request.resource.data.generatedBy in ['clinic-signup', 'doctor-signup', 'self-signup', 'lab-signup']);
 
       // No deletes allowed
       allow delete: if false;
@@ -177,6 +177,45 @@ service cloud.firestore {
           (request.auth.token.email in get(/databases/$(database)/documents/clinics/$(clinicId)).data.locationEmails) ||
           (request.auth.token.email == get(/databases/$(database)/documents/clinics/$(clinicId)).data.masterAccessEmail)
         );
+      }
+    }
+
+    // ============================================
+    // LABS / DIAGNOSTIC CENTERS COLLECTION
+    // ============================================
+    match /labs/{labId} {
+      // Allow read by anyone (for QR booking flow)
+      allow read: if true;
+
+      // Allow create by authenticated lab owners (UID must match document ID)
+      allow create: if isAuthenticated() && request.auth.uid == labId;
+
+      // Allow update by lab owner
+      allow update: if isAuthenticated() && request.auth.uid == labId;
+
+      // No deletes allowed
+      allow delete: if false;
+
+      // Lab assistants subcollection
+      match /assistants/{assistantId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == labId;
+      }
+
+      // Lab support messages
+      match /supportMessages/{messageId} {
+        allow read, write: if isAuthenticated();
+      }
+
+      // Lab test catalog
+      match /testCatalog/{testId} {
+        allow read: if true;
+        allow write: if isAuthenticated() && request.auth.uid == labId;
+      }
+
+      // Lab schedule slots
+      match /scheduleSlots/{slotId} {
+        allow read: if true;
+        allow write: if isAuthenticated() && request.auth.uid == labId;
       }
     }
 
@@ -864,6 +903,29 @@ service cloud.firestore {
       allow create: if true;
       allow read: if isAuthenticated();
       allow update, delete: if false;
+    }
+
+    match /lab_qr_scans/{scanId} {
+      allow create: if true;
+      allow read: if isAuthenticated();
+      allow update, delete: if false;
+    }
+
+    // ============================================
+    // LAB BOOKINGS COLLECTION
+    // ============================================
+    match /labBookings/{bookingId} {
+      // Anyone can create a booking (patient-facing, no auth required)
+      allow create: if true;
+
+      // Authenticated users can read (lab owners read their bookings, patients read theirs)
+      allow read: if true;
+
+      // Lab owners can update status (approve, reject, complete)
+      allow update: if isAuthenticated();
+
+      // No deletes
+      allow delete: if false;
     }
 
     // ============================================

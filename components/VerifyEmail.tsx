@@ -90,7 +90,7 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
 
       // Fallback to localStorage (same browser/session)
       if (!signupData) {
-        const signupDataStr = localStorage.getItem('healqr_pending_clinic_signup') || localStorage.getItem('healqr_pending_signup');
+        const signupDataStr = localStorage.getItem('healqr_pending_clinic_signup') || localStorage.getItem('healqr_pending_lab_signup') || localStorage.getItem('healqr_pending_signup');
 
         if (signupDataStr) {
           try {
@@ -108,7 +108,8 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
 
       // Validate we have the required fields based on type
       const isClinic = signupData.type === 'clinic';
-      const nameField = isClinic ? (signupData.name || signupData.clinicName) : signupData.name;
+      const isLab = signupData.type === 'lab';
+      const nameField = isClinic ? (signupData.name || signupData.clinicName) : isLab ? (signupData.name || signupData.labName) : signupData.name;
 
       if (!nameField) {
         console.error('❌ Name is missing from signup data');
@@ -271,6 +272,154 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
 
             return;
           }
+      }
+
+      // Lab Registration Logic
+      if (isLab) {
+        const { db } = await import('../lib/firebase/config');
+        if (db) {
+          const { doc, setDoc, serverTimestamp, collection, query, where, getDocs, updateDoc } = await import('firebase/firestore');
+
+          // Check if lab already exists
+          const labsRef = collection(db, 'labs');
+          const q = query(labsRef, where('email', '==', email));
+          const existingDocs = await getDocs(q);
+
+          if (!existingDocs.empty) {
+            setStatus('error');
+            setMessage('This email is already registered as a lab.');
+            return;
+          }
+
+          // Generate Lab Code
+          const { generateLabCode } = await import('../utils/idGenerator');
+          const labCode = await generateLabCode(signupData.pinCode);
+
+          // Generate lab slug and booking URL
+          const labName = signupData.labName || signupData.name;
+          let labSlug = labName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+          let bookingUrl = `https://healqr.com/lab/${labSlug}`;
+          let qrUrl = '';
+
+          // Generate QR code for lab
+          qrUrl = await QRCode.toDataURL(bookingUrl, {
+            width: 300,
+            margin: 2,
+            color: { dark: '#000000', light: '#FFFFFF' },
+          });
+
+          // Create Lab Doc
+          await setDoc(doc(db, 'labs', user.uid), {
+            uid: user.uid,
+            email: email,
+            name: labName,
+            address: signupData.address || '',
+            pinCode: signupData.pinCode,
+            state: signupData.state || getStateFromPincode(signupData.pinCode || ''),
+            landmark: signupData.landmark || '',
+            qrNumber: signupData.qrNumber,
+            qrType: signupData.qrType || 'preprinted',
+            companyName: (signupData.companyName || '').trim(),
+            division: (signupData.division || '').trim(),
+            labCode: labCode,
+            labSlug: labSlug,
+            bookingUrl: bookingUrl,
+            qrCode: qrUrl,
+            createdAt: serverTimestamp(),
+            type: 'lab',
+            locations: signupData.locations || [{ id: '001', name: labName, landmark: '' }],
+            defaultLocationId: (signupData.locations && signupData.locations[0]?.id) || '001',
+          });
+
+          // Store lab data in localStorage for direct login
+          localStorage.setItem('healqr_lab_code', labCode);
+          localStorage.setItem('healqr_user_email', email);
+          localStorage.setItem('healqr_user_name', labName);
+          localStorage.setItem('healqr_qr_code', qrUrl);
+          localStorage.setItem('healqr_qr_id', signupData.qrNumber);
+          localStorage.setItem('healqr_booking_url', bookingUrl);
+          localStorage.setItem('healqr_authenticated', 'true');
+          localStorage.setItem('healqr_is_lab', 'true');
+          localStorage.setItem('userId', user.uid);
+
+          // Auto-link lab to pharma company's distributedLabs subcollection
+          if (signupData.companyName) {
+            try {
+              const { addDoc } = await import('firebase/firestore');
+              const pharmaRef = collection(db, 'pharmaCompanies');
+              const pharmaQuery = query(pharmaRef, where('companyName', '==', signupData.companyName.trim()));
+              const pharmaSnap = await getDocs(pharmaQuery);
+              if (!pharmaSnap.empty) {
+                const pharmaDoc = pharmaSnap.docs[0];
+                await addDoc(collection(db, 'pharmaCompanies', pharmaDoc.id, 'distributedLabs'), {
+                  labId: user.uid,
+                  labName: labName,
+                  email: email,
+                  pincode: signupData.pinCode || '',
+                  division: signupData.division || '',
+                  qrNumber: signupData.qrNumber || '',
+                  isActive: true,
+                  distributedAt: serverTimestamp(),
+                });
+              }
+            } catch (linkErr) {
+              console.error('Lab pharma auto-link error:', linkErr);
+            }
+          }
+
+          // Update QR Code in BOTH collections
+          const qrPoolCollection = collection(db, 'qrPool');
+          const qrCodesCollection = collection(db, 'qrCodes');
+          const poolQuery = query(qrPoolCollection, where('qrNumber', '==', signupData.qrNumber));
+          const codesQuery = query(qrCodesCollection, where('qrNumber', '==', signupData.qrNumber));
+
+          const [poolSnapshot, codesSnapshot] = await Promise.all([
+            getDocs(poolQuery),
+            getDocs(codesQuery)
+          ]);
+
+          if (!poolSnapshot.empty) {
+            const qrDocRef = poolSnapshot.docs[0].ref;
+            await updateDoc(qrDocRef, {
+              status: 'active',
+              linkedEmail: email,
+              labId: user.uid,
+              activatedAt: serverTimestamp()
+            });
+          } else if (!codesSnapshot.empty) {
+            const qrDocRef = codesSnapshot.docs[0].ref;
+            await updateDoc(qrDocRef, {
+              status: 'active',
+              linkedEmail: email,
+              labId: user.uid,
+              activatedAt: serverTimestamp()
+            });
+          }
+
+          // Clear temporary signup data
+          localStorage.removeItem('healqr_pending_lab_signup');
+
+          // Generate styled QR with lab info
+          const labData = {
+            name: labName,
+            email: email,
+            qrNumber: signupData.qrNumber,
+            bookingUrl: bookingUrl
+          };
+
+          await generateStyledQR(labData);
+          setDoctorData(labData);
+
+          setStatus('success');
+          setMessage('Lab verified successfully!');
+
+          // Auto-redirect to lab dashboard
+          setTimeout(() => {
+            window.location.href = '/?page=lab-dashboard';
+          }, 2000);
+
+          return;
+        }
       }
 
       setDoctorData(signupData);

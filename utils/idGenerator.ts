@@ -240,6 +240,61 @@ export function generateClinicLocationCode(clinicCode: string, locationId: strin
 }
 
 /**
+ * Generate unique Lab/Diagnostic Center Code
+ * Format: HQR-PINCODE-SERIAL-LAB
+ *
+ * @param pincode - 6-digit Indian pincode
+ * @returns Promise<string> - Unique lab code
+ *
+ * @example
+ * generateLabCode('700001') -> 'HQR-700001-0001-LAB'
+ */
+export async function generateLabCode(pincode: string): Promise<string> {
+  if (!db) {
+    throw new Error('Firebase not initialized');
+  }
+
+  if (!/^\d{6}$/.test(pincode)) {
+    throw new Error('Invalid pincode. Must be 6 digits.');
+  }
+
+  try {
+    const labsRef = collection(db, 'labs');
+    const prefix = `HQR-${pincode}-`;
+
+    const q = query(
+      labsRef,
+      where('labCode', '>=', prefix),
+      where('labCode', '<=', `${prefix}\uf8ff`),
+      orderBy('labCode', 'desc'),
+      limit(1)
+    );
+
+    const snapshot = await getDocs(q);
+
+    let nextSerial = 1;
+
+    if (!snapshot.empty) {
+      const lastCode = snapshot.docs[0].data().labCode;
+      const match = lastCode.match(/HQR-\d{6}-(\d{4})-LAB/);
+      if (match) {
+        nextSerial = parseInt(match[1]) + 1;
+      }
+    }
+
+    const serialFormatted = nextSerial.toString().padStart(4, '0');
+    const labCode = `HQR-${pincode}-${serialFormatted}-LAB`;
+
+    return labCode;
+
+  } catch (error) {
+    console.error('❌ Error generating lab code:', error);
+    const timestamp = Date.now().toString().slice(-4);
+    return `HQR-${pincode}-${timestamp}-LAB`;
+  }
+}
+
+/**
  * Generate unique Patient Booking ID
  * Format: HQR-DOCTORCODE-YYMMDD-SERIAL-P
  *

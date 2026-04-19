@@ -65,6 +65,25 @@ service firebase.storage {
     }
 
     // ============================================
+    // LAB IMAGES (Logo, Cover, etc.)
+    // ============================================
+
+    match /labs/{labId}/{allPaths=**} {
+      // Allow read by anyone (for mini-website)
+      allow read: if true;
+
+      // Allow write only by lab owner, must be image, max 10MB
+      allow write: if isOwner(labId) && isImageFile() && isValidImageSize();
+    }
+
+    // LAB RX UPLOADS — patients upload prescriptions (unauthenticated)
+    match /labs/{labId}/rx-uploads/{fileName} {
+      allow read: if true;
+      allow create: if request.resource.size < 5 * 1024 * 1024
+                    && (request.resource.contentType.matches('image/.*') || request.resource.contentType == 'application/pdf');
+    }
+
+    // ============================================
     // QR CODES
     // ============================================
 

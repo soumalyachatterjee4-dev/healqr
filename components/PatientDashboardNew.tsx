@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, BarChart3, History, Bell, FolderHeart, Search, LogOut, Calendar, Stethoscope, Activity, TrendingUp, Heart, Star, Loader2, X } from 'lucide-react';
+import { Lock, BarChart3, History, Bell, FolderHeart, Search, LogOut, Calendar, Stethoscope, Activity, TrendingUp, Heart, Star, Loader2, X, BrainCircuit, User } from 'lucide-react';
 import { getFirestore, collection, query, where, getDocs, onSnapshot, orderBy, limit, doc, getDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import healqrLogo from '../assets/healqr.logo.png';
 
@@ -553,6 +553,21 @@ const PatientDashboardNew = ({ onLanguageDetected }: { onLanguageDetected?: (lan
           Data is encrypted
         </div>
 
+        {/* White: BrainDeck */}
+        <button
+          className="w-full flex items-center justify-center rounded-xl bg-white text-blue-600 font-bold py-3 text-base border border-blue-200 shadow"
+          style={{ letterSpacing: '0.02em' }}
+        >
+          <BrainCircuit className="w-5 h-5 mr-2" />
+          healQR BrainDeck
+        </button>
+
+        {/* Green: Patient Name */}
+        <div className="w-full flex items-center justify-center rounded-xl bg-green-600 text-white font-bold py-3 text-base shadow shadow-green-200">
+          <User className="w-5 h-5 mr-2" />
+          {patientData?.name || 'Patient'}
+        </div>
+
         {/* Stats Overview - White + Blue */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="bg-white rounded-xl p-4 border border-blue-100 shadow-sm">
@@ -604,11 +619,11 @@ const PatientDashboardNew = ({ onLanguageDetected }: { onLanguageDetected?: (lan
           </div>
         </div>
 
-        {/* Health Card - Now Clickable - Green */}
+        {/* Health Card - Now Clickable - Orange */}
         <div
           onClick={() => setCurrentView('health-card')}
-          className="rounded-xl p-8 text-white cursor-pointer hover:shadow-2xl hover:shadow-emerald-500/50 transition-all duration-300"
-          style={{ background: 'linear-gradient(to bottom right, rgb(16, 185, 129), rgb(5, 150, 105))' }}
+          className="rounded-xl p-8 text-white cursor-pointer hover:shadow-2xl hover:shadow-orange-500/50 transition-all duration-300"
+          style={{ background: 'linear-gradient(to bottom right, rgb(249, 115, 22), rgb(234, 88, 12))' }}
         >
           <div className="flex items-center justify-between">
             <div className="flex-1">
@@ -617,26 +632,26 @@ const PatientDashboardNew = ({ onLanguageDetected }: { onLanguageDetected?: (lan
                 <h3 className="text-2xl font-bold">Health Card</h3>
               </div>
               {healthCardData?.mission && (
-                <p className="text-emerald-50 italic mb-4">&ldquo;{healthCardData.mission}&rdquo;</p>
+                <p className="text-orange-50 italic mb-4">&ldquo;{healthCardData.mission}&rdquo;</p>
               )}
               {!healthCardData?.mission && (
-                <p className="text-emerald-100 mb-4">Your complete health profile at a glance</p>
+                <p className="text-orange-100 mb-4">Your complete health profile at a glance</p>
               )}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
                 <div>
-                  <p className="text-emerald-100 text-sm">Name</p>
+                  <p className="text-orange-100 text-sm">Name</p>
                   <p className="font-semibold text-lg">{healthCardData?.name || patientData?.name || 'N/A'}</p>
                 </div>
                 <div>
-                  <p className="text-emerald-100 text-sm">Age / Gender</p>
+                  <p className="text-orange-100 text-sm">Age / Gender</p>
                   <p className="font-semibold text-lg">{healthCardData?.age || patientData?.age || 'N/A'} / {healthCardData?.gender || patientData?.gender || 'N/A'}</p>
                 </div>
                 <div>
-                  <p className="text-emerald-100 text-sm">Blood Group</p>
+                  <p className="text-orange-100 text-sm">Blood Group</p>
                   <p className="font-semibold text-lg">{healthCardData?.bloodGroup || patientData?.bloodGroup || 'Not Set'}</p>
                 </div>
               </div>
-              <div className="mt-4 text-sm text-emerald-100 flex items-center gap-2">
+              <div className="mt-4 text-sm text-orange-100 flex items-center gap-2">
                 <span>Click to view & edit full profile</span>
                 <span>→</span>
               </div>

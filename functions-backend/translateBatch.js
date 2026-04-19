@@ -1,7 +1,7 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent';
 
 const SUPPORTED_LANGUAGES = [
   'english','hindi','bengali','marathi','tamil','telugu','gujarati','kannada',
@@ -54,15 +54,15 @@ const LANGUAGE_INFO = {
  *
  * Returns: { translations: string[] }
  */
-exports.translateBatch = onCall({ maxInstances: 10 }, async (request) => {
+exports.translateBatch = onCall({ maxInstances: 10, minInstances: 1 }, async (request) => {
   const { texts, targetLanguage, context = 'ui' } = request.data;
 
   // Validate inputs
   if (!texts || !Array.isArray(texts) || texts.length === 0) {
     throw new HttpsError('invalid-argument', 'texts must be a non-empty array');
   }
-  if (texts.length > 50) {
-    throw new HttpsError('invalid-argument', 'Maximum 50 texts per batch');
+  if (texts.length > 100) {
+    throw new HttpsError('invalid-argument', 'Maximum 100 texts per batch');
   }
   if (!targetLanguage || !SUPPORTED_LANGUAGES.includes(targetLanguage)) {
     throw new HttpsError('invalid-argument', 'Invalid target language');
@@ -115,7 +115,7 @@ Return format: ["translated1", "translated2", ...]`;
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.1,
-          maxOutputTokens: 4000,
+          maxOutputTokens: 8000,
         }
       })
     });

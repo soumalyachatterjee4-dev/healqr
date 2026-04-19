@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
-import { Video, User, AlertCircle, Star, Grid3x3, Smartphone, Clock, FileText, CheckCircle, TrendingUp, Bell, Users, Layout, ShoppingCart, Building2, MessageSquare, MonitorPlay, ShoppingBag, ScanLine, Twitter, Linkedin, Facebook, ArrowLeft, Sparkles, QrCode } from 'lucide-react';
+import { Video, User, AlertCircle, Star, Grid3x3, Smartphone, Clock, FileText, CheckCircle, TrendingUp, Bell, Users, Layout, ShoppingCart, Building2, MessageSquare, MonitorPlay, ShoppingBag, ScanLine, Twitter, Linkedin, Facebook, ArrowLeft, Sparkles, QrCode, Microscope } from 'lucide-react';
 import { collection, query, where, getDocs, getCountFromServer, Timestamp, orderBy, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase/config';
 import LandingSupportModal from './LandingSupportModal';
@@ -64,6 +64,7 @@ export default function LandingPage({
   const [showClinicOptions, setShowClinicOptions] = useState(false);
   const [showAdvertiserOptions, setShowAdvertiserOptions] = useState(false);
   const [showPatientOptions, setShowPatientOptions] = useState(false);
+  const [showLabOptions, setShowLabOptions] = useState(false);
   const [showPharmaOptions, setShowPharmaOptions] = useState(false);
   const [firestoreTestimonials, setFirestoreTestimonials] = useState<DoctorTestimonial[]>([]);
 
@@ -272,17 +273,17 @@ export default function LandingPage({
               multi-language support, and complete patient data ownership.
             </p>
 
-            {/* 3-Way Entry Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto mb-16">
+            {/* 4-Way Entry Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto mb-16">
 
               {/* 1. Patients - Orange */}
-              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 hover:border-orange-500/50 transition-all group">
+              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 hover:border-orange-500/50 transition-all group flex flex-col">
                 <div className="h-12 w-12 bg-orange-500/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-orange-500/20 transition-colors">
                   <Users className="w-6 h-6 text-orange-500" />
                 </div>
                 <h3 className="text-xl font-semibold text-orange-500 mb-2">For Patients</h3>
                 <p className="text-gray-400 text-sm mb-6">Easily find doctors, book appointments, and access your medical records securely. Experience seamless healthcare with QR-powered convenience and multi-language support.</p>
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-2 mt-auto">
                   <Button
                     onClick={() => setShowPatientOptions(true)}
                     className="w-full bg-orange-600 hover:bg-orange-700 text-white"
@@ -292,14 +293,14 @@ export default function LandingPage({
                 </div>
               </div>
 
-              {/* 2. Clinics - White + Blue */}
-              <div className="bg-zinc-900/50 border border-blue-600 rounded-xl p-6 hover:border-blue-700 transition-all group">
+              {/* 2. Clinics / Hospitals - Blue */}
+              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 hover:border-blue-500/50 transition-all group flex flex-col">
                 <div className="h-12 w-12 bg-blue-500/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-blue-500/20 transition-colors">
                   <Building2 className="w-6 h-6 text-blue-500" />
                 </div>
-                <h3 className="text-xl font-semibold text-white mb-2">For Clinics</h3>
-                <p className="text-white text-sm mb-6">Easily manage multiple doctors across multiple clinic locations, all unified under a single QR code. Streamline scheduling, doctor access, and clinic operations with our advanced platform.</p>
-                <div className="flex flex-col gap-2">
+                <h3 className="text-xl font-semibold text-blue-500 mb-2">For Clinics & Hospitals</h3>
+                <p className="text-gray-400 text-sm mb-6">Manage multiple doctors across multiple locations with unified OPD operations under a single QR code. Streamline scheduling, doctor access, and clinic management effortlessly.</p>
+                <div className="flex flex-col gap-2 mt-auto">
                   <Button
                     onClick={() => setShowClinicOptions(true)}
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white"
@@ -310,16 +311,33 @@ export default function LandingPage({
               </div>
 
               {/* 3. Doctors - Green */}
-              <div className="bg-zinc-900/50 border border-emerald-600 rounded-xl p-6 hover:border-emerald-700 transition-all group">
+              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 hover:border-emerald-500/50 transition-all group flex flex-col">
                 <div className="h-12 w-12 bg-emerald-500/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-emerald-500/20 transition-colors">
                   <User className="w-6 h-6 text-emerald-500" />
                 </div>
                 <h3 className="text-xl font-semibold text-emerald-500 mb-2">For Doctors</h3>
                 <p className="text-gray-400 text-sm mb-6">Effortlessly manage your practice, appointments, and patient records with QR-based booking. Enjoy multi-location access, analytics, and secure patient data ownership—all in one platform.</p>
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-2 mt-auto">
                   <Button
                     onClick={() => setShowDoctorOptions(true)}
                     className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                  >
+                    Get Started
+                  </Button>
+                </div>
+              </div>
+
+              {/* 4. Labs / Diagnostic Centers - Purple */}
+              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 hover:border-purple-500/50 transition-all group flex flex-col">
+                <div className="h-12 w-12 bg-purple-500/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-purple-500/20 transition-colors">
+                  <Microscope className="w-6 h-6 text-purple-500" />
+                </div>
+                <h3 className="text-xl font-semibold text-purple-500 mb-2">For Labs & Diagnostic Centers</h3>
+                <p className="text-gray-400 text-sm mb-6">Manage test bookings, sample collection, report delivery, and doctor referrals with a single QR code. Branches, staff, and analytics—all in one platform.</p>
+                <div className="flex flex-col gap-2 mt-auto">
+                  <Button
+                    onClick={() => setShowLabOptions(true)}
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white"
                   >
                     Get Started
                   </Button>
@@ -658,7 +676,7 @@ export default function LandingPage({
       {/* Footer */}
       <footer className="py-12 px-6 bg-black border-t border-zinc-800">
         <div className="container mx-auto max-w-7xl">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-8">
             {/* Brand Column */}
             <div className="lg:col-span-2">
               {/* Logo and Brand Name */}
@@ -706,6 +724,37 @@ export default function LandingPage({
                   <Facebook className="w-5 h-5" />
                 </a>
               </div>
+            </div>
+
+            {/* For Labs Column */}
+            <div>
+              <h3 className="mb-4">For Labs</h3>
+              <ul className="space-y-3">
+                <li>
+                  <button
+                    onClick={() => window.location.href = '/?page=lab-signup'}
+                    className="text-gray-400 hover:text-purple-500 transition-colors text-sm text-left"
+                  >
+                    Sign Up
+                  </button>
+                </li>
+                <li>
+                  <button
+                    onClick={() => window.location.href = '/?page=lab-login'}
+                    className="text-gray-400 hover:text-purple-500 transition-colors text-sm text-left"
+                  >
+                    Login
+                  </button>
+                </li>
+                <li>
+                  <button
+                    onClick={() => setShowSupportModal(true)}
+                    className="text-gray-400 hover:text-purple-500 transition-colors text-sm text-left"
+                  >
+                    Support
+                  </button>
+                </li>
+              </ul>
             </div>
 
             {/* For Doctors Column */}
@@ -1052,6 +1101,50 @@ export default function LandingPage({
                 className="w-full border-zinc-700 text-gray-300 hover:bg-zinc-800 hover:text-white py-6 text-lg"
               >
                 Medical Locker
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lab Options Modal */}
+      {showLabOptions && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 max-w-md w-full relative">
+            <button
+              onClick={() => setShowLabOptions(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white"
+            >
+              ✕
+            </button>
+
+            <div className="text-center mb-6">
+              <div className="h-16 w-16 bg-purple-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Microscope className="w-8 h-8 text-purple-500" />
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-2">For Labs / Diagnostic Centers</h2>
+              <p className="text-gray-400">Manage bookings, reports, and lab operations with QR</p>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <Button
+                onClick={() => {
+                  setShowLabOptions(false);
+                  window.location.href = '/?page=lab-signup';
+                }}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white py-6 text-lg"
+              >
+                Sign Up
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowLabOptions(false);
+                  window.location.href = '/?page=lab-login';
+                }}
+                variant="outline"
+                className="w-full border-zinc-700 text-gray-300 hover:bg-zinc-800 hover:text-white py-6 text-lg"
+              >
+                Log In
               </Button>
             </div>
           </div>

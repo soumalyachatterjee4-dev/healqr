@@ -13,7 +13,9 @@ import {
   X,
   FileText,
   Clock,
-  MapPin
+  MapPin,
+  FlaskConical,
+  Building2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
@@ -41,6 +43,28 @@ interface Consultation {
   createdAt: any;
 }
 
+interface LabBooking {
+  id: string;
+  bookingId: string;
+  labName: string;
+  branchName: string;
+  branchAddress: string;
+  tests: Array<{ testName: string; price: number; discountedPrice?: number; category: string; preparation?: string }>;
+  totalAmount: number;
+  homeCollectionCharges: number;
+  collectionType: 'walk-in' | 'home-collection';
+  bookingDate: string;
+  timeSlot: string;
+  slotName: string;
+  patientName: string;
+  patientPhone: string;
+  patientAge: string;
+  patientGender: string;
+  referringDoctor: string;
+  status: string;
+  createdAt: any;
+}
+
 interface PatientConsultationHistoryProps {
   patientPhone?: string;
   language?: Language;
@@ -55,9 +79,13 @@ export default function PatientConsultationHistory({ patientPhone, language = 'e
   const [specialtyFilter, setSpecialtyFilter] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
   const [specialties, setSpecialties] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<'doctor' | 'lab'>('doctor');
+  const [labBookings, setLabBookings] = useState<LabBooking[]>([]);
+  const [labLoading, setLabLoading] = useState(false);
 
   useEffect(() => {
     loadConsultations();
+    loadLabBookings();
   }, [patientPhone]);
 
   useEffect(() => {
@@ -154,6 +182,54 @@ export default function PatientConsultationHistory({ patientPhone, language = 'e
     }
   };
 
+  const loadLabBookings = async () => {
+    setLabLoading(true);
+    try {
+      const currentPatientPhone = patientPhone || localStorage.getItem('patient_phone');
+      if (!currentPatientPhone) { setLabLoading(false); return; }
+
+      const q = query(
+        collection(db, 'labBookings'),
+        where('patientPhone', '==', currentPatientPhone),
+      );
+      const snap = await getDocs(q);
+      const data: LabBooking[] = snap.docs.map(d => {
+        const raw = d.data();
+        return {
+          id: d.id,
+          bookingId: raw.bookingId || d.id,
+          labName: raw.labName || '',
+          branchName: raw.branchName || '',
+          branchAddress: raw.branchAddress || '',
+          tests: raw.tests || [],
+          totalAmount: raw.totalAmount || 0,
+          homeCollectionCharges: raw.homeCollectionCharges || 0,
+          collectionType: raw.collectionType || 'walk-in',
+          bookingDate: raw.bookingDate || '',
+          timeSlot: raw.timeSlot || '',
+          slotName: raw.slotName || '',
+          patientName: raw.patientName || '',
+          patientPhone: raw.patientPhone || '',
+          patientAge: raw.patientAge || '',
+          patientGender: raw.patientGender || '',
+          referringDoctor: raw.referringDoctor || '',
+          status: raw.status || 'confirmed',
+          createdAt: raw.createdAt,
+        } as LabBooking;
+      });
+      data.sort((a, b) => {
+        const da = a.createdAt?.toMillis?.() || new Date(a.bookingDate).getTime();
+        const db2 = b.createdAt?.toMillis?.() || new Date(b.bookingDate).getTime();
+        return db2 - da;
+      });
+      setLabBookings(data);
+    } catch (err) {
+      console.error('Error loading lab bookings:', err);
+    } finally {
+      setLabLoading(false);
+    }
+  };
+
   const applyFilters = () => {
     let filtered = [...consultations];
 
@@ -235,6 +311,147 @@ export default function PatientConsultationHistory({ patientPhone, language = 'e
       {/* Health Tip */}
       <DashboardPromoDisplay category="health-tip" placement="patient-history" />
 
+      {/* Tab Toggle: Doctor | Lab */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setActiveTab('doctor')}
+          className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+            activeTab === 'doctor'
+              ? 'bg-emerald-500 text-white'
+              : 'bg-zinc-900 border border-zinc-800 text-gray-400 hover:border-zinc-700'
+          }`}
+        >
+          <Stethoscope className="w-4 h-4" /> Doctor Visits
+          {consultations.length > 0 && (
+            <span className={`text-xs px-1.5 py-0.5 rounded-full ${activeTab === 'doctor' ? 'bg-white/20' : 'bg-zinc-700'}`}>
+              {consultations.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('lab')}
+          className={`flex-1 py-3 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+            activeTab === 'lab'
+              ? 'bg-purple-500 text-white'
+              : 'bg-zinc-900 border border-zinc-800 text-gray-400 hover:border-zinc-700'
+          }`}
+        >
+          <FlaskConical className="w-4 h-4" /> Lab Bookings
+          {labBookings.length > 0 && (
+            <span className={`text-xs px-1.5 py-0.5 rounded-full ${activeTab === 'lab' ? 'bg-white/20' : 'bg-zinc-700'}`}>
+              {labBookings.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* ========= LAB BOOKINGS TAB ========= */}
+      {activeTab === 'lab' && (
+        <>
+          {labLoading ? (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4" />
+              <p className="text-gray-400">Loading lab bookings...</p>
+            </div>
+          ) : labBookings.length === 0 ? (
+            <Card className="bg-zinc-900 border-zinc-800">
+              <CardContent className="p-12 text-center">
+                <FlaskConical className="h-16 w-16 text-gray-600 mx-auto mb-4" />
+                <h3 className="text-xl font-bold text-white mb-2">No Lab Bookings</h3>
+                <p className="text-gray-400">You haven't booked any lab tests yet</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-gray-400 text-sm">{labBookings.length} lab booking{labBookings.length !== 1 ? 's' : ''}</p>
+              {labBookings.map(lb => {
+                const statusColor = lb.status === 'confirmed' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                  : lb.status === 'approved' ? 'bg-green-500/10 text-green-400 border-green-500/20'
+                  : lb.status === 'sample-collected' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                  : lb.status === 'processing' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20'
+                  : lb.status === 'report-ready' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                  : lb.status === 'cancelled' ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                  : 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+                return (
+                  <Card key={lb.id} className="bg-zinc-900 border-zinc-800 hover:border-purple-500/50 transition-colors">
+                    <CardContent className="p-5 space-y-4">
+                      {/* Header */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Building2 className="w-5 h-5 text-purple-400" />
+                          <div>
+                            <p className="text-white font-semibold">{lb.labName}</p>
+                            {lb.branchName && <p className="text-gray-500 text-xs">{lb.branchName}</p>}
+                          </div>
+                        </div>
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${statusColor}`}>
+                          {lb.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        </span>
+                      </div>
+
+                      {/* Tests */}
+                      <div className="bg-zinc-800/50 rounded-lg p-3 space-y-1.5">
+                        <h4 className="text-sm font-semibold text-purple-400 mb-1">Tests Booked</h4>
+                        {lb.tests.map((t, i) => (
+                          <div key={i} className="flex justify-between items-center text-sm">
+                            <div>
+                              <span className="text-white">{t.testName}</span>
+                              <span className="text-gray-600 text-xs ml-2">{t.category}</span>
+                            </div>
+                            <span className="text-gray-300">₹{t.discountedPrice || t.price}</span>
+                          </div>
+                        ))}
+                        <div className="border-t border-zinc-700 pt-1.5 mt-1.5 flex justify-between font-semibold text-sm">
+                          <span className="text-gray-300">Total</span>
+                          <span className="text-purple-400">₹{lb.totalAmount + lb.homeCollectionCharges}</span>
+                        </div>
+                      </div>
+
+                      {/* Schedule */}
+                      <div className="bg-zinc-800/50 rounded-lg p-3 space-y-1.5 text-sm">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-gray-500" />
+                          <span className="text-gray-400">Date:</span>
+                          <span className="text-white">{new Date(lb.bookingDate).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-gray-500" />
+                          <span className="text-gray-400">Time:</span>
+                          <span className="text-white">{lb.timeSlot}</span>
+                          {lb.slotName && <span className="text-gray-600 text-xs">({lb.slotName})</span>}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-400 ml-6">Type:</span>
+                          <span className="text-white capitalize">{lb.collectionType.replace('-', ' ')}</span>
+                        </div>
+                      </div>
+
+                      {/* Preparation warnings */}
+                      {lb.tests.some(t => t.preparation) && (
+                        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">
+                          <p className="text-yellow-400 text-xs font-semibold mb-1">⚠ Preparation Required</p>
+                          {lb.tests.filter(t => t.preparation).map((t, i) => (
+                            <p key={i} className="text-yellow-300/70 text-xs">• <strong>{t.testName}</strong>: {t.preparation}</p>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Booking ID */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500">Booking ID:</span>
+                        <code className="text-xs text-purple-400 bg-purple-500/10 px-2 py-1 rounded">{lb.bookingId}</code>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ========= DOCTOR VISITS TAB ========= */}
+      {activeTab === 'doctor' && (<>
       {/* Search and Filters */}
       <Card className="bg-zinc-900 border-zinc-800">
         <CardContent className="p-6">
@@ -494,7 +711,7 @@ export default function PatientConsultationHistory({ patientPhone, language = 'e
           ))}
         </div>
       )}
+      </>)}
     </div>
   );
 }
-

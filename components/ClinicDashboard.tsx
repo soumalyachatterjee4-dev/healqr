@@ -1254,30 +1254,17 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
               {/* Welcome Card */}
               <div className="space-y-4">
                 <div>
-                  <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
-                    Welcome Back, {displayClinicName} !
-                  </h1>
-
-                  {/* Rating Placeholder */}
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="flex text-amber-400">
-                      {'★★★★'.split('').map((star, i) => <span key={i} className="text-lg">{star}</span>)}
-                      <span className="text-lg text-gray-600">★</span>
-                    </div>
-                    <span className="text-white text-sm ml-1">4.5/5</span>
-                    <span className="text-blue-500 text-sm hover:underline cursor-pointer">2 reviews</span>
-                  </div>
-
-
-                  {/* Full-width Encrypted Badge */}
+                  {/* 🇮🇳 Indian Tricolor Header: Saffron → White → Green */}
+                  {/* Saffron: Name */}
                   <div className="w-full mb-3">
                     <div className="w-full flex items-center justify-center rounded-xl bg-orange-500 text-white font-bold py-3 text-base shadow shadow-orange-200">
-                      <LucideLock className="w-5 h-5 mr-2" />
-                      Data is encrypted
+                      <h1 className="text-lg md:text-xl">
+                        Welcome Back, {displayClinicName}!
+                      </h1>
                     </div>
                   </div>
 
-                  {/* Full-width BrainDeck Button */}
+                  {/* White: BrainDeck */}
                   <div className="w-full mb-3">
                     <button
                       onClick={() => handleMenuChange('braindeck')}
@@ -1287,6 +1274,24 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
                       <BrainCircuit className="w-5 h-5 mr-2" />
                       healQR BrainDeck
                     </button>
+                  </div>
+
+                  {/* Green: Encrypted Badge */}
+                  <div className="w-full mb-3">
+                    <div className="w-full flex items-center justify-center rounded-xl bg-green-600 text-white font-bold py-3 text-base shadow shadow-green-200">
+                      <LucideLock className="w-5 h-5 mr-2" />
+                      Data is encrypted
+                    </div>
+                  </div>
+
+                  {/* Rating */}
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="flex text-amber-400">
+                      {'★★★★'.split('').map((star, i) => <span key={i} className="text-lg">{star}</span>)}
+                      <span className="text-lg text-gray-600">★</span>
+                    </div>
+                    <span className="text-white text-sm ml-1">4.5/5</span>
+                    <span className="text-blue-500 text-sm hover:underline cursor-pointer">2 reviews</span>
                   </div>
 
                   <div className="flex items-center gap-3 mb-4">
@@ -1314,12 +1319,12 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
               <DataExportBanner mode="clinic" onNavigate={() => handleMenuChange('data-management')} />
               <div
                 className="rounded-2xl p-6 relative overflow-hidden shadow-xl"
-                style={{ background: 'linear-gradient(to bottom right, rgb(16, 185, 129), rgb(5, 150, 105))' }}
+                style={{ background: 'linear-gradient(to bottom right, rgb(59, 130, 246), rgb(37, 99, 235))' }}
               >
                 {/* Top: Free + Active badges */}
                 <div className="flex gap-2 mb-3">
                   <Badge variant="outline" className="text-white border-white/40 bg-transparent text-[10px] px-2 py-0 h-5">Free</Badge>
-                  <Badge className="bg-green-700 text-white border-none text-[10px] px-2 py-0 h-5">Active</Badge>
+                  <Badge className="bg-blue-800 text-white border-none text-[10px] px-2 py-0 h-5">Active</Badge>
                 </div>
 
                 {/* Bookings Count */}
@@ -1328,7 +1333,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
                     <span className="text-4xl font-bold text-white">{analyticsData.monthlyBookings}</span>
                     <span className="text-2xl font-semibold text-white">Bookings</span>
                   </div>
-                  <p className="text-[11px] text-emerald-100 opacity-80 font-medium">
+                  <p className="text-[11px] text-blue-100 opacity-80 font-medium">
                     {new Date().toLocaleString('default', { month: 'short' })} 1, {new Date().getFullYear()} – {new Date().toLocaleString('default', { month: 'short' })} {new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()}, {new Date().getFullYear()}
                   </p>
                 </div>
@@ -1339,8 +1344,8 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
                 {/* Social Kit Info */}
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <Badge className="hover:bg-white border-none text-[10px] font-bold px-2 py-0 h-5 shrink-0" style={{ backgroundColor: 'white', color: '#059669' }}>
-                      <Sparkles className="w-3 h-3 mr-1" style={{ fill: '#059669' }} />
+                    <Badge className="hover:bg-white border-none text-[10px] font-bold px-2 py-0 h-5 shrink-0" style={{ backgroundColor: 'white', color: '#2563eb' }}>
+                      <Sparkles className="w-3 h-3 mr-1" style={{ fill: '#2563eb' }} />
                       New
                     </Badge>
                     <h3 className="text-sm font-bold text-white whitespace-nowrap">Social Media Kit</h3>
@@ -1350,7 +1355,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
                     <button
                       onClick={() => handleMenuChange('social-kit')}
                       className="hover:bg-slate-50 px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-1.5 transition-all shadow-lg shrink-0"
-                      style={{ backgroundColor: 'white', color: '#059669' }}
+                      style={{ backgroundColor: 'white', color: '#2563eb' }}
                     >
                       Try Now
                       <ArrowRight className="w-4 h-4" />

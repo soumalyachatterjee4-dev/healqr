@@ -97,7 +97,12 @@ const ClinicProfile = lazy(() => import("./components/ClinicProfile"));
 const ClinicBookingFlow = lazy(() => import("./components/ClinicBookingFlow"));
 const PatientSearch = lazy(() => import("./components/PatientSearch"));
 const ClinicSignUp = lazy(() => import("./components/ClinicSignUp"));
+const LabSignUp = lazy(() => import("./components/LabSignUp"));
 const ClinicLogin = lazy(() => import("./components/ClinicLogin"));
+const LabLogin = lazy(() => import("./components/LabLogin"));
+const LabDashboard = lazy(() => import("./components/LabDashboard"));
+const LabBookingMiniWebsite = lazy(() => import("./components/LabBookingMiniWebsite"));
+const LabBookingFlow = lazy(() => import("./components/LabBookingFlow"));
 const ClinicDashboard = lazy(() => import("./components/ClinicDashboard"));
 const PatientLogin = lazy(() => import("./components/PatientLogin"));
 const PatientDashboardNew = lazy(() => import("./components/PatientDashboardNew"));
@@ -226,6 +231,11 @@ export default function App() {
     | "clinic-signup"
     | "clinic-login"
     | "clinic-dashboard"
+    | "lab-signup"
+    | "lab-login"
+    | "lab-dashboard"
+    | "lab-mini-website"
+    | "lab-booking-flow"
     | "patient-login"
     | "patient-dashboard"
     | "patient-history"
@@ -251,9 +261,12 @@ export default function App() {
   >(() => {
     // Initialize currentPage from localStorage to prevent flash/auto-logout on refresh
     const isClinic = localStorage.getItem('healqr_is_clinic') === 'true';
+    const isLab = localStorage.getItem('healqr_is_lab') === 'true';
     const isAssistant = localStorage.getItem('healqr_is_assistant') === 'true';
     const hasClinicSession = isClinic && (localStorage.getItem('userId') || localStorage.getItem('healqr_user_email'));
     if (hasClinicSession) return 'clinic-dashboard'; // Clinic owners AND clinic assistants
+    const hasLabSession = isLab && (localStorage.getItem('userId') || localStorage.getItem('healqr_user_email'));
+    if (hasLabSession) return 'lab-dashboard';
     // Doctor-level assistants should also start on dashboard
     if (isAssistant && localStorage.getItem('healqr_assistant_doctor_id')) return 'dashboard';
     return 'landing';
@@ -703,6 +716,54 @@ export default function App() {
       }
     }
 
+    // Handle /lab/{slug} clean URL — look up lab by labSlug/profileSlug
+    if (pathname.startsWith('/lab/') && !pathname.includes('/lab-login') && !pathname.includes('/lab-signup')) {
+      const slug = pathname.split('/lab/')[1]?.split('/')[0]?.split('?')[0]?.toLowerCase();
+      if (slug && db) {
+        try {
+          const { collection, query, where, getDocs, addDoc, serverTimestamp } = await import('firebase/firestore');
+          const labsRef = collection(db, 'labs');
+          // Try labSlug first, then profileSlug
+          let slugQuery = query(labsRef, where('labSlug', '==', slug));
+          let slugSnapshot = await getDocs(slugQuery);
+          if (slugSnapshot.empty) {
+            slugQuery = query(labsRef, where('profileSlug', '==', slug));
+            slugSnapshot = await getDocs(slugQuery);
+          }
+
+          if (!slugSnapshot.empty) {
+            const actualLabId = slugSnapshot.docs[0].id;
+            sessionStorage.setItem('booking_lab_id', actualLabId);
+            sessionStorage.setItem('booking_source', 'lab_url');
+
+            // Track URL visit
+            try {
+              await addDoc(collection(db, 'qrScans'), {
+                scannedBy: 'lab',
+                labId: actualLabId,
+                timestamp: serverTimestamp(),
+                scanSessionId: `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                completed: false,
+                source: 'slug_url'
+              });
+            } catch (error) {
+              console.error('Error tracking lab slug URL visit:', error);
+            }
+
+            setCurrentPage('lab-mini-website');
+            setIsAuthInitialized(true);
+            return;
+          } else {
+            console.error('No lab found with slug:', slug);
+            setIsAuthInitialized(true);
+          }
+        } catch (error) {
+          console.error('Error looking up lab slug:', error);
+          setIsAuthInitialized(true);
+        }
+      }
+    }
+
     // Handle /dr/{slug} clean URL — look up doctor by profileSlug
     if (pathname.startsWith('/dr/') && !isScanningDoctor) {
       const slug = pathname.split('/dr/')[1]?.split('/')[0]?.split('?')[0]?.toLowerCase();
@@ -913,6 +974,12 @@ export default function App() {
       return;
     } else if (pageParam === 'clinic-login') {
       setCurrentPage('clinic-login');
+      return;
+    } else if (pageParam === 'lab-signup') {
+      setCurrentPage('lab-signup');
+      return;
+    } else if (pageParam === 'lab-login') {
+      setCurrentPage('lab-login');
       return;
     } else if (pageParam === 'clinic-dashboard') {
       setCurrentPage('clinic-dashboard');
@@ -1435,7 +1502,7 @@ export default function App() {
       const isVerificationLink = urlParams.get('mode') === 'signIn' && urlParams.get('oobCode');
       const hasBookingDoctorId = urlParams.get('doctorId') || sessionStorage.getItem('booking_doctor_id');
       const hasBookingClinicId = urlParams.get('clinicId') || sessionStorage.getItem('booking_clinic_id');
-      const isSlugUrl = window.location.pathname.startsWith('/dr/') || window.location.pathname.startsWith('/clinic/');
+      const isSlugUrl = window.location.pathname.startsWith('/dr/') || window.location.pathname.startsWith('/clinic/') || window.location.pathname.startsWith('/lab/');
       const pageParam = urlParams.get('page');
       const isNotificationPage = pageParam && (
         pageParam === 'consultation-completed' ||
@@ -1454,15 +1521,16 @@ export default function App() {
       );
 
       const isVerifyVisit = window.location.pathname.includes('/verify-visit/');
-      const isOnVerifyLoginPage = window.location.pathname.includes('/verify-login') && currentPage !== 'clinic-dashboard';
+      const isOnVerifyLoginPage = window.location.pathname.includes('/verify-login') && currentPage !== 'clinic-dashboard' && currentPage !== 'lab-dashboard';
       const isOnVerifyEmailPage = window.location.pathname.includes('/verify-email');
       const isOnAssistantLoginPage = window.location.pathname.includes('/assistant-login');
       const isOnMasterAccessLoginPage = window.location.pathname.includes('/master-access-login');
       const isClinicPage = currentPage === 'clinic-login' || currentPage === 'clinic-signup' || pageParam === 'clinic-login' || pageParam === 'clinic-signup';
+      const isLabPage = currentPage === 'lab-login' || currentPage === 'lab-signup' || pageParam === 'lab-login' || pageParam === 'lab-signup';
       const isAdvertiserPage = currentPage === 'advertiser-login' || currentPage === 'advertiser-signup' || currentPage === 'advertiser-verify' || pageParam === 'advertiser-login' || pageParam === 'advertiser-signup' || pageParam === 'advertiser-verify';
       const isPharmaPage = currentPage === 'pharma-login' || currentPage === 'pharma-verify' || currentPage === 'pharma-portal' || currentPage === 'pharma-signup' || pageParam === 'pharma-login' || pageParam === 'pharma-verify' || pageParam === 'pharma-portal' || pageParam === 'pharma-signup';
 
-      if (isVerificationLink || isBookingMode || hasBookingDoctorId || hasBookingClinicId || isSlugUrl || isNotificationPage || isVerifyVisit || isOnVerifyLoginPage || isOnVerifyEmailPage || isOnAssistantLoginPage || isOnMasterAccessLoginPage || isClinicPage || isAdvertiserPage || isPharmaPage || currentPage === 'verify-email' || currentPage === 'verify-login' || currentPage === 'assistant-login' || currentPage === 'master-access-login' || currentPage === 'temp-doctor-login' || currentPage === 'temp-doctor-dashboard' || currentPage === 'admin-verify' || currentPage === 'verify-walkin' || currentPage === 'queue-display' || currentPage === 'leave-apply' || currentPage.startsWith('booking-') || currentPage === 'clinic-booking-flow') {
+      if (isVerificationLink || isBookingMode || hasBookingDoctorId || hasBookingClinicId || isSlugUrl || isNotificationPage || isVerifyVisit || isOnVerifyLoginPage || isOnVerifyEmailPage || isOnAssistantLoginPage || isOnMasterAccessLoginPage || isClinicPage || isLabPage || isAdvertiserPage || isPharmaPage || currentPage === 'verify-email' || currentPage === 'verify-login' || currentPage === 'assistant-login' || currentPage === 'master-access-login' || currentPage === 'temp-doctor-login' || currentPage === 'temp-doctor-dashboard' || currentPage === 'admin-verify' || currentPage === 'verify-walkin' || currentPage === 'queue-display' || currentPage === 'leave-apply' || currentPage.startsWith('booking-') || currentPage === 'clinic-booking-flow' || currentPage === 'lab-mini-website') {
         // For slug URLs, don't set isAuthInitialized yet — let handleUrlParams finish first
         // so the user sees PageLoader instead of a flash of the landing page
         if (!isSlugUrl) {
@@ -1493,7 +1561,15 @@ export default function App() {
 
         // Check localStorage first for quick routing (set by VerifyLogin)
         const isClinicFromStorage = localStorage.getItem('healqr_is_clinic') === 'true';
+        const isLabFromStorage = localStorage.getItem('healqr_is_lab') === 'true';
         const isAssistantFromStorage = localStorage.getItem('healqr_is_assistant') === 'true';
+
+        if (isLabFromStorage && !isAssistantFromStorage) {
+          // Pure lab owner - fast route to lab dashboard
+          setCurrentPage('lab-dashboard');
+          setIsAuthInitialized(true);
+          return;
+        }
 
         if (isClinicFromStorage && !isAssistantFromStorage) {
           // Pure clinic owner - fast route to clinic dashboard (assistants need validation below)
@@ -1502,25 +1578,33 @@ export default function App() {
           return;
         }
 
-        // Check if user is a clinic in Firestore (fallback if localStorage not set)
-        // BUT: Only check clinics if user is NOT already identified as a doctor
-        // This prevents UID collisions where same UID exists in both doctors + clinics collections
+        // Check if user is a clinic or lab in Firestore (fallback if localStorage not set)
         if (db && !isAssistantFromStorage) {
           try {
-            // Check doctors collection FIRST to give doctor identity priority
-            const doctorDocExists = await getDoc(doc(db, 'doctors', user.uid));
-            if (!doctorDocExists.exists()) {
-              // Not a doctor � check if clinic
-              const clinicDoc = await getDoc(doc(db, 'clinics', user.uid));
-              if (clinicDoc.exists()) {
-                localStorage.setItem('healqr_is_clinic', 'true'); // Cache for next time
-                setCurrentPage('clinic-dashboard');
-                setIsAuthInitialized(true);
-                return; // CRITICAL: Stop here, don't load doctor profile
-              }
+            // Check all three entity types in parallel
+            const [labDoc, clinicDoc, doctorDoc] = await Promise.all([
+              getDoc(doc(db, 'labs', user.uid)),
+              getDoc(doc(db, 'clinics', user.uid)),
+              getDoc(doc(db, 'doctors', user.uid)),
+            ]);
+
+            // Lab takes priority (most specific entity type)
+            if (labDoc.exists()) {
+              localStorage.setItem('healqr_is_lab', 'true');
+              setCurrentPage('lab-dashboard');
+              setIsAuthInitialized(true);
+              return;
+            }
+
+            // Then clinic
+            if (clinicDoc.exists() && !doctorDoc.exists()) {
+              localStorage.setItem('healqr_is_clinic', 'true');
+              setCurrentPage('clinic-dashboard');
+              setIsAuthInitialized(true);
+              return;
             }
           } catch (e) {
-            console.error("Error checking clinic status", e);
+            console.error("Error checking clinic/lab status", e);
           }
         }
 
@@ -2732,6 +2816,7 @@ export default function App() {
       localStorage.removeItem('healqr_user_email');
       localStorage.removeItem('healqr_user_name');
       localStorage.removeItem('healqr_is_clinic');
+      localStorage.removeItem('healqr_is_lab');
       localStorage.removeItem('healqr_is_assistant');
       localStorage.removeItem('healqr_assistant_pages');
       localStorage.removeItem('healqr_assistant_doctor_id');
@@ -2784,7 +2869,7 @@ export default function App() {
       return previewLanguage || 'english';
     }
     // Patient-facing: booking flow
-    if (currentPage.startsWith('booking-') || currentPage === 'clinic-booking-flow') {
+    if (currentPage.startsWith('booking-') || currentPage === 'clinic-booking-flow' || currentPage === 'lab-mini-website' || currentPage === 'lab-booking-flow') {
       return bookingLanguage;
     }
     // Patient-facing: notifications & review
@@ -2894,13 +2979,16 @@ export default function App() {
             const storedEmail = localStorage.getItem('healqr_user_email');
             const storedName = localStorage.getItem('healqr_user_name');
             const isClinic = localStorage.getItem('healqr_is_clinic') === 'true';
+            const isLab = localStorage.getItem('healqr_is_lab') === 'true';
             const isAssistant = localStorage.getItem('healqr_is_assistant') === 'true';
 
             if (storedEmail) setUserEmail(storedEmail);
             if (storedName) setUserName(storedName);
 
             // Route based on user type
-            if (isClinic) {
+            if (isLab) {
+              setCurrentPage("lab-dashboard"); // Lab owners AND lab assistants
+            } else if (isClinic) {
               setCurrentPage("clinic-dashboard"); // Clinic owners AND clinic assistants
             } else if (isAssistant) {
               setCurrentPage("dashboard"); // Doctor assistants use doctor dashboard
@@ -3828,6 +3916,25 @@ export default function App() {
         </Suspense>
       )}
 
+      {currentPage === "lab-mini-website" && (
+        <Suspense fallback={<PageLoader />}>
+          <LabBookingMiniWebsite
+            onBookNow={() => setCurrentPage('lab-booking-flow')}
+            onBack={() => setCurrentPage('landing')}
+          />
+        </Suspense>
+      )}
+
+      {currentPage === "lab-booking-flow" && (
+        <Suspense fallback={<PageLoader />}>
+          <LabBookingFlow
+            onBack={() => setCurrentPage('lab-mini-website')}
+            language={bookingLanguage}
+            onLanguageChange={(lang) => setBookingLanguage(lang)}
+          />
+        </Suspense>
+      )}
+
       {currentPage === "patient-search" && (
         <Suspense fallback={<PageLoader />}>
           <PatientSearch language={bookingLanguage} />
@@ -3843,6 +3950,15 @@ export default function App() {
         </Suspense>
       )}
 
+      {currentPage === "lab-signup" && (
+        <Suspense fallback={<PageLoader />}>
+          <LabSignUp
+            onBack={() => setCurrentPage("landing")}
+            onLogin={() => window.location.href = '/?page=lab-login'}
+          />
+        </Suspense>
+      )}
+
       {currentPage === "clinic-login" && (
         <Suspense fallback={<PageLoader />}>
           <ClinicLogin
@@ -3850,6 +3966,22 @@ export default function App() {
             onSignUp={() => setCurrentPage("clinic-signup")}
             onSuccess={() => setCurrentPage("clinic-dashboard")}
           />
+        </Suspense>
+      )}
+
+      {currentPage === "lab-login" && (
+        <Suspense fallback={<PageLoader />}>
+          <LabLogin
+            onBack={() => setCurrentPage("landing")}
+            onSignUp={() => setCurrentPage("lab-signup")}
+            onSuccess={() => setCurrentPage("lab-dashboard")}
+          />
+        </Suspense>
+      )}
+
+      {currentPage === "lab-dashboard" && (
+        <Suspense fallback={<PageLoader />}>
+          <LabDashboard onLogout={handleLogout} />
         </Suspense>
       )}
 

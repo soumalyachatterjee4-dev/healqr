@@ -65,8 +65,8 @@ function isSkippedElement(node: Node): boolean {
   return false;
 }
 
-// ─── Batch size limit (Cloud Function accepts max 50 texts) ───
-const MAX_BATCH_SIZE = 50;
+// ─── Batch size limit (Cloud Function accepts max 100 texts) ───
+const MAX_BATCH_SIZE = 100;
 
 export function TranslationProvider({ language, children }: TranslationProviderProps) {
   const containerRef = useRef<HTMLDivElement>(null);

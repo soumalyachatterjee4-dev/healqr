@@ -1,6 +1,49 @@
-# HealQR — YouTube Video Scripts (25-30 sec each)
+# HealQR — YouTube Video Scripts
 ## Hindi voiceover | Hinglish thumbnail headings | AI Avatar delivery
 ## Platform: YouTube Shorts → Reels (IG/FB) → LinkedIn
+
+---
+
+# ═══════════════════════════════════════════
+# SECTION 0: healQR INTRODUCTION (1 script — 2.5 min)
+# ═══════════════════════════════════════════
+
+## 0. healQR Introduction — healQR Kya Hai? Poori Kahani!
+
+**🎬 Thumbnail:** healQR Kya Hai? Poori Kahani Hindi Me!
+**YouTube Title:** healQR Kya Hai? Doctors, Patients, Clinics Ke Liye Game Changer | Full Intro Hindi
+**Duration:** ~2 min 30 sec
+**Format:** YouTube Long + LinkedIn (landscape) — NOT Shorts
+
+**Script (Hindi):**
+
+"Namaste! Aaj hum baat karenge healQR ke baare me — India ka pehla QR-code based OPD booking platform.
+
+**Pehle samjhein — problem kya hai?**
+
+India me 13 lakh se zyada registered doctors hain. Har saal 520 crore OPD visits hote hain — matlab 5 arab baar log doctor ke paas jaate hain. Lekin aaj bhi zyatar doctors paper register pe kaam karte hain. Phone call se booking hoti hai, waiting room me koi system nahi — patient subah se baith ke wait karta hai ki uska number kab aayega. Doctor ke paas bhi koi digital record nahi hota — kitne patients aaye, kaunsi dawai likhi, revenue kitna hua — sab andhaaze me chalta hai. Aur clinic chalane wale? Multiple branches, multiple doctors, staff management — sab alag alag jagah. Koi centralized system nahi.
+
+**Ab samjhein — healQR kya karta hai?**
+
+healQR ek bahut simple idea pe kaam karta hai — ek QR code. Doctor ya clinic ko ek premium QR code milta hai. Patient us QR code ko apne phone se scan karta hai — koi app download nahi, koi login nahi. Scan karte hi ek mini-website khulti hai jahan patient date select karta hai, chamber choose karta hai, naam aur phone number daalke appointment book kar leta hai. Bas! Serial number turant screen pe aa jaata hai. Itna simple.
+
+**Patient ko kya milta hai?**
+
+Patient ko sabse pehle milta hai convenience. QR scan karo, 30 second me booking done. Appointment cancel hua? Push notification aayega turant. Live queue status ghar baithe dekho — pata chalega number kab aayega, wait karne ki zaroorat nahi. Consultation hone ke baad digital prescription milega notification me — dawai ka naam, dose, instructions — sab kuch phone me saved rahega. Follow-up date aayegi toh reminder aa jaayega. Aur yeh sab bina koi app download kiye — sirf ek QR scan se shuru hota hai.
+
+**Doctor ko kya milta hai?**
+
+Doctor ko milta hai ek complete digital dashboard. Aaj ke patients ki list, chamber ON-OFF toggle, walk-in patients add karna — sab Today's Schedule me. Digital prescription 2 minute me ban jaata hai — watermark logo, header, footer, degrees — sab automatically print hota hai. AI Diet Chart generate hota hai ek click me. Revenue ka daily-monthly record — income, expense, net balance sab ek screen pe. Billing receipt banao aur WhatsApp pe patient ko bhejo. Staff ki attendance, leave, salary — manage karo. Clinic ka inventory — stock in, stock out, expiry alerts. Referral network se specialists ko patients refer karo. Patient broadcast se health tips ya camp announcement sabko ek saath bhejo. Aur yeh sab ek hi platform se — bina kisi extra software ke.
+
+**Clinic ko kya milta hai?**
+
+Clinic owner ko multiple branches manage karna hota hai — healQR me sab ek dashboard se hota hai. Multiple doctors link karo, branch managers ko limited access do, receptionist ko assistant mode de do — har kisi ka permission control me. TV ya tablet pe smart queue display lagao — airport jaisa dikhta hai, patients ko pata chalega ki unka number kab aayega. Data export karo Excel me with automatic privacy masking. Master Access se clinic owner ghar baithe saari branches ka revenue, billing, inventory, patient retention — sab monitor kar sakta hai.
+
+**Aur sabse important baat?**
+
+healQR kabhi patient data sell nahi karta. DPDP Act 2023 strictly follow hota hai. Doctor-patient relationship me koi interference nahi. Hum sirf ek booking platform hain — treatment me koi dakhal nahi. Aapka data, aapka control.
+
+healQR — हर घर healQR. Scan. Book. Heal — Instantly."
 
 ---
 
@@ -511,9 +554,10 @@
 ---
 
 # ═══════════════════════════════════════════
-# TOTAL: 47 VIDEO SCRIPTS
+# TOTAL: 48 VIDEO SCRIPTS
 # ═══════════════════════════════════════════
 #
+# 0. Introduction:   1 video (2.5 min — full intro)
 # A. Patient:        8 videos
 # B. Doctor:        18 videos
 # C. Clinic:         6 videos

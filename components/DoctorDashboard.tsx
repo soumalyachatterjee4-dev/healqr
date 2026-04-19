@@ -1222,12 +1222,38 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
           <div className="p-4 md:p-8">
             {/* Welcome Section */}
           <div className="mb-6 md:mb-8">
-            <h1 className="text-2xl md:text-3xl mb-4">
-              Welcome Back, {useDrPrefix ? 'Dr. ' : ''}{doctorName}!
-            </h1>
+            {/* 🇮🇳 Indian Tricolor Header: Saffron → White → Green */}
+            {/* Saffron: Name */}
+            <div className="w-full mb-3">
+              <div className="w-full flex items-center justify-center rounded-xl bg-orange-500 text-white font-bold py-3 text-base shadow shadow-orange-200">
+                <h1 className="text-lg md:text-xl">
+                  Welcome Back, {useDrPrefix ? 'Dr. ' : ''}{doctorName}!
+                </h1>
+              </div>
+            </div>
 
+            {/* White: BrainDeck */}
+            <div className="w-full mb-3">
+              <button
+                onClick={() => onMenuChange?.('braindeck')}
+                className="w-full flex items-center justify-center rounded-xl bg-white text-blue-600 font-bold py-3 text-base border border-blue-200 shadow"
+                style={{ letterSpacing: '0.02em' }}
+              >
+                <BrainCircuit className="w-5 h-5 mr-2" />
+                healQR BrainDeck
+              </button>
+            </div>
+
+            {/* Green: Encrypted Badge */}
+            <div className="w-full mb-3">
+              <div className="w-full flex items-center justify-center rounded-xl bg-green-600 text-white font-bold py-3 text-base shadow shadow-green-200">
+                <Lock className="w-5 h-5 mr-2" />
+                Data is encrypted
+              </div>
+            </div>
+
+            {/* Rating & Reviews */}
             <div className="flex items-center gap-4 mb-4">
-              {/* Star Rating */}
               <div className="flex items-center gap-2">
                 {[...Array(5)].map((_, i) => {
                   const isFilled = i < Math.floor(averageRating);
@@ -1246,27 +1272,6 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
                   {totalReviews} {totalReviews === 1 ? 'review' : 'reviews'}
                 </button>
               </div>
-            </div>
-
-
-            {/* Full-width Encrypted Badge */}
-            <div className="w-full mb-3">
-              <div className="w-full flex items-center justify-center rounded-xl bg-orange-500 text-white font-bold py-3 text-base shadow shadow-orange-200">
-                <Lock className="w-5 h-5 mr-2" />
-                Data is encrypted
-              </div>
-            </div>
-
-            {/* Full-width BrainDeck Button */}
-            <div className="w-full mb-3">
-              <button
-                onClick={() => onMenuChange?.('braindeck')}
-                className="w-full flex items-center justify-center rounded-xl bg-white text-blue-600 font-bold py-3 text-base border border-blue-200 shadow"
-                style={{ letterSpacing: '0.02em' }}
-              >
-                <BrainCircuit className="w-5 h-5 mr-2" />
-                healQR BrainDeck
-              </button>
             </div>
           </div>
 
