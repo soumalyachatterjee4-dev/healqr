@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import {
@@ -7,26 +6,20 @@ import {
   Lock,
   BrainCircuit,
   Microscope,
-  BarChart3,
   Settings,
-  LogOut,
-  Home,
-  User,
-  QrCode,
-  FileText,
-  TestTubes,
-  Users,
-  ClipboardList,
-  Calendar,
 } from 'lucide-react';
 import { auth, db } from '../lib/firebase/config';
 import { signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { toast } from 'sonner';
+import LabSidebar from './LabSidebar';
 import LabProfileManager from './LabProfileManager';
 import LabQRManager from './LabQRManager';
 import LabTestCatalog from './LabTestCatalog';
 import LabScheduleManager from './LabScheduleManager';
+import LabBookingsManager from './LabBookingsManager';
+import LabLocationManager from './LabLocationManager';
+import LabDoctorManager from './LabDoctorManager';
 
 interface LabData {
   uid: string;
@@ -50,6 +43,7 @@ export default function LabDashboard({ onLogout }: { onLogout?: () => void | Pro
   const [loading, setLoading] = useState(true);
   const [activeMenu, setActiveMenu] = useState('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [bookingCount, setBookingCount] = useState(0);
 
   const resolvedLabId = auth?.currentUser?.uid || localStorage.getItem('userId') || '';
 
@@ -67,6 +61,20 @@ export default function LabDashboard({ onLogout }: { onLogout?: () => void | Pro
         if (labSnap.exists()) {
           setLabData({ uid: labSnap.id, ...labSnap.data() } as LabData);
         }
+
+        // Fetch this month's booking count (single-field query, filter client-side)
+        const now = new Date();
+        const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const bq = query(
+          collection(db, 'labBookings'),
+          where('labId', '==', resolvedLabId)
+        );
+        const bSnap = await getDocs(bq);
+        const monthCount = bSnap.docs.filter(d => {
+          const bd = d.data().bookingDate || '';
+          return bd.startsWith(monthPrefix);
+        }).length;
+        setBookingCount(monthCount);
       } catch (error) {
         console.error('Error fetching lab data:', error);
       } finally {
@@ -113,18 +121,33 @@ export default function LabDashboard({ onLogout }: { onLogout?: () => void | Pro
     }
   };
 
-  const sidebarItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: Home },
-    { id: 'profile', label: 'Profile Manager', icon: User },
-    { id: 'qr-manager', label: 'QR Manager', icon: QrCode },
-    { id: 'test-catalog', label: 'Test Catalog', icon: TestTubes },
-    { id: 'schedule', label: 'Collection Schedule', icon: Calendar },
-    { id: 'bookings', label: 'Bookings', icon: ClipboardList },
-    { id: 'reports', label: 'Reports', icon: FileText },
-    { id: 'staff', label: 'Staff', icon: Users },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-    { id: 'settings', label: 'Settings', icon: Settings },
-  ];
+  // Page title map for header
+  const pageTitles: Record<string, string> = {
+    dashboard: 'Dashboard',
+    'location-manager': 'Location Manager',
+    'manage-doctors': 'Manage Doctors',
+    bookings: 'Bookings Manager',
+    'queue-display': 'Queue Display',
+    'phlebotomist-manager': 'Phlebotomist Manager',
+    'allocation-queue': 'Allocation Queue',
+    'test-catalog': 'Test Catalog',
+    schedule: 'Schedule Manager',
+    'report-upload': 'Report Upload',
+    'report-search': 'Report Search',
+    analytics: 'Analytics',
+    revenue: 'Revenue Dashboard',
+    billing: 'Billing & Receipts',
+    inventory: 'Inventory',
+    staff: 'Staff Attendance',
+    'patient-broadcast': 'Patient Broadcast',
+    'referral-network': 'Referral Network',
+    'patient-retention': 'Patient Retention',
+    'social-kit': 'Social Kit & Offers',
+    profile: 'Profile Manager',
+    'qr-manager': 'QR Manager',
+    'monthly-planner': 'Monthly Planner',
+    'data-management': 'Data Management',
+  };
 
   if (loading) {
     return (
@@ -138,60 +161,20 @@ export default function LabDashboard({ onLogout }: { onLogout?: () => void | Pro
   }
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col lg:flex-row">
-      {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-zinc-950 border-r border-zinc-800 transform transition-transform duration-200 lg:translate-x-0 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="flex flex-col h-full">
-          {/* Logo */}
-          <div className="p-4 border-b border-zinc-800">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                <Microscope className="w-5 h-5 text-purple-500" />
-              </div>
-              <span className="text-lg font-bold">Lab Dashboard</span>
-            </div>
-          </div>
-
-          {/* Navigation */}
-          <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-            {sidebarItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => { setActiveMenu(item.id); setMobileMenuOpen(false); }}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] transition-colors ${
-                  activeMenu === item.id
-                    ? 'bg-purple-600 text-white'
-                    : 'text-gray-400 hover:bg-zinc-900 hover:text-white'
-                }`}
-              >
-                <item.icon className="w-4 h-4" />
-                {item.label}
-              </button>
-            ))}
-          </nav>
-
-          {/* Logout */}
-          <div className="p-3 border-t border-zinc-800">
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] text-red-400 hover:bg-red-500/10 transition-colors"
-            >
-              <LogOut className="w-4 h-4" />
-              Logout
-            </button>
-          </div>
-        </div>
-      </aside>
-
-      {/* Backdrop */}
-      {mobileMenuOpen && (
-        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setMobileMenuOpen(false)} />
-      )}
+    <div className="min-h-screen bg-zinc-950 text-white overflow-x-hidden">
+      {/* Sidebar Component */}
+      <LabSidebar
+        activeMenu={activeMenu}
+        onMenuChange={(menu) => { setActiveMenu(menu); setMobileMenuOpen(false); }}
+        onLogout={handleLogout}
+        isOpen={mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
+      />
 
       {/* Main Content */}
-      <div className="flex-1 lg:ml-64 flex flex-col min-h-screen">
+      <div className="transition-all duration-300 lg:ml-64">
         {/* Header */}
-        <header className="bg-black border-b border-zinc-900 px-4 md:px-8 py-4 flex items-center justify-between sticky top-0 z-30">
+        <header className="bg-zinc-950 border-b border-zinc-900 px-4 md:px-8 py-4 flex items-center justify-between sticky top-0 z-30">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileMenuOpen(true)}
@@ -200,7 +183,7 @@ export default function LabDashboard({ onLogout }: { onLogout?: () => void | Pro
               <Menu className="w-5 h-5 text-purple-500" />
             </button>
             <h2 className="text-lg md:text-xl font-medium">
-              {sidebarItems.find(i => i.id === activeMenu)?.label || 'Dashboard'}
+              {pageTitles[activeMenu] || 'Dashboard'}
             </h2>
           </div>
           <div className="flex items-center gap-2">
@@ -213,6 +196,16 @@ export default function LabDashboard({ onLogout }: { onLogout?: () => void | Pro
         {/* Dashboard Content */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden">
           <div className="px-4 md:px-8 py-8 space-y-8">
+
+            {/* Location Manager */}
+            {activeMenu === 'location-manager' && (
+              <LabLocationManager />
+            )}
+
+            {/* Manage Doctors */}
+            {activeMenu === 'manage-doctors' && (
+              <LabDoctorManager labId={resolvedLabId} />
+            )}
 
             {/* Profile Manager */}
             {activeMenu === 'profile' && (
@@ -232,6 +225,11 @@ export default function LabDashboard({ onLogout }: { onLogout?: () => void | Pro
             {/* Collection Schedule */}
             {activeMenu === 'schedule' && (
               <LabScheduleManager labId={resolvedLabId} labData={labData} />
+            )}
+
+            {/* Bookings Manager */}
+            {activeMenu === 'bookings' && (
+              <LabBookingsManager labId={resolvedLabId} />
             )}
 
             {/* Dashboard Home */}
@@ -288,7 +286,7 @@ export default function LabDashboard({ onLogout }: { onLogout?: () => void | Pro
               </div>
               <div className="mb-1">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-4xl font-bold text-white">0</span>
+                  <span className="text-4xl font-bold text-white">{bookingCount}</span>
                   <span className="text-2xl font-semibold text-white">Test Bookings</span>
                 </div>
                 <p className="text-[11px] text-purple-100 opacity-80 font-medium">
@@ -350,14 +348,14 @@ export default function LabDashboard({ onLogout }: { onLogout?: () => void | Pro
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {[
-                    { icon: '🔬', label: 'Test Catalog Management' },
-                    { icon: '📋', label: 'Sample Collection Tracking' },
+                    { icon: '�', label: 'Bookings Manager' },
+                    { icon: '🩸', label: 'Phlebotomist System' },
                     { icon: '📊', label: 'Report Upload & Delivery' },
                     { icon: '🏥', label: 'Doctor Referral Network' },
                     { icon: '🎫', label: 'Discount Coupons' },
                     { icon: '📈', label: 'Revenue & Analytics' },
                     { icon: '👥', label: 'Staff Management' },
-                    { icon: '🔔', label: 'Patient Notifications' },
+                    { icon: '🔔', label: 'Patient Broadcast' },
                   ].map((feature, i) => (
                     <div key={i} className="flex items-center gap-3 bg-black rounded-lg px-4 py-3 border border-zinc-800">
                       <span className="text-xl">{feature.icon}</span>
@@ -370,12 +368,12 @@ export default function LabDashboard({ onLogout }: { onLogout?: () => void | Pro
             </>)}
 
             {/* Other menu items — Coming Soon */}
-            {activeMenu !== 'dashboard' && activeMenu !== 'profile' && activeMenu !== 'qr-manager' && activeMenu !== 'test-catalog' && activeMenu !== 'schedule' && (
+            {activeMenu !== 'dashboard' && activeMenu !== 'profile' && activeMenu !== 'qr-manager' && activeMenu !== 'test-catalog' && activeMenu !== 'schedule' && activeMenu !== 'bookings' && activeMenu !== 'location-manager' && activeMenu !== 'manage-doctors' && (
               <Card className="bg-zinc-900 border-zinc-800">
                 <CardContent className="flex flex-col items-center justify-center py-16">
                   <Settings className="w-12 h-12 text-purple-500/30 mb-4" />
                   <h3 className="text-white text-lg font-semibold mb-2">
-                    {sidebarItems.find(i => i.id === activeMenu)?.label || 'Feature'}
+                    {pageTitles[activeMenu] || 'Feature'}
                   </h3>
                   <p className="text-gray-500 text-sm">Coming soon...</p>
                 </CardContent>

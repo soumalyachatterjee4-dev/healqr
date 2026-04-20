@@ -311,7 +311,7 @@ export default function LabBookingFlow({ onBack, language = 'english', onLanguag
   // â”€â”€â”€ Load booked slot counts for selected date â”€â”€â”€
   useEffect(() => {
     if (!selectedDate || !labId) return;
-    const dateStr = selectedDate.toISOString().split('T')[0];
+    const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
     (async () => {
       try {
         const q = query(
@@ -403,7 +403,7 @@ export default function LabBookingFlow({ onBack, language = 'english', onLanguag
     setSubmitting(true);
     try {
       const bid = generateLabBookingId();
-      const dateStr = selectedDate!.toISOString().split('T')[0];
+      const dateStr = `${selectedDate!.getFullYear()}-${String(selectedDate!.getMonth() + 1).padStart(2, '0')}-${String(selectedDate!.getDate()).padStart(2, '0')}`;
 
       // Get serial number for walk-in
       let srl = 0;

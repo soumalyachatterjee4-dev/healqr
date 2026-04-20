@@ -217,6 +217,12 @@ service cloud.firestore {
         allow read: if true;
         allow write: if isAuthenticated() && request.auth.uid == labId;
       }
+
+      // Lab phlebotomists
+      match /phlebotomists/{phlebId} {
+        allow read: if true;
+        allow write: if isAuthenticated() && request.auth.uid == labId;
+      }
     }
 
     // ============================================
