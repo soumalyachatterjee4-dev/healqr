@@ -101,9 +101,14 @@ const LabSignUp = lazy(() => import("./components/LabSignUp"));
 const ClinicLogin = lazy(() => import("./components/ClinicLogin"));
 const LabLogin = lazy(() => import("./components/LabLogin"));
 const LabDashboard = lazy(() => import("./components/LabDashboard"));
-const PhlebotomistSignUp = lazy(() => import("./components/PhlebotomistSignUp"));
-const PhlebotomistLogin = lazy(() => import("./components/PhlebotomistLogin"));
-const PhlebotomistDashboard = lazy(() => import("./components/PhlebotomistDashboard"));
+const PhlebotomistSignUp = lazy(() => import("./components/ParamedicalSignUp"));
+const PhlebotomistLogin = lazy(() => import("./components/ParamedicalLogin"));
+const PhlebotomistDashboard = lazy(() => import("./components/ParamedicalDashboard"));
+const ParamedicalSignUp = lazy(() => import("./components/ParamedicalSignUp"));
+const ParamedicalLogin = lazy(() => import("./components/ParamedicalLogin"));
+const ParamedicalDashboard = lazy(() => import("./components/ParamedicalDashboard"));
+const ParamedicalMiniWebsite = lazy(() => import("./components/ParamedicalMiniWebsite"));
+const ParamedicalBookingFlow = lazy(() => import("./components/ParamedicalBookingFlow"));
 const LabBookingMiniWebsite = lazy(() => import("./components/LabBookingMiniWebsite"));
 const LabBookingFlow = lazy(() => import("./components/LabBookingFlow"));
 const ClinicDashboard = lazy(() => import("./components/ClinicDashboard"));
@@ -264,18 +269,23 @@ export default function App() {
     | "phlebo-signup"
     | "phlebo-login"
     | "phlebo-dashboard"
+    | "paramedical-signup"
+    | "paramedical-login"
+    | "paramedical-dashboard"
+    | "paramedical-mini-website"
+    | "paramedical-booking-flow"
   >(() => {
     // Initialize currentPage from localStorage to prevent flash/auto-logout on refresh
     const isClinic = localStorage.getItem('healqr_is_clinic') === 'true';
     const isLab = localStorage.getItem('healqr_is_lab') === 'true';
-    const isPhlebo = localStorage.getItem('healqr_is_phlebo') === 'true';
+    const isPhlebo = localStorage.getItem('healqr_is_phlebo') === 'true' || localStorage.getItem('healqr_is_paramedical') === 'true';
     const isAssistant = localStorage.getItem('healqr_is_assistant') === 'true';
     const hasClinicSession = isClinic && (localStorage.getItem('userId') || localStorage.getItem('healqr_user_email'));
     if (hasClinicSession) return 'clinic-dashboard'; // Clinic owners AND clinic assistants
     const hasLabSession = isLab && (localStorage.getItem('userId') || localStorage.getItem('healqr_user_email'));
     if (hasLabSession) return 'lab-dashboard';
     const hasPhlebSession = isPhlebo && (localStorage.getItem('userId') || localStorage.getItem('healqr_user_email'));
-    if (hasPhlebSession) return 'phlebo-dashboard';
+    if (hasPhlebSession) return 'paramedical-dashboard';
     // Doctor-level assistants should also start on dashboard
     if (isAssistant && localStorage.getItem('healqr_assistant_doctor_id')) return 'dashboard';
     return 'landing';
@@ -872,6 +882,34 @@ export default function App() {
       }
     }
 
+    // Handle /para/{slug} clean URL — look up paramedical by profileSlug
+    if (pathname.startsWith('/para/')) {
+      const slug = pathname.split('/para/')[1]?.split('/')[0]?.split('?')[0]?.toLowerCase();
+      if (slug && db) {
+        try {
+          const { collection, query, where, getDocs } = await import('firebase/firestore');
+          const paraRef = collection(db, 'paramedicals');
+          const slugQuery = query(paraRef, where('profileSlug', '==', slug));
+          const slugSnap = await getDocs(slugQuery);
+
+          if (!slugSnap.empty) {
+            const paraDoc = slugSnap.docs[0];
+            sessionStorage.setItem('booking_paramedical_id', paraDoc.id);
+            sessionStorage.setItem('booking_source', 'para_url');
+            const scanSessionId = `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            sessionStorage.setItem('scan_session_id', scanSessionId);
+            setCurrentPage('paramedical-mini-website');
+            setIsAuthInitialized(true);
+            return;
+          } else {
+            console.error('No paramedical found with slug:', slug);
+          }
+        } catch (error) {
+          console.error('Error looking up para slug:', error);
+        }
+      }
+    }
+
     // Handle Patient RX deep link (AI RX Notification Click)
     if (pathname.startsWith('/patient/rx/')) {
       const notificationId = pathname.split('/patient/rx/')[1];
@@ -990,11 +1028,11 @@ export default function App() {
     } else if (pageParam === 'lab-login') {
       setCurrentPage('lab-login');
       return;
-    } else if (pageParam === 'phlebo-signup') {
-      setCurrentPage('phlebo-signup');
+    } else if (pageParam === 'phlebo-signup' || pageParam === 'paramedical-signup') {
+      setCurrentPage('paramedical-signup');
       return;
-    } else if (pageParam === 'phlebo-login') {
-      setCurrentPage('phlebo-login');
+    } else if (pageParam === 'phlebo-login' || pageParam === 'paramedical-login') {
+      setCurrentPage('paramedical-login');
       return;
     } else if (pageParam === 'clinic-dashboard') {
       setCurrentPage('clinic-dashboard');
@@ -1542,7 +1580,7 @@ export default function App() {
       const isOnMasterAccessLoginPage = window.location.pathname.includes('/master-access-login');
       const isClinicPage = currentPage === 'clinic-login' || currentPage === 'clinic-signup' || pageParam === 'clinic-login' || pageParam === 'clinic-signup';
       const isLabPage = currentPage === 'lab-login' || currentPage === 'lab-signup' || pageParam === 'lab-login' || pageParam === 'lab-signup';
-      const isPhlebPage = currentPage === 'phlebo-login' || currentPage === 'phlebo-signup' || pageParam === 'phlebo-login' || pageParam === 'phlebo-signup';
+      const isPhlebPage = currentPage === 'phlebo-login' || currentPage === 'phlebo-signup' || currentPage === 'paramedical-login' || currentPage === 'paramedical-signup' || currentPage === 'paramedical-mini-website' || currentPage === 'paramedical-booking-flow' || pageParam === 'phlebo-login' || pageParam === 'phlebo-signup' || pageParam === 'paramedical-login' || pageParam === 'paramedical-signup';
       const isAdvertiserPage = currentPage === 'advertiser-login' || currentPage === 'advertiser-signup' || currentPage === 'advertiser-verify' || pageParam === 'advertiser-login' || pageParam === 'advertiser-signup' || pageParam === 'advertiser-verify';
       const isPharmaPage = currentPage === 'pharma-login' || currentPage === 'pharma-verify' || currentPage === 'pharma-portal' || currentPage === 'pharma-signup' || pageParam === 'pharma-login' || pageParam === 'pharma-verify' || pageParam === 'pharma-portal' || pageParam === 'pharma-signup';
 
@@ -1578,11 +1616,11 @@ export default function App() {
         // Check localStorage first for quick routing (set by VerifyLogin)
         const isClinicFromStorage = localStorage.getItem('healqr_is_clinic') === 'true';
         const isLabFromStorage = localStorage.getItem('healqr_is_lab') === 'true';
-        const isPhlebFromStorage = localStorage.getItem('healqr_is_phlebo') === 'true';
+        const isPhlebFromStorage = localStorage.getItem('healqr_is_phlebo') === 'true' || localStorage.getItem('healqr_is_paramedical') === 'true';
         const isAssistantFromStorage = localStorage.getItem('healqr_is_assistant') === 'true';
 
         if (isPhlebFromStorage) {
-          setCurrentPage('phlebo-dashboard');
+          setCurrentPage('paramedical-dashboard');
           setIsAuthInitialized(true);
           return;
         }
@@ -2842,6 +2880,8 @@ export default function App() {
       localStorage.removeItem('healqr_is_lab');
       localStorage.removeItem('healqr_is_phlebo');
       localStorage.removeItem('healqr_phlebo_id');
+      localStorage.removeItem('healqr_is_paramedical');
+      localStorage.removeItem('healqr_paramedical_id');
       localStorage.removeItem('healqr_is_assistant');
       localStorage.removeItem('healqr_assistant_pages');
       localStorage.removeItem('healqr_assistant_doctor_id');
@@ -2894,7 +2934,7 @@ export default function App() {
       return previewLanguage || 'english';
     }
     // Patient-facing: booking flow
-    if (currentPage.startsWith('booking-') || currentPage === 'clinic-booking-flow' || currentPage === 'lab-mini-website' || currentPage === 'lab-booking-flow') {
+    if (currentPage.startsWith('booking-') || currentPage === 'clinic-booking-flow' || currentPage === 'lab-mini-website' || currentPage === 'lab-booking-flow' || currentPage === 'paramedical-mini-website' || currentPage === 'paramedical-booking-flow') {
       return bookingLanguage;
     }
     // Patient-facing: notifications & review
@@ -2961,8 +3001,8 @@ export default function App() {
           onPharmaLogin={() => setCurrentPage("pharma-login")}
           onReferrerRegister={() => setCurrentPage("referrer-register")}
           onReferrerLogin={() => setCurrentPage("referrer-login")}
-          onPhlebSignUp={() => setCurrentPage("phlebo-signup")}
-          onPhlebLogin={() => setCurrentPage("phlebo-login")}
+          onPhlebSignUp={() => setCurrentPage("paramedical-signup")}
+          onPhlebLogin={() => setCurrentPage("paramedical-login")}
         />
       )}
 
@@ -3007,7 +3047,7 @@ export default function App() {
             const storedName = localStorage.getItem('healqr_user_name');
             const isClinic = localStorage.getItem('healqr_is_clinic') === 'true';
             const isLab = localStorage.getItem('healqr_is_lab') === 'true';
-            const isPhlebo = localStorage.getItem('healqr_is_phlebo') === 'true';
+            const isPhlebo = localStorage.getItem('healqr_is_phlebo') === 'true' || localStorage.getItem('healqr_is_paramedical') === 'true';
             const isAssistant = localStorage.getItem('healqr_is_assistant') === 'true';
 
             if (storedEmail) setUserEmail(storedEmail);
@@ -3015,7 +3055,7 @@ export default function App() {
 
             // Route based on user type
             if (isPhlebo) {
-              setCurrentPage("phlebo-dashboard");
+              setCurrentPage("paramedical-dashboard");
             } else if (isLab) {
               setCurrentPage("lab-dashboard"); // Lab owners AND lab assistants
             } else if (isClinic) {
@@ -4015,28 +4055,43 @@ export default function App() {
         </Suspense>
       )}
 
-      {currentPage === "phlebo-signup" && (
+      {(currentPage === "phlebo-signup" || currentPage === "paramedical-signup") && (
         <Suspense fallback={<PageLoader />}>
-          <PhlebotomistSignUp
+          <ParamedicalSignUp
             onBack={() => setCurrentPage("landing")}
-            onLogin={() => window.location.href = '/?page=phlebo-login'}
+            onLogin={() => window.location.href = '/?page=paramedical-login'}
           />
         </Suspense>
       )}
 
-      {currentPage === "phlebo-login" && (
+      {(currentPage === "phlebo-login" || currentPage === "paramedical-login") && (
         <Suspense fallback={<PageLoader />}>
-          <PhlebotomistLogin
+          <ParamedicalLogin
             onBack={() => setCurrentPage("landing")}
-            onSignUp={() => setCurrentPage("phlebo-signup")}
-            onSuccess={() => setCurrentPage("phlebo-dashboard")}
+            onSignUp={() => setCurrentPage("paramedical-signup")}
+            onSuccess={() => setCurrentPage("paramedical-dashboard")}
           />
         </Suspense>
       )}
 
-      {currentPage === "phlebo-dashboard" && (
+      {(currentPage === "phlebo-dashboard" || currentPage === "paramedical-dashboard") && (
         <Suspense fallback={<PageLoader />}>
-          <PhlebotomistDashboard onLogout={handleLogout} />
+          <ParamedicalDashboard onLogout={handleLogout} />
+        </Suspense>
+      )}
+
+      {currentPage === "paramedical-mini-website" && (
+        <Suspense fallback={<PageLoader />}>
+          <ParamedicalMiniWebsite
+            onBookNow={() => setCurrentPage("paramedical-booking-flow")}
+            onBack={() => setCurrentPage("landing")}
+          />
+        </Suspense>
+      )}
+
+      {currentPage === "paramedical-booking-flow" && (
+        <Suspense fallback={<PageLoader />}>
+          <ParamedicalBookingFlow onBack={() => setCurrentPage("landing")} />
         </Suspense>
       )}
 

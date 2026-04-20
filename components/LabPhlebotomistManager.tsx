@@ -92,30 +92,46 @@ export default function LabPhlebotomistManager({ labId }: { labId: string }) {
     return () => unsub();
   }, [labId]);
 
-  /* ───── Search phlebotomists from top-level collection ───── */
+  /* ───── Search phlebotomists from top-level collection (paramedicals with role=phlebotomist) ───── */
   const handleSearch = useCallback(async () => {
     if (!searchQuery.trim()) return;
     setSearching(true);
     try {
       const q = searchQuery.trim().toLowerCase();
+      // Search in paramedicals collection (new), fall back to phlebotomists (legacy)
+      const paraRef = collection(db, 'paramedicals');
       const phlebRef = collection(db, 'phlebotomists');
 
-      // Search by phone
-      const byPhone = await getDocs(query(phlebRef, where('phone', '==', q)));
-      // Search by email
-      const byEmail = await getDocs(query(phlebRef, where('email', '==', q)));
+      // Search by phone in paramedicals
+      const byPhonePara = await getDocs(query(paraRef, where('phone', '==', q), where('role', '==', 'phlebotomist')));
+      // Search by email in paramedicals
+      const byEmailPara = await getDocs(query(paraRef, where('email', '==', q), where('role', '==', 'phlebotomist')));
+      // Legacy: search by phone in phlebotomists
+      const byPhoneOld = await getDocs(query(phlebRef, where('phone', '==', q)));
+      // Legacy: search by email in phlebotomists
+      const byEmailOld = await getDocs(query(phlebRef, where('email', '==', q)));
 
       const resultMap = new Map<string, SearchResult>();
-      [...byPhone.docs, ...byEmail.docs].forEach((d) => {
+      [...byPhonePara.docs, ...byEmailPara.docs, ...byPhoneOld.docs, ...byEmailOld.docs].forEach((d) => {
         if (!resultMap.has(d.id)) {
           resultMap.set(d.id, { id: d.id, ...d.data() } as SearchResult);
         }
       });
 
-      // Also try partial name match (get all and filter client-side — phlebotomists won't be millions)
+      // Also try partial name match
       if (resultMap.size === 0) {
-        const allPhlebos = await getDocs(phlebRef);
-        allPhlebos.docs.forEach((d) => {
+        const allPara = await getDocs(query(paraRef, where('role', '==', 'phlebotomist')));
+        allPara.docs.forEach((d) => {
+          const data = d.data();
+          if (data.name?.toLowerCase().includes(q) || data.phone?.includes(q)) {
+            if (!resultMap.has(d.id)) {
+              resultMap.set(d.id, { id: d.id, ...data } as SearchResult);
+            }
+          }
+        });
+        // Legacy fallback
+        const allOld = await getDocs(phlebRef);
+        allOld.docs.forEach((d) => {
           const data = d.data();
           if (data.name?.toLowerCase().includes(q) || data.phone?.includes(q)) {
             if (!resultMap.has(d.id)) {
@@ -155,10 +171,16 @@ export default function LabPhlebotomistManager({ labId }: { labId: string }) {
         linkedPhlebotomists: arrayUnion(linkEntry),
       });
 
-      // Also add to phlebo's linkedLabs array (bidirectional)
-      await updateDoc(doc(db, 'phlebotomists', phlebo.id), {
-        linkedLabs: arrayUnion({ id: labId, name: labName, linkedAt: new Date().toISOString() }),
-      });
+      // Also add to phlebo's linkedLabs array (bidirectional) — try paramedicals first, fallback to phlebotomists
+      try {
+        await updateDoc(doc(db, 'paramedicals', phlebo.id), {
+          linkedLabs: arrayUnion({ id: labId, name: labName, linkedAt: new Date().toISOString() }),
+        });
+      } catch (_) {
+        await updateDoc(doc(db, 'phlebotomists', phlebo.id), {
+          linkedLabs: arrayUnion({ id: labId, name: labName, linkedAt: new Date().toISOString() }),
+        });
+      }
 
       // Also add to labs/{labId}/phlebotomists subcollection (for booking allocation dropdown)
       await addDoc(collection(db, 'labs', labId, 'phlebotomists'), {
@@ -196,12 +218,18 @@ export default function LabPhlebotomistManager({ labId }: { labId: string }) {
         await deleteDoc(d.ref);
       }
 
-      // Remove lab from phlebo's linkedLabs (best effort)
+      // Remove lab from phlebo's linkedLabs (best effort — try paramedicals first)
       try {
-        const phlebDoc = await getDoc(doc(db, 'phlebotomists', phlebo.id));
-        if (phlebDoc.exists()) {
-          const labs = (phlebDoc.data().linkedLabs || []).filter((l: any) => l.id !== labId);
-          await updateDoc(doc(db, 'phlebotomists', phlebo.id), { linkedLabs: labs });
+        const paraDocSnap = await getDoc(doc(db, 'paramedicals', phlebo.id));
+        if (paraDocSnap.exists()) {
+          const labs = (paraDocSnap.data().linkedLabs || []).filter((l: any) => l.id !== labId);
+          await updateDoc(doc(db, 'paramedicals', phlebo.id), { linkedLabs: labs });
+        } else {
+          const phlebDoc = await getDoc(doc(db, 'phlebotomists', phlebo.id));
+          if (phlebDoc.exists()) {
+            const labs = (phlebDoc.data().linkedLabs || []).filter((l: any) => l.id !== labId);
+            await updateDoc(doc(db, 'phlebotomists', phlebo.id), { linkedLabs: labs });
+          }
         }
       } catch (_) { /* best effort */ }
 
@@ -220,20 +248,22 @@ export default function LabPhlebotomistManager({ labId }: { labId: string }) {
     }
     setAddSaving(true);
     try {
-      // Check if phone already exists
-      const existing = await getDocs(query(collection(db, 'phlebotomists'), where('phone', '==', addPhone.trim())));
-      if (!existing.empty) {
+      // Check if phone already exists in paramedicals or phlebotomists
+      const existingPara = await getDocs(query(collection(db, 'paramedicals'), where('phone', '==', addPhone.trim()), where('role', '==', 'phlebotomist')));
+      const existingOld = await getDocs(query(collection(db, 'phlebotomists'), where('phone', '==', addPhone.trim())));
+      if (!existingPara.empty || !existingOld.empty) {
         toast.error('This phone is already registered. Use Search to find and link them.');
         setAddSaving(false);
         return;
       }
 
-      // Create in top-level collection
-      const newDoc = await addDoc(collection(db, 'phlebotomists'), {
+      // Create in paramedicals collection (new unified collection)
+      const newDoc = await addDoc(collection(db, 'paramedicals'), {
         name: addName.trim(),
         phone: addPhone.trim(),
         email: addEmail.trim().toLowerCase(),
         pincode: addPincode.trim(),
+        role: 'phlebotomist',
         experience: '',
         status: 'active',
         linkedLabs: [{ id: labId, name: labName, linkedAt: new Date().toISOString() }],

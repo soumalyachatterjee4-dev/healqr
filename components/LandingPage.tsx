@@ -867,7 +867,7 @@ export default function LandingPage({
                     onClick={onPhlebLogin}
                     className="text-gray-400 hover:text-teal-500 transition-colors text-sm text-left"
                   >
-                    Phlebotomist Gateway
+                    Healthcare Professional Gateway
                   </button>
                 </li>
               </ul>

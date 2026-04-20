@@ -230,37 +230,67 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
               }
             }
           }
-        } else if (loginType === 'phlebo') {
-          // ✅ PHLEBOTOMIST LOGIN FLOW
+        } else if (loginType === 'phlebo' || loginType === 'paramedical') {
+          // ✅ PARAMEDICAL / PHLEBOTOMIST LOGIN FLOW
           const isSignup = urlParams.get('signup') === 'true';
 
-          // Check phlebotomists collection by uid first
-          const phlebDocRef = doc(db, 'phlebotomists', user.uid);
-          const phlebDoc = await getDoc(phlebDocRef);
+          // Check paramedicals collection by uid first, then fallback to phlebotomists
+          let foundDoc: any = null;
+          let foundDocId = '';
+          const paraDocRef = doc(db, 'paramedicals', user.uid);
+          const paraDoc = await getDoc(paraDocRef);
+          if (paraDoc.exists()) {
+            foundDoc = paraDoc.data();
+            foundDocId = user.uid;
+          } else {
+            // Fallback: old phlebotomists collection
+            const oldRef = doc(db, 'phlebotomists', user.uid);
+            const oldDoc = await getDoc(oldRef);
+            if (oldDoc.exists()) {
+              foundDoc = oldDoc.data();
+              foundDocId = user.uid;
+            }
+          }
 
-          if (phlebDoc.exists()) {
-            const phlebData = phlebDoc.data();
-            localStorage.setItem('userId', user.uid);
+          if (foundDoc) {
+            localStorage.setItem('userId', foundDocId);
             localStorage.setItem('healqr_user_email', email);
             localStorage.setItem('healqr_authenticated', 'true');
+            localStorage.setItem('healqr_is_paramedical', 'true');
+            localStorage.setItem('healqr_paramedical_id', foundDocId);
             localStorage.setItem('healqr_is_phlebo', 'true');
-            localStorage.setItem('healqr_phlebo_id', user.uid);
+            localStorage.setItem('healqr_phlebo_id', foundDocId);
             localStorage.removeItem('healqr_is_clinic');
             localStorage.removeItem('healqr_is_lab');
             localStorage.removeItem('healqr_is_assistant');
-            if (phlebData.name) {
-              localStorage.setItem('healqr_user_name', phlebData.name);
+            if (foundDoc.name) {
+              localStorage.setItem('healqr_user_name', foundDoc.name);
             }
           } else if (isSignup) {
-            // New signup — move from pending_phlebo_signups to phlebotomists
-            const pendingQuery = query(collection(db, 'pending_phlebo_signups'), where('email', '==', email), limit(1));
-            const pendingSnap = await getDocs(pendingQuery);
+            // New signup — check both pending collections
+            let pendingData: any = null;
+            let pendingRef: any = null;
 
-            if (!pendingSnap.empty) {
-              const pendingData = pendingSnap.docs[0].data();
+            // Check new pending_paramedical_signups first
+            const pendingParaQ = query(collection(db, 'pending_paramedical_signups'), where('email', '==', email), limit(1));
+            const pendingParaSnap = await getDocs(pendingParaQ);
+            if (!pendingParaSnap.empty) {
+              pendingData = pendingParaSnap.docs[0].data();
+              pendingRef = pendingParaSnap.docs[0].ref;
+            } else {
+              // Fallback: old pending_phlebo_signups
+              const pendingOldQ = query(collection(db, 'pending_phlebo_signups'), where('email', '==', email), limit(1));
+              const pendingOldSnap = await getDocs(pendingOldQ);
+              if (!pendingOldSnap.empty) {
+                pendingData = pendingOldSnap.docs[0].data();
+                pendingRef = pendingOldSnap.docs[0].ref;
+              }
+            }
+
+            if (pendingData && pendingRef) {
               const { setDoc, deleteDoc } = await import('firebase/firestore');
-              // Create in phlebotomists collection with auth uid as doc ID
-              await setDoc(doc(db, 'phlebotomists', user.uid), {
+              // Create in paramedicals collection with auth uid as doc ID
+              await setDoc(doc(db, 'paramedicals', user.uid), {
                 ...pendingData,
                 uid: user.uid,
                 verified: true,
@@ -268,11 +298,13 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
                 createdAt: pendingData.createdAt || new Date().toISOString(),
               });
               // Delete pending record
-              await deleteDoc(pendingSnap.docs[0].ref);
+              await deleteDoc(pendingRef);
 
               localStorage.setItem('userId', user.uid);
               localStorage.setItem('healqr_user_email', email);
               localStorage.setItem('healqr_authenticated', 'true');
+              localStorage.setItem('healqr_is_paramedical', 'true');
+              localStorage.setItem('healqr_paramedical_id', user.uid);
               localStorage.setItem('healqr_is_phlebo', 'true');
               localStorage.setItem('healqr_phlebo_id', user.uid);
               localStorage.removeItem('healqr_is_clinic');
@@ -286,35 +318,49 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
               setStatus('error');
               setMessage('No pending signup found for this email. Please sign up first.');
               setTimeout(() => {
-                window.location.href = '/?page=phlebo-signup';
+                window.location.href = '/?page=paramedical-signup';
               }, 2500);
               return;
             }
           } else {
-            // Fallback: query by email
-            const phlebByEmailQuery = query(collection(db, 'phlebotomists'), where('email', '==', email), limit(1));
-            const phlebByEmailSnap = await getDocs(phlebByEmailQuery);
+            // Fallback: query by email in both collections
+            let foundByEmail: any = null;
+            let foundByEmailId = '';
 
-            if (!phlebByEmailSnap.empty) {
-              const phlebData = phlebByEmailSnap.docs[0].data();
-              const phlebDocId = phlebByEmailSnap.docs[0].id;
-              localStorage.setItem('userId', phlebDocId);
+            const paraByEmailQ = query(collection(db, 'paramedicals'), where('email', '==', email), limit(1));
+            const paraByEmailSnap = await getDocs(paraByEmailQ);
+            if (!paraByEmailSnap.empty) {
+              foundByEmail = paraByEmailSnap.docs[0].data();
+              foundByEmailId = paraByEmailSnap.docs[0].id;
+            } else {
+              const oldByEmailQ = query(collection(db, 'phlebotomists'), where('email', '==', email), limit(1));
+              const oldByEmailSnap = await getDocs(oldByEmailQ);
+              if (!oldByEmailSnap.empty) {
+                foundByEmail = oldByEmailSnap.docs[0].data();
+                foundByEmailId = oldByEmailSnap.docs[0].id;
+              }
+            }
+
+            if (foundByEmail) {
+              localStorage.setItem('userId', foundByEmailId);
               localStorage.setItem('healqr_user_email', email);
               localStorage.setItem('healqr_authenticated', 'true');
+              localStorage.setItem('healqr_is_paramedical', 'true');
+              localStorage.setItem('healqr_paramedical_id', foundByEmailId);
               localStorage.setItem('healqr_is_phlebo', 'true');
-              localStorage.setItem('healqr_phlebo_id', phlebDocId);
+              localStorage.setItem('healqr_phlebo_id', foundByEmailId);
               localStorage.removeItem('healqr_is_clinic');
               localStorage.removeItem('healqr_is_lab');
               localStorage.removeItem('healqr_is_assistant');
-              if (phlebData.name) {
-                localStorage.setItem('healqr_user_name', phlebData.name);
+              if (foundByEmail.name) {
+                localStorage.setItem('healqr_user_name', foundByEmail.name);
               }
             } else {
               await auth.signOut();
               setStatus('error');
-              setMessage('This email is not registered as a Phlebotomist. Redirecting to Sign Up...');
+              setMessage('This email is not registered. Redirecting to Sign Up...');
               setTimeout(() => {
-                window.location.href = '/?page=phlebo-signup';
+                window.location.href = '/?page=paramedical-signup';
               }, 2500);
               return;
             }
@@ -426,8 +472,8 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
       const isAssistant = localStorage.getItem('healqr_is_assistant');
       const isClinic = localStorage.getItem('healqr_is_clinic');
       const isLab = localStorage.getItem('healqr_is_lab');
-      const isPhlebo = localStorage.getItem('healqr_is_phlebo');
-      setMessage(isAssistant ? 'Assistant access granted!' : isPhlebo ? 'Phlebotomist login successful!' : isLab ? 'Lab login successful!' : isClinic ? 'Clinic login successful!' : 'Login successful!');
+      const isPhlebo = localStorage.getItem('healqr_is_paramedical');
+      setMessage(isAssistant ? 'Assistant access granted!' : isPhlebo ? 'Professional login successful!' : isLab ? 'Lab login successful!' : isClinic ? 'Clinic login successful!' : 'Login successful!');
 
 
       // Immediately redirect to clean URL - App.tsx will handle routing based on localStorage

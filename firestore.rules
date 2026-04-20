@@ -39,7 +39,7 @@ service cloud.firestore {
       // 2. Unauthenticated virtual QR generation during clinic/doctor signup
       allow create: if (isAuthenticated() && request.auth.token.admin == true) ||
                       (isAuthenticated() && exists(/databases/$(database)/documents/admins/$(request.auth.token.email))) ||
-                      (request.resource.data.qrType == 'virtual' && request.resource.data.generatedBy in ['clinic-signup', 'doctor-signup', 'self-signup', 'lab-signup']);
+                      (request.resource.data.qrType == 'virtual' && request.resource.data.generatedBy in ['clinic-signup', 'doctor-signup', 'self-signup', 'lab-signup', 'paramedical-signup']);
 
       // No deletes allowed
       allow delete: if false;
@@ -261,6 +261,49 @@ service cloud.firestore {
     // ============================================
 
     match /pending_phlebo_signups/{docId} {
+      // Allow anyone to create (signup flow before auth)
+      allow create: if true;
+      // Allow read for verification
+      allow read: if true;
+      // Allow delete after successful verification
+      allow delete: if isAuthenticated();
+      // No updates
+      allow update: if false;
+    }
+
+    // ============================================
+    // PARAMEDICALS COLLECTION (Unified: phlebotomist, physiotherapist, nurse, wound-dresser, aaya, home-assistant)
+    // ============================================
+
+    match /paramedicals/{paraId} {
+      // Allow read for search, profile loading, and public mini-website
+      allow read: if true;
+      // Allow create during verification flow
+      allow create: if isAuthenticated();
+      // Allow update/delete only by owner
+      allow update, delete: if isOwner(paraId);
+    }
+
+    // ============================================
+    // PARAMEDICAL BOOKINGS COLLECTION
+    // ============================================
+
+    match /paramedicalBookings/{bookingId} {
+      // Allow read for authenticated paramedical staff
+      allow read: if isAuthenticated();
+      // Allow create for patient booking (unauthenticated)
+      allow create: if true;
+      // Allow update for authenticated paramedical staff
+      allow update: if isAuthenticated();
+      // No deletes
+      allow delete: if false;
+    }
+
+    // ============================================
+    // PENDING PARAMEDICAL SIGNUPS COLLECTION
+    // ============================================
+
+    match /pending_paramedical_signups/{docId} {
       // Allow anyone to create (signup flow before auth)
       allow create: if true;
       // Allow read for verification
