@@ -242,7 +242,7 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
           }
         } else if (loginType === 'phlebo' || loginType === 'paramedical') {
           // ✅ PARAMEDICAL / PHLEBOTOMIST LOGIN FLOW
-          const isSignup = urlParams.get('signup') === 'true';
+          const isSignup = searchParams.get('signup') === 'true';
 
           // Check paramedicals collection by uid first, then fallback to phlebotomists
           let foundDoc: any = null;
