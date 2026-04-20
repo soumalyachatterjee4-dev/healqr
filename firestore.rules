@@ -244,6 +244,34 @@ service cloud.firestore {
     }
 
     // ============================================
+    // PHLEBOTOMISTS COLLECTION (Top-level independent entity)
+    // ============================================
+
+    match /phlebotomists/{phlebId} {
+      // Allow read for search (by phone/email/name) and profile loading
+      allow read: if true;
+      // Allow create during verification flow
+      allow create: if isAuthenticated();
+      // Allow update/delete only by owner
+      allow update, delete: if isOwner(phlebId);
+    }
+
+    // ============================================
+    // PENDING PHLEBO SIGNUPS COLLECTION
+    // ============================================
+
+    match /pending_phlebo_signups/{docId} {
+      // Allow anyone to create (signup flow before auth)
+      allow create: if true;
+      // Allow read for verification
+      allow read: if true;
+      // Allow delete after successful verification
+      allow delete: if isAuthenticated();
+      // No updates
+      allow update: if false;
+    }
+
+    // ============================================
     // DOCTORS COLLECTION
     // ============================================
 

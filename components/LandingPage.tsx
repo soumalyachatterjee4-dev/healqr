@@ -37,6 +37,8 @@ interface LandingPageProps {
   onPharmaLogin?: () => void;
   onReferrerRegister?: () => void;
   onReferrerLogin?: () => void;
+  onPhlebSignUp?: () => void;
+  onPhlebLogin?: () => void;
 }
 
 export default function LandingPage({
@@ -56,7 +58,9 @@ export default function LandingPage({
   onAdvertiserGateway,
   onPharmaLogin,
   onReferrerRegister,
-  onReferrerLogin
+  onReferrerLogin,
+  onPhlebSignUp,
+  onPhlebLogin
 }: LandingPageProps) {
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [showAdvertiserModal, setShowAdvertiserModal] = useState(false);
@@ -856,6 +860,14 @@ export default function LandingPage({
                     className="text-gray-400 hover:text-emerald-500 transition-colors text-sm text-left"
                   >
                     Referrer Dashboard
+                  </button>
+                </li>
+                <li>
+                  <button
+                    onClick={onPhlebLogin}
+                    className="text-gray-400 hover:text-teal-500 transition-colors text-sm text-left"
+                  >
+                    Phlebotomist Gateway
                   </button>
                 </li>
               </ul>

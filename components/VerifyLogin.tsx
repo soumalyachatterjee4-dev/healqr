@@ -230,6 +230,95 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
               }
             }
           }
+        } else if (loginType === 'phlebo') {
+          // ✅ PHLEBOTOMIST LOGIN FLOW
+          const isSignup = urlParams.get('signup') === 'true';
+
+          // Check phlebotomists collection by uid first
+          const phlebDocRef = doc(db, 'phlebotomists', user.uid);
+          const phlebDoc = await getDoc(phlebDocRef);
+
+          if (phlebDoc.exists()) {
+            const phlebData = phlebDoc.data();
+            localStorage.setItem('userId', user.uid);
+            localStorage.setItem('healqr_user_email', email);
+            localStorage.setItem('healqr_authenticated', 'true');
+            localStorage.setItem('healqr_is_phlebo', 'true');
+            localStorage.setItem('healqr_phlebo_id', user.uid);
+            localStorage.removeItem('healqr_is_clinic');
+            localStorage.removeItem('healqr_is_lab');
+            localStorage.removeItem('healqr_is_assistant');
+            if (phlebData.name) {
+              localStorage.setItem('healqr_user_name', phlebData.name);
+            }
+          } else if (isSignup) {
+            // New signup — move from pending_phlebo_signups to phlebotomists
+            const pendingQuery = query(collection(db, 'pending_phlebo_signups'), where('email', '==', email), limit(1));
+            const pendingSnap = await getDocs(pendingQuery);
+
+            if (!pendingSnap.empty) {
+              const pendingData = pendingSnap.docs[0].data();
+              const { setDoc, deleteDoc } = await import('firebase/firestore');
+              // Create in phlebotomists collection with auth uid as doc ID
+              await setDoc(doc(db, 'phlebotomists', user.uid), {
+                ...pendingData,
+                uid: user.uid,
+                verified: true,
+                verifiedAt: new Date().toISOString(),
+                createdAt: pendingData.createdAt || new Date().toISOString(),
+              });
+              // Delete pending record
+              await deleteDoc(pendingSnap.docs[0].ref);
+
+              localStorage.setItem('userId', user.uid);
+              localStorage.setItem('healqr_user_email', email);
+              localStorage.setItem('healqr_authenticated', 'true');
+              localStorage.setItem('healqr_is_phlebo', 'true');
+              localStorage.setItem('healqr_phlebo_id', user.uid);
+              localStorage.removeItem('healqr_is_clinic');
+              localStorage.removeItem('healqr_is_lab');
+              localStorage.removeItem('healqr_is_assistant');
+              if (pendingData.name) {
+                localStorage.setItem('healqr_user_name', pendingData.name);
+              }
+            } else {
+              await auth.signOut();
+              setStatus('error');
+              setMessage('No pending signup found for this email. Please sign up first.');
+              setTimeout(() => {
+                window.location.href = '/?page=phlebo-signup';
+              }, 2500);
+              return;
+            }
+          } else {
+            // Fallback: query by email
+            const phlebByEmailQuery = query(collection(db, 'phlebotomists'), where('email', '==', email), limit(1));
+            const phlebByEmailSnap = await getDocs(phlebByEmailQuery);
+
+            if (!phlebByEmailSnap.empty) {
+              const phlebData = phlebByEmailSnap.docs[0].data();
+              const phlebDocId = phlebByEmailSnap.docs[0].id;
+              localStorage.setItem('userId', phlebDocId);
+              localStorage.setItem('healqr_user_email', email);
+              localStorage.setItem('healqr_authenticated', 'true');
+              localStorage.setItem('healqr_is_phlebo', 'true');
+              localStorage.setItem('healqr_phlebo_id', phlebDocId);
+              localStorage.removeItem('healqr_is_clinic');
+              localStorage.removeItem('healqr_is_lab');
+              localStorage.removeItem('healqr_is_assistant');
+              if (phlebData.name) {
+                localStorage.setItem('healqr_user_name', phlebData.name);
+              }
+            } else {
+              await auth.signOut();
+              setStatus('error');
+              setMessage('This email is not registered as a Phlebotomist. Redirecting to Sign Up...');
+              setTimeout(() => {
+                window.location.href = '/?page=phlebo-signup';
+              }, 2500);
+              return;
+            }
+          }
         } else {
           // ✅ DOCTOR LOGIN FLOW: Assistant check first, then doctor
           const assistantsRef = collection(db, 'assistants');
@@ -337,7 +426,8 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
       const isAssistant = localStorage.getItem('healqr_is_assistant');
       const isClinic = localStorage.getItem('healqr_is_clinic');
       const isLab = localStorage.getItem('healqr_is_lab');
-      setMessage(isAssistant ? 'Assistant access granted!' : isLab ? 'Lab login successful!' : isClinic ? 'Clinic login successful!' : 'Login successful!');
+      const isPhlebo = localStorage.getItem('healqr_is_phlebo');
+      setMessage(isAssistant ? 'Assistant access granted!' : isPhlebo ? 'Phlebotomist login successful!' : isLab ? 'Lab login successful!' : isClinic ? 'Clinic login successful!' : 'Login successful!');
 
 
       // Immediately redirect to clean URL - App.tsx will handle routing based on localStorage

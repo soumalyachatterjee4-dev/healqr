@@ -101,6 +101,9 @@ const LabSignUp = lazy(() => import("./components/LabSignUp"));
 const ClinicLogin = lazy(() => import("./components/ClinicLogin"));
 const LabLogin = lazy(() => import("./components/LabLogin"));
 const LabDashboard = lazy(() => import("./components/LabDashboard"));
+const PhlebotomistSignUp = lazy(() => import("./components/PhlebotomistSignUp"));
+const PhlebotomistLogin = lazy(() => import("./components/PhlebotomistLogin"));
+const PhlebotomistDashboard = lazy(() => import("./components/PhlebotomistDashboard"));
 const LabBookingMiniWebsite = lazy(() => import("./components/LabBookingMiniWebsite"));
 const LabBookingFlow = lazy(() => import("./components/LabBookingFlow"));
 const ClinicDashboard = lazy(() => import("./components/ClinicDashboard"));
@@ -258,15 +261,21 @@ export default function App() {
     | "referrer-dashboard"
     | "queue-display"
     | "leave-apply"
+    | "phlebo-signup"
+    | "phlebo-login"
+    | "phlebo-dashboard"
   >(() => {
     // Initialize currentPage from localStorage to prevent flash/auto-logout on refresh
     const isClinic = localStorage.getItem('healqr_is_clinic') === 'true';
     const isLab = localStorage.getItem('healqr_is_lab') === 'true';
+    const isPhlebo = localStorage.getItem('healqr_is_phlebo') === 'true';
     const isAssistant = localStorage.getItem('healqr_is_assistant') === 'true';
     const hasClinicSession = isClinic && (localStorage.getItem('userId') || localStorage.getItem('healqr_user_email'));
     if (hasClinicSession) return 'clinic-dashboard'; // Clinic owners AND clinic assistants
     const hasLabSession = isLab && (localStorage.getItem('userId') || localStorage.getItem('healqr_user_email'));
     if (hasLabSession) return 'lab-dashboard';
+    const hasPhlebSession = isPhlebo && (localStorage.getItem('userId') || localStorage.getItem('healqr_user_email'));
+    if (hasPhlebSession) return 'phlebo-dashboard';
     // Doctor-level assistants should also start on dashboard
     if (isAssistant && localStorage.getItem('healqr_assistant_doctor_id')) return 'dashboard';
     return 'landing';
@@ -981,6 +990,12 @@ export default function App() {
     } else if (pageParam === 'lab-login') {
       setCurrentPage('lab-login');
       return;
+    } else if (pageParam === 'phlebo-signup') {
+      setCurrentPage('phlebo-signup');
+      return;
+    } else if (pageParam === 'phlebo-login') {
+      setCurrentPage('phlebo-login');
+      return;
     } else if (pageParam === 'clinic-dashboard') {
       setCurrentPage('clinic-dashboard');
       return;
@@ -1527,10 +1542,11 @@ export default function App() {
       const isOnMasterAccessLoginPage = window.location.pathname.includes('/master-access-login');
       const isClinicPage = currentPage === 'clinic-login' || currentPage === 'clinic-signup' || pageParam === 'clinic-login' || pageParam === 'clinic-signup';
       const isLabPage = currentPage === 'lab-login' || currentPage === 'lab-signup' || pageParam === 'lab-login' || pageParam === 'lab-signup';
+      const isPhlebPage = currentPage === 'phlebo-login' || currentPage === 'phlebo-signup' || pageParam === 'phlebo-login' || pageParam === 'phlebo-signup';
       const isAdvertiserPage = currentPage === 'advertiser-login' || currentPage === 'advertiser-signup' || currentPage === 'advertiser-verify' || pageParam === 'advertiser-login' || pageParam === 'advertiser-signup' || pageParam === 'advertiser-verify';
       const isPharmaPage = currentPage === 'pharma-login' || currentPage === 'pharma-verify' || currentPage === 'pharma-portal' || currentPage === 'pharma-signup' || pageParam === 'pharma-login' || pageParam === 'pharma-verify' || pageParam === 'pharma-portal' || pageParam === 'pharma-signup';
 
-      if (isVerificationLink || isBookingMode || hasBookingDoctorId || hasBookingClinicId || isSlugUrl || isNotificationPage || isVerifyVisit || isOnVerifyLoginPage || isOnVerifyEmailPage || isOnAssistantLoginPage || isOnMasterAccessLoginPage || isClinicPage || isLabPage || isAdvertiserPage || isPharmaPage || currentPage === 'verify-email' || currentPage === 'verify-login' || currentPage === 'assistant-login' || currentPage === 'master-access-login' || currentPage === 'temp-doctor-login' || currentPage === 'temp-doctor-dashboard' || currentPage === 'admin-verify' || currentPage === 'verify-walkin' || currentPage === 'queue-display' || currentPage === 'leave-apply' || currentPage.startsWith('booking-') || currentPage === 'clinic-booking-flow' || currentPage === 'lab-mini-website') {
+      if (isVerificationLink || isBookingMode || hasBookingDoctorId || hasBookingClinicId || isSlugUrl || isNotificationPage || isVerifyVisit || isOnVerifyLoginPage || isOnVerifyEmailPage || isOnAssistantLoginPage || isOnMasterAccessLoginPage || isClinicPage || isLabPage || isPhlebPage || isAdvertiserPage || isPharmaPage || currentPage === 'verify-email' || currentPage === 'verify-login' || currentPage === 'assistant-login' || currentPage === 'master-access-login' || currentPage === 'temp-doctor-login' || currentPage === 'temp-doctor-dashboard' || currentPage === 'admin-verify' || currentPage === 'verify-walkin' || currentPage === 'queue-display' || currentPage === 'leave-apply' || currentPage.startsWith('booking-') || currentPage === 'clinic-booking-flow' || currentPage === 'lab-mini-website') {
         // For slug URLs, don't set isAuthInitialized yet — let handleUrlParams finish first
         // so the user sees PageLoader instead of a flash of the landing page
         if (!isSlugUrl) {
@@ -1562,7 +1578,14 @@ export default function App() {
         // Check localStorage first for quick routing (set by VerifyLogin)
         const isClinicFromStorage = localStorage.getItem('healqr_is_clinic') === 'true';
         const isLabFromStorage = localStorage.getItem('healqr_is_lab') === 'true';
+        const isPhlebFromStorage = localStorage.getItem('healqr_is_phlebo') === 'true';
         const isAssistantFromStorage = localStorage.getItem('healqr_is_assistant') === 'true';
+
+        if (isPhlebFromStorage) {
+          setCurrentPage('phlebo-dashboard');
+          setIsAuthInitialized(true);
+          return;
+        }
 
         if (isLabFromStorage && !isAssistantFromStorage) {
           // Pure lab owner - fast route to lab dashboard
@@ -2817,6 +2840,8 @@ export default function App() {
       localStorage.removeItem('healqr_user_name');
       localStorage.removeItem('healqr_is_clinic');
       localStorage.removeItem('healqr_is_lab');
+      localStorage.removeItem('healqr_is_phlebo');
+      localStorage.removeItem('healqr_phlebo_id');
       localStorage.removeItem('healqr_is_assistant');
       localStorage.removeItem('healqr_assistant_pages');
       localStorage.removeItem('healqr_assistant_doctor_id');
@@ -2936,6 +2961,8 @@ export default function App() {
           onPharmaLogin={() => setCurrentPage("pharma-login")}
           onReferrerRegister={() => setCurrentPage("referrer-register")}
           onReferrerLogin={() => setCurrentPage("referrer-login")}
+          onPhlebSignUp={() => setCurrentPage("phlebo-signup")}
+          onPhlebLogin={() => setCurrentPage("phlebo-login")}
         />
       )}
 
@@ -3982,6 +4009,31 @@ export default function App() {
       {currentPage === "lab-dashboard" && (
         <Suspense fallback={<PageLoader />}>
           <LabDashboard onLogout={handleLogout} />
+        </Suspense>
+      )}
+
+      {currentPage === "phlebo-signup" && (
+        <Suspense fallback={<PageLoader />}>
+          <PhlebotomistSignUp
+            onBack={() => setCurrentPage("landing")}
+            onLogin={() => window.location.href = '/?page=phlebo-login'}
+          />
+        </Suspense>
+      )}
+
+      {currentPage === "phlebo-login" && (
+        <Suspense fallback={<PageLoader />}>
+          <PhlebotomistLogin
+            onBack={() => setCurrentPage("landing")}
+            onSignUp={() => setCurrentPage("phlebo-signup")}
+            onSuccess={() => setCurrentPage("phlebo-dashboard")}
+          />
+        </Suspense>
+      )}
+
+      {currentPage === "phlebo-dashboard" && (
+        <Suspense fallback={<PageLoader />}>
+          <PhlebotomistDashboard onLogout={handleLogout} />
         </Suspense>
       )}
 

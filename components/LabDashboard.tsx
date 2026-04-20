@@ -20,6 +20,7 @@ import LabScheduleManager from './LabScheduleManager';
 import LabBookingsManager from './LabBookingsManager';
 import LabLocationManager from './LabLocationManager';
 import LabDoctorManager from './LabDoctorManager';
+import LabPhlebotomistManager from './LabPhlebotomistManager';
 
 interface LabData {
   uid: string;
@@ -368,7 +369,7 @@ export default function LabDashboard({ onLogout }: { onLogout?: () => void | Pro
             </>)}
 
             {/* Other menu items — Coming Soon */}
-            {activeMenu !== 'dashboard' && activeMenu !== 'profile' && activeMenu !== 'qr-manager' && activeMenu !== 'test-catalog' && activeMenu !== 'schedule' && activeMenu !== 'bookings' && activeMenu !== 'location-manager' && activeMenu !== 'manage-doctors' && (
+            {activeMenu !== 'dashboard' && activeMenu !== 'profile' && activeMenu !== 'qr-manager' && activeMenu !== 'test-catalog' && activeMenu !== 'schedule' && activeMenu !== 'bookings' && activeMenu !== 'location-manager' && activeMenu !== 'manage-doctors' && activeMenu !== 'phlebotomist-manager' && (
               <Card className="bg-zinc-900 border-zinc-800">
                 <CardContent className="flex flex-col items-center justify-center py-16">
                   <Settings className="w-12 h-12 text-purple-500/30 mb-4" />
@@ -378,6 +379,10 @@ export default function LabDashboard({ onLogout }: { onLogout?: () => void | Pro
                   <p className="text-gray-500 text-sm">Coming soon...</p>
                 </CardContent>
               </Card>
+            )}
+
+            {activeMenu === 'phlebotomist-manager' && resolvedLabId && (
+              <LabPhlebotomistManager labId={resolvedLabId} />
             )}
 
           </div>
