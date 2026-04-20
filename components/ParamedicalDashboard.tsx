@@ -13,11 +13,12 @@ import {
   BarChart3, Share2, IndianRupee, Users, Settings, LogOut, ChevronDown,
   ChevronUp, Clock, MapPin, Phone, Mail, Edit3, Save, Loader2, Check,
   Plus, Trash2, Copy, Download, Star, Building2, Stethoscope, ArrowLeft,
-  History, Activity, Megaphone
+  History, Activity, Megaphone, Lock, Shield
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import type { ParamedicalRole } from './ParamedicalSignUp';
+import DashboardPromoDisplay from './DashboardPromoDisplay';
 
 // ===== ROLE CONFIG =====
 const ROLE_LABELS: Record<string, string> = {
@@ -264,24 +265,66 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
   };
 
   // ===== DASHBOARD HOME =====
-  const DashboardHome = () => (
+  const DashboardHome = () => {
+    const monthBookings = bookings.filter(b => b.appointmentDate?.startsWith(today.slice(0, 7))).length;
+    const completedCount = bookings.filter(b => b.status === 'completed').length;
+    const now = new Date();
+    const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const lastOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+    return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-          <p className="text-gray-400 text-xs mb-1">Today's Bookings</p>
-          <p className="text-2xl font-bold text-white">{todaysBookings.length}</p>
+      {/* ===== PREMIUM WELCOME SECTION ===== */}
+      {/* Welcome Banner */}
+      <div className="w-full">
+        <div className="w-full flex items-center justify-center rounded-xl bg-teal-500 text-white font-bold py-3 text-base shadow shadow-teal-200">
+          <h1 className="text-lg md:text-xl">Welcome Back, {profile?.name || 'Professional'}!</h1>
         </div>
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-          <p className="text-gray-400 text-xs mb-1">Upcoming</p>
-          <p className="text-2xl font-bold text-teal-400">{futureBookings.length}</p>
+      </div>
+
+      {/* Data Encrypted Banner */}
+      <div className="w-full">
+        <div className="w-full flex items-center justify-center rounded-xl bg-emerald-600 text-white font-bold py-3 text-base shadow shadow-emerald-200">
+          <Lock className="w-5 h-5 mr-2" />
+          Data is encrypted
         </div>
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-          <p className="text-gray-400 text-xs mb-1">This Month</p>
-          <p className="text-2xl font-bold text-white">{bookings.filter(b => b.appointmentDate?.startsWith(today.slice(0, 7))).length}</p>
-        </div>
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-          <p className="text-gray-400 text-xs mb-1">Total Served</p>
-          <p className="text-2xl font-bold text-emerald-400">{bookings.filter(b => b.status === 'completed').length}</p>
+      </div>
+
+      {/* Health Tip Card */}
+      <DashboardPromoDisplay category="health-tip" placement="landing-patient-modal" />
+
+      {/* Premium Teal Stats Card */}
+      <div style={{ background: 'linear-gradient(to bottom right, rgb(20, 184, 166), rgb(6, 95, 70))' }} className="text-white rounded-xl p-6 relative overflow-hidden">
+        <div className="flex flex-col md:flex-row gap-6 md:gap-8 relative z-10">
+          {/* Left Side — Booking Stats */}
+          <div className="md:w-[40%] flex flex-col justify-center border-b md:border-b-0 md:border-r border-white/20 pb-4 md:pb-0 md:pr-4">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="bg-white/20 text-white text-xs font-semibold px-2.5 py-1 rounded-full">Free</span>
+              <span className="bg-teal-800 text-white text-xs font-semibold px-2.5 py-1 rounded-full">Active</span>
+            </div>
+            <div className="text-2xl md:text-3xl font-bold mb-1">{monthBookings} Bookings</div>
+            <div className="text-xs text-emerald-100 opacity-80">{firstOfMonth} – {lastOfMonth}</div>
+          </div>
+
+          {/* Right Side — Quick Stats */}
+          <div className="md:w-[60%] grid grid-cols-2 gap-4">
+            <div className="bg-white/10 rounded-lg p-3">
+              <p className="text-emerald-200 text-xs mb-1">Today</p>
+              <p className="text-xl font-bold">{todaysBookings.length}</p>
+            </div>
+            <div className="bg-white/10 rounded-lg p-3">
+              <p className="text-emerald-200 text-xs mb-1">Upcoming</p>
+              <p className="text-xl font-bold">{futureBookings.length}</p>
+            </div>
+            <div className="bg-white/10 rounded-lg p-3">
+              <p className="text-emerald-200 text-xs mb-1">Completed</p>
+              <p className="text-xl font-bold">{completedCount}</p>
+            </div>
+            <div className="bg-white/10 rounded-lg p-3">
+              <p className="text-emerald-200 text-xs mb-1">Total</p>
+              <p className="text-xl font-bold">{bookings.length}</p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -324,7 +367,8 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
         ))}
       </div>
     </div>
-  );
+    );
+  };
 
   // ===== PROFILE PAGE =====
   const ProfilePage = () => {
