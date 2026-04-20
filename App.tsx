@@ -1536,7 +1536,7 @@ export default function App() {
       );
 
       const isVerifyVisit = window.location.pathname.includes('/verify-visit/');
-      const isOnVerifyLoginPage = window.location.pathname.includes('/verify-login') && currentPage !== 'clinic-dashboard' && currentPage !== 'lab-dashboard';
+      const isOnVerifyLoginPage = window.location.pathname.includes('/verify-login') && currentPage !== 'clinic-dashboard' && currentPage !== 'lab-dashboard' && currentPage !== 'phlebo-dashboard';
       const isOnVerifyEmailPage = window.location.pathname.includes('/verify-email');
       const isOnAssistantLoginPage = window.location.pathname.includes('/assistant-login');
       const isOnMasterAccessLoginPage = window.location.pathname.includes('/master-access-login');
@@ -3007,13 +3007,16 @@ export default function App() {
             const storedName = localStorage.getItem('healqr_user_name');
             const isClinic = localStorage.getItem('healqr_is_clinic') === 'true';
             const isLab = localStorage.getItem('healqr_is_lab') === 'true';
+            const isPhlebo = localStorage.getItem('healqr_is_phlebo') === 'true';
             const isAssistant = localStorage.getItem('healqr_is_assistant') === 'true';
 
             if (storedEmail) setUserEmail(storedEmail);
             if (storedName) setUserName(storedName);
 
             // Route based on user type
-            if (isLab) {
+            if (isPhlebo) {
+              setCurrentPage("phlebo-dashboard");
+            } else if (isLab) {
               setCurrentPage("lab-dashboard"); // Lab owners AND lab assistants
             } else if (isClinic) {
               setCurrentPage("clinic-dashboard"); // Clinic owners AND clinic assistants
