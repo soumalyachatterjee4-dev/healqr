@@ -1176,11 +1176,17 @@ export default function LandingPage({
             </button>
 
             <div className="text-center mb-6">
-              <div className="h-16 w-16 bg-teal-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Users className="w-8 h-8 text-teal-500" />
+              <img src={healqrLogo} alt="HealQR" className="h-8 w-auto mx-auto mb-4" />
+              <div className="h-16 w-16 bg-gradient-to-br from-teal-500/20 to-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4 ring-2 ring-teal-500/30">
+                <Users className="w-8 h-8 text-teal-400" />
               </div>
-              <h2 className="text-2xl font-bold text-white mb-2">For Healthcare Professionals</h2>
+              <h2 className="text-2xl font-bold mb-2 bg-gradient-to-r from-teal-400 to-emerald-400 bg-clip-text text-transparent">For Healthcare Professionals</h2>
               <p className="text-gray-400">Phlebotomist, Physiotherapist, Nurse, Wound Dresser, Aaya & Home Assistant</p>
+            </div>
+
+            {/* Health Tip Card */}
+            <div className="mb-4">
+              <DashboardPromoDisplay category="health-tip" placement="landing-patient-modal" />
             </div>
 
             <div className="flex flex-col gap-3">
@@ -1189,7 +1195,7 @@ export default function LandingPage({
                   setShowParamedicalOptions(false);
                   onPhlebSignUp?.();
                 }}
-                className="w-full bg-teal-600 hover:bg-teal-700 text-white py-6 text-lg"
+                className="w-full bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white py-6 text-lg font-semibold shadow-lg shadow-teal-500/20"
               >
                 Sign Up
               </Button>
@@ -1199,7 +1205,7 @@ export default function LandingPage({
                   onPhlebLogin?.();
                 }}
                 variant="outline"
-                className="w-full border-zinc-700 text-gray-300 hover:bg-zinc-800 hover:text-white py-6 text-lg"
+                className="w-full border-teal-700 text-teal-400 hover:bg-teal-500/10 hover:text-teal-300 py-6 text-lg font-semibold"
               >
                 Log In
               </Button>

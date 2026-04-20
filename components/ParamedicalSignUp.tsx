@@ -1,6 +1,6 @@
 import { Input } from './ui/input';
 import { Button } from './ui/button';
-import { Mail, ArrowLeft, User, Phone, MapPin, Loader2, Stethoscope, ChevronDown } from 'lucide-react';
+import { Mail, ArrowLeft, User, MapPin, Loader2, Stethoscope, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import healqrLogo from '../assets/healqr.logo.png';
 import { auth, db } from '../lib/firebase/config';
@@ -28,7 +28,7 @@ interface ParamedicalSignUpProps {
 export default function ParamedicalSignUp({ onBack, onLogin }: ParamedicalSignUpProps) {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
+
   const [pincode, setPincode] = useState('');
   const [experience, setExperience] = useState('');
   const [role, setRole] = useState<ParamedicalRole | ''>('');
@@ -40,16 +40,12 @@ export default function ParamedicalSignUp({ onBack, onLogin }: ParamedicalSignUp
       toast.error('Please select your profession');
       return;
     }
-    if (!email || !name || !phone) {
+    if (!email || !name) {
       toast.error('Please fill all required fields');
       return;
     }
     if (!email.includes('@')) {
       toast.error('Please enter a valid email');
-      return;
-    }
-    if (phone.replace(/\D/g, '').length < 10) {
-      toast.error('Please enter a valid phone number');
       return;
     }
 
@@ -59,14 +55,6 @@ export default function ParamedicalSignUp({ onBack, onLogin }: ParamedicalSignUp
       const existing = await getDocs(query(collection(db, 'paramedicals'), where('email', '==', email.toLowerCase().trim())));
       if (!existing.empty) {
         toast.error('This email is already registered. Please login instead.');
-        setLoading(false);
-        return;
-      }
-
-      // Check by phone
-      const existingPhone = await getDocs(query(collection(db, 'paramedicals'), where('phone', '==', phone.trim())));
-      if (!existingPhone.empty) {
-        toast.error('This phone number is already registered.');
         setLoading(false);
         return;
       }
@@ -113,7 +101,6 @@ export default function ParamedicalSignUp({ onBack, onLogin }: ParamedicalSignUp
       await addDoc(collection(db, 'pending_paramedical_signups'), {
         email: email.toLowerCase().trim(),
         name: name.trim(),
-        phone: phone.trim(),
         pincode: pincode.trim(),
         state: pincode ? getStateFromPincode(pincode.trim()) : '',
         experience: experience.trim(),
@@ -190,7 +177,7 @@ export default function ParamedicalSignUp({ onBack, onLogin }: ParamedicalSignUp
                   value={role}
                   onChange={(e) => setRole(e.target.value as ParamedicalRole)}
                   className="w-full pl-12 pr-10 h-12 bg-black border border-zinc-800 text-white rounded-lg focus:border-teal-500 focus:outline-none appearance-none"
-                  style={{ colorScheme: 'dark' }}
+                  style={{ colorScheme: 'dark', WebkitAppearance: 'none', MozAppearance: 'none' as any }}
                 >
                   <option value="">Select your profession</option>
                   {PARAMEDICAL_ROLES.map(r => (
@@ -219,17 +206,6 @@ export default function ParamedicalSignUp({ onBack, onLogin }: ParamedicalSignUp
                 <Input value={email} onChange={(e) => setEmail(e.target.value)}
                   className="pl-12 bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-teal-500"
                   placeholder="email@example.com" type="email" />
-              </div>
-            </div>
-
-            {/* Phone */}
-            <div>
-              <label className="block mb-2 text-sm text-gray-300">Phone Number *</label>
-              <div className="relative">
-                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-teal-500" />
-                <Input value={phone} onChange={(e) => setPhone(e.target.value)}
-                  className="pl-12 bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-teal-500"
-                  placeholder="+91 9876543210" type="tel" />
               </div>
             </div>
 
