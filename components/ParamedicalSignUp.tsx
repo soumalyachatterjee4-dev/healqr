@@ -8,6 +8,7 @@ import { sendSignInLinkToEmail } from 'firebase/auth';
 import { collection, getDocs, query, where, addDoc, serverTimestamp } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { getStateFromPincode } from '../utils/pincodeMapping';
+import DashboardPromoDisplay from './DashboardPromoDisplay';
 
 const PARAMEDICAL_ROLES = [
   { value: 'phlebotomist', label: 'Phlebotomist', desc: 'Sample Collection Professional' },
@@ -158,6 +159,11 @@ export default function ParamedicalSignUp({ onBack, onLogin }: ParamedicalSignUp
         </div>
 
         <div className="bg-zinc-900 rounded-2xl p-8 border border-zinc-800">
+          {/* Health Tip Card */}
+          <div className="mb-6">
+            <DashboardPromoDisplay category="health-tip" placement="landing-patient-modal" />
+          </div>
+
           <div className="text-center mb-8">
             <div className="h-16 w-16 bg-gradient-to-br from-teal-500/20 to-emerald-500/20 rounded-xl flex items-center justify-center mx-auto mb-6 ring-2 ring-teal-500/30">
               <Stethoscope className="w-8 h-8 text-teal-400" />

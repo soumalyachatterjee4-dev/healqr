@@ -275,6 +275,15 @@ export default function App() {
     | "paramedical-mini-website"
     | "paramedical-booking-flow"
   >(() => {
+    // CRITICAL: Check URL pathname FIRST — prevents flash of wrong page on magic link clicks
+    const pathname = window.location.pathname;
+    if (pathname.includes('/verify-login')) return 'verify-login';
+    if (pathname.includes('/verify-email')) return 'verify-email';
+    if (pathname.includes('/admin-verify')) return 'admin-verify';
+    if (pathname.includes('/assistant-login')) return 'assistant-login';
+    if (pathname.includes('/master-access-login')) return 'master-access-login';
+    if (pathname.includes('/temp-doctor-login')) return 'temp-doctor-login';
+
     // Initialize currentPage from localStorage to prevent flash/auto-logout on refresh
     const isClinic = localStorage.getItem('healqr_is_clinic') === 'true';
     const isLab = localStorage.getItem('healqr_is_lab') === 'true';
@@ -1574,7 +1583,7 @@ export default function App() {
       );
 
       const isVerifyVisit = window.location.pathname.includes('/verify-visit/');
-      const isOnVerifyLoginPage = window.location.pathname.includes('/verify-login') && currentPage !== 'clinic-dashboard' && currentPage !== 'lab-dashboard' && currentPage !== 'phlebo-dashboard';
+      const isOnVerifyLoginPage = window.location.pathname.includes('/verify-login') && currentPage !== 'clinic-dashboard' && currentPage !== 'lab-dashboard' && currentPage !== 'phlebo-dashboard' && currentPage !== 'paramedical-dashboard';
       const isOnVerifyEmailPage = window.location.pathname.includes('/verify-email');
       const isOnAssistantLoginPage = window.location.pathname.includes('/assistant-login');
       const isOnMasterAccessLoginPage = window.location.pathname.includes('/master-access-login');
