@@ -172,10 +172,10 @@ export default function ParamedicalSignUp({ onBack, onLogin }: ParamedicalSignUp
 
         <div className="bg-zinc-900 rounded-2xl p-8 border border-zinc-800">
           <div className="text-center mb-8">
-            <div className="h-16 w-16 bg-teal-500/10 rounded-xl flex items-center justify-center mx-auto mb-6">
-              <Stethoscope className="w-8 h-8 text-teal-500" />
+            <div className="h-16 w-16 bg-gradient-to-br from-teal-500/20 to-emerald-500/20 rounded-xl flex items-center justify-center mx-auto mb-6 ring-2 ring-teal-500/30">
+              <Stethoscope className="w-8 h-8 text-teal-400" />
             </div>
-            <h1 className="text-2xl font-bold mb-2">Healthcare Professional</h1>
+            <h1 className="text-2xl font-bold mb-2 bg-gradient-to-r from-teal-400 to-emerald-400 bg-clip-text text-transparent">Healthcare Professional</h1>
             <p className="text-gray-400">Register as a paramedical professional</p>
           </div>
 
@@ -184,8 +184,8 @@ export default function ParamedicalSignUp({ onBack, onLogin }: ParamedicalSignUp
             <div>
               <label className="block mb-2 text-sm text-gray-300">Your Profession *</label>
               <div className="relative">
-                <Stethoscope className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none z-10" />
-                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none z-10" />
+                <Stethoscope className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-teal-500 pointer-events-none z-10" />
+                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-teal-500 pointer-events-none z-10" />
                 <select
                   value={role}
                   onChange={(e) => setRole(e.target.value as ParamedicalRole)}
@@ -204,7 +204,7 @@ export default function ParamedicalSignUp({ onBack, onLogin }: ParamedicalSignUp
             <div>
               <label className="block mb-2 text-sm text-gray-300">Full Name *</label>
               <div className="relative">
-                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-teal-500" />
                 <Input value={name} onChange={(e) => setName(e.target.value)}
                   className="pl-12 bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-teal-500"
                   placeholder="Your full name" />
@@ -215,7 +215,7 @@ export default function ParamedicalSignUp({ onBack, onLogin }: ParamedicalSignUp
             <div>
               <label className="block mb-2 text-sm text-gray-300">Email *</label>
               <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-teal-500" />
                 <Input value={email} onChange={(e) => setEmail(e.target.value)}
                   className="pl-12 bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-teal-500"
                   placeholder="email@example.com" type="email" />
@@ -226,7 +226,7 @@ export default function ParamedicalSignUp({ onBack, onLogin }: ParamedicalSignUp
             <div>
               <label className="block mb-2 text-sm text-gray-300">Phone Number *</label>
               <div className="relative">
-                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-teal-500" />
                 <Input value={phone} onChange={(e) => setPhone(e.target.value)}
                   className="pl-12 bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-teal-500"
                   placeholder="+91 9876543210" type="tel" />
@@ -237,7 +237,7 @@ export default function ParamedicalSignUp({ onBack, onLogin }: ParamedicalSignUp
             <div>
               <label className="block mb-2 text-sm text-gray-300">Service Area Pincode</label>
               <div className="relative">
-                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-teal-500" />
                 <Input value={pincode} onChange={(e) => setPincode(e.target.value)}
                   className="pl-12 bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-teal-500"
                   placeholder="700001" maxLength={6} />
@@ -254,14 +254,14 @@ export default function ParamedicalSignUp({ onBack, onLogin }: ParamedicalSignUp
           </div>
 
           <Button onClick={handleSignUp} disabled={loading}
-            className="w-full bg-teal-600 hover:bg-teal-700 text-white h-14 rounded-lg text-lg font-medium mt-6 mb-6">
+            className="w-full bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white h-14 rounded-lg text-lg font-semibold mt-6 mb-6 shadow-lg shadow-teal-500/20">
             {loading ? <><Loader2 className="w-5 h-5 animate-spin mr-2" /> Creating Account...</> : 'Create Account'}
           </Button>
 
           <div className="text-center mb-6">
             <p className="text-gray-400">
               Already registered?{' '}
-              <button onClick={onLogin} className="text-teal-500 hover:underline">Log in</button>
+              <button onClick={onLogin} className="text-teal-400 hover:text-teal-300 font-semibold hover:underline">Log in</button>
             </p>
           </div>
 

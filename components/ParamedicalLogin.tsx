@@ -71,10 +71,10 @@ export default function ParamedicalLogin({ onBack, onSignUp, onSuccess }: Parame
 
         <div className="bg-zinc-900 rounded-2xl p-8 border border-zinc-800">
           <div className="text-center mb-8">
-            <div className="h-16 w-16 bg-teal-500/10 rounded-xl flex items-center justify-center mx-auto mb-6">
-              <Stethoscope className="w-8 h-8 text-teal-500" />
+            <div className="h-16 w-16 bg-gradient-to-br from-teal-500/20 to-emerald-500/20 rounded-xl flex items-center justify-center mx-auto mb-6 ring-2 ring-teal-500/30">
+              <Stethoscope className="w-8 h-8 text-teal-400" />
             </div>
-            <h1 className="text-2xl font-bold mb-2">Professional Login</h1>
+            <h1 className="text-2xl font-bold mb-2 bg-gradient-to-r from-teal-400 to-emerald-400 bg-clip-text text-transparent">Professional Login</h1>
             <p className="text-gray-400">Sign in to your healthcare professional dashboard</p>
           </div>
 
@@ -82,9 +82,9 @@ export default function ParamedicalLogin({ onBack, onSignUp, onSuccess }: Parame
             <div>
               <label className="block mb-2 text-sm text-gray-300">Registered Email</label>
               <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-teal-500" />
                 <Input value={email} onChange={(e) => setEmail(e.target.value)}
-                  className="pl-12 bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-teal-500"
+                  className="pl-12 bg-black border-zinc-800 text-white h-12 rounded-lg focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50"
                   placeholder="email@example.com" type="email"
                   onKeyDown={(e) => e.key === 'Enter' && handleLogin()} />
               </div>
@@ -92,19 +92,19 @@ export default function ParamedicalLogin({ onBack, onSignUp, onSuccess }: Parame
           </div>
 
           <Button onClick={handleLogin} disabled={loading}
-            className="w-full bg-teal-600 hover:bg-teal-700 text-white h-14 rounded-lg text-lg font-medium mt-6 mb-6">
+            className="w-full bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white h-14 rounded-lg text-lg font-semibold mt-6 mb-6 shadow-lg shadow-teal-500/20">
             {loading ? <><Loader2 className="w-5 h-5 animate-spin mr-2" /> Sending Link...</> : 'Send Login Link'}
           </Button>
 
           <div className="text-center mb-6">
             <p className="text-gray-400">
               Not registered yet?{' '}
-              <button onClick={onSignUp} className="text-teal-500 hover:underline">Sign up</button>
+              <button onClick={onSignUp} className="text-teal-400 hover:text-teal-300 font-semibold hover:underline">Sign up</button>
             </p>
           </div>
 
           <div className="text-center">
-            <button onClick={onBack} className="text-gray-400 hover:text-white transition-colors inline-flex items-center gap-2">
+            <button onClick={onBack} className="text-gray-400 hover:text-teal-400 transition-colors inline-flex items-center gap-2">
               <ArrowLeft className="w-4 h-4" /> Back
             </button>
           </div>

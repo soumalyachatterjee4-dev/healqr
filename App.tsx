@@ -2195,6 +2195,7 @@ export default function App() {
           const protectedPages = [
             'dashboard',
             'clinic-dashboard',
+            'paramedical-dashboard',
             'profile-manager',
             'qr-manager',
             'schedule-manager',

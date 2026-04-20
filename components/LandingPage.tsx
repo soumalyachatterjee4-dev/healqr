@@ -70,6 +70,7 @@ export default function LandingPage({
   const [showPatientOptions, setShowPatientOptions] = useState(false);
   const [showLabOptions, setShowLabOptions] = useState(false);
   const [showPharmaOptions, setShowPharmaOptions] = useState(false);
+  const [showParamedicalOptions, setShowParamedicalOptions] = useState(false);
   const [firestoreTestimonials, setFirestoreTestimonials] = useState<DoctorTestimonial[]>([]);
 
   // Real-time stats
@@ -864,7 +865,7 @@ export default function LandingPage({
                 </li>
                 <li>
                   <button
-                    onClick={onPhlebLogin}
+                    onClick={() => setShowParamedicalOptions(true)}
                     className="text-gray-400 hover:text-teal-500 transition-colors text-sm text-left"
                   >
                     Healthcare Professional Gateway
@@ -1152,6 +1153,50 @@ export default function LandingPage({
                 onClick={() => {
                   setShowLabOptions(false);
                   window.location.href = '/?page=lab-login';
+                }}
+                variant="outline"
+                className="w-full border-zinc-700 text-gray-300 hover:bg-zinc-800 hover:text-white py-6 text-lg"
+              >
+                Log In
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Healthcare Professional Gateway Modal */}
+      {showParamedicalOptions && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 max-w-md w-full relative">
+            <button
+              onClick={() => setShowParamedicalOptions(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white"
+            >
+              ✕
+            </button>
+
+            <div className="text-center mb-6">
+              <div className="h-16 w-16 bg-teal-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Users className="w-8 h-8 text-teal-500" />
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-2">For Healthcare Professionals</h2>
+              <p className="text-gray-400">Phlebotomist, Physiotherapist, Nurse, Wound Dresser, Aaya & Home Assistant</p>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <Button
+                onClick={() => {
+                  setShowParamedicalOptions(false);
+                  onPhlebSignUp?.();
+                }}
+                className="w-full bg-teal-600 hover:bg-teal-700 text-white py-6 text-lg"
+              >
+                Sign Up
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowParamedicalOptions(false);
+                  onPhlebLogin?.();
                 }}
                 variant="outline"
                 className="w-full border-zinc-700 text-gray-300 hover:bg-zinc-800 hover:text-white py-6 text-lg"

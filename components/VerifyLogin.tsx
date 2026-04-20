@@ -30,9 +30,15 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
         return;
       }
 
-      // Get email from localStorage (multiple sources)
+      // Get email from localStorage (multiple sources), then URL params, then prompt
       let email = localStorage.getItem('healqr_email_for_signin')
                   || localStorage.getItem('healqr_user_email');
+
+      // Also try URL param (magic link includes email in continueUrl)
+      if (!email) {
+        const searchParams = new URLSearchParams(window.location.search);
+        email = searchParams.get('email');
+      }
 
       if (!email) {
         // If not in localStorage, ask user to enter their email
@@ -56,6 +62,10 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
       localStorage.removeItem('healqr_is_clinic');
       localStorage.removeItem('healqr_is_lab');
       localStorage.removeItem('healqr_is_assistant');
+      localStorage.removeItem('healqr_is_phlebo');
+      localStorage.removeItem('healqr_phlebo_id');
+      localStorage.removeItem('healqr_is_paramedical');
+      localStorage.removeItem('healqr_paramedical_id');
       localStorage.removeItem('healqr_assistant_pages');
       localStorage.removeItem('healqr_assistant_doctor_id');
       localStorage.removeItem('healqr_doctor_stats');
