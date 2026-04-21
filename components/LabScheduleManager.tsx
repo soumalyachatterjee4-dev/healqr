@@ -22,6 +22,8 @@ import {
 import { auth, db } from '../lib/firebase/config';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { toast } from 'sonner';
+import CancellationModal from './CancellationModal';
+import RestorationModal from './RestorationModal';
 
 interface CollectionSlot {
   id: number;
@@ -77,6 +79,10 @@ export default function LabScheduleManager({ labId, labData }: LabScheduleManage
   const [endDate, setEndDate] = useState('');
   const [plannedOffPeriods, setPlannedOffPeriods] = useState<Array<{ id: string; startDate: string; endDate: string; status: string }>>([]);
   const hasActivePeriods = plannedOffPeriods.some(p => p.status === 'active');
+
+  // Confirmation modal state for Planned Off (block/unblock bookings)
+  const [confirmSavePlannedOff, setConfirmSavePlannedOff] = useState(false);
+  const [deactivatingPeriodId, setDeactivatingPeriodId] = useState<string | null>(null);
 
   // Load slots from Firestore
   useEffect(() => {
@@ -334,7 +340,7 @@ export default function LabScheduleManager({ labId, labData }: LabScheduleManage
                     <p className="text-white text-sm">{p.startDate} → {p.endDate}</p>
                   </div>
                   <button
-                    onClick={() => handleDeactivatePlannedOff(p.id)}
+                    onClick={() => setDeactivatingPeriodId(p.id)}
                     className="text-xs px-2 py-1 rounded bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20"
                   >
                     Deactivate
@@ -384,7 +390,11 @@ export default function LabScheduleManager({ labId, labData }: LabScheduleManage
                     <Button variant="ghost" onClick={() => { setPlannedOffEnabled(false); setStartDate(''); setEndDate(''); }} className="text-gray-400 text-sm">
                       Cancel
                     </Button>
-                    <Button onClick={handlePlannedOffSave} disabled={saving} className="bg-purple-500 hover:bg-purple-600 text-sm">
+                    <Button onClick={() => {
+                      if (!startDate || !endDate) { toast.error('Select both start and end date'); return; }
+                      if (endDate < startDate) { toast.error('End date must be after start date'); return; }
+                      setConfirmSavePlannedOff(true);
+                    }} disabled={saving} className="bg-purple-500 hover:bg-purple-600 text-sm">
                       {saving ? 'Saving...' : 'Save'}
                     </Button>
                   </div>
@@ -751,6 +761,27 @@ export default function LabScheduleManager({ labId, labData }: LabScheduleManage
           </div>
         </div>
       )}
+
+      {/* Confirm: Save Planned Off (blocks bookings) */}
+      <CancellationModal
+        isOpen={confirmSavePlannedOff}
+        onClose={() => setConfirmSavePlannedOff(false)}
+        onConfirm={() => {
+          setConfirmSavePlannedOff(false);
+          handlePlannedOffSave();
+        }}
+      />
+
+      {/* Confirm: Deactivate Planned Off (restores bookings) */}
+      <RestorationModal
+        isOpen={!!deactivatingPeriodId}
+        onClose={() => setDeactivatingPeriodId(null)}
+        onConfirm={() => {
+          const id = deactivatingPeriodId;
+          setDeactivatingPeriodId(null);
+          if (id) handleDeactivatePlannedOff(id);
+        }}
+      />
     </div>
   );
 }

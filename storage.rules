@@ -83,6 +83,14 @@ service firebase.storage {
                     && (request.resource.contentType.matches('image/.*') || request.resource.contentType == 'application/pdf');
     }
 
+    // LAB REPORT UPLOADS — lab-generated or lab-uploaded patient reports (PDF)
+    match /labs/{labId}/reports/{bookingId}/{fileName} {
+      allow read: if true;
+      allow write: if isOwner(labId)
+                    && request.resource.size < 10 * 1024 * 1024
+                    && request.resource.contentType == 'application/pdf';
+    }
+
     // ============================================
     // QR CODES
     // ============================================

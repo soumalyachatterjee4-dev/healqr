@@ -487,6 +487,9 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
 
 
       // Immediately redirect to clean URL - App.tsx will handle routing based on localStorage
+      // Clean URL FIRST to prevent re-verification on refresh
+      window.history.replaceState({}, '', '/');
+      
       if (onSuccess) {
         onSuccess();
       } else {

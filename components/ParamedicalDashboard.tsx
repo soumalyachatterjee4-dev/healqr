@@ -13,7 +13,7 @@ import {
   BarChart3, Share2, IndianRupee, Users, Settings, LogOut, ChevronDown,
   ChevronUp, Clock, MapPin, Phone, Mail, Edit3, Save, Loader2, Check,
   Plus, Trash2, Copy, Download, Star, Building2, Stethoscope, ArrowLeft,
-  History, Activity, Megaphone, Lock, Shield
+  History, Activity, Megaphone, Lock, Shield, BrainCircuit
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -183,6 +183,7 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
   }, [paraId]);
 
   const handleLogout = async () => {
+    console.log('🔍 [PARAMEDICAL] handleLogout called! Stack:', new Error().stack);
     try {
       await signOut(auth);
       localStorage.removeItem('healqr_is_paramedical');
@@ -221,7 +222,6 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
           <div className="flex items-center gap-3">
             <img src={healqrLogo} alt="HealQR" className="h-8 w-auto" />
             <div className="min-w-0">
-              <p className="text-white text-sm font-semibold truncate">{profile?.name || 'Professional'}</p>
               <p className="text-teal-400 text-xs truncate">{roleName}</p>
             </div>
           </div>
@@ -285,8 +285,8 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
       {/* White healQR BrainDeck Banner */}
       <div className="w-full">
         <div className="w-full flex items-center justify-center rounded-xl bg-white text-blue-600 font-bold py-3 text-base border border-blue-200 shadow" style={{ letterSpacing: '0.02em' }}>
-          <Shield className="w-5 h-5 mr-2" />
-          healQR Healthcare Professional
+          <BrainCircuit className="w-5 h-5 mr-2" />
+          healQR BrainDeck
         </div>
       </div>
 
@@ -297,9 +297,6 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
           Data is encrypted
         </div>
       </div>
-
-      {/* Health Tip Card */}
-      <DashboardPromoDisplay category="health-tip" placement="landing-patient-modal" />
 
       {/* Pink/Rose Stats Card — unique to Paramedical */}
       <div style={{ background: 'linear-gradient(to bottom right, rgb(236, 72, 153), rgb(159, 18, 57))' }} className="text-white rounded-xl p-6 relative overflow-hidden">
@@ -314,8 +311,32 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
             <div className="text-xs text-pink-100 opacity-80">{firstOfMonth} – {lastOfMonth}</div>
           </div>
 
-          {/* Right Side — Quick Stats */}
-          <div className="md:w-[60%] grid grid-cols-2 gap-4">
+          {/* Right Side — Social Media Kit + Quick Stats */}
+          <div className="md:w-[60%] flex flex-col gap-4">
+            {/* Social Media Kit Promo */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="px-2 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-medium backdrop-blur-sm flex items-center gap-1 w-fit shrink-0">✨ New</span>
+                  <h3 className="text-sm sm:text-lg font-bold text-white whitespace-nowrap">Social Media Kit</h3>
+                </div>
+                <p className="text-pink-50 text-xs mb-2 leading-relaxed opacity-90">Create branded posts for Instagram & WhatsApp.</p>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-md bg-white/10"><Share2 className="w-3 h-3 text-pink-200" /></div>
+                    <div className="p-1.5 rounded-md bg-white/10"><Share2 className="w-3 h-3 text-blue-200" /></div>
+                    <div className="p-1.5 rounded-md bg-white/10"><Share2 className="w-3 h-3 text-emerald-200" /></div>
+                  </div>
+                  <span className="text-[10px] text-pink-100/70">One-click share</span>
+                </div>
+              </div>
+              <button onClick={() => setActiveMenu('social-kit')} className="bg-white text-pink-600 hover:bg-pink-50 font-bold px-4 py-2 rounded-lg text-sm shadow-lg whitespace-nowrap w-fit shrink-0">
+                Try Now →
+              </button>
+            </div>
+
+            {/* Quick Stats Grid */}
+            <div className="grid grid-cols-2 gap-4">
             <div className="bg-white/10 rounded-lg p-3">
               <p className="text-pink-200 text-xs mb-1">Today</p>
               <p className="text-xl font-bold">{todaysBookings.length}</p>
@@ -332,9 +353,13 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
               <p className="text-pink-200 text-xs mb-1">Total</p>
               <p className="text-xl font-bold">{bookings.length}</p>
             </div>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Health Tip Card */}
+      <DashboardPromoDisplay category="health-tip" placement="landing-patient-modal" />
 
       {/* Today's schedule preview */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
@@ -1059,7 +1084,7 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
       {mobileMenuOpen && (
         <div className="lg:hidden fixed inset-0 z-40">
           <div className="absolute inset-0 bg-black/60" onClick={() => setMobileMenuOpen(false)} />
-          <div className="absolute left-0 top-0 bottom-0 w-64 z-50">
+          <div className="absolute left-0 top-0 bottom-0 w-64 z-50 bg-zinc-950">
             <Sidebar />
           </div>
         </div>

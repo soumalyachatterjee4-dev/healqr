@@ -277,7 +277,35 @@ export default function App() {
   >(() => {
     // CRITICAL: Check URL pathname FIRST — prevents flash of wrong page on magic link clicks
     const pathname = window.location.pathname;
-    if (pathname.includes('/verify-login')) return 'verify-login';
+    
+    // 🔍 DEBUG: Log all paramedical-related localStorage keys on page load
+    console.log('🔍 [INIT] Page Load Debug:', {
+      pathname,
+      search: window.location.search,
+      healqr_is_phlebo: localStorage.getItem('healqr_is_phlebo'),
+      healqr_is_paramedical: localStorage.getItem('healqr_is_paramedical'),
+      healqr_phlebo_id: localStorage.getItem('healqr_phlebo_id'),
+      healqr_paramedical_id: localStorage.getItem('healqr_paramedical_id'),
+      userId: localStorage.getItem('userId'),
+      healqr_user_email: localStorage.getItem('healqr_user_email'),
+      healqr_authenticated: localStorage.getItem('healqr_authenticated'),
+      healqr_user_name: localStorage.getItem('healqr_user_name'),
+    });
+
+    if (pathname.includes('/verify-login')) {
+      // Check if there's already an active session — don't go back to verify-login
+      const isPhlebo = localStorage.getItem('healqr_is_phlebo') === 'true' || localStorage.getItem('healqr_is_paramedical') === 'true';
+      const hasPhlebSession = isPhlebo && (localStorage.getItem('userId') || localStorage.getItem('healqr_user_email'));
+      if (hasPhlebSession) return 'paramedical-dashboard';
+      const isClinic = localStorage.getItem('healqr_is_clinic') === 'true';
+      if (isClinic && (localStorage.getItem('userId') || localStorage.getItem('healqr_user_email'))) return 'clinic-dashboard';
+      const isLab = localStorage.getItem('healqr_is_lab') === 'true';
+      if (isLab && (localStorage.getItem('userId') || localStorage.getItem('healqr_user_email'))) return 'lab-dashboard';
+      const hasQR = localStorage.getItem('healqr_qr_code');
+      const isAuth = localStorage.getItem('healqr_authenticated');
+      if (hasQR && isAuth) return 'dashboard';
+      return 'verify-login';
+    }
     if (pathname.includes('/verify-email')) return 'verify-email';
     if (pathname.includes('/admin-verify')) return 'admin-verify';
     if (pathname.includes('/assistant-login')) return 'assistant-login';
@@ -1526,7 +1554,27 @@ export default function App() {
     } else if (pathname.includes('/master-access-login')) {
       setCurrentPage('master-access-login');
     } else if (pathname.includes('/verify-login')) {
-      setCurrentPage('verify-login');
+      // Don't override dashboard if there's already an active session
+      const hasParamedicalSession = (localStorage.getItem('healqr_is_paramedical') === 'true' || localStorage.getItem('healqr_is_phlebo') === 'true') && (localStorage.getItem('userId') || localStorage.getItem('healqr_user_email'));
+      const hasClinicSession = localStorage.getItem('healqr_is_clinic') === 'true' && (localStorage.getItem('userId') || localStorage.getItem('healqr_user_email'));
+      const hasLabSession = localStorage.getItem('healqr_is_lab') === 'true' && (localStorage.getItem('userId') || localStorage.getItem('healqr_user_email'));
+      const hasDoctorSession = localStorage.getItem('healqr_qr_code') && localStorage.getItem('healqr_authenticated');
+
+      if (hasParamedicalSession) {
+        window.history.replaceState({}, '', '/');
+        setCurrentPage('paramedical-dashboard');
+      } else if (hasClinicSession) {
+        window.history.replaceState({}, '', '/');
+        setCurrentPage('clinic-dashboard');
+      } else if (hasLabSession) {
+        window.history.replaceState({}, '', '/');
+        setCurrentPage('lab-dashboard');
+      } else if (hasDoctorSession) {
+        window.history.replaceState({}, '', '/');
+        setCurrentPage('dashboard');
+      } else {
+        setCurrentPage('verify-login');
+      }
     } else if (pathname.includes('/verify-visit/')) {
       // Extract booking ID from path
       const pathParts = pathname.split('/verify-visit/');
@@ -1559,6 +1607,15 @@ export default function App() {
     }
 
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      console.log('🔍 [AUTH] onAuthStateChanged fired:', {
+        hasUser: !!user,
+        userUid: user?.uid || null,
+        userEmail: user?.email || null,
+        currentPage,
+        pathname: window.location.pathname,
+        search: window.location.search,
+      });
+
       // CRITICAL: Check if we're on verification pages, booking flow, or notification templates - don't redirect!
       const urlParams = new URLSearchParams(window.location.search);
       const isVerificationLink = urlParams.get('mode') === 'signIn' && urlParams.get('oobCode');
@@ -1594,6 +1651,11 @@ export default function App() {
       const isPharmaPage = currentPage === 'pharma-login' || currentPage === 'pharma-verify' || currentPage === 'pharma-portal' || currentPage === 'pharma-signup' || pageParam === 'pharma-login' || pageParam === 'pharma-verify' || pageParam === 'pharma-portal' || pageParam === 'pharma-signup';
 
       if (isVerificationLink || isBookingMode || hasBookingDoctorId || hasBookingClinicId || isSlugUrl || isNotificationPage || isVerifyVisit || isOnVerifyLoginPage || isOnVerifyEmailPage || isOnAssistantLoginPage || isOnMasterAccessLoginPage || isClinicPage || isLabPage || isPhlebPage || isAdvertiserPage || isPharmaPage || currentPage === 'verify-email' || currentPage === 'verify-login' || currentPage === 'assistant-login' || currentPage === 'master-access-login' || currentPage === 'temp-doctor-login' || currentPage === 'temp-doctor-dashboard' || currentPage === 'admin-verify' || currentPage === 'verify-walkin' || currentPage === 'queue-display' || currentPage === 'leave-apply' || currentPage.startsWith('booking-') || currentPage === 'clinic-booking-flow' || currentPage === 'lab-mini-website') {
+        console.log('🔍 [AUTH] EARLY RETURN - skipping auth check. Reasons:', {
+          isVerificationLink, isBookingMode, hasBookingDoctorId, hasBookingClinicId, isSlugUrl,
+          isNotificationPage, isVerifyVisit, isOnVerifyLoginPage, isOnVerifyEmailPage,
+          isPhlebPage, isClinicPage, isLabPage, currentPage
+        });
         // For slug URLs, don't set isAuthInitialized yet — let handleUrlParams finish first
         // so the user sees PageLoader instead of a flash of the landing page
         if (!isSlugUrl) {
@@ -1629,6 +1691,7 @@ export default function App() {
         const isAssistantFromStorage = localStorage.getItem('healqr_is_assistant') === 'true';
 
         if (isPhlebFromStorage) {
+          console.log('🔍 [AUTH] USER EXISTS + paramedical flag found → routing to paramedical-dashboard');
           setCurrentPage('paramedical-dashboard');
           setIsAuthInitialized(true);
           return;
@@ -2083,6 +2146,16 @@ export default function App() {
         }
       } else {
         // Firebase auth is null, but check localStorage for persistent session
+        console.log('🔍 [AUTH] NO USER (auth null). Checking localStorage sessions...', {
+          healqr_is_phlebo: localStorage.getItem('healqr_is_phlebo'),
+          healqr_is_paramedical: localStorage.getItem('healqr_is_paramedical'),
+          userId: localStorage.getItem('userId'),
+          healqr_user_email: localStorage.getItem('healqr_user_email'),
+          healqr_authenticated: localStorage.getItem('healqr_authenticated'),
+          healqr_is_clinic: localStorage.getItem('healqr_is_clinic'),
+          healqr_is_lab: localStorage.getItem('healqr_is_lab'),
+          currentPage,
+        });
 
         // Check for admin session first
         const isAdminAuthenticated = localStorage.getItem('healqr_admin_authenticated');
@@ -2151,6 +2224,28 @@ export default function App() {
           setUserEmail(storedEmail || '');
           setUserName(localStorage.getItem('healqr_user_name') || '');
           setCurrentPage('clinic-dashboard');
+          setIsAuthInitialized(true);
+          return;
+        }
+
+        // Check for paramedical/phlebotomist session
+        const isParamedicalSession = localStorage.getItem('healqr_is_paramedical') === 'true' || localStorage.getItem('healqr_is_phlebo') === 'true';
+        if (isParamedicalSession && (userId || storedEmail)) {
+          console.log('🔍 [AUTH] NO USER but paramedical session found → routing to paramedical-dashboard');
+          setUserEmail(storedEmail || '');
+          setUserName(localStorage.getItem('healqr_user_name') || '');
+          setCurrentPage('paramedical-dashboard');
+          setIsAuthInitialized(true);
+          return;
+        }
+        console.log('🔍 [AUTH] Paramedical session check FAILED:', { isParamedicalSession, userId, storedEmail });
+
+        // Check for lab session
+        const isLabSession = localStorage.getItem('healqr_is_lab') === 'true';
+        if (isLabSession && (userId || storedEmail)) {
+          setUserEmail(storedEmail || '');
+          setUserName(localStorage.getItem('healqr_user_name') || '');
+          setCurrentPage('lab-dashboard');
           setIsAuthInitialized(true);
           return;
         }
@@ -2224,11 +2319,13 @@ export default function App() {
           ];
 
           if (protectedPages.includes(currentPage)) {
+            console.log('🔍 [AUTH] ❌ NO VALID SESSION → redirecting from', currentPage, 'to landing');
             setCurrentPage('landing');
           }
         }
 
         // ✅ No user authenticated - mark auth as initialized
+        console.log('🔍 [AUTH] Auth initialized (no user). Final currentPage:', currentPage);
         setIsAuthInitialized(true);
       }
 
@@ -2873,6 +2970,7 @@ export default function App() {
 
   // Proper logout handler with Firebase signOut
   const handleLogout = async () => {
+    console.log('🔍 [APP] handleLogout called! currentPage:', currentPage, 'Stack:', new Error().stack?.split('\n').slice(0, 5).join('\n'));
     try {
       // 🧹 Clear demo mode and test data on logout
       localStorage.removeItem('healqr_demo_mode_addons');

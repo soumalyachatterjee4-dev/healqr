@@ -50,6 +50,7 @@ import {
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { toast } from 'sonner';
 import TemplateDisplay from './TemplateDisplay';
+import { requestNotificationPermission } from '../services/fcm.service';
 import type { Language } from '../utils/translations';
 
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
@@ -426,7 +427,7 @@ export default function LabBookingFlow({ onBack, language = 'english', onLanguag
         ? selectedTests.reduce((s, t) => s + (t.homeCollectionCharge || 0), 0)
         : 0;
 
-      await addDoc(collection(db, 'labBookings'), {
+      const bookingRef = await addDoc(collection(db, 'labBookings'), {
         bookingId: bid,
         labId,
         labName: labData?.name || '',
@@ -483,21 +484,15 @@ export default function LabBookingFlow({ onBack, language = 'english', onLanguag
       setSerialNo(srl);
       setStep('confirmation');
 
-      // Request FCM push notification permission
+      // Register patient for FCM in unified fcmTokens collection (same flow as doctor booking confirmation)
       try {
-        if ('Notification' in window && Notification.permission !== 'denied') {
-          const perm = await Notification.requestPermission();
-          if (perm === 'granted') {
-            const { getMessaging, getToken: getFCMToken } = await import('firebase/messaging');
-            const messaging = getMessaging();
-            const token = await getFCMToken(messaging, { vapidKey: 'BJmNGTLMjbSIlYr9Yw7-4n-Rn2p4B8nBzK1mDGxVuUB-CWG8TfY6r7VvdJ6SFndY07E8lqwRPqFNWjdjZNOhqg' });
+        const phone10 = patient.phone.trim().replace(/\D/g, '').slice(-10);
+        if (phone10.length === 10) {
+          const patientUserId = `patient_${phone10}`;
+          const token = await requestNotificationPermission(patientUserId, 'patient');
+          if (token) {
             setFcmToken(token);
-            // Update booking with FCM token
-            try {
-              const bookingQ = query(collection(db, 'labBookings'), where('bookingId', '==', bid));
-              const bookingSnap = await getDocs(bookingQ);
-              bookingSnap.docs.forEach(async d => { await updateDoc(d.ref, { fcmToken: token }); });
-            } catch {}
+            await updateDoc(bookingRef, { fcmToken: token });
           }
         }
       } catch (fcmErr) {
@@ -1068,29 +1063,57 @@ export default function LabBookingFlow({ onBack, language = 'english', onLanguag
                   <div className="bg-[#1a1f2e] rounded-3xl p-5 shadow-2xl space-y-3">
                     {getAvailableSlots().map(slot => {
                       const isChosen = selectedSlot?.id === slot.id;
+                      // Time-over check: only applies when booking for today
+                      const isToday = selectedDate
+                        && selectedDate.getFullYear() === today.getFullYear()
+                        && selectedDate.getMonth() === today.getMonth()
+                        && selectedDate.getDate() === today.getDate();
+                      let isExpired = false;
+                      if (isToday && slot.endTime) {
+                        const [eh, em] = slot.endTime.split(':').map(Number);
+                        const now = new Date();
+                        const slotEnd = new Date();
+                        slotEnd.setHours(eh || 0, em || 0, 0, 0);
+                        isExpired = now.getTime() >= slotEnd.getTime();
+                      }
                       return (
                         <button
                           key={slot.id}
-                          onClick={() => { setSelectedSlot(slot); setCollectionType(null); }}
-                          className={`w-full text-left p-5 rounded-2xl border-2 transition-all ${isChosen
-                            ? 'border-purple-500 bg-purple-500/10'
-                            : 'border-gray-700 bg-[#0f1419] hover:border-gray-600'
+                          onClick={() => {
+                            if (isExpired) return;
+                            setSelectedSlot(slot);
+                            setCollectionType(null);
+                          }}
+                          disabled={isExpired}
+                          className={`w-full text-left p-5 rounded-2xl border-2 transition-all ${
+                            isExpired
+                              ? 'border-gray-800 bg-[#0f1419]/60 opacity-60 cursor-not-allowed'
+                              : isChosen
+                                ? 'border-purple-500 bg-purple-500/10'
+                                : 'border-gray-700 bg-[#0f1419] hover:border-gray-600'
                           }`}
                         >
                           <div className="flex items-center gap-3">
-                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${isChosen ? 'bg-purple-500/20' : 'bg-gray-800'}`}>
-                              <Clock className={`w-6 h-6 ${isChosen ? 'text-purple-400' : 'text-gray-500'}`} />
+                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${isChosen && !isExpired ? 'bg-purple-500/20' : 'bg-gray-800'}`}>
+                              <Clock className={`w-6 h-6 ${isChosen && !isExpired ? 'text-purple-400' : 'text-gray-500'}`} />
                             </div>
-                            <div className="flex-1">
-                              <p className="text-white font-semibold">{slot.slotName}</p>
-                              <p className="text-gray-400 text-sm">{formatTime(slot.startTime)} — {formatTime(slot.endTime)}</p>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className={`font-semibold ${isExpired ? 'text-gray-500 line-through' : 'text-white'}`}>{slot.slotName}</p>
+                                {isExpired && (
+                                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/30">
+                                    Time Over
+                                  </span>
+                                )}
+                              </div>
+                              <p className={`text-sm ${isExpired ? 'text-gray-600' : 'text-gray-400'}`}>{formatTime(slot.startTime)} — {formatTime(slot.endTime)}</p>
                               {slot.branchName && (
                                 <span className="text-gray-500 text-[10px] flex items-center gap-1 mt-1">
                                   <MapPin className="w-3 h-3" />{slot.branchName}
                                 </span>
                               )}
                             </div>
-                            {isChosen && (
+                            {isChosen && !isExpired && (
                               <div className="w-6 h-6 rounded-full bg-purple-500 flex items-center justify-center flex-shrink-0">
                                 <Check className="w-4 h-4 text-white" />
                               </div>
@@ -1414,19 +1437,44 @@ export default function LabBookingFlow({ onBack, language = 'english', onLanguag
               )}
 
               {/* Walk-in arrival time + reminder */}
-              {collectionType === 'walk-in' && selectedSlot && (
-                <div className="bg-gradient-to-r from-purple-500/20 to-purple-600/20 border border-purple-500/40 rounded-2xl p-4 mb-4 text-center">
-                  <p className="text-gray-400 text-xs">You must reach by</p>
-                  <p className="text-white text-xl font-bold flex items-center justify-center gap-2 mt-1">
-                    <Clock className="w-5 h-5 text-purple-400" />
-                    {formatTime(selectedSlot.startTime)}
-                  </p>
-                  <div className="flex items-center justify-center gap-1.5 mt-2">
-                    <Bell className="w-3 h-3 text-purple-400" />
-                    <p className="text-purple-300/80 text-[10px]">You'll get a reminder notification 1 hour before your appointment</p>
+              {collectionType === 'walk-in' && selectedSlot && (() => {
+                // Calculate token-based arrival time (same formula as doctor chambers)
+                const [startH, startM] = selectedSlot.startTime.split(':').map(Number);
+                const [endH, endM] = selectedSlot.endTime.split(':').map(Number);
+                const totalMinutes = (endH * 60 + endM) - (startH * 60 + startM);
+                const capacity = selectedSlot.maxCapacity || 20;
+                const timePerPatient = totalMinutes / capacity;
+                const patientSlotMinutes = (serialNo > 0 ? serialNo - 1 : 0) * timePerPatient;
+                const slotDate = selectedDate ? new Date(selectedDate) : new Date();
+                slotDate.setHours(startH, startM + patientSlotMinutes, 0, 0);
+                const now = new Date();
+                const hoursUntilAppt = (slotDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+                const isImmediate = slotDate.getTime() <= now.getTime();
+                const hrs = slotDate.getHours();
+                const mins = slotDate.getMinutes();
+                const period = hrs >= 12 ? 'PM' : 'AM';
+                const displayH = hrs % 12 || 12;
+                const arrivalStr = isImmediate ? 'IMMEDIATELY' : `${displayH}:${mins.toString().padStart(2, '0')} ${period}`;
+                const showReminder = hoursUntilAppt >= 6;
+                return (
+                  <div className="bg-gradient-to-r from-purple-500/20 to-purple-600/20 border border-purple-500/40 rounded-2xl p-4 mb-4 text-center">
+                    <p className="text-gray-400 text-xs">{isImmediate ? 'Please come' : 'You must reach by'}</p>
+                    <p className="text-white text-xl font-bold flex items-center justify-center gap-2 mt-1">
+                      <Clock className="w-5 h-5 text-purple-400" />
+                      {arrivalStr}
+                    </p>
+                    {serialNo > 1 && (
+                      <p className="text-purple-300/60 text-[10px] mt-1">Token #{serialNo} · Estimated based on your position in queue</p>
+                    )}
+                    {showReminder && (
+                      <div className="flex items-center justify-center gap-1.5 mt-2">
+                        <Bell className="w-3 h-3 text-purple-400" />
+                        <p className="text-purple-300/80 text-[10px]">You'll get a reminder notification 1 hour before your appointment</p>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Home address on confirmation */}
               {collectionType === 'home-collection' && homeAddress.fullAddress && (

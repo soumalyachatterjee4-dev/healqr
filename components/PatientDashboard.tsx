@@ -9,7 +9,9 @@ import {
   User,
   Calendar,
   FileText,
-  Activity
+  Activity,
+  Lock,
+  BrainCircuit
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
@@ -235,13 +237,39 @@ export default function PatientDashboard({ initialView = 'dashboard', onLogout }
         {/* Dashboard Overview */}
         {activeView === 'dashboard' && (
           <div className="space-y-4 sm:space-y-6">
+            {/* 🇮🇳 Indian Tricolor Header: Saffron → White → Green */}
+            <div className="space-y-3">
+              {/* Saffron: Name */}
+              <div className="w-full">
+                <div className="w-full flex items-center justify-center rounded-xl bg-orange-500 text-white font-bold py-3 text-base shadow shadow-orange-200">
+                  <h1 className="text-lg md:text-xl">Welcome, {patientName}!</h1>
+                </div>
+              </div>
+
+              {/* White: BrainDeck */}
+              <div className="w-full">
+                <div className="w-full flex items-center justify-center rounded-xl bg-white text-blue-600 font-bold py-3 text-base border border-blue-200 shadow" style={{ letterSpacing: '0.02em' }}>
+                  <BrainCircuit className="w-5 h-5 mr-2" />
+                  healQR BrainDeck
+                </div>
+              </div>
+
+              {/* Green: Encrypted Badge */}
+              <div className="w-full">
+                <div className="w-full flex items-center justify-center rounded-xl bg-green-600 text-white font-bold py-3 text-base shadow shadow-green-200">
+                  <Lock className="w-5 h-5 mr-2" />
+                  Data is encrypted
+                </div>
+              </div>
+            </div>
+
             {/* Quick Stats */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
               <Card className="bg-zinc-900 border-zinc-800">
                 <CardContent className="p-4 sm:p-6">
                   <div className="flex items-center gap-3 sm:gap-4">
-                    <div className="h-10 w-10 sm:h-12 sm:w-12 bg-emerald-500/10 rounded-full flex items-center justify-center flex-shrink-0">
-                      <History className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-500" />
+                    <div className="h-10 w-10 sm:h-12 sm:w-12 bg-orange-500/10 rounded-full flex items-center justify-center flex-shrink-0">
+                      <History className="h-5 w-5 sm:h-6 sm:w-6 text-orange-500" />
                     </div>
                     <div className="min-w-0">
                       <p className="text-xl sm:text-2xl font-bold text-white">{consultationCount}</p>
@@ -254,8 +282,8 @@ export default function PatientDashboard({ initialView = 'dashboard', onLogout }
               <Card className="bg-zinc-900 border-zinc-800">
                 <CardContent className="p-4 sm:p-6">
                   <div className="flex items-center gap-3 sm:gap-4">
-                    <div className="h-10 w-10 sm:h-12 sm:w-12 bg-blue-500/10 rounded-full flex items-center justify-center flex-shrink-0">
-                      <Bell className="h-5 w-5 sm:h-6 sm:w-6 text-blue-500" />
+                    <div className="h-10 w-10 sm:h-12 sm:w-12 bg-orange-500/10 rounded-full flex items-center justify-center flex-shrink-0">
+                      <Bell className="h-5 w-5 sm:h-6 sm:w-6 text-orange-500" />
                     </div>
                     <div className="min-w-0">
                       <p className="text-xl sm:text-2xl font-bold text-white">{notificationCount}</p>
@@ -268,8 +296,8 @@ export default function PatientDashboard({ initialView = 'dashboard', onLogout }
               <Card className="bg-zinc-900 border-zinc-800">
                 <CardContent className="p-4 sm:p-6">
                   <div className="flex items-center gap-3 sm:gap-4">
-                    <div className="h-10 w-10 sm:h-12 sm:w-12 bg-purple-500/10 rounded-full flex items-center justify-center flex-shrink-0">
-                      <Clock className="h-5 w-5 sm:h-6 sm:w-6 text-purple-500" />
+                    <div className="h-10 w-10 sm:h-12 sm:w-12 bg-orange-500/10 rounded-full flex items-center justify-center flex-shrink-0">
+                      <Clock className="h-5 w-5 sm:h-6 sm:w-6 text-orange-500" />
                     </div>
                     <div className="min-w-0">
                       <p className="text-xl sm:text-2xl font-bold text-white">{activeBookingId ? 'Active' : 'None'}</p>

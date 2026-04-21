@@ -223,6 +223,18 @@ service cloud.firestore {
         allow read: if true;
         allow write: if isAuthenticated() && request.auth.uid == labId;
       }
+
+      // Lab reviews (collected from patients + self-created by lab)
+      match /reviews/{reviewId} {
+        allow read: if true;
+        allow create: if true; // Patients can submit reviews
+        allow update, delete: if isAuthenticated() && request.auth.uid == labId;
+      }
+
+      // Lab report templates (reusable test combos like FBS/PP, T3/T4/TSH)
+      match /labReportTemplates/{templateId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == labId;
+      }
     }
 
     // ============================================

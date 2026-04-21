@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Syringe, LogOut, User, Building2, Stethoscope, Microscope, MapPin, Phone, Mail,
-  Calendar, CheckCircle2, Clock, ChevronRight, Home, AlertCircle, Menu, X,
+  Calendar, CheckCircle2, Clock, ChevronRight, Home, AlertCircle, Menu, X, Lock, BrainCircuit,
 } from 'lucide-react';
 import { db, auth } from '../lib/firebase/config';
 import {
@@ -293,22 +293,48 @@ export default function PhlebotomistDashboard({ onLogout }: { onLogout: () => vo
   function renderToday() {
     return (
       <div className="space-y-6">
+        {/* 🇮🇳 Indian Tricolor Header: Saffron → White → Green */}
+        <div className="space-y-3">
+          {/* Saffron: Name */}
+          <div className="w-full">
+            <div className="w-full flex items-center justify-center rounded-xl bg-orange-500 text-white font-bold py-3 text-base shadow shadow-orange-200">
+              <h1 className="text-lg md:text-xl">Welcome, {phlebData.name || 'Phlebotomist'}!</h1>
+            </div>
+          </div>
+
+          {/* White: BrainDeck */}
+          <div className="w-full">
+            <div className="w-full flex items-center justify-center rounded-xl bg-white text-blue-600 font-bold py-3 text-base border border-blue-200 shadow" style={{ letterSpacing: '0.02em' }}>
+              <BrainCircuit className="w-5 h-5 mr-2" />
+              healQR BrainDeck
+            </div>
+          </div>
+
+          {/* Green: Encrypted Badge */}
+          <div className="w-full">
+            <div className="w-full flex items-center justify-center rounded-xl bg-green-600 text-white font-bold py-3 text-base shadow shadow-green-200">
+              <Lock className="w-5 h-5 mr-2" />
+              Data is encrypted
+            </div>
+          </div>
+        </div>
+
         <h2 className="text-lg font-bold flex items-center gap-2">
           <Calendar className="w-5 h-5 text-teal-400" /> Today's Collections
         </h2>
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-            <p className="text-[10px] text-gray-500 uppercase">Total</p>
-            <p className="text-2xl font-bold text-white mt-1">{todayCollections.length}</p>
+          <div className="bg-sky-500/10 border border-sky-500/20 rounded-xl p-4">
+            <p className="text-[10px] text-sky-300 uppercase">Total</p>
+            <p className="text-2xl font-bold text-sky-400 mt-1">{todayCollections.length}</p>
           </div>
-          <div className="bg-amber-500/10 border border-zinc-800 rounded-xl p-4">
-            <p className="text-[10px] text-gray-500 uppercase">Pending</p>
+          <div className="bg-sky-500/10 border border-sky-500/20 rounded-xl p-4">
+            <p className="text-[10px] text-sky-300 uppercase">Pending</p>
             <p className="text-2xl font-bold text-amber-400 mt-1">{pendingToday.length}</p>
           </div>
-          <div className="bg-emerald-500/10 border border-zinc-800 rounded-xl p-4">
-            <p className="text-[10px] text-gray-500 uppercase">Collected</p>
+          <div className="bg-sky-500/10 border border-sky-500/20 rounded-xl p-4">
+            <p className="text-[10px] text-sky-300 uppercase">Collected</p>
             <p className="text-2xl font-bold text-emerald-400 mt-1">{completedToday.length}</p>
           </div>
         </div>
