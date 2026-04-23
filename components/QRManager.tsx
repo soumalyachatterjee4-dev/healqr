@@ -6,7 +6,8 @@ import {
   Download,
   Palette,
   Image as ImageIcon,
-  Zap
+  Zap,
+  Phone
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { Slider } from './ui/slider';
@@ -41,6 +42,7 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [assignedQrCode, setAssignedQrCode] = useState<string>('');
+  const [ivrCode, setIvrCode] = useState<string>('');
 
   // Doctor Information
   const doctorImage = profileData?.image || null;
@@ -122,6 +124,11 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
         // Set assigned activation QR code
         if (data.activationQrCode) {
           setAssignedQrCode(data.activationQrCode);
+        }
+
+        // Set IVR code
+        if (data.ivrCode) {
+          setIvrCode(data.ivrCode);
         }
 
         if (data.trialEndDate) {
@@ -238,17 +245,49 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
 
   const generateQRCode = async () => {
     try {
-      const dataUrl = await QRCode.toDataURL(qrUrl, {
+      // Generate base QR with H-level error correction
+      const qrCanvas = document.createElement('canvas');
+      await QRCode.toCanvas(qrCanvas, qrUrl, {
         width: qrSize,
         margin: 2,
-        errorCorrectionLevel: 'H', // High error correction for better scannability
+        errorCorrectionLevel: 'H',
         color: {
           dark: qrColor,
           light: qrBackgroundColor,
         },
-        type: 'image/png',
       });
-      setQrCodeDataUrl(dataUrl);
+
+      // Overlay logo in center
+      const ctx = qrCanvas.getContext('2d');
+      if (ctx) {
+        try {
+          const logo = new Image();
+          logo.crossOrigin = 'anonymous';
+          logo.src = '/icon-192.png';
+          await new Promise<void>((resolve, reject) => {
+            logo.onload = () => resolve();
+            logo.onerror = () => reject();
+          });
+
+          const logoSize = qrSize * 0.22;
+          const logoX = (qrSize - logoSize) / 2;
+          const logoY = (qrSize - logoSize) / 2;
+
+          // White circle background
+          const circleRadius = logoSize / 2 + 4;
+          ctx.fillStyle = qrBackgroundColor;
+          ctx.beginPath();
+          ctx.arc(qrSize / 2, qrSize / 2, circleRadius, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Draw logo
+          ctx.drawImage(logo, logoX, logoY, logoSize, logoSize);
+        } catch {
+          // Logo failed to load — QR is still valid without it
+        }
+      }
+
+      setQrCodeDataUrl(qrCanvas.toDataURL('image/png'));
     } catch (error) {
       console.error('Error generating QR code:', error);
     }
@@ -551,6 +590,27 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
     ctx.fillStyle = '#10b981';
     ctx.font = `700 ${height * 0.028}px system-ui, -apple-system, sans-serif`;
     ctx.fillText('HEALQR.COM', width / 2, footerY + footerHeight * 0.82);
+
+    // IVR Code section (above footer if available)
+    if (ivrCode) {
+      const ivrY = footerY - height * 0.06;
+      const ivrText = `📞 IVR: ${ivrCode}`;
+      ctx.font = `bold ${height * 0.026}px system-ui, sans-serif`;
+      const ivrWidth = ctx.measureText(ivrText).width + height * 0.04;
+      const ivrHeight = height * 0.04;
+      const ivrX = (width - ivrWidth) / 2;
+
+      ctx.fillStyle = '#10b981';
+      ctx.beginPath();
+      ctx.roundRect(ivrX, ivrY, ivrWidth, ivrHeight, ivrHeight / 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `bold ${height * 0.022}px system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(ivrText, width / 2, ivrY + ivrHeight / 2);
+    }
   };
 
   const handleDownloadWithSize = async (size: DownloadSize) => {
@@ -648,13 +708,21 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
                 <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
                   <h2 className="text-emerald-400 mb-6">Live Preview</h2>
 
-                  <div className="bg-white rounded-lg p-8 flex items-center justify-center min-h-[400px]">
+                  <div className="bg-white rounded-lg p-8 flex flex-col items-center justify-center min-h-[400px]">
                     {qrCodeDataUrl ? (
-                      <img
-                        src={qrCodeDataUrl}
-                        alt="QR Code"
-                        className="max-w-full h-auto"
-                      />
+                      <>
+                        <img
+                          src={qrCodeDataUrl}
+                          alt="QR Code"
+                          className="max-w-full h-auto"
+                        />
+                        {ivrCode && (
+                          <div className="mt-4 flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-5 py-2">
+                            <Phone className="w-4 h-4 text-emerald-400" />
+                            <span className="text-sm font-bold text-emerald-400 tracking-wider">IVR: {ivrCode}</span>
+                          </div>
+                        )}
+                      </>
                     ) : (
                       <p className="text-gray-500">Generating QR code...</p>
                     )}

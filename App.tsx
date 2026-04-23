@@ -1618,7 +1618,10 @@ export default function App() {
 
       // CRITICAL: Check if we're on verification pages, booking flow, or notification templates - don't redirect!
       const urlParams = new URLSearchParams(window.location.search);
-      const isVerificationLink = urlParams.get('mode') === 'signIn' && urlParams.get('oobCode');
+      const hashStr = window.location.hash || '';
+      const isVerificationLink = (urlParams.get('mode') === 'signIn' && urlParams.get('oobCode')) || 
+                                  hashStr.includes('#verify') || 
+                                  urlParams.get('apiKey') !== null;
       const hasBookingDoctorId = urlParams.get('doctorId') || sessionStorage.getItem('booking_doctor_id');
       const hasBookingClinicId = urlParams.get('clinicId') || sessionStorage.getItem('booking_clinic_id');
       const isSlugUrl = window.location.pathname.startsWith('/dr/') || window.location.pathname.startsWith('/clinic/') || window.location.pathname.startsWith('/lab/');

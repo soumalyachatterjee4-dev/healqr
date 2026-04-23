@@ -143,6 +143,10 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
             const { generateClinicCode } = await import('../utils/idGenerator');
             const clinicCode = await generateClinicCode(signupData.pinCode);
 
+            // Generate IVR code for non-smartphone users
+            const { generateIvrCode } = await import('../utils/ivrCodeGenerator');
+            const ivrCode = await generateIvrCode(signupData.clinicName, '', user.uid, 'clinic');
+
             // Generate clinic slug and booking URL
             let clinicSlug = signupData.clinicName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
             let bookingUrl = `https://healqr.com/clinic/${clinicSlug}`;
@@ -173,6 +177,7 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
                 clinicSlug: clinicSlug,
                 bookingUrl: bookingUrl,
                 qrCode: qrUrl,
+                ivrCode: ivrCode,
                 createdAt: serverTimestamp(),
                 type: 'clinic',
                 linkedDoctorCodes: [],
@@ -295,6 +300,10 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
           const { generateLabCode } = await import('../utils/idGenerator');
           const labCode = await generateLabCode(signupData.pinCode);
 
+          // Generate IVR code for non-smartphone users
+          const { generateIvrCode: generateLabIvrCode } = await import('../utils/ivrCodeGenerator');
+          const ivrCode = await generateLabIvrCode(signupData.labName || signupData.name, '', user.uid, 'lab');
+
           // Generate lab slug and booking URL
           const labName = signupData.labName || signupData.name;
           let labSlug = labName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
@@ -325,6 +334,7 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
             labSlug: labSlug,
             bookingUrl: bookingUrl,
             qrCode: qrUrl,
+            ivrCode: ivrCode,
             createdAt: serverTimestamp(),
             type: 'lab',
             locations: signupData.locations || [{ id: '001', name: labName, landmark: '' }],
@@ -474,7 +484,8 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
         name: signupData.name,
         email: email,
         qrNumber: qrId,
-        bookingUrl: bookingUrl
+        bookingUrl: bookingUrl,
+        ivrCode: '' // Will be set after generation
       };
 
       // Save doctor data to Firestore (permanent storage) - OPTIMIZE: Run in parallel with QR linking
@@ -489,6 +500,11 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
 
         // Generate unique doctor code based on pincode
         const doctorCode = await generateDoctorCode(signupData.pinCode || '000000');
+
+        // Generate IVR code for non-smartphone users
+        const { generateIvrCode } = await import('../utils/ivrCodeGenerator');
+        const ivrCode = await generateIvrCode(signupData.name, signupData.dob || '', user.uid, 'doctor');
+        tempDoctorData.ivrCode = ivrCode; // Pass IVR code to styled QR generator
 
         await setDoc(doctorDocRef, {
           uid: user.uid,
@@ -506,6 +522,7 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
           division: (signupData.division || '').trim(), // Division for pre-printed QR
           qrDocId: '', // Will be set after QR doc lookup
           doctorCode: doctorCode,
+          ivrCode: ivrCode,
           baCode: signupData.baCode || '',
           activationQrCode: signupData.activationQrCode || '',
           qrCode: qrUrl,
@@ -679,7 +696,7 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
     if (!ctx) return;
 
     const width = 600;
-    const height = 750;
+    const height = 850; // Increased for IVR code section
     canvas.width = width;
     canvas.height = height;
 
@@ -687,10 +704,18 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, width, height);
 
-    // Generate QR code
+    // Top emerald accent bar
+    const topGrad = ctx.createLinearGradient(0, 0, width, 0);
+    topGrad.addColorStop(0, '#10b981');
+    topGrad.addColorStop(1, '#059669');
+    ctx.fillStyle = topGrad;
+    ctx.fillRect(0, 0, width, 8);
+
+    // Generate QR code with H-level error correction (30% for logo overlay)
     const qrDataUrl = await QRCode.toDataURL(data.bookingUrl, {
       width: 400,
       margin: 2,
+      errorCorrectionLevel: 'H',
       color: {dark: '#000000', light: '#ffffff'},
     });
 
@@ -701,31 +726,104 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
     });
 
     // Draw QR code centered
-    const qrSize = 400;
+    const qrSize = 380;
     const qrX = (width - qrSize) / 2;
-    const qrY = 80;
+    const qrY = 50;
     ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
 
+    // Overlay HealQR logo in center of QR
+    try {
+      const logo = new Image();
+      logo.crossOrigin = 'anonymous';
+      logo.src = '/icon-192.png';
+      await new Promise((resolve, reject) => {
+        logo.onload = resolve;
+        logo.onerror = reject;
+      });
+
+      const logoSize = qrSize * 0.22;
+      const logoX = qrX + (qrSize - logoSize) / 2;
+      const logoY = qrY + (qrSize - logoSize) / 2;
+
+      // White circle background for logo
+      const circleRadius = logoSize / 2 + 8;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(qrX + qrSize / 2, qrY + qrSize / 2, circleRadius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Subtle border
+      ctx.strokeStyle = '#e5e7eb';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(qrX + qrSize / 2, qrY + qrSize / 2, circleRadius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Draw logo
+      ctx.drawImage(logo, logoX, logoY, logoSize, logoSize);
+    } catch (e) {
+      console.warn('Logo overlay skipped:', e);
+    }
+
+    // IVR Code pill (below QR)
+    if (data.ivrCode) {
+      const pillY = qrY + qrSize + 18;
+      const codeText = `📞 IVR Code: ${data.ivrCode}`;
+      ctx.font = 'bold 22px system-ui, -apple-system, sans-serif';
+      const textWidth = ctx.measureText(codeText).width;
+      const pillWidth = textWidth + 40;
+      const pillHeight = 38;
+      const pillX = (width - pillWidth) / 2;
+
+      ctx.fillStyle = '#10b981';
+      ctx.beginPath();
+      ctx.roundRect(pillX, pillY, pillWidth, pillHeight, 19);
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(codeText, width / 2, pillY + pillHeight / 2);
+    }
+
     // Doctor name
+    const nameY = data.ivrCode ? qrY + qrSize + 78 : qrY + qrSize + 40;
     ctx.fillStyle = '#1f2937';
-    ctx.font = 'bold 32px system-ui, sans-serif';
+    ctx.font = 'bold 30px system-ui, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(data.name.toUpperCase(), width / 2, 550);
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(data.name.toUpperCase(), width / 2, nameY);
 
     // Email
     ctx.fillStyle = '#6b7280';
-    ctx.font = '20px system-ui, sans-serif';
-    ctx.fillText(data.email, width / 2, 590);
+    ctx.font = '18px system-ui, sans-serif';
+    ctx.fillText(data.email, width / 2, nameY + 35);
 
     // QR Number
     ctx.fillStyle = '#10b981';
-    ctx.font = 'bold 22px system-ui, sans-serif';
-    ctx.fillText(`QR: ${data.qrNumber}`, width / 2, 630);
+    ctx.font = 'bold 20px system-ui, sans-serif';
+    ctx.fillText(`QR: ${data.qrNumber}`, width / 2, nameY + 65);
+
+    // Divider
+    ctx.strokeStyle = '#e5e7eb';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(width * 0.2, nameY + 90);
+    ctx.lineTo(width * 0.8, nameY + 90);
+    ctx.stroke();
+
+    // IVR info text for non-smartphone users
+    if (data.ivrCode) {
+      ctx.fillStyle = '#6b7280';
+      ctx.font = '14px system-ui, sans-serif';
+      ctx.fillText('No smartphone? Call 1800-XXX-XXXX', width / 2, nameY + 115);
+      ctx.fillText(`and enter code: ${data.ivrCode}`, width / 2, nameY + 135);
+    }
 
     // HealQR branding
-    ctx.fillStyle = '#3b82f6';
+    ctx.fillStyle = '#10b981';
     ctx.font = 'bold 24px system-ui, sans-serif';
-    ctx.fillText('HEALQR.COM', width / 2, 700);
+    ctx.fillText('HEALQR.COM', width / 2, height - 30);
 
     // Set styled QR as download
     setQrCodeUrl(canvas.toDataURL('image/png'));

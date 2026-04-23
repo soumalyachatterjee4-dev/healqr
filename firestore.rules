@@ -1688,6 +1688,21 @@ service cloud.firestore {
     }
 
     // ============================================
+    // IVR CODES COLLECTION (IVR booking system for non-smartphone users)
+    // ============================================
+
+    match /ivrCodes/{codeId} {
+      // Allow read by anyone (IVR system needs to lookup codes)
+      allow read: if true;
+
+      // Allow create during signup flow (before and after auth)
+      allow create: if true;
+
+      // No updates or deletes (codes are immutable once created)
+      allow update, delete: if false;
+    }
+
+    // ============================================
     // DEFAULT DENY
     // ============================================
 
