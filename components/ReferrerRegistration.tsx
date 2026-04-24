@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { UserPlus, CheckCircle, SkipForward } from 'lucide-react';
+import { UserPlus, CheckCircle, SkipForward, ArrowLeft } from 'lucide-react';
 import HealthTipBanner from './HealthTipBanner';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -79,6 +79,14 @@ export default function ReferrerRegistration({ onSuccess, onSkip, onLoginRedirec
   return (
     <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
+        {/* Back to Home */}
+        <button
+          onClick={onSkip}
+          className="inline-flex items-center gap-1.5 text-gray-400 hover:text-emerald-400 text-sm mb-4 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" /> Back to Home
+        </button>
+
         {/* Header */}
         <div className="text-center mb-6">
           <img src={healqrLogo} alt="HealQR" className="h-12 w-auto mx-auto mb-4" />

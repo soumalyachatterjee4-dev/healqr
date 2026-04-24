@@ -156,6 +156,7 @@ export default function DashboardSidebar({
     { id: 'inventory-manager', label: 'Inventory', icon: Package },
     { id: 'patient-broadcast', label: 'Patient Broadcast', icon: Megaphone },
     { id: 'social-kit', label: 'Social Kit & Offers', icon: Share2 },
+    { id: 'paramedical-manager', label: 'Paramedical Manager', icon: Heart },
   ];
 
   const generalTools = [

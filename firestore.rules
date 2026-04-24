@@ -294,6 +294,18 @@ service cloud.firestore {
       allow create: if isAuthenticated();
       // Allow update/delete only by owner
       allow update, delete: if isOwner(paraId);
+
+      // Reviews subcollection (public mini-site + owner management)
+      match /reviews/{reviewId} {
+        allow read: if true;
+        allow create: if true; // patients leaving reviews (pre-auth booking flow)
+        allow update, delete: if isOwner(paraId);
+      }
+
+      // Notifications subcollection (owner only)
+      match /notifications/{notifId} {
+        allow read, write: if isOwner(paraId);
+      }
     }
 
     // ============================================

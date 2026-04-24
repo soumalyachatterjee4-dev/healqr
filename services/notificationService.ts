@@ -1261,6 +1261,107 @@ export const scheduleVideoCallLink = async (data: any, appointmentTime: Date) =>
   return result;
 };
 
+// 🧪 LAB REPORT READY - dedicated notification for lab reports
+export const sendLabReportReady = async (data: {
+  patientPhone: string;
+  patientName: string;
+  labId: string;
+  labName: string;
+  branchName?: string;
+  bookingId: string;
+  reportPdfUrl: string;
+  reportFileName?: string;
+  language?: string;
+  testsSummary?: string; // e.g. "CBC, LFT"
+}) => {
+  const { userId, phone10 } = normalizePatientTarget(data.patientPhone);
+
+  const title = '🧪 Lab Report Ready';
+  const body = `Hello ${data.patientName?.split(' ')[0] || 'there'}, your lab report from ${data.labName} is ready. Tap to view & download.`;
+
+  const deepLinkParams = new URLSearchParams({
+    page: 'lab-report-view',
+    bookingId: data.bookingId || '',
+    labId: data.labId || '',
+    labName: data.labName || '',
+    patientName: data.patientName || '',
+    pdf: data.reportPdfUrl || '',
+    language: data.language || 'english',
+  });
+  const deepLink = `https://healqr.com/?${deepLinkParams.toString()}`;
+
+  const result = await sendFCM({
+    userId,
+    title,
+    body,
+    data: {
+      type: 'lab_report',
+      labId: data.labId,
+      labName: data.labName,
+      bookingId: data.bookingId,
+      reportPdfUrl: data.reportPdfUrl,
+      url: deepLink,
+      language: data.language || 'english',
+    },
+  });
+
+  // History record
+  try {
+    await saveNotificationHistory({
+      patientPhone: phone10,
+      patientName: data.patientName || 'Patient',
+      doctorName: data.labName || 'Lab',
+      clinicName: data.branchName || data.labName,
+      chamber: data.branchName || data.labName,
+      notificationType: 'lab_report',
+      bookingStatus: 'completed',
+      notificationStatus: result?.success === false ? 'failed' : 'delivered',
+      messageId: result?.messageId,
+      timestamp: new Date(),
+      consultationDate: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+      consultationTime: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      bookingId: data.bookingId,
+      message: body,
+      doctorId: data.labId,
+    });
+  } catch (e) {
+    console.error('Failed to save lab_report history:', e);
+  }
+
+  // ALWAYS store patient-facing notification (even if FCM failed)
+  try {
+    await storePatientNotification({
+      patientPhone: phone10,
+      patientName: data.patientName || 'Patient',
+      type: 'lab_report',
+      title,
+      message: body,
+      bookingId: data.bookingId || '',
+      doctorId: data.labId,
+      doctorName: data.labName || 'Lab',
+      chamberName: data.branchName || data.labName,
+      fcmAttempted: true,
+      fcmSuccess: result?.success !== false,
+      fcmError: result?.error,
+      fcmToken: result?.fcmToken,
+      metadata: {
+        reportPdfUrl: data.reportPdfUrl,
+        reportFileName: data.reportFileName,
+        labId: data.labId,
+        labName: data.labName,
+        branchName: data.branchName,
+        testsSummary: data.testsSummary,
+        templateUrl: deepLink,
+        language: data.language || 'english',
+      },
+    });
+  } catch (e) {
+    console.error('Failed to store patient lab_report notification:', e);
+  }
+
+  return result;
+};
+
 // ðŸš¨ ADMIN ALERT - Send to Doctor when patients not marked seen after chamber end
 export const sendAdminAlert = async (data: {
   doctorId: string;

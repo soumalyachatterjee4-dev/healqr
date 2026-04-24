@@ -98,6 +98,27 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
   const [supportOpen, setSupportOpen] = useState(false);
   const [debugLog, setDebugLog] = useState<string[]>([]);
 
+  const allReviews = [...incomingReviews, ...selfCreatedReviews, ...uploadedReviews];
+
+  const renderStars = (rating: number, className = 'w-4 h-4') => {
+    return [...Array(5)].map((_, i) => {
+      const isFilled = i < Math.floor(rating);
+      const isHalf = !isFilled && i < rating;
+      return (
+        <Star
+          key={i}
+          className={`${className} ${
+            isFilled
+              ? 'fill-yellow-500 text-yellow-500'
+              : isHalf
+              ? 'fill-yellow-500/50 text-yellow-500'
+              : 'text-gray-600'
+          }`}
+        />
+      );
+    });
+  };
+
   // Check if user is assistant and get allowed pages
   const isAssistant = !!localStorage.getItem('healqr_is_assistant');
   const assistantPagesStr = localStorage.getItem('healqr_assistant_pages');
@@ -1054,8 +1075,41 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
   // usagePercentage removed: no longer needed in free mode
   // isBookingBlocked removed: no longer needed in free mode
 
+  const pageTitles: Record<string, string> = {
+    dashboard: 'Dashboard',
+    profile: 'Profile Manager',
+    qr: 'QR Manager',
+    schedule: 'Schedule Manager',
+    'todays-schedule': "Today's Schedule",
+    'advance-booking': 'Advance Booking',
+    analytics: 'Analytics',
+    'retention-analytics': 'Patient Retention',
+    reports: 'Reports',
+    'revenue-dashboard': 'Revenue Dashboard',
+    'billing-receipt': 'Billing & Receipts',
+    'queue-display': 'Queue Display',
+    'staff-attendance': 'Staff Attendance',
+    'inventory-manager': 'Inventory',
+    'patient-broadcast': 'Patient Broadcast',
+    'social-kit': 'Social Kit & Offers',
+    'monthly-planner': 'Monthly Planner',
+    'data-management': 'Data Management',
+    'assistant-access': 'Assistant Access',
+    'lab-referral-tracking': 'Lab Referral Tracking',
+    'referral-network': 'Referral Network',
+    'chronic-care': 'Chronic Care',
+    'personalized-templates': 'Personalized Templates',
+    'emergency-button': 'Emergency Button',
+    'pharma-cme': 'CME Content',
+    'pharma-samples': 'Sample Requests',
+    'ai-diet-chart': 'AI Diet Chart',
+    'ai-rx-reader': 'AI RX Reader',
+    'video-consultation': 'Video Consultation',
+    'video-library': 'Video Library'
+  };
+
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col lg:flex-row">
+    <div className="min-h-screen bg-zinc-950 text-white flex flex-col lg:flex-row overflow-x-hidden">
       {/* Sidebar - Works for both mobile and desktop */}
       <DashboardSidebar
         activeMenu={activeMenu}
@@ -1077,7 +1131,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
       {/* Main Content Container */}
       <div className="flex-1 lg:ml-64 flex flex-col min-h-screen">
         {/* Top Header - Fixed */}
-        <header className="bg-black border-b border-gray-900 px-4 md:px-8 py-4 flex items-center justify-between sticky top-0 z-50">
+        <header className="bg-zinc-950 border-b border-zinc-900 px-4 md:px-8 py-4 flex items-center justify-between sticky top-0 z-50">
           <div className="flex items-center gap-3">
             {/* Mobile Menu Button - 3 Lines Hamburger */}
             <button
@@ -1086,7 +1140,9 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
             >
               <Menu className="w-5 h-5 text-emerald-500" />
             </button>
-            <h2 className="text-lg md:text-xl">Dashboard</h2>
+            <h2 className="text-lg md:text-xl font-medium">
+              {pageTitles[activeMenu] || 'Dashboard'}
+            </h2>
           </div>
 
           <div className="flex items-center gap-2 md:gap-3">
@@ -1207,13 +1263,19 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
             </button>
 
             {/* Profile Button */}
-            <div className="w-9 h-9 md:w-10 md:h-10 bg-emerald-500 rounded-full flex items-center justify-center overflow-hidden">
+            <button
+              onClick={() => {
+                setActiveMenu('profile');
+                if (onMenuChange) onMenuChange('profile');
+              }}
+              className="w-9 h-9 md:w-10 md:h-10 bg-emerald-500 rounded-full flex items-center justify-center overflow-hidden"
+            >
               {profilePhoto ? (
                 <img src={profilePhoto} alt="Profile" className="w-full h-full object-cover" />
               ) : (
                 <User className="w-4 h-4 md:w-5 md:h-5 text-white" />
               )}
-            </div>
+            </button>
           </div>
         </header>
 
@@ -1252,26 +1314,18 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
               </div>
             </div>
 
-            {/* Rating & Reviews */}
-            <div className="flex items-center gap-4 mb-4">
-              <div className="flex items-center gap-2">
-                {[...Array(5)].map((_, i) => {
-                  const isFilled = i < Math.floor(averageRating);
-                  return (
-                    <Star
-                      key={i}
-                      className={`w-5 h-5 ${isFilled ? 'fill-yellow-500 text-yellow-500' : 'text-gray-600'}`}
-                    />
-                  );
-                })}
-                <span className="ml-2">{averageRating.toFixed(1)}/5</span>
-                <button
-                  onClick={() => setReviewsOpen(true)}
-                  className="text-emerald-500 text-sm hover:text-emerald-400 hover:underline transition-colors cursor-pointer"
-                >
-                  {totalReviews} {totalReviews === 1 ? 'review' : 'reviews'}
-                </button>
+            {/* ⭐ Simple inline rating (previous UI) */}
+            <div className="flex items-center gap-2 mb-6 md:mb-8">
+              <div className="flex items-center gap-1">
+                {renderStars(averageRating, 'w-5 h-5')}
               </div>
+              <span className="text-white font-semibold text-base">{averageRating.toFixed(1)}/5</span>
+              <button
+                onClick={() => setReviewsOpen(true)}
+                className="text-emerald-400 text-sm hover:text-emerald-300 hover:underline transition-colors"
+              >
+                {totalReviews} {totalReviews === 1 ? 'review' : 'reviews'}
+              </button>
             </div>
           </div>
 
@@ -1342,7 +1396,7 @@ export default function DoctorDashboard({ doctorName, email, onLogout, onMenuCha
                 </p>
               </CardHeader>
               <CardContent>
-                <div className="bg-black rounded-xl p-6">
+                <div className="bg-zinc-950 rounded-xl p-6">
                   {/* Custom Bar Chart */}
                   <div className="space-y-6">
                     {practiceOverviewData.map((item, index) => {

@@ -15,7 +15,7 @@ export interface NotificationRecord {
   doctorName: string;
   clinicName?: string;
   chamber?: string;
-  notificationType: 'booking_confirmed' | 'appointment_confirmed' | 'consultation_completed' | 'reminder' | 'cancelled' | 'restored' | 'follow_up' | 'review_request' | 'prescription_ready' | 'video_call_link';
+  notificationType: 'booking_confirmed' | 'appointment_confirmed' | 'consultation_completed' | 'reminder' | 'cancelled' | 'restored' | 'follow_up' | 'review_request' | 'prescription_ready' | 'video_call_link' | 'lab_report';
   bookingStatus: 'confirmed' | 'cancelled' | 'dropout' | 'completed';
   notificationStatus: 'delivered' | 'failed' | 'not_allowed' | 'pending' | 'sent'; // 'sent' kept for backward compatibility
   deliveryStatus?: 'push_sent' | 'push_failed' | 'permission_denied' | 'no_token' | 'saved_only'; // New: detailed delivery status

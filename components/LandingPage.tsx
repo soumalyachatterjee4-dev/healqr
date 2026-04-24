@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
-import { Video, User, AlertCircle, Star, Grid3x3, Smartphone, Clock, FileText, CheckCircle, TrendingUp, Bell, Users, Layout, ShoppingCart, Building2, MessageSquare, MonitorPlay, ShoppingBag, ScanLine, Twitter, Linkedin, Facebook, ArrowLeft, Sparkles, QrCode, Microscope } from 'lucide-react';
+import { Video, User, AlertCircle, Star, Grid3x3, Smartphone, Clock, FileText, CheckCircle, TrendingUp, Bell, Users, Layout, ShoppingCart, Building2, MessageSquare, MonitorPlay, ShoppingBag, ScanLine, Twitter, Linkedin, Facebook, ArrowLeft, Sparkles, QrCode, Microscope, Share2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { collection, query, where, getDocs, getCountFromServer, Timestamp, orderBy, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase/config';
 import LandingSupportModal from './LandingSupportModal';
@@ -228,6 +229,34 @@ export default function LandingPage({
 
           {/* Right Side Actions */}
           <div className="flex items-center gap-2 sm:gap-4">
+            {/* Simple Share Button — no referrer registration required */}
+            <button
+              onClick={async () => {
+                const shareData = {
+                  title: 'HealQR — Doctor Booking Platform',
+                  text: 'Book doctors, clinics and lab tests instantly with HealQR.',
+                  url: window.location.origin,
+                };
+                try {
+                  if (typeof navigator !== 'undefined' && (navigator as any).share) {
+                    await (navigator as any).share(shareData);
+                  } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                    await navigator.clipboard.writeText(shareData.url);
+                    toast.success('Link copied to clipboard');
+                  } else {
+                    toast.info(shareData.url);
+                  }
+                } catch (err: any) {
+                  if (err?.name !== 'AbortError') {
+                    console.error('Share failed:', err);
+                  }
+                }
+              }}
+              className="w-10 h-10 bg-blue-900/60 border border-blue-700/40 rounded-md flex items-center justify-center hover:bg-blue-800/80 transition-colors"
+              title="Share HealQR"
+            >
+              <Share2 className="w-5 h-5 text-blue-300" />
+            </button>
             {/* Referrer QR Share Button */}
             <button
               onClick={onReferrerRegister}

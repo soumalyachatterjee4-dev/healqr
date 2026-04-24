@@ -32,6 +32,7 @@ const AdvanceBooking = lazy(() => import("./components/AdvanceBooking"));
 const PatientDetails = lazy(() => import("./components/PatientDetails"));
 const PreviewCenter = lazy(() => import("./components/PreviewCenter"));
 const Analytics = lazy(() => import("./components/Analytics"));
+const DoctorParamedicalManagerPage = lazy(() => import("./components/DoctorParamedicalManagerPage"));
 const PatientRetentionAnalytics = lazy(() => import("./components/PatientRetentionAnalytics"));
 const DoctorQueueSetup = lazy(() => import("./components/DoctorQueueSetup"));
 const StaffAttendance = lazy(() => import("./components/StaffAttendance"));
@@ -188,6 +189,7 @@ export default function App() {
     | "billing-receipt"
     | "inventory-manager"
     | "patient-broadcast"
+    | "paramedical-manager"
     | "template-uploader"
     | "reminder-notifications"
     | "booking-language"
@@ -277,7 +279,7 @@ export default function App() {
   >(() => {
     // CRITICAL: Check URL pathname FIRST — prevents flash of wrong page on magic link clicks
     const pathname = window.location.pathname;
-    
+
     // 🔍 DEBUG: Log all paramedical-related localStorage keys on page load
     console.log('🔍 [INIT] Page Load Debug:', {
       pathname,
@@ -1619,8 +1621,8 @@ export default function App() {
       // CRITICAL: Check if we're on verification pages, booking flow, or notification templates - don't redirect!
       const urlParams = new URLSearchParams(window.location.search);
       const hashStr = window.location.hash || '';
-      const isVerificationLink = (urlParams.get('mode') === 'signIn' && urlParams.get('oobCode')) || 
-                                  hashStr.includes('#verify') || 
+      const isVerificationLink = (urlParams.get('mode') === 'signIn' && urlParams.get('oobCode')) ||
+                                  hashStr.includes('#verify') ||
                                   urlParams.get('apiKey') !== null;
       const hasBookingDoctorId = urlParams.get('doctorId') || sessionStorage.getItem('booking_doctor_id');
       const hasBookingClinicId = urlParams.get('clinicId') || sessionStorage.getItem('booking_clinic_id');
@@ -2280,6 +2282,7 @@ export default function App() {
             'patient-details',
             'preview-center',
             'analytics',
+            'paramedical-manager',
             'reports',
             'revenue-dashboard',
             'billing-receipt',
@@ -2310,6 +2313,7 @@ export default function App() {
             'patient-details',
             'preview-center',
             'analytics',
+            'paramedical-manager',
             'reports',
             'revenue-dashboard',
             'billing-receipt',
@@ -2933,6 +2937,8 @@ export default function App() {
       setCurrentPage("template-uploader");
     else if (menu === "social-kit")
       setCurrentPage("social-kit");
+    else if (menu === "paramedical-manager")
+      setCurrentPage("paramedical-manager");
     else if (menu === "reminder-notifications")
       setCurrentPage("reminder-notifications");
     else if (menu === "video-library") {
@@ -3486,6 +3492,16 @@ export default function App() {
           onMenuChange={menuChangeHandler}
           activeAddOns={activeAddOns}
         />
+      )}
+
+      {currentPage === "paramedical-manager" && (
+        <Suspense fallback={<PageLoader />}>
+          <DoctorParamedicalManagerPage
+            onLogout={handleLogout}
+            onMenuChange={menuChangeHandler}
+            activeAddOns={activeAddOns}
+          />
+        </Suspense>
       )}
 
       {currentPage === "retention-analytics" && (

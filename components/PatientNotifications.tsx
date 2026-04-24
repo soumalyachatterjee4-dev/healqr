@@ -487,6 +487,7 @@ export default function PatientNotifications({ patientPhone }: PatientNotificati
                           {notification.type === 'booking_restored' && '🔄'}
                           {notification.type === 'follow_up' && '📋'}
                           {notification.type === 'chronic_care' && '❤️'}
+                          {notification.type === 'lab_report' && '🧪'}
                         </div>
                         <div>
                           <h3 className="text-lg font-bold text-white">
@@ -500,6 +501,33 @@ export default function PatientNotifications({ patientPhone }: PatientNotificati
                       </div>
 
                       <p className="text-gray-300 mb-3">{notification.message}</p>
+
+                      {/* Lab Report Download */}
+                      {notification.type === 'lab_report' && (notification as any).metadata?.reportPdfUrl && (
+                        <div className="mb-4 space-y-2">
+                          {(notification as any).metadata?.testsSummary && (
+                            <div className="bg-zinc-800/60 rounded-lg px-3 py-2 text-xs text-gray-300">
+                              <span className="text-gray-500">Tests: </span>
+                              {(notification as any).metadata.testsSummary}
+                            </div>
+                          )}
+                          <a
+                            href={(notification as any).metadata.reportPdfUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-4 py-3 text-sm font-semibold transition-all w-full"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            Download Lab Report (PDF)
+                          </a>
+                          <p className="text-gray-500 text-[11px] text-center italic">
+                            Securely delivered by {(notification as any).metadata?.labName || notification.doctorName}
+                          </p>
+                        </div>
+                      )}
 
                       {/* Appointment Details */}
                       {(notification.appointmentDate || notification.appointmentTime || notification.chamberName) && (

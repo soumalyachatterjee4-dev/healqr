@@ -110,10 +110,10 @@ export default function LabSidebar({
     },
     {
       id: 'home-collection',
-      title: 'HOME COLLECTION',
+      title: 'PARAMEDICAL SERVICES',
       color: 'emerald',
       items: [
-        { id: 'phlebotomist-manager', label: 'Phlebotomist Manager', icon: Syringe },
+        { id: 'phlebotomist-manager', label: 'Paramedical Manager', icon: Syringe },
         { id: 'allocation-queue', label: 'Allocation Queue', icon: Truck },
       ],
     },

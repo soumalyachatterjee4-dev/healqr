@@ -47,7 +47,10 @@ import LabScheduleManager from './LabScheduleManager';
 import LabBookingsManager from './LabBookingsManager';
 import LabLocationManager from './LabLocationManager';
 import LabDoctorManager from './LabDoctorManager';
-import LabPhlebotomistManager from './LabPhlebotomistManager';
+import ParamedicalManager from './ParamedicalManager';
+import LabAnalytics from './LabAnalytics';
+import LabReportUpload from './LabReportUpload';
+import LabReportSearch from './LabReportSearch';
 import VideoLibrary from './VideoLibrary';
 import { Send } from 'lucide-react';
 interface LabData {
@@ -435,7 +438,7 @@ export default function LabDashboard({ onLogout }: { onLogout?: () => void | Pro
     'manage-doctors': 'Manage Doctors',
     bookings: 'Bookings Manager',
     'queue-display': 'Queue Display',
-    'phlebotomist-manager': 'Phlebotomist Manager',
+    'phlebotomist-manager': 'Paramedical Manager',
     'allocation-queue': 'Allocation Queue',
     'test-catalog': 'Test Catalog',
     schedule: 'Schedule Manager',
@@ -629,6 +632,21 @@ export default function LabDashboard({ onLogout }: { onLogout?: () => void | Pro
             {/* Bookings Manager */}
             {activeMenu === 'bookings' && (
               <LabBookingsManager labId={resolvedLabId} />
+            )}
+
+            {/* Analytics */}
+            {activeMenu === 'analytics' && resolvedLabId && (
+              <LabAnalytics labId={resolvedLabId} />
+            )}
+
+            {/* Report Upload */}
+            {activeMenu === 'report-upload' && resolvedLabId && (
+              <LabReportUpload labId={resolvedLabId} labName={labData?.name} />
+            )}
+
+            {/* Report Search */}
+            {activeMenu === 'report-search' && resolvedLabId && (
+              <LabReportSearch labId={resolvedLabId} labName={labData?.name} />
             )}
 
             {/* Dashboard Home */}
@@ -1023,7 +1041,7 @@ export default function LabDashboard({ onLogout }: { onLogout?: () => void | Pro
             )}
 
             {/* Other menu items â€” Coming Soon */}
-            {activeMenu !== 'dashboard' && activeMenu !== 'profile' && activeMenu !== 'qr-manager' && activeMenu !== 'test-catalog' && activeMenu !== 'schedule' && activeMenu !== 'bookings' && activeMenu !== 'location-manager' && activeMenu !== 'manage-doctors' && activeMenu !== 'phlebotomist-manager' && (
+            {activeMenu !== 'dashboard' && activeMenu !== 'profile' && activeMenu !== 'qr-manager' && activeMenu !== 'test-catalog' && activeMenu !== 'schedule' && activeMenu !== 'bookings' && activeMenu !== 'location-manager' && activeMenu !== 'manage-doctors' && activeMenu !== 'phlebotomist-manager' && activeMenu !== 'analytics' && activeMenu !== 'report-upload' && activeMenu !== 'report-search' && (
               <Card className="bg-zinc-900 border-zinc-800">
                 <CardContent className="flex flex-col items-center justify-center py-16">
                   <Settings className="w-12 h-12 text-purple-500/30 mb-4" />
@@ -1036,7 +1054,12 @@ export default function LabDashboard({ onLogout }: { onLogout?: () => void | Pro
             )}
 
             {activeMenu === 'phlebotomist-manager' && resolvedLabId && (
-              <LabPhlebotomistManager labId={resolvedLabId} />
+              <ParamedicalManager
+                ownerType="lab"
+                ownerId={resolvedLabId}
+                ownerName={labData?.name || 'Lab'}
+                accent="teal"
+              />
             )}
 
           </div>

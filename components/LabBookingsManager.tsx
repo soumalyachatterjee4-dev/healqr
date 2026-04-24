@@ -24,6 +24,7 @@ import {
   sendAppointmentRestored,
   sendBatchCancellation,
   sendBatchRestoration,
+  sendLabReportReady,
 } from '../services/notificationService';
 
 /* ───────── Types ───────── */
@@ -780,27 +781,33 @@ export default function LabBookingsManager({ labId }: { labId: string }) {
 
     setSendingReport(true);
     try {
-      await sendFollowUp({
+      const testsSummary = (booking.tests || []).map(t => t.testName).filter(Boolean).slice(0, 5).join(', ');
+      const result = await sendLabReportReady({
         patientPhone: booking.patientPhone,
         patientName: booking.patientName,
-        doctorId: booking.labId,
-        doctorName: booking.labName || 'Lab',
-        chamber: booking.branchName || booking.labName || 'Lab',
-        clinicName: booking.branchName || booking.labName || 'Lab',
+        labId: booking.labId,
+        labName: booking.labName || 'Lab',
+        branchName: booking.branchName,
         bookingId: booking.bookingId,
-        followUpDate: new Date().toISOString(),
-        followUpDays: 0,
-        customMessage: `Your lab report is ready. Please open HealQR Notifications > Reports to view and download.`,
-        purpose: 'Lab report ready',
+        reportPdfUrl: booking.reportPdfUrl!,
+        reportFileName: booking.reportFileName,
         language: booking.language || 'english',
+        testsSummary,
       });
 
+      const fcmOk = result?.success !== false;
       await updateDoc(doc(db, 'labBookings', booking.id), {
         reportSent: true,
         reportSentAt: new Date().toISOString(),
+        reportFcmSuccess: fcmOk,
+        reportFcmError: result?.error || null,
         paymentStatusAtDelivery: booking.paymentReceived ? 'received' : 'pending',
       });
-      toast.success('Report ready notification sent to patient');
+      if (fcmOk) {
+        toast.success('Report sent to patient (push + in-app)');
+      } else {
+        toast.warning('Saved to patient inbox; push delivery failed (patient may not have notifications enabled).');
+      }
       setReportPreviewOpen(false);
       setDeliveryWarningOpen(false);
       setReportActionBooking(null);

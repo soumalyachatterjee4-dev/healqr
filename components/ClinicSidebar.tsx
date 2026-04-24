@@ -100,7 +100,7 @@ export default function ClinicSidebar({
   // Branch managers get a restricted set of pages
   const branchAllowedPages = [
     'dashboard', 'doctors', 'qr-manager', 'schedule-manager', 'todays-schedule',
-    'advance-booking', 'analytics', 'reports', 'revenue-dashboard', 'billing-receipt', 'inventory-manager', 'patient-broadcast', 'patient-retention', 'queue-display', 'staff-attendance', 'social-kit', 'monthly-planner', 'data-management',
+    'advance-booking', 'analytics', 'reports', 'revenue-dashboard', 'billing-receipt', 'inventory-manager', 'patient-broadcast', 'patient-retention', 'queue-display', 'staff-attendance', 'social-kit', 'paramedical-manager', 'monthly-planner', 'data-management',
     'assistant', 'lab-referral', 'ai-diet', 'ai-rx', 'video-consult',
     'pharma-cme', 'pharma-samples'
   ];
@@ -135,6 +135,7 @@ export default function ClinicSidebar({
         { id: 'queue-display', label: 'Queue Display', icon: Monitor },
         { id: 'staff-attendance', label: 'Staff Attendance', icon: Users },
         { id: 'social-kit', label: 'Social Kit & Offers', icon: Share2 },
+        { id: 'paramedical-manager', label: 'Paramedical Manager', icon: Stethoscope },
       ]
     },
     {

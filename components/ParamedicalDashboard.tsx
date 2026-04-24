@@ -13,12 +13,17 @@ import {
   BarChart3, Share2, IndianRupee, Users, Settings, LogOut, ChevronDown,
   ChevronUp, Clock, MapPin, Phone, Mail, Edit3, Save, Loader2, Check,
   Plus, Trash2, Copy, Download, Star, Building2, Stethoscope, ArrowLeft,
-  History, Activity, Megaphone, Lock, Shield, BrainCircuit
+  History, Activity, Megaphone, Lock, Shield, BrainCircuit, Upload,
+  Bell, Video, Facebook, Twitter, Linkedin, MessageCircle, Send, CheckCircle2, Circle, FlaskConical, ChevronRight, LayoutDashboard, Network
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { Badge } from './ui/badge';
+import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import type { ParamedicalRole } from './ParamedicalSignUp';
 import DashboardPromoDisplay from './DashboardPromoDisplay';
+import VideoLibrary from './VideoLibrary';
 
 // ===== ROLE CONFIG =====
 const ROLE_LABELS: Record<string, string> = {
@@ -28,6 +33,20 @@ const ROLE_LABELS: Record<string, string> = {
   'wound-dresser': 'Wound Dresser',
   'aaya': 'Aaya / Caretaker',
   'home-assistant': 'Home Health Assistant',
+  'nutritionist': 'Nutritionist',
+  'radiologist': 'Radiologist',
+  'dentist': 'Dentist',
+  'pharmacist': 'Pharmacist',
+  'other': 'Professional'
+};
+
+const renderStars = (rating: number, sizeClass = "w-4 h-4") => {
+  return [...Array(5)].map((_, i) => (
+    <Star
+      key={i}
+      className={`${sizeClass} ${i < Math.floor(rating) ? 'text-yellow-400 fill-yellow-400' : 'text-zinc-700'}`}
+    />
+  ));
 };
 
 const SERVICE_LABELS: Record<string, string> = {
@@ -81,6 +100,16 @@ interface ScheduleSlot {
   maxBookings: number;
 }
 
+interface ParaReview {
+  id: string;
+  patientName: string;
+  rating: number;
+  comment: string;
+  date: string;
+  source: 'incoming' | 'selfCreated';
+  publishedToMiniSite?: boolean;
+}
+
 interface Booking {
   id: string;
   patientName: string;
@@ -97,6 +126,8 @@ interface Booking {
   paymentStatus?: string;
   createdAt?: any;
   referredBy?: { name: string; type: string; id: string };
+  allottedBy?: { name: string; type: string; id: string; branchId?: string; branchName?: string };
+  source?: string;
 }
 
 interface ReferralEntry {
@@ -111,9 +142,10 @@ interface ReferralEntry {
 
 // ===== SIDEBAR MENU =====
 const SIDEBAR_ITEMS = [
-  { id: 'dashboard', label: 'Dashboard', icon: Activity, section: 'main' },
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'main' },
   { id: 'profile', label: 'Profile', icon: User, section: 'management' },
   { id: 'qr-manager', label: 'QR Manager', icon: QrCode, section: 'management' },
+  { id: 'reviews', label: 'Manage Reviews', icon: Star, section: 'management' },
   { id: 'schedule', label: 'Schedule Maker', icon: Calendar, section: 'management' },
   { id: 'todays-schedule', label: "Today's Schedule", icon: CalendarDays, section: 'practice' },
   { id: 'advance-booking', label: 'Advance Bookings', icon: CalendarPlus, section: 'practice' },
@@ -121,15 +153,20 @@ const SIDEBAR_ITEMS = [
   { id: 'reports', label: 'Reports', icon: FileText, section: 'practice' },
   { id: 'analytics', label: 'Analytics', icon: BarChart3, section: 'practice' },
   { id: 'revenue', label: 'Revenue Dashboard', icon: IndianRupee, section: 'practice' },
-  { id: 'referral-manager', label: 'Referral Manager', icon: Users, section: 'network' },
+  { id: 'referral-manager', label: 'Referral Manager', icon: Network, section: 'network' },
   { id: 'social-kit', label: 'Social Kit', icon: Share2, section: 'network' },
 ];
 
 const SECTION_LABELS: Record<string, string> = {
-  main: '',
-  management: 'Management',
-  practice: 'Practice Tools',
-  network: 'Network & Growth',
+  management: 'MANAGEMENT TOOLS',
+  practice: 'PRACTICE ENHANCER TOOLS',
+  network: 'NETWORK & GROWTH',
+};
+
+const SECTION_COLORS: Record<string, string> = {
+  management: 'blue',
+  practice: 'purple',
+  network: 'emerald',
 };
 
 export default function ParamedicalDashboard({ onLogout }: { onLogout: () => void }) {
@@ -137,7 +174,34 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
   const [loading, setLoading] = useState(true);
   const [activeMenu, setActiveMenu] = useState('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [reviewsOpen, setReviewsOpen] = useState(false);
+
+  const renderStars = (rating: number, size: string = "w-4 h-4") => {
+    return [...Array(5)].map((_, i) => (
+      <Star
+        key={i}
+        className={`${size} ${i < rating ? 'text-yellow-500 fill-yellow-500' : 'text-zinc-600'}`}
+      />
+    ));
+  };
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [reviewsActiveTab, setReviewsActiveTab] = useState<'incoming' | 'selfCreated' | 'published'>('incoming');
+  const [newReviewName, setNewReviewName] = useState('');
+  const [newReviewComment, setNewReviewComment] = useState('');
+  const [newReviewRating, setNewReviewRating] = useState(5);
+  const [addingReview, setAddingReview] = useState(false);
+
+  const [shareMenuOpen, setShareMenuOpen] = useState(false);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [monthStats, setMonthStats] = useState({
+    total: 0,
+    completed: 0,
+    cancelled: 0,
+    upcoming: 0,
+    revenue: 0
+  });
 
   const paraId = auth?.currentUser?.uid || localStorage.getItem('userId') || localStorage.getItem('healqr_phlebo_id') || '';
 
@@ -162,7 +226,17 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
     load();
   }, [paraId]);
 
-  // Real-time bookings
+  // Fetch reviews
+  useEffect(() => {
+    if (!paraId) return;
+    const reviewsRef = collection(db, 'paramedicals', paraId, 'reviews');
+    const unsubscribe = onSnapshot(query(reviewsRef, orderBy('date', 'desc')), (snap) => {
+      setReviews(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (err) => console.error('Reviews error:', err));
+    return () => unsubscribe();
+  }, [paraId]);
+
+  // Fetch bookings
   useEffect(() => {
     if (!paraId) return;
     const q = query(collection(db, 'paramedicalBookings'), where('paramedicalId', '==', paraId), orderBy('appointmentDate', 'desc'));
@@ -182,11 +256,45 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
     return unsub;
   }, [paraId]);
 
+  // Month stats calculation
+  useEffect(() => {
+    if (!bookings.length) return;
+    const now = new Date();
+    const monthPrefix = now.toISOString().slice(0, 7);
+    const monthBookings = bookings.filter(b => b.appointmentDate?.startsWith(monthPrefix));
+
+    setMonthStats({
+      total: monthBookings.length,
+      completed: monthBookings.filter(b => b.status === 'completed').length,
+      cancelled: monthBookings.filter(b => b.status === 'cancelled' || b.status === 'rejected').length,
+      upcoming: monthBookings.filter(b => b.status === 'confirmed').length,
+      revenue: monthBookings.filter(b => b.status === 'completed').reduce((sum, b) => sum + (b.amount || 0), 0)
+    });
+  }, [bookings]);
+
+  // Unread notifications listener
+  useEffect(() => {
+    if (!paraId) return;
+    try {
+      const nRef = collection(db, 'paramedicals', paraId, 'notifications');
+      const unsub = onSnapshot(nRef, (snap) => {
+        setUnreadNotificationCount(snap.docs.filter(d => !d.data()?.read).length);
+      }, () => {});
+      return () => unsub();
+    } catch { }
+  }, [paraId]);
+
+  // Computed review stats
+  const incomingReviews = reviews.filter(r => r.source === 'incoming');
+  const selfCreatedReviews = reviews.filter(r => r.source === 'selfCreated');
+  const publishedReviews = reviews.filter(r => r.publishedToMiniSite);
+  const averageRating = reviews.length > 0
+    ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
+    : 0;
+
   const handleLogout = async () => {
-    console.log('🔍 [PARAMEDICAL] handleLogout called! Stack:', new Error().stack);
     try {
       await signOut(auth);
-      localStorage.removeItem('healqr_is_paramedical');
       localStorage.removeItem('healqr_paramedical_id');
       localStorage.removeItem('healqr_is_phlebo');
       localStorage.removeItem('healqr_phlebo_id');
@@ -196,6 +304,78 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
       localStorage.removeItem('healqr_user_name');
       onLogout();
     } catch (err) { console.error('Logout error:', err); }
+  };
+
+  const handleAddSelfReview = async () => {
+    if (!newReviewName.trim() || !newReviewComment.trim()) { toast.error('Fill in all fields'); return; }
+    setAddingReview(true);
+    try {
+      await addDoc(collection(db, 'paramedicals', paraId, 'reviews'), {
+        patientName: newReviewName.trim(),
+        rating: newReviewRating,
+        comment: newReviewComment.trim(),
+        date: new Date().toISOString().split('T')[0],
+        source: 'selfCreated',
+        publishedToMiniSite: false,
+        createdAt: serverTimestamp(),
+      });
+      setNewReviewName('');
+      setNewReviewComment('');
+      setNewReviewRating(5);
+      toast.success('Review added');
+    } catch (err) { toast.error('Failed to add review'); } finally { setAddingReview(false); }
+  };
+
+  const handleTogglePublish = async (review: ParaReview) => {
+    if (!review.publishedToMiniSite && publishedReviews.length >= 2) {
+      toast.error('Max 2 reviews can be published to Mini Website'); return;
+    }
+    try {
+      await updateDoc(doc(db, 'paramedicals', paraId, 'reviews', review.id), { publishedToMiniSite: !review.publishedToMiniSite });
+      toast.success(review.publishedToMiniSite ? 'Unpublished' : 'Published to Mini Website!');
+    } catch (err) { toast.error('Failed'); }
+  };
+
+  const handleDeleteReview = async (reviewId: string) => {
+    try {
+      await deleteDoc(doc(db, 'paramedicals', paraId, 'reviews', reviewId));
+      toast.success('Review deleted');
+    } catch (err) { toast.error('Failed to delete'); }
+  };
+
+  const handleShare = (platform: string) => {
+    const bookingUrl = `https://healqr.com/para/${profile?.profileSlug || paraId}`;
+    const shareText = `Book ${roleName} services from ${profile?.name || 'Professional'} on HealQR: ${bookingUrl}`;
+    let url = '';
+
+    switch (platform) {
+      case 'facebook': url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(bookingUrl)}`; break;
+      case 'twitter': url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`; break;
+      case 'linkedin': url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(bookingUrl)}`; break;
+      case 'whatsapp': url = `https://wa.me/?text=${encodeURIComponent(shareText)}`; break;
+      case 'email': url = `mailto:?subject=${encodeURIComponent('Medical Services Booking')}&body=${encodeURIComponent(shareText)}`; break;
+      case 'copy':
+        navigator.clipboard.writeText(bookingUrl);
+        toast.success('Link copied to clipboard');
+        setShareMenuOpen(false);
+        return;
+      default: return;
+    }
+    window.open(url, '_blank');
+    setShareMenuOpen(false);
+  };
+
+  const handleToggleStatus = async (bookingId: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'completed' ? 'confirmed' : 'completed';
+    try {
+      await updateDoc(doc(db, 'paramedicalBookings', bookingId), {
+        status: newStatus,
+        ...(newStatus === 'completed' ? { completedAt: new Date().toISOString() } : { completedAt: null })
+      });
+      toast.success(`Marked as ${newStatus}`);
+    } catch (err) {
+      toast.error('Failed to update status');
+    }
   };
 
   const today = new Date().toISOString().split('T')[0];
@@ -215,50 +395,139 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
 
   // ===== SIDEBAR =====
   const Sidebar = () => {
-    const sections = ['main', 'management', 'practice', 'network'];
+    const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+      management: true,
+      practice: true,
+      network: true,
+    });
+
+    const sections = ['management', 'practice', 'network'];
+
+    // Color maps for section headers and active items
+    const sectionHeaderColor: Record<string, string> = {
+      purple: 'text-purple-400/50',
+      emerald: 'text-emerald-400/50',
+      blue: 'text-blue-400/50',
+    };
+
+    const sectionChevronColor: Record<string, string> = {
+      purple: 'text-purple-500/40',
+      emerald: 'text-emerald-500/40',
+      blue: 'text-blue-500/40',
+    };
+
+    const sectionActiveClass: Record<string, string> = {
+      purple: 'bg-purple-500/15 text-purple-400',
+      emerald: 'bg-emerald-500/15 text-emerald-400',
+      blue: 'bg-blue-500/15 text-blue-400',
+    };
+
     return (
-      <div className="h-full flex flex-col bg-[#0a1a1a] border-r border-zinc-800">
-        <div className="p-4 border-b border-zinc-800">
-          <div className="flex items-center gap-3">
-            <img src={healqrLogo} alt="HealQR" className="h-8 w-auto" />
-            <div className="min-w-0">
-              <p className="text-teal-400 text-xs truncate">{roleName}</p>
-            </div>
-          </div>
+      <div className="h-full flex flex-col transition-all duration-300" style={{ backgroundColor: '#0d0a1a' }}>
+        {/* Logo */}
+        <div className="p-6">
+          <img
+            src={healqrLogo}
+            alt="healQr"
+            className="h-8 w-auto filter invert brightness-200"
+          />
         </div>
-        <nav className="flex-1 overflow-y-auto py-2 space-y-1">
-          {sections.map(section => {
-            const items = SIDEBAR_ITEMS.filter(i => i.section === section);
-            if (!items.length) return null;
-            return (
-              <div key={section}>
-                {SECTION_LABELS[section] && (
-                  <p className="px-4 pt-4 pb-1 text-[10px] uppercase tracking-widest text-gray-500 font-medium">{SECTION_LABELS[section]}</p>
-                )}
-                {items.map(item => {
-                  const Icon = item.icon;
-                  const isActive = activeMenu === item.id;
-                  return (
-                    <button key={item.id}
-                      onClick={() => { setActiveMenu(item.id); setMobileMenuOpen(false); }}
-                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] transition-colors ${isActive ? 'bg-teal-500/10 text-teal-400 border-r-2 border-teal-500' : 'text-gray-400 hover:text-white hover:bg-zinc-800/50'}`}>
-                      <Icon className="w-4 h-4 flex-shrink-0" />
-                      <span className="truncate">{item.label}</span>
-                      {item.id === 'todays-schedule' && todaysBookings.length > 0 && (
-                        <span className="ml-auto bg-teal-500/20 text-teal-400 text-[10px] px-1.5 py-0.5 rounded-full">{todaysBookings.length}</span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </nav>
-        <div className="p-3 border-t border-zinc-800">
-          <button onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] text-red-400 hover:bg-red-500/10 rounded-lg transition-colors">
-            <LogOut className="w-4 h-4" /> Logout
-          </button>
+
+        <div className="flex-1 overflow-y-auto px-4 custom-scrollbar">
+          {/* Dashboard Button */}
+          <div className="mb-6">
+            <button
+              onClick={() => {
+                setActiveMenu('dashboard');
+                setMobileMenuOpen(false);
+              }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${
+                activeMenu === 'dashboard'
+                  ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/25'
+                  : 'text-slate-400 hover:bg-purple-900/30 hover:text-purple-200'
+              }`}
+            >
+              <LayoutDashboard className="w-5 h-5" />
+              <span className="text-[15px] font-semibold">Dashboard</span>
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            {sections.map((sectionId) => {
+              const label = SECTION_LABELS[sectionId];
+              const color = SECTION_COLORS[sectionId];
+              const items = SIDEBAR_ITEMS.filter(i => i.section === sectionId);
+              const isExpanded = expandedSections[sectionId] ?? true;
+
+              if (!items.length) return null;
+
+              return (
+                <div key={sectionId} className="mb-4">
+                  <button
+                    onClick={() =>
+                      setExpandedSections((prev) => ({
+                        ...prev,
+                        [sectionId]: !prev[sectionId],
+                      }))
+                    }
+                    className={`w-full flex items-center justify-between px-4 py-2 text-[10px] font-bold uppercase tracking-[0.1em] hover:opacity-80 transition-colors text-left ${sectionHeaderColor[color]}`}
+                  >
+                    <span className="whitespace-nowrap">{label}</span>
+                    <ChevronDown
+                      className={`w-3 h-3 transition-transform duration-200 ${isExpanded ? '' : '-rotate-90'} shrink-0 ${sectionChevronColor[color]}`}
+                    />
+                  </button>
+
+                  {isExpanded && (
+                    <div className="mt-1 space-y-0.5">
+                      {items.map((item) => {
+                        const Icon = item.icon;
+                        const isActive = activeMenu === item.id;
+                        return (
+                          <button
+                            key={item.id}
+                            onClick={() => {
+                              if (item.id === 'reviews') {
+                                setReviewsOpen(true);
+                                setMobileMenuOpen(false);
+                                return;
+                              }
+                              setActiveMenu(item.id);
+                              setMobileMenuOpen(false);
+                            }}
+                            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 group text-left ${
+                              isActive
+                                ? sectionActiveClass[color]
+                                : 'text-slate-400 hover:bg-purple-500/10 hover:text-purple-200'
+                            }`}
+                          >
+                            <Icon className="w-4 h-4 shrink-0" />
+                            <span className="text-[13px] font-normal whitespace-nowrap">
+                              {item.label}
+                            </span>
+                            {item.id === 'todays-schedule' && todaysBookings.length > 0 && (
+                              <span className="ml-auto bg-purple-500/20 text-purple-400 text-[10px] px-1.5 py-0.5 rounded-full">{todaysBookings.length}</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Logout */}
+          <div className="mt-8 mb-8 border-t border-purple-900/30 pt-4">
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="text-[13px]">Logout</span>
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -271,6 +540,7 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
     const now = new Date();
     const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     const lastOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const averageRating = reviews.length > 0 ? reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length : 0;
 
     return (
     <div className="space-y-3">
@@ -298,17 +568,17 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
         </div>
       </div>
 
-      {/* Pink/Rose Stats Card — unique to Paramedical */}
-      <div style={{ background: 'linear-gradient(to bottom right, rgb(236, 72, 153), rgb(159, 18, 57))' }} className="text-white rounded-xl p-6 relative overflow-hidden">
+      {/* Purple Stats Card — matching LabDashboard aesthetics */}
+      <div style={{ background: 'linear-gradient(to bottom right, rgb(147, 51, 234), rgb(126, 34, 206))' }} className="text-white rounded-xl p-6 relative overflow-hidden">
         <div className="flex flex-col md:flex-row gap-6 md:gap-8 relative z-10">
           {/* Left Side — Booking Stats */}
           <div className="md:w-[40%] flex flex-col justify-center border-b md:border-b-0 md:border-r border-white/20 pb-4 md:pb-0 md:pr-4">
             <div className="flex items-center gap-2 mb-3">
               <span className="bg-white/20 text-white text-xs font-semibold px-2.5 py-1 rounded-full">Free</span>
-              <span className="bg-pink-900 text-white text-xs font-semibold px-2.5 py-1 rounded-full">Active</span>
+              <span className="bg-purple-900 text-white text-xs font-semibold px-2.5 py-1 rounded-full">Active</span>
             </div>
             <div className="text-2xl md:text-3xl font-bold mb-1">{monthBookings} Bookings</div>
-            <div className="text-xs text-pink-100 opacity-80">{firstOfMonth} – {lastOfMonth}</div>
+            <div className="text-xs text-purple-100 opacity-80">{firstOfMonth} – {lastOfMonth}</div>
           </div>
 
           {/* Right Side — Social Media Kit + Quick Stats */}
@@ -320,17 +590,17 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
                   <span className="px-2 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-medium backdrop-blur-sm flex items-center gap-1 w-fit shrink-0">✨ New</span>
                   <h3 className="text-sm sm:text-lg font-bold text-white whitespace-nowrap">Social Media Kit</h3>
                 </div>
-                <p className="text-pink-50 text-xs mb-2 leading-relaxed opacity-90">Create branded posts for Instagram & WhatsApp.</p>
+                <p className="text-purple-50 text-xs mb-2 leading-relaxed opacity-90">Create branded posts for Instagram & WhatsApp.</p>
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-md bg-white/10"><Share2 className="w-3 h-3 text-pink-200" /></div>
+                    <div className="p-1.5 rounded-md bg-white/10"><Share2 className="w-3 h-3 text-purple-200" /></div>
                     <div className="p-1.5 rounded-md bg-white/10"><Share2 className="w-3 h-3 text-blue-200" /></div>
                     <div className="p-1.5 rounded-md bg-white/10"><Share2 className="w-3 h-3 text-emerald-200" /></div>
                   </div>
-                  <span className="text-[10px] text-pink-100/70">One-click share</span>
+                  <span className="text-[10px] text-purple-100/70">One-click share</span>
                 </div>
               </div>
-              <button onClick={() => setActiveMenu('social-kit')} className="bg-white text-pink-600 hover:bg-pink-50 font-bold px-4 py-2 rounded-lg text-sm shadow-lg whitespace-nowrap w-fit shrink-0">
+              <button onClick={() => setActiveMenu('social-kit')} className="bg-white text-purple-600 hover:bg-purple-50 font-bold px-4 py-2 rounded-lg text-sm shadow-lg whitespace-nowrap w-fit shrink-0">
                 Try Now →
               </button>
             </div>
@@ -338,19 +608,19 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
             {/* Quick Stats Grid */}
             <div className="grid grid-cols-2 gap-4">
             <div className="bg-white/10 rounded-lg p-3">
-              <p className="text-pink-200 text-xs mb-1">Today</p>
+              <p className="text-purple-200 text-xs mb-1">Today</p>
               <p className="text-xl font-bold">{todaysBookings.length}</p>
             </div>
             <div className="bg-white/10 rounded-lg p-3">
-              <p className="text-pink-200 text-xs mb-1">Upcoming</p>
+              <p className="text-purple-200 text-xs mb-1">Upcoming</p>
               <p className="text-xl font-bold">{futureBookings.length}</p>
             </div>
             <div className="bg-white/10 rounded-lg p-3">
-              <p className="text-pink-200 text-xs mb-1">Completed</p>
+              <p className="text-purple-200 text-xs mb-1">Completed</p>
               <p className="text-xl font-bold">{completedCount}</p>
             </div>
             <div className="bg-white/10 rounded-lg p-3">
-              <p className="text-pink-200 text-xs mb-1">Total</p>
+              <p className="text-purple-200 text-xs mb-1">Total</p>
               <p className="text-xl font-bold">{bookings.length}</p>
             </div>
             </div>
@@ -380,6 +650,46 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
               </div>
             ))}
             {todaysBookings.length > 5 && <p className="text-gray-500 text-xs text-center">+{todaysBookings.length - 5} more</p>}
+          </div>
+        )}
+      </div>
+
+      {/* ★ Review Collection Widget */}
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1">
+              {renderStars(averageRating, 'w-5 h-5')}
+            </div>
+            <span className="text-white font-semibold text-base">{averageRating.toFixed(1)}/5</span>
+            <button
+              onClick={() => setReviewsOpen(true)}
+              className="text-purple-400 text-sm hover:text-purple-300 hover:underline transition-colors"
+            >
+              {reviews.length} {reviews.length === 1 ? 'review' : 'reviews'}
+            </button>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => setReviewsOpen(true)}
+            className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-3"
+          >
+            Manage Reviews
+          </Button>
+        </div>
+        {reviews.length === 0 ? (
+          <p className="text-xs text-gray-500">No reviews yet. Collect feedback from your patients.</p>
+        ) : (
+          <div className="flex gap-2 flex-wrap">
+            {reviews.slice(0, 3).map(r => (
+              <div key={r.id} className="bg-zinc-800 rounded-lg px-3 py-2 max-w-xs">
+                <div className="flex items-center gap-1 mb-1">
+                  {renderStars(r.rating, 'w-3 h-3')}
+                  <span className="text-xs text-gray-400 ml-1">{r.patientName}</span>
+                </div>
+                <p className="text-xs text-gray-300 line-clamp-1">{r.comment}</p>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -727,6 +1037,14 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
                   <p className="text-gray-400">{b.serviceType || serviceLabel}</p>
                   {b.address && <p className="text-gray-400 col-span-2"><MapPin className="w-3 h-3 inline mr-1" />{b.address}</p>}
                 </div>
+                {b.allottedBy?.name && (
+                  <div className="mb-3 inline-flex items-center gap-1.5 text-[11px] px-2 py-1 rounded-full bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                    Allotted by {b.allottedBy.type === 'doctor' ? 'Dr. ' : b.allottedBy.type === 'clinic' ? 'Clinic ' : b.allottedBy.type === 'lab' ? 'Lab ' : ''}{b.allottedBy.name}
+                    {b.allottedBy.branchName && b.allottedBy.branchName !== b.allottedBy.name && (
+                      <span className="opacity-80">— {b.allottedBy.branchName}</span>
+                    )}
+                  </div>
+                )}
                 {b.status !== 'completed' && b.status !== 'cancelled' && (
                   <div className="flex gap-2">
                     <Button size="sm" onClick={() => markStatus(b.id, 'completed')} disabled={updatingId === b.id}
@@ -1030,7 +1348,7 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
     return (
       <div className="space-y-6">
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-          <h3 className="text-white font-semibold mb-4 flex items-center gap-2"><Share2 className="w-5 h-5 text-pink-400" /> Social Sharing Kit</h3>
+          <h3 className="text-white font-semibold mb-4 flex items-center gap-2"><Share2 className="w-5 h-5 text-purple-400" /> Social Sharing Kit</h3>
           <div className="space-y-3">
             <Button onClick={shareWhatsApp} className="w-full bg-green-600 hover:bg-green-700 justify-start">
               <Megaphone className="w-4 h-4 mr-2" /> Share on WhatsApp
@@ -1063,6 +1381,13 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
       case 'revenue': return <RevenueDashboard />;
       case 'referral-manager': return <ReferralManager />;
       case 'social-kit': return <SocialKit />;
+      case 'video-library':
+        return (
+          <VideoLibrary
+            onBack={() => setActiveMenu('dashboard')}
+            source="dashboard"
+          />
+        );
       default: return <DashboardHome />;
     }
   };
@@ -1071,39 +1396,233 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white overflow-x-hidden">
-      {/* Mobile header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-[#0a1a1a] border-b border-zinc-800 px-4 py-3 flex items-center justify-between">
-        <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="text-white p-1">
-          {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-        </button>
-        <span className="text-white font-semibold text-sm">{pageTitle}</span>
-        <img src={healqrLogo} alt="HealQR" className="h-6 w-auto" />
-      </div>
+      {/* Sidebar Component */}
+      <aside className={`fixed inset-y-0 left-0 z-50 w-64 h-screen transform ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 transition-transform duration-300 ease-in-out`}>
+        <Sidebar />
+      </aside>
 
-      {/* Mobile sidebar overlay */}
+      {/* Mobile Overlay */}
       {mobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 z-40">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setMobileMenuOpen(false)} />
-          <div className="absolute left-0 top-0 bottom-0 w-64 z-50 bg-zinc-950">
-            <Sidebar />
-          </div>
-        </div>
+        <div
+          className="fixed inset-0 bg-black/60 z-40 lg:hidden animate-in fade-in duration-300"
+          onClick={() => setMobileMenuOpen(false)}
+        />
       )}
 
-      {/* Desktop sidebar */}
-      <div className="hidden lg:block fixed left-0 top-0 bottom-0 w-64 z-40">
-        <Sidebar />
-      </div>
-
-      {/* Main content */}
-      <div className="lg:ml-64 pt-16 lg:pt-0 min-h-screen">
-        <div className="p-4 lg:p-6 max-w-6xl">
-          <div className="hidden lg:block mb-6">
-            <h1 className="text-2xl font-bold text-white">{pageTitle}</h1>
-            <p className="text-gray-500 text-sm">{roleName} Dashboard</p>
+      {/* Main Content */}
+      <div className="transition-all duration-300 lg:ml-64 flex flex-col min-h-screen">
+        {/* Unified Header */}
+        <header className="bg-zinc-950 border-b border-zinc-900 px-4 md:px-8 py-4 flex items-center justify-between sticky top-0 z-30">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setMobileMenuOpen(true)}
+              className="lg:hidden w-10 h-10 bg-zinc-900 hover:bg-zinc-800 rounded-lg flex items-center justify-center transition-colors"
+            >
+              <Menu className="w-5 h-5 text-purple-500" />
+            </button>
+            <h2 className="text-lg md:text-xl font-medium">
+              {pageTitle}
+            </h2>
           </div>
+
+          <div className="flex items-center gap-2 md:gap-3">
+            {/* Share Popover */}
+            <Popover open={shareMenuOpen} onOpenChange={setShareMenuOpen}>
+              <PopoverTrigger asChild>
+                <button className="w-9 h-9 md:w-10 md:h-10 bg-[#1a162e] hover:bg-[#252145] rounded-xl flex items-center justify-center transition-all duration-300 border border-purple-900/30 group">
+                  <Share2 className="w-4 h-4 md:w-5 md:h-5 text-purple-400 group-hover:text-purple-300" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72 p-4 bg-zinc-900 border-zinc-800" align="end">
+                <div className="space-y-3">
+                  <div className="mb-1">
+                    <h3 className="text-white mb-1">Share Your Profile</h3>
+                    <p className="text-gray-400 text-xs truncate">https://healqr.com/para/{profile?.profileSlug || paraId}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button onClick={() => handleShare('facebook')} className="flex items-center gap-2 px-3 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-lg transition-colors"><Facebook className="w-4 h-4" /><span className="text-sm">Facebook</span></button>
+                    <button onClick={() => handleShare('twitter')} className="flex items-center gap-2 px-3 py-2 bg-sky-600/20 hover:bg-sky-600/30 text-sky-400 rounded-lg transition-colors"><Twitter className="w-4 h-4" /><span className="text-sm">Twitter</span></button>
+                    <button onClick={() => handleShare('linkedin')} className="flex items-center gap-2 px-3 py-2 bg-blue-700/20 hover:bg-blue-700/30 text-blue-400 rounded-lg transition-colors"><Linkedin className="w-4 h-4" /><span className="text-sm">LinkedIn</span></button>
+                    <button onClick={() => handleShare('whatsapp')} className="flex items-center gap-2 px-3 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-400 rounded-lg transition-colors"><MessageCircle className="w-4 h-4" /><span className="text-sm">WhatsApp</span></button>
+                    <button onClick={() => handleShare('email')} className="flex items-center gap-2 px-3 py-2 bg-gray-700/20 hover:bg-gray-700/30 text-gray-400 rounded-lg transition-colors"><Mail className="w-4 h-4" /><span className="text-sm">Email</span></button>
+                    <button onClick={() => handleShare('copy')} className="flex items-center gap-2 px-3 py-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 rounded-lg transition-colors"><Copy className="w-4 h-4" /><span className="text-sm">Copy Link</span></button>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {/* Video Tutorials */}
+            <button
+              onClick={() => setActiveMenu('video-library')}
+              className="w-9 h-9 md:w-10 md:h-10 bg-[#1a162e] hover:bg-[#252145] rounded-xl flex items-center justify-center transition-all duration-300 border border-purple-900/30 group"
+              title="Video Tutorials"
+            >
+              <Video className="w-4 h-4 md:w-5 md:h-5 text-purple-400 group-hover:text-purple-300" />
+            </button>
+
+            {/* Notifications */}
+            <button
+              onClick={() => {
+                if (unreadNotificationCount === 0) {
+                  toast.info('No new notifications');
+                } else {
+                  toast.info(`${unreadNotificationCount} unread notification${unreadNotificationCount > 1 ? 's' : ''}`);
+                }
+              }}
+              className="w-9 h-9 md:w-10 md:h-10 bg-[#1a162e] hover:bg-[#252145] rounded-xl flex items-center justify-center transition-all duration-300 border border-purple-900/30 group relative"
+              title="Notifications"
+            >
+              <Bell className="w-4 h-4 md:w-5 md:h-5 text-purple-400 group-hover:text-purple-300" />
+              {unreadNotificationCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-purple-500 rounded-full text-[10px] text-white flex items-center justify-center border-2 border-zinc-950">
+                  {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
+                </span>
+              )}
+            </button>
+
+            {/* Profile Avatar */}
+            <button
+              onClick={() => setActiveMenu('profile')}
+              className="w-9 h-9 md:w-10 md:h-10 bg-purple-500 rounded-full flex items-center justify-center overflow-hidden border-2 border-zinc-900"
+              title="Profile"
+            >
+              {profile?.profilePhoto ? (
+                <img src={profile.profilePhoto} alt="Profile" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-white font-bold text-sm">{(profile?.name || 'P')[0].toUpperCase()}</span>
+              )}
+            </button>
+          </div>
+        </header>
+
+        {/* Page Content Area */}
+        <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
           {renderPage()}
-        </div>
+        </main>
+
+        {/* Reviews Side Panel */}
+        {reviewsOpen && (
+          <div className="fixed inset-0 z-[100] flex">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setReviewsOpen(false)} />
+            <div className="relative ml-auto w-full max-w-md bg-zinc-950 border-l border-zinc-800 flex flex-col h-full shadow-2xl animate-in slide-in-from-right duration-300">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800 sticky top-0 bg-zinc-950 z-10">
+                <div>
+                  <h2 className="text-white font-semibold text-lg">Paramedical Reviews</h2>
+                  <p className="text-xs text-gray-400">{reviews.length} total · {publishedReviews.length}/2 published</p>
+                </div>
+                <button onClick={() => setReviewsOpen(false)} className="w-8 h-8 bg-zinc-800 hover:bg-zinc-700 rounded-lg flex items-center justify-center transition-colors">
+                  <X className="w-4 h-4 text-gray-400" />
+                </button>
+              </div>
+
+              {/* Tabs */}
+              <div className="flex border-b border-zinc-800 px-5">
+                {(['incoming', 'selfCreated', 'published'] as const).map(tab => (
+                  <button
+                    key={tab}
+                    onClick={() => setReviewsActiveTab(tab)}
+                    className={`py-3 px-3 text-sm font-medium border-b-2 transition-all ${
+                      reviewsActiveTab === tab
+                        ? 'border-purple-500 text-purple-400'
+                        : 'border-transparent text-gray-400 hover:text-gray-300'
+                    }`}
+                  >
+                    {tab === 'incoming' ? `Incoming (${incomingReviews.length})`
+                      : tab === 'selfCreated' ? `Self-Created (${selfCreatedReviews.length})`
+                      : `Published (${publishedReviews.length}/2)`}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex-1 p-5 space-y-4 overflow-y-auto custom-scrollbar">
+                {reviewsActiveTab === 'selfCreated' && (
+                  <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 space-y-3 mb-6">
+                    <h3 className="text-white text-sm font-semibold flex items-center gap-2"><Plus className="w-4 h-4 text-purple-400" /> Add Self-Created Review</h3>
+                    <div className="space-y-3">
+                      <Input
+                        placeholder="Patient Name"
+                        value={newReviewName}
+                        onChange={(e) => setNewReviewName(e.target.value)}
+                        className="bg-zinc-950 border-zinc-800 text-white h-9"
+                      />
+                      <div className="flex items-center gap-2 px-1">
+                        <span className="text-xs text-gray-400">Rating:</span>
+                        <div className="flex gap-1">
+                          {[1, 2, 3, 4, 5].map((num) => (
+                            <button key={num} onClick={() => setNewReviewRating(num)}>
+                              <Star className={`w-4 h-4 ${num <= newReviewRating ? 'text-yellow-400 fill-yellow-400' : 'text-zinc-700'}`} />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <textarea
+                        placeholder="Patient's feedback..."
+                        value={newReviewComment}
+                        onChange={(e) => setNewReviewComment(e.target.value)}
+                        className="w-full h-20 bg-zinc-950 border border-zinc-800 rounded-md p-2 text-sm text-white resize-none focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      />
+                      <Button
+                        onClick={handleAddSelfReview}
+                        disabled={addingReview}
+                        className="w-full bg-purple-600 hover:bg-purple-700 text-white h-9"
+                      >
+                        {addingReview ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Review'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  {(reviewsActiveTab === 'published' ? publishedReviews :
+                    reviewsActiveTab === 'selfCreated' ? selfCreatedReviews :
+                    incomingReviews).map((r) => (
+                    <div key={r.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 transition-colors hover:border-purple-900/20 group">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            {renderStars(r.rating, 'w-3.5 h-3.5')}
+                          </div>
+                          <p className="text-white font-medium text-sm">{r.patientName}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleTogglePublish(r)}
+                            title={r.publishedToMiniSite ? 'Unpublish' : 'Publish to Mini Website'}
+                            className={`p-1.5 rounded-lg transition-colors ${r.publishedToMiniSite ? 'bg-green-900 text-green-400' : 'bg-zinc-800 text-gray-400 hover:text-green-400'}`}
+                          >
+                            <Upload className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteReview(r.id)}
+                            className="p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors opacity-0 group-hover:opacity-100"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-sm text-gray-400 leading-relaxed italic">"{r.comment}"</p>
+                      <div className="mt-3 flex items-center justify-between">
+                        <span className="text-[10px] text-gray-500">{r.date}</span>
+                        {r.publishedToMiniSite && (
+                          <span className="text-[10px] bg-green-900 text-green-400 px-2 py-0.5 rounded-full">Live on Mini Website</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                  {(reviewsActiveTab === 'incoming' ? incomingReviews :
+                    reviewsActiveTab === 'selfCreated' ? selfCreatedReviews :
+                    publishedReviews).length === 0 && (
+                    <div className="text-center py-10">
+                      <Star className="w-10 h-10 text-zinc-800 mx-auto mb-3" />
+                      <p className="text-gray-500 text-sm">No reviews found in this category.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

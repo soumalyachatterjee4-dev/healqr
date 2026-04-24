@@ -21,7 +21,7 @@ import { toast } from 'sonner';
 import DashboardPromoDisplay from './DashboardPromoDisplay';
 import MasterAccessSidebar from './MasterAccessSidebar';
 
-type MasterMenu = 'dashboard' | 'analytics' | 'todays-overview' | 'revenue' | 'billing' | 'inventory' | 'retention' | 'branches' | 'assistants';
+type MasterMenu = 'dashboard' | 'analytics' | 'todays-overview' | 'revenue' | 'billing' | 'inventory' | 'retention' | 'branches' | 'assistants' | 'paramedicals';
 
 interface MasterAccessProps {
   onBack: () => void;
@@ -145,6 +145,21 @@ export default function ClinicMasterAccess({ onBack, clinicId }: MasterAccessPro
     id: string; name: string; category: string; quantity: number; unit: string; minStock: number; expiryDate: string;
   }[]>([]);
 
+  // Paramedicals (cross-branch view — owner only)
+  const [paramedicalsLoading, setParamedicalsLoading] = useState(false);
+  const [paramedicalBookings, setParamedicalBookings] = useState<Array<{
+    id: string;
+    paramedicalId: string;
+    paramedicalName: string;
+    paramedicalRole?: string;
+    serviceType?: string;
+    appointmentDate?: string;
+    status?: string;
+    patientName?: string;
+    createdAt?: any;
+    allottedBy?: { id?: string; name?: string; type?: string; branchId?: string; branchName?: string };
+  }>>([]);
+
   // Retention
   const [retentionLoading, setRetentionLoading] = useState(false);
   const [retentionData, setRetentionData] = useState<{
@@ -190,6 +205,13 @@ export default function ClinicMasterAccess({ onBack, clinicId }: MasterAccessPro
   useEffect(() => {
     if (activeMenu === 'inventory' && resolvedClinicId) {
       loadInventoryItems();
+    }
+  }, [activeMenu, resolvedClinicId]);
+
+  // Load paramedical allotments (cross-branch view)
+  useEffect(() => {
+    if (activeMenu === 'paramedicals' && resolvedClinicId) {
+      loadParamedicalBookings();
     }
   }, [activeMenu, resolvedClinicId]);
 
@@ -644,6 +666,34 @@ export default function ClinicMasterAccess({ onBack, clinicId }: MasterAccessPro
       console.error('Inventory load error:', err);
     } finally {
       setInventoryLoading(false);
+    }
+  };
+
+  // ═══════════════════════════════════════════════
+  // PARAMEDICAL ALLOTMENTS LOADING (cross-branch)
+  // ═══════════════════════════════════════════════
+
+  const loadParamedicalBookings = async () => {
+    if (!resolvedClinicId || !db) return;
+    setParamedicalsLoading(true);
+    try {
+      const q = query(
+        collection(db, 'paramedicalBookings'),
+        where('allottedBy.id', '==', resolvedClinicId)
+      );
+      const snap = await getDocs(q);
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+      list.sort((a, b) => {
+        const aT = a.createdAt?.seconds || 0;
+        const bT = b.createdAt?.seconds || 0;
+        return bT - aT;
+      });
+      setParamedicalBookings(list);
+    } catch (err) {
+      console.error('Error loading paramedical allotments:', err);
+      toast.error('Failed to load paramedical allotments');
+    } finally {
+      setParamedicalsLoading(false);
     }
   };
 
@@ -1872,6 +1922,174 @@ export default function ClinicMasterAccess({ onBack, clinicId }: MasterAccessPro
             )}
           </>
         )}
+
+          {/* ═══════════════ PARAMEDICALS (cross-branch) ═══════════════ */}
+          {activeMenu === 'paramedicals' && (() => {
+            const linked: any[] = (clinicData?.linkedParamedicals as any[]) || [];
+            const mainBranchId = locations[0]?.id || '001';
+            const branchGroups = new Map<string, { branchId: string; branchName: string; total: number; paraMap: Map<string, { name: string; role: string; count: number; last?: string }>; }>();
+            // Seed with known branches
+            for (const loc of locations) {
+              branchGroups.set(loc.id, { branchId: loc.id, branchName: loc.name, total: 0, paraMap: new Map() });
+            }
+            // Aggregate bookings into branch groups
+            for (const b of paramedicalBookings) {
+              const bId = b.allottedBy?.branchId || mainBranchId;
+              const bName = b.allottedBy?.branchName || (locations.find(l => l.id === bId)?.name) || 'Main Branch';
+              if (!branchGroups.has(bId)) branchGroups.set(bId, { branchId: bId, branchName: bName, total: 0, paraMap: new Map() });
+              const g = branchGroups.get(bId)!;
+              g.total += 1;
+              const key = b.paramedicalId || b.paramedicalName;
+              const existing = g.paraMap.get(key);
+              if (existing) {
+                existing.count += 1;
+                if (!existing.last || (b.appointmentDate && b.appointmentDate > existing.last)) existing.last = b.appointmentDate;
+              } else {
+                g.paraMap.set(key, { name: b.paramedicalName || 'Unknown', role: b.paramedicalRole || '', count: 1, last: b.appointmentDate });
+              }
+            }
+            const groupsArr = Array.from(branchGroups.values()).sort((a, b) => b.total - a.total);
+            return (
+              <>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h1 className="text-2xl font-bold text-white flex items-center gap-2"><Stethoscope className="w-6 h-6 text-purple-400" /> Paramedicals</h1>
+                    <p className="text-sm text-zinc-400 mt-1">Cross-branch view — owner only. Linked paramedicals are shared across all branches; allotment activity is shown per branch.</p>
+                  </div>
+                  <button
+                    onClick={loadParamedicalBookings}
+                    disabled={paramedicalsLoading}
+                    className="px-3 py-1.5 text-xs rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700"
+                  >
+                    {paramedicalsLoading ? 'Refreshing...' : 'Refresh'}
+                  </button>
+                </div>
+
+                {/* Summary */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Card className="bg-zinc-900 border-zinc-800">
+                    <CardContent className="p-4">
+                      <p className="text-xs text-zinc-400">Linked Paramedicals</p>
+                      <p className="text-3xl font-bold text-purple-400">{linked.length}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-zinc-900 border-zinc-800">
+                    <CardContent className="p-4">
+                      <p className="text-xs text-zinc-400">Total Allotments</p>
+                      <p className="text-3xl font-bold text-emerald-400">{paramedicalBookings.length}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-zinc-900 border-zinc-800">
+                    <CardContent className="p-4">
+                      <p className="text-xs text-zinc-400">Active Branches</p>
+                      <p className="text-3xl font-bold text-amber-400">{groupsArr.filter(g => g.total > 0).length}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-zinc-900 border-zinc-800">
+                    <CardContent className="p-4">
+                      <p className="text-xs text-zinc-400">Pending / Confirmed</p>
+                      <p className="text-3xl font-bold text-blue-400">{paramedicalBookings.filter(b => b.status === 'confirmed' || b.status === 'pending').length}</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Shared Master List */}
+                <Card className="bg-zinc-900 border-zinc-800">
+                  <CardContent className="p-5">
+                    <h2 className="text-lg font-semibold text-white mb-3">Shared Master List</h2>
+                    <p className="text-xs text-zinc-500 mb-4">These paramedicals are accessible to every branch and assistant under your clinic.</p>
+                    {linked.length === 0 ? (
+                      <p className="text-sm text-zinc-500 italic">No paramedicals linked yet. Link them via Paramedical Manager in the clinic dashboard.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {linked.map((p: any, idx: number) => (
+                          <div key={p.id || idx} className="bg-zinc-800/60 border border-zinc-700 rounded-lg p-3">
+                            <p className="text-sm text-white font-medium truncate">{p.name || 'Unknown'}</p>
+                            <p className="text-[11px] text-purple-300/80 uppercase tracking-wider">{p.role || '—'}</p>
+                            {p.phone && <p className="text-xs text-zinc-400 mt-1">{p.phone}</p>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Per-Branch Allotment Activity */}
+                <div>
+                  <h2 className="text-lg font-semibold text-white mb-3">Allotment Activity by Branch</h2>
+                  {paramedicalsLoading ? (
+                    <div className="text-sm text-zinc-500 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Loading...</div>
+                  ) : groupsArr.length === 0 ? (
+                    <p className="text-sm text-zinc-500 italic">No branches configured.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {groupsArr.map(g => (
+                        <Card key={g.branchId} className="bg-zinc-900 border-zinc-800">
+                          <CardContent className="p-5">
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <MapPin className="w-4 h-4 text-amber-400 shrink-0" />
+                                <span className="text-white font-medium truncate">{g.branchName}</span>
+                                <span className="text-[10px] text-amber-400 font-mono">#{g.branchId}</span>
+                              </div>
+                              <Badge className={`${g.total > 0 ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-zinc-700/50 text-zinc-400 border-zinc-600'}`}>
+                                {g.total} allotments
+                              </Badge>
+                            </div>
+                            {g.paraMap.size === 0 ? (
+                              <p className="text-xs text-zinc-500 italic">No allotments from this branch yet.</p>
+                            ) : (
+                              <div className="space-y-2">
+                                {Array.from(g.paraMap.values()).sort((a, b) => b.count - a.count).map((p, idx) => (
+                                  <div key={idx} className="flex items-center justify-between bg-zinc-800/50 rounded-md px-3 py-2">
+                                    <div className="min-w-0">
+                                      <p className="text-sm text-white truncate">{p.name}</p>
+                                      <p className="text-[10px] text-purple-300/80 uppercase tracking-wider">{p.role || '—'}{p.last ? ` • last: ${p.last}` : ''}</p>
+                                    </div>
+                                    <span className="text-xs text-emerald-400 font-medium shrink-0 ml-3">{p.count}×</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Recent allotments (last 15) */}
+                <Card className="bg-zinc-900 border-zinc-800">
+                  <CardContent className="p-5">
+                    <h2 className="text-lg font-semibold text-white mb-3">Recent Allotments</h2>
+                    {paramedicalBookings.length === 0 ? (
+                      <p className="text-sm text-zinc-500 italic">No allotments yet.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {paramedicalBookings.slice(0, 15).map(b => (
+                          <div key={b.id} className="flex items-start justify-between bg-zinc-800/40 border border-zinc-700/60 rounded-md px-3 py-2 gap-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm text-white truncate">{b.serviceType || 'Service'}</span>
+                                <span className={`text-[10px] uppercase px-2 py-0.5 rounded-full ${b.status === 'completed' ? 'bg-emerald-500/15 text-emerald-400' : b.status === 'cancelled' ? 'bg-red-500/15 text-red-400' : 'bg-blue-500/15 text-blue-400'}`}>{b.status || 'confirmed'}</span>
+                              </div>
+                              <p className="text-xs text-zinc-400 mt-0.5 truncate">
+                                {b.paramedicalName}{b.paramedicalRole ? ` (${b.paramedicalRole})` : ''} • {b.patientName || '—'}
+                              </p>
+                              <p className="text-[10px] text-amber-400/80 mt-0.5">
+                                Branch: {b.allottedBy?.branchName || locations.find(l => l.id === (b.allottedBy?.branchId || mainBranchId))?.name || 'Main Branch'}
+                                {b.appointmentDate ? ` • ${b.appointmentDate}` : ''}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </>
+            );
+          })()}
 
       </div>
 

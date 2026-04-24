@@ -568,6 +568,22 @@
         { "fieldPath": "patientPhone", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "paramedicalBookings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "paramedicalId", "order": "ASCENDING" },
+        { "fieldPath": "appointmentDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "paramedicalBookings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "allottedBy.id", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

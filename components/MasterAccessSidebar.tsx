@@ -8,6 +8,7 @@ import {
   Target,
   Building2,
   Users,
+  Stethoscope,
   ChevronDown,
   LogOut,
   LayoutDashboard,
@@ -101,6 +102,7 @@ export default function MasterAccessSidebar({
       items: [
         { id: 'branches', label: 'Branches', icon: Building2 },
         { id: 'assistants', label: 'Assistants', icon: Users },
+        { id: 'paramedicals', label: 'Paramedicals', icon: Stethoscope },
       ],
     },
   ];

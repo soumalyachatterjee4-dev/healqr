@@ -50,6 +50,7 @@ import ClinicRetentionAnalytics from './ClinicRetentionAnalytics';
 import ClinicQueueSetup from './ClinicQueueSetup';
 import StaffAttendance from './StaffAttendance';
 import ClinicSocialMediaKit from './ClinicSocialMediaKit';
+import ClinicParamedicalManagerPage from './ClinicParamedicalManagerPage';
 import ClinicMonthlyPlanner from './ClinicMonthlyPlanner';
 import DataManagement from './DataManagement';
 import DataExportBanner from './DataExportBanner';
@@ -149,7 +150,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
   const branchAllowedPages = [
     'dashboard', 'doctors', 'qr-manager', 'schedule-manager', 'todays-schedule',
     'advance-booking', 'analytics', 'reports', 'revenue-dashboard', 'billing-receipt', 'inventory-manager', 'patient-broadcast',
-    'patient-retention', 'queue-display', 'staff-attendance', 'social-kit', 'monthly-planner', 'data-management',
+    'patient-retention', 'queue-display', 'staff-attendance', 'social-kit', 'paramedical-manager', 'monthly-planner', 'data-management',
     'assistant', 'lab-referral', 'ai-diet', 'ai-rx', 'video-consult'
   ];
 
@@ -816,6 +817,24 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
         clinicName={displayClinicName}
         onMenuChange={handleMenuChange}
         onLogout={handleLogout}
+      />
+    );
+  }
+
+  // Render Paramedical Manager if menu is active
+  if (activeMenu === 'paramedical-manager') {
+    // For branch managers, owner name is the PARENT clinic's name; branch name is their branch.
+    // For clinic owners, owner name is the clinic name; no branch context.
+    const parentClinicName = clinicData?.name || 'Clinic';
+    return (
+      <ClinicParamedicalManagerPage
+        clinicId={resolvedClinicId}
+        clinicName={isLocationManager ? parentClinicName : displayClinicName}
+        onMenuChange={handleMenuChange}
+        onLogout={handleLogout}
+        branchId={isLocationManager ? locationManagerBranchId : undefined}
+        branchName={isLocationManager ? displayClinicName : undefined}
+        isBranchManager={isLocationManager}
       />
     );
   }
