@@ -10,6 +10,7 @@
     "rules": "storage.rules"
   },
   "hosting": {
+    "site": "teamhealqr",
     "public": "dist",
     "ignore": [
       "firebase.json",
