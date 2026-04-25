@@ -364,12 +364,14 @@ export default function LabInventory({ labId }: LabInventoryProps) {
                         <td className="py-3">
                           <div className="flex items-center justify-end gap-1.5">
                             <Button size="sm" variant="outline" className="h-7 text-xs border-emerald-700 text-emerald-300 hover:bg-emerald-950"
-                              onClick={() => setStockModal({ item: i, type: 'in' })}>
-                              <ArrowDown className="w-3 h-3 mr-1" /> In
+                              onClick={() => setStockModal({ item: i, type: 'in' })}
+                              title="Credit (Stock In) — add to stock">
+                              <ArrowDown className="w-3 h-3 mr-1" /> Credit
                             </Button>
                             <Button size="sm" variant="outline" className="h-7 text-xs border-red-700 text-red-300 hover:bg-red-950"
-                              onClick={() => setStockModal({ item: i, type: 'out' })}>
-                              <ArrowUp className="w-3 h-3 mr-1" /> Out
+                              onClick={() => setStockModal({ item: i, type: 'out' })}
+                              title="Debit (Stock Out) — consume / remove from stock">
+                              <ArrowUp className="w-3 h-3 mr-1" /> Debit
                             </Button>
                             <Button size="sm" variant="outline" className="h-7 text-xs border-zinc-700 text-gray-300"
                               onClick={() => startEdit(i)}>
@@ -507,7 +509,7 @@ export default function LabInventory({ labId }: LabInventoryProps) {
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-white text-lg font-bold mb-1 flex items-center gap-2">
               {stockModal.type === 'in' ? <ArrowDown className="w-5 h-5 text-emerald-500" /> : <ArrowUp className="w-5 h-5 text-red-500" />}
-              Stock {stockModal.type === 'in' ? 'In' : 'Out'}: {stockModal.item.name}
+              {stockModal.type === 'in' ? 'Credit (Stock In)' : 'Debit (Stock Out)'}: {stockModal.item.name}
             </h3>
             <p className="text-gray-400 text-xs mb-4">Current: {stockModal.item.quantity} {stockModal.item.unit}</p>
             <div className="space-y-3">

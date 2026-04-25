@@ -235,6 +235,36 @@ service cloud.firestore {
       match /labReportTemplates/{templateId} {
         allow read, write: if isAuthenticated() && request.auth.uid == labId;
       }
+
+      // Inventory items (reagents, kits, consumables)
+      match /inventory/{itemId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == labId;
+      }
+
+      // Stock movement logs (credit / debit history)
+      match /stockLogs/{logId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == labId;
+      }
+
+      // Staff members
+      match /staff/{staffId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == labId;
+      }
+
+      // Daily attendance records
+      match /attendance/{attendanceId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == labId;
+      }
+
+      // Monthly planner notes (tasks / events / reminders)
+      match /plannerNotes/{noteId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == labId;
+      }
+
+      // Patient broadcast history
+      match /broadcastLogs/{logId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == labId;
+      }
     }
 
     // ============================================
