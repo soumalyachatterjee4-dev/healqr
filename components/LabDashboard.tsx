@@ -53,6 +53,9 @@ import LabReportUpload from './LabReportUpload';
 import LabReportSearch from './LabReportSearch';
 import LabRevenueDashboard from './LabRevenueDashboard';
 import LabBillingReceipts from './LabBillingReceipts';
+import LabInventory from './LabInventory';
+import LabPatientBroadcast from './LabPatientBroadcast';
+import LabReferralNetwork from './LabReferralNetwork';
 import VideoLibrary from './VideoLibrary';
 import { Send } from 'lucide-react';
 interface LabData {
@@ -661,6 +664,21 @@ export default function LabDashboard({ onLogout }: { onLogout?: () => void | Pro
               <LabBillingReceipts labId={resolvedLabId} labName={labData?.name} />
             )}
 
+            {/* Inventory */}
+            {activeMenu === 'inventory' && resolvedLabId && (
+              <LabInventory labId={resolvedLabId} labName={labData?.name} />
+            )}
+
+            {/* Patient Broadcast */}
+            {activeMenu === 'patient-broadcast' && resolvedLabId && (
+              <LabPatientBroadcast labId={resolvedLabId} labName={labData?.name} />
+            )}
+
+            {/* Referral Network */}
+            {activeMenu === 'referral-network' && resolvedLabId && (
+              <LabReferralNetwork labId={resolvedLabId} labName={labData?.name} />
+            )}
+
             {/* Dashboard Home */}
             {activeMenu === 'dashboard' && (<>
             {/* ðŸ‡®ðŸ‡³ Indian Tricolor Header: Saffron â†’ White â†’ Green */}
@@ -1053,7 +1071,7 @@ export default function LabDashboard({ onLogout }: { onLogout?: () => void | Pro
             )}
 
             {/* Other menu items â€” Coming Soon */}
-            {activeMenu !== 'dashboard' && activeMenu !== 'profile' && activeMenu !== 'qr-manager' && activeMenu !== 'test-catalog' && activeMenu !== 'schedule' && activeMenu !== 'bookings' && activeMenu !== 'location-manager' && activeMenu !== 'manage-doctors' && activeMenu !== 'phlebotomist-manager' && activeMenu !== 'analytics' && activeMenu !== 'report-upload' && activeMenu !== 'report-search' && activeMenu !== 'revenue' && activeMenu !== 'billing' && (
+            {activeMenu !== 'dashboard' && activeMenu !== 'profile' && activeMenu !== 'qr-manager' && activeMenu !== 'test-catalog' && activeMenu !== 'schedule' && activeMenu !== 'bookings' && activeMenu !== 'location-manager' && activeMenu !== 'manage-doctors' && activeMenu !== 'phlebotomist-manager' && activeMenu !== 'analytics' && activeMenu !== 'report-upload' && activeMenu !== 'report-search' && activeMenu !== 'revenue' && activeMenu !== 'billing' && activeMenu !== 'inventory' && activeMenu !== 'patient-broadcast' && activeMenu !== 'referral-network' && (
               <Card className="bg-zinc-900 border-zinc-800">
                 <CardContent className="flex flex-col items-center justify-center py-16">
                   <Settings className="w-12 h-12 text-purple-500/30 mb-4" />
