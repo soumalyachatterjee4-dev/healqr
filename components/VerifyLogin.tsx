@@ -299,6 +299,29 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
 
             if (pendingData && pendingRef) {
               const { setDoc, deleteDoc } = await import('firebase/firestore');
+
+              // Generate IVR code so the QR poster matches doctor / clinic / lab
+              let paraIvrCode = '';
+              try {
+                const { generateIvrCode } = await import('../utils/ivrCodeGenerator');
+                paraIvrCode = await generateIvrCode(
+                  pendingData.name || 'Professional',
+                  pendingData.dob || '',
+                  user.uid,
+                  'paramedical'
+                );
+              } catch (ivrErr) {
+                console.error('[VerifyLogin] paramedical IVR generation failed:', ivrErr);
+              }
+
+              // Generate profile slug + booking URL once at signup so QR is stable
+              const paraSlug = (pendingData.name || 'pro')
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-|-$/g, '')
+                .slice(0, 50);
+              const paraBookingUrl = `https://healqr.com/para/${paraSlug || user.uid}`;
+
               // Create in paramedicals collection with auth uid as doc ID
               await setDoc(doc(db, 'paramedicals', user.uid), {
                 ...pendingData,
@@ -306,6 +329,9 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
                 verified: true,
                 verifiedAt: new Date().toISOString(),
                 createdAt: pendingData.createdAt || new Date().toISOString(),
+                ivrCode: paraIvrCode,
+                profileSlug: pendingData.profileSlug || paraSlug,
+                bookingUrl: paraBookingUrl,
               });
               // Delete pending record
               await deleteDoc(pendingRef);
@@ -489,7 +515,7 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
       // Immediately redirect to clean URL - App.tsx will handle routing based on localStorage
       // Clean URL FIRST to prevent re-verification on refresh
       window.history.replaceState({}, '', '/');
-      
+
       if (onSuccess) {
         onSuccess();
       } else {

@@ -33,7 +33,7 @@ export async function generateIvrCode(
   fullName: string,
   dob: string,
   entityId: string,
-  entityType: 'doctor' | 'clinic' | 'lab' = 'doctor'
+  entityType: 'doctor' | 'clinic' | 'lab' | 'paramedical' = 'doctor'
 ): Promise<string> {
   if (!db) throw new Error('Firebase not initialized');
 
@@ -121,7 +121,7 @@ async function generateRandomUniqueCode(
   fullName: string,
   dob: string,
   entityId: string,
-  entityType: 'doctor' | 'clinic' | 'lab'
+  entityType: 'doctor' | 'clinic' | 'lab' | 'paramedical'
 ): Promise<string> {
   if (!db) throw new Error('Firebase not initialized');
 

@@ -7,6 +7,7 @@ import {
 } from 'firebase/firestore';
 import { toast } from 'sonner';
 import QRCode from 'react-qr-code';
+import QRCodeLib from 'qrcode';
 import healqrLogo from '../assets/healqr.logo.png';
 import {
   Menu, X, User, QrCode, Calendar, CalendarDays, CalendarPlus, FileText,
@@ -70,6 +71,8 @@ interface ParamedicalProfile {
   experience?: string;
   qrNumber?: string;
   profileSlug?: string;
+  ivrCode?: string;
+  bookingUrl?: string;
   bio?: string;
   serviceAreas?: string[];
   certifications?: string[];
@@ -822,7 +825,10 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
     const [slugInput, setSlugInput] = useState(profile?.profileSlug || '');
     const [savingSlug, setSavingSlug] = useState(false);
     const canvasRef = useRef<HTMLDivElement>(null);
+    const posterCanvasRef = useRef<HTMLCanvasElement>(null);
+    const [posterDataUrl, setPosterDataUrl] = useState<string>('');
     const bookingUrl = `https://healqr.com/para/${profile?.profileSlug || paraId}`;
+    const ivrCode = profile?.ivrCode || '';
 
     const handleSaveSlug = async () => {
       if (!slugInput.trim() || !paraId) return;
@@ -843,19 +849,148 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
       finally { setSavingSlug(false); }
     };
 
+    // Generate styled poster: QR with HealQR logo + IVR pill + name
+    useEffect(() => {
+      const generate = async () => {
+        const canvas = posterCanvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        const W = 600, H = 850;
+        canvas.width = W; canvas.height = H;
+
+        // White background
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, W, H);
+
+        // Top accent bar (teal gradient — matches paramedical brand)
+        const topGrad = ctx.createLinearGradient(0, 0, W, 0);
+        topGrad.addColorStop(0, '#14b8a6');
+        topGrad.addColorStop(1, '#10b981');
+        ctx.fillStyle = topGrad;
+        ctx.fillRect(0, 0, W, 8);
+
+        // QR (H-level error correction so logo overlay is safe)
+        const qrDataUrl = await QRCodeLib.toDataURL(bookingUrl, {
+          width: 400,
+          margin: 2,
+          errorCorrectionLevel: 'H',
+          color: { dark: '#000000', light: '#ffffff' },
+        });
+        const qrImg = new Image();
+        qrImg.src = qrDataUrl;
+        await new Promise<void>((resolve) => { qrImg.onload = () => resolve(); });
+
+        const qrSize = 380;
+        const qrX = (W - qrSize) / 2;
+        const qrY = 50;
+        ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
+
+        // Center HealQR logo overlay
+        try {
+          const logo = new Image();
+          logo.crossOrigin = 'anonymous';
+          logo.src = healqrLogo;
+          await new Promise<void>((resolve, reject) => {
+            logo.onload = () => resolve();
+            logo.onerror = () => reject();
+          });
+          const logoSize = qrSize * 0.22;
+          const logoX = qrX + (qrSize - logoSize) / 2;
+          const logoY = qrY + (qrSize - logoSize) / 2;
+          const circleRadius = logoSize / 2 + 8;
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(qrX + qrSize / 2, qrY + qrSize / 2, circleRadius, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#e5e7eb';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(qrX + qrSize / 2, qrY + qrSize / 2, circleRadius, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.drawImage(logo, logoX, logoY, logoSize, logoSize);
+        } catch (e) {
+          console.warn('[Paramedical QR] Logo overlay skipped:', e);
+        }
+
+        // IVR pill below QR
+        if (ivrCode) {
+          const pillY = qrY + qrSize + 18;
+          const codeText = `\u{1F4DE} IVR Code: ${ivrCode}`;
+          ctx.font = 'bold 22px system-ui, -apple-system, sans-serif';
+          const textW = ctx.measureText(codeText).width;
+          const pillW = textW + 40;
+          const pillH = 38;
+          const pillX = (W - pillW) / 2;
+          ctx.fillStyle = '#10b981';
+          ctx.beginPath();
+          ctx.roundRect(pillX, pillY, pillW, pillH, 19);
+          ctx.fill();
+          ctx.fillStyle = '#ffffff';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(codeText, W / 2, pillY + pillH / 2);
+        }
+
+        // Name (clear gap below pill — pill bottom ≈ qrY+qrSize+56)
+        const nameY = ivrCode ? qrY + qrSize + 110 : qrY + qrSize + 40;
+        ctx.fillStyle = '#1f2937';
+        ctx.font = 'bold 30px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillText((profile?.name || 'Healthcare Professional').toUpperCase(), W / 2, nameY);
+
+        // Role
+        ctx.fillStyle = '#6b7280';
+        ctx.font = '18px system-ui, sans-serif';
+        ctx.fillText(roleName, W / 2, nameY + 30);
+
+        // QR Number
+        if (profile?.qrNumber) {
+          ctx.fillStyle = '#10b981';
+          ctx.font = 'bold 20px system-ui, sans-serif';
+          ctx.fillText(`QR: ${profile.qrNumber}`, W / 2, nameY + 60);
+        }
+
+        // Divider
+        ctx.strokeStyle = '#e5e7eb';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(W * 0.2, nameY + 85);
+        ctx.lineTo(W * 0.8, nameY + 85);
+        ctx.stroke();
+
+        // IVR call-out for non-smartphone users
+        if (ivrCode) {
+          ctx.fillStyle = '#6b7280';
+          ctx.font = '14px system-ui, sans-serif';
+          ctx.fillText('No smartphone? Call 1800-XXX-XXXX', W / 2, nameY + 110);
+          ctx.fillText(`and enter code: ${ivrCode}`, W / 2, nameY + 130);
+        }
+
+        // HealQR brand
+        ctx.fillStyle = '#10b981';
+        ctx.font = 'bold 24px system-ui, sans-serif';
+        ctx.fillText('HEALQR.COM', W / 2, H - 30);
+
+        setPosterDataUrl(canvas.toDataURL('image/png'));
+      };
+      generate();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [bookingUrl, ivrCode, profile?.name, profile?.qrNumber]);
+
+    const downloadPoster = () => {
+      if (!posterDataUrl) return;
+      const a = document.createElement('a');
+      a.href = posterDataUrl;
+      a.download = `HealQR-${profile?.qrNumber || profile?.name || 'paramedical'}.png`;
+      a.click();
+    };
+
     const copyUrl = () => {
       navigator.clipboard.writeText(bookingUrl);
       toast.success('URL copied!');
-    };
-
-    const downloadQR = () => {
-      const canvas = canvasRef.current?.querySelector('canvas');
-      if (!canvas) return;
-      const url = canvas.toDataURL('image/png');
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `HealQR-${profile?.qrNumber || 'QR'}.png`;
-      a.click();
     };
 
     return (
@@ -863,14 +998,26 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
           <h3 className="text-white font-semibold mb-6">Your QR Code</h3>
           <div className="flex flex-col md:flex-row gap-6 items-center md:items-start">
-            <div ref={canvasRef} className="bg-white p-4 rounded-2xl">
-              <QRCode value={bookingUrl} size={200} level="H" />
+            <div ref={canvasRef} className="bg-white p-3 rounded-2xl">
+              {posterDataUrl ? (
+                <img src={posterDataUrl} alt="HealQR poster" className="w-[260px] h-auto rounded-lg" />
+              ) : (
+                <div className="w-[260px] aspect-[600/850] flex items-center justify-center text-gray-400 text-xs">
+                  Generating…
+                </div>
+              )}
             </div>
             <div className="flex-1 space-y-4 text-center md:text-left">
               <div>
                 <p className="text-gray-400 text-xs mb-1">QR Number</p>
                 <p className="text-white font-mono text-2xl font-bold">{profile?.qrNumber || 'Not assigned'}</p>
               </div>
+              {ivrCode && (
+                <div>
+                  <p className="text-gray-400 text-xs mb-1">IVR Code (for non-smartphone users)</p>
+                  <p className="text-emerald-400 font-mono text-xl font-bold tracking-wider">{ivrCode}</p>
+                </div>
+              )}
               <div>
                 <p className="text-gray-400 text-xs mb-1">Booking URL</p>
                 <div className="flex items-center gap-2">
@@ -878,11 +1025,14 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
                   <Button size="sm" variant="outline" onClick={copyUrl} className="border-zinc-700"><Copy className="w-4 h-4" /></Button>
                 </div>
               </div>
-              <div className="flex gap-2">
-                <Button onClick={downloadQR} className="bg-teal-600 hover:bg-teal-700"><Download className="w-4 h-4 mr-2" /> Download QR</Button>
+              <div className="flex gap-2 flex-wrap">
+                <Button onClick={downloadPoster} disabled={!posterDataUrl} className="bg-teal-600 hover:bg-teal-700">
+                  <Download className="w-4 h-4 mr-2" /> Download QR Poster
+                </Button>
               </div>
             </div>
           </div>
+          <canvas ref={posterCanvasRef} style={{ display: 'none' }} />
         </div>
 
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">

@@ -786,8 +786,8 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
       ctx.fillText(codeText, width / 2, pillY + pillHeight / 2);
     }
 
-    // Doctor name
-    const nameY = data.ivrCode ? qrY + qrSize + 78 : qrY + qrSize + 40;
+    // Doctor name — when IVR pill present, leave a clear gap below it (pill bottom ≈ qrSize+56)
+    const nameY = data.ivrCode ? qrY + qrSize + 110 : qrY + qrSize + 40;
     ctx.fillStyle = '#1f2937';
     ctx.font = 'bold 30px system-ui, sans-serif';
     ctx.textAlign = 'center';
