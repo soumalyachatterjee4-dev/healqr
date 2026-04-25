@@ -32,6 +32,9 @@ import {
   MessageCircle,
   Mail,
   Copy,
+  Instagram,
+  Sparkles,
+  ArrowRight,
 } from 'lucide-react';
 import { auth, db } from '../lib/firebase/config';
 import { signOut } from 'firebase/auth';
@@ -754,23 +757,67 @@ export default function LabDashboard({ onLogout }: { onLogout?: () => void | Pro
               </div>
             </div>
 
-            {/* Purple Stats Card */}
+            {/* Purple Stats + Social Media Kit Card */}
             <div
               className="rounded-2xl p-6 relative overflow-hidden shadow-xl mt-6"
               style={{ background: 'linear-gradient(to bottom right, rgb(147, 51, 234), rgb(126, 34, 206))' }}
             >
+              {/* Top: Free + Active badges */}
               <div className="flex gap-2 mb-3">
                 <Badge variant="outline" className="text-white border-white/40 bg-transparent text-[10px] px-2 py-0 h-5">Free</Badge>
                 <Badge className="bg-purple-800 text-white border-none text-[10px] px-2 py-0 h-5">Active</Badge>
               </div>
+
+              {/* Bookings Count */}
               <div className="mb-1">
                 <div className="flex items-baseline gap-2">
                   <span className="text-4xl font-bold text-white">{monthStats.total}</span>
                   <span className="text-2xl font-semibold text-white">Test Bookings</span>
                 </div>
                 <p className="text-[11px] text-purple-100 opacity-80 font-medium">
-                  {new Date().toLocaleString('default', { month: 'short' })} 1, {new Date().getFullYear()} â€“ {new Date().toLocaleString('default', { month: 'short' })} {new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()}, {new Date().getFullYear()}
+                  {new Date().toLocaleString('default', { month: 'short' })} 1, {new Date().getFullYear()} – {new Date().toLocaleString('default', { month: 'short' })} {new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()}, {new Date().getFullYear()}
                 </p>
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-white/10 my-4" />
+
+              {/* Social Kit Info */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Badge className="hover:bg-white border-none text-[10px] font-bold px-2 py-0 h-5 shrink-0" style={{ backgroundColor: 'white', color: '#7e22ce' }}>
+                    <Sparkles className="w-3 h-3 mr-1" style={{ fill: '#7e22ce' }} />
+                    New
+                  </Badge>
+                  <h3 className="text-sm font-bold text-white whitespace-nowrap">Social Media Kit</h3>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs text-purple-100/80">Create branded posts for Instagram &amp; WhatsApp.</p>
+                  <button
+                    onClick={() => setActiveMenu('social-kit')}
+                    className="hover:bg-slate-50 px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-1.5 transition-all shadow-lg shrink-0"
+                    style={{ backgroundColor: 'white', color: '#7e22ce' }}
+                  >
+                    Try Now
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Social Icons + One-click share */}
+              <div className="flex items-center gap-3 mt-4">
+                <div className="flex -space-x-1">
+                  <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
+                    <Instagram className="w-3.5 h-3.5 text-white" />
+                  </div>
+                  <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
+                    <Facebook className="w-3.5 h-3.5 text-white" />
+                  </div>
+                  <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
+                    <Share2 className="w-3.5 h-3.5 text-white" />
+                  </div>
+                </div>
+                <span className="text-[11px] text-purple-100/90 font-medium">One-click share</span>
               </div>
             </div>
 
