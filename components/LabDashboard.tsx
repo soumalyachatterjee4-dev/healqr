@@ -56,6 +56,13 @@ import LabBillingReceipts from './LabBillingReceipts';
 import LabInventory from './LabInventory';
 import LabPatientBroadcast from './LabPatientBroadcast';
 import LabReferralNetwork from './LabReferralNetwork';
+import LabPatientRetention from './LabPatientRetention';
+import LabQueueDisplay from './LabQueueDisplay';
+import LabStaffAttendance from './LabStaffAttendance';
+import LabSocialKit from './LabSocialKit';
+import LabAllocationQueue from './LabAllocationQueue';
+import LabMonthlyPlanner from './LabMonthlyPlanner';
+import LabDataManagement from './LabDataManagement';
 import VideoLibrary from './VideoLibrary';
 import { Send } from 'lucide-react';
 interface LabData {
@@ -679,6 +686,41 @@ export default function LabDashboard({ onLogout }: { onLogout?: () => void | Pro
               <LabReferralNetwork labId={resolvedLabId} labName={labData?.name} />
             )}
 
+            {/* Patient Retention */}
+            {activeMenu === 'patient-retention' && resolvedLabId && (
+              <LabPatientRetention labId={resolvedLabId} labName={labData?.name} />
+            )}
+
+            {/* Queue Display */}
+            {activeMenu === 'queue-display' && resolvedLabId && (
+              <LabQueueDisplay labId={resolvedLabId} labName={labData?.name} />
+            )}
+
+            {/* Staff Attendance */}
+            {activeMenu === 'staff' && resolvedLabId && (
+              <LabStaffAttendance labId={resolvedLabId} labName={labData?.name} />
+            )}
+
+            {/* Social Kit & Offers */}
+            {activeMenu === 'social-kit' && resolvedLabId && (
+              <LabSocialKit labId={resolvedLabId} labName={labData?.name} />
+            )}
+
+            {/* Allocation Queue */}
+            {activeMenu === 'allocation-queue' && resolvedLabId && (
+              <LabAllocationQueue labId={resolvedLabId} labName={labData?.name} />
+            )}
+
+            {/* Monthly Planner */}
+            {activeMenu === 'monthly-planner' && resolvedLabId && (
+              <LabMonthlyPlanner labId={resolvedLabId} labName={labData?.name} />
+            )}
+
+            {/* Data Management */}
+            {activeMenu === 'data-management' && resolvedLabId && (
+              <LabDataManagement labId={resolvedLabId} labName={labData?.name} />
+            )}
+
             {/* Dashboard Home */}
             {activeMenu === 'dashboard' && (<>
             {/* ðŸ‡®ðŸ‡³ Indian Tricolor Header: Saffron â†’ White â†’ Green */}
@@ -1071,7 +1113,7 @@ export default function LabDashboard({ onLogout }: { onLogout?: () => void | Pro
             )}
 
             {/* Other menu items â€” Coming Soon */}
-            {activeMenu !== 'dashboard' && activeMenu !== 'profile' && activeMenu !== 'qr-manager' && activeMenu !== 'test-catalog' && activeMenu !== 'schedule' && activeMenu !== 'bookings' && activeMenu !== 'location-manager' && activeMenu !== 'manage-doctors' && activeMenu !== 'phlebotomist-manager' && activeMenu !== 'analytics' && activeMenu !== 'report-upload' && activeMenu !== 'report-search' && activeMenu !== 'revenue' && activeMenu !== 'billing' && activeMenu !== 'inventory' && activeMenu !== 'patient-broadcast' && activeMenu !== 'referral-network' && (
+            {activeMenu !== 'dashboard' && activeMenu !== 'profile' && activeMenu !== 'qr-manager' && activeMenu !== 'test-catalog' && activeMenu !== 'schedule' && activeMenu !== 'bookings' && activeMenu !== 'location-manager' && activeMenu !== 'manage-doctors' && activeMenu !== 'phlebotomist-manager' && activeMenu !== 'analytics' && activeMenu !== 'report-upload' && activeMenu !== 'report-search' && activeMenu !== 'revenue' && activeMenu !== 'billing' && activeMenu !== 'inventory' && activeMenu !== 'patient-broadcast' && activeMenu !== 'referral-network' && activeMenu !== 'patient-retention' && activeMenu !== 'queue-display' && activeMenu !== 'staff' && activeMenu !== 'social-kit' && activeMenu !== 'allocation-queue' && activeMenu !== 'monthly-planner' && activeMenu !== 'data-management' && (
               <Card className="bg-zinc-900 border-zinc-800">
                 <CardContent className="flex flex-col items-center justify-center py-16">
                   <Settings className="w-12 h-12 text-purple-500/30 mb-4" />
