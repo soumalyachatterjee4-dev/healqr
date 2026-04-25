@@ -134,6 +134,7 @@ const PharmaSignUp = lazy(() => import("./components/PharmaSignUp"));
 const DoctorCMEViewer = lazy(() => import("./components/DoctorCMEViewer"));
 const DoctorSampleRequest = lazy(() => import("./components/DoctorSampleRequest"));
 const ClinicQueueDisplay = lazy(() => import("./components/ClinicQueueDisplay"));
+const LabQueueDisplay = lazy(() => import("./components/LabQueueDisplay"));
 // AIChatBot is imported directly at the top (not lazy)
 
 // Loading Component
@@ -267,6 +268,7 @@ export default function App() {
     | "referrer-login"
     | "referrer-dashboard"
     | "queue-display"
+    | "lab-queue-display"
     | "leave-apply"
     | "phlebo-signup"
     | "phlebo-login"
@@ -999,6 +1001,10 @@ export default function App() {
       setCurrentPage('queue-display');
       return;
     }
+    if (pageParam === 'lab-queue-display') {
+      setCurrentPage('lab-queue-display');
+      return;
+    }
     if (pageParam === 'leave-apply') {
       setCurrentPage('leave-apply');
       return;
@@ -1655,7 +1661,7 @@ export default function App() {
       const isAdvertiserPage = currentPage === 'advertiser-login' || currentPage === 'advertiser-signup' || currentPage === 'advertiser-verify' || pageParam === 'advertiser-login' || pageParam === 'advertiser-signup' || pageParam === 'advertiser-verify';
       const isPharmaPage = currentPage === 'pharma-login' || currentPage === 'pharma-verify' || currentPage === 'pharma-portal' || currentPage === 'pharma-signup' || pageParam === 'pharma-login' || pageParam === 'pharma-verify' || pageParam === 'pharma-portal' || pageParam === 'pharma-signup';
 
-      if (isVerificationLink || isBookingMode || hasBookingDoctorId || hasBookingClinicId || isSlugUrl || isNotificationPage || isVerifyVisit || isOnVerifyLoginPage || isOnVerifyEmailPage || isOnAssistantLoginPage || isOnMasterAccessLoginPage || isClinicPage || isLabPage || isPhlebPage || isAdvertiserPage || isPharmaPage || currentPage === 'verify-email' || currentPage === 'verify-login' || currentPage === 'assistant-login' || currentPage === 'master-access-login' || currentPage === 'temp-doctor-login' || currentPage === 'temp-doctor-dashboard' || currentPage === 'admin-verify' || currentPage === 'verify-walkin' || currentPage === 'queue-display' || currentPage === 'leave-apply' || currentPage.startsWith('booking-') || currentPage === 'clinic-booking-flow' || currentPage === 'lab-mini-website') {
+      if (isVerificationLink || isBookingMode || hasBookingDoctorId || hasBookingClinicId || isSlugUrl || isNotificationPage || isVerifyVisit || isOnVerifyLoginPage || isOnVerifyEmailPage || isOnAssistantLoginPage || isOnMasterAccessLoginPage || isClinicPage || isLabPage || isPhlebPage || isAdvertiserPage || isPharmaPage || currentPage === 'verify-email' || currentPage === 'verify-login' || currentPage === 'assistant-login' || currentPage === 'master-access-login' || currentPage === 'temp-doctor-login' || currentPage === 'temp-doctor-dashboard' || currentPage === 'admin-verify' || currentPage === 'verify-walkin' || currentPage === 'queue-display' || currentPage === 'lab-queue-display' || pageParam === 'lab-queue-display' || currentPage === 'leave-apply' || currentPage.startsWith('booking-') || currentPage === 'clinic-booking-flow' || currentPage === 'lab-mini-website') {
         console.log('🔍 [AUTH] EARLY RETURN - skipping auth check. Reasons:', {
           isVerificationLink, isBookingMode, hasBookingDoctorId, hasBookingClinicId, isSlugUrl,
           isNotificationPage, isVerifyVisit, isOnVerifyLoginPage, isOnVerifyEmailPage,
@@ -3311,6 +3317,14 @@ export default function App() {
           <ClinicQueueDisplay
             clinicId={new URLSearchParams(window.location.search).get('clinicId') || ''}
             doctorId={new URLSearchParams(window.location.search).get('doctorId') || ''}
+          />
+        </Suspense>
+      )}
+
+      {currentPage === "lab-queue-display" && (
+        <Suspense fallback={<PageLoader />}>
+          <LabQueueDisplay
+            labId={new URLSearchParams(window.location.search).get('labId') || ''}
           />
         </Suspense>
       )}

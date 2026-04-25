@@ -57,7 +57,7 @@ import LabInventory from './LabInventory';
 import LabPatientBroadcast from './LabPatientBroadcast';
 import LabReferralNetwork from './LabReferralNetwork';
 import LabPatientRetention from './LabPatientRetention';
-import LabQueueDisplay from './LabQueueDisplay';
+import LabQueueSetup from './LabQueueSetup';
 import LabStaffAttendance from './LabStaffAttendance';
 import LabSocialKit from './LabSocialKit';
 import LabAllocationQueue from './LabAllocationQueue';
@@ -691,9 +691,9 @@ export default function LabDashboard({ onLogout }: { onLogout?: () => void | Pro
               <LabPatientRetention labId={resolvedLabId} labName={labData?.name} />
             )}
 
-            {/* Queue Display */}
+            {/* Queue Display Setup (URL share) */}
             {activeMenu === 'queue-display' && resolvedLabId && (
-              <LabQueueDisplay labId={resolvedLabId} labName={labData?.name} />
+              <LabQueueSetup labId={resolvedLabId} labName={labData?.name} />
             )}
 
             {/* Staff Attendance */}
