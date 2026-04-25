@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { jsPDF } from 'jspdf';
+import QRCode from 'qrcode';
 
 interface LabBillingReceiptsProps {
   labId: string;
@@ -232,7 +233,26 @@ export default function LabBillingReceipts({ labId, labName }: LabBillingReceipt
       const contentWidth = pageWidth - margin * 2;
       let y = 20;
 
-      // Header
+      // QR (top-right) — scan to view receipt / booking online
+      const qrPayload = `${window.location.origin}/?booking=${encodeURIComponent(b.bookingId)}&receipt=${encodeURIComponent(receiptNo)}`;
+      let qrDataUrl = '';
+      try {
+        qrDataUrl = await QRCode.toDataURL(qrPayload, { margin: 0, width: 240, color: { dark: '#000', light: '#FFF' } });
+      } catch (e) {
+        console.error('[LabBillingReceipts] QR generation failed:', e);
+      }
+      const qrSize = 28; // mm
+      const qrX = pageWidth - margin - qrSize;
+      const qrY = y - 2;
+      if (qrDataUrl) {
+        pdfDoc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
+        pdfDoc.setFontSize(7);
+        pdfDoc.setFont('helvetica', 'normal');
+        pdfDoc.setTextColor(120, 120, 120);
+        pdfDoc.text('Scan to verify', qrX + qrSize / 2, qrY + qrSize + 3, { align: 'center' });
+      }
+
+      // Header (lab name)
       pdfDoc.setFontSize(20);
       pdfDoc.setFont('helvetica', 'bold');
       pdfDoc.setTextColor(40, 40, 40);
