@@ -51,6 +51,8 @@ import ParamedicalManager from './ParamedicalManager';
 import LabAnalytics from './LabAnalytics';
 import LabReportUpload from './LabReportUpload';
 import LabReportSearch from './LabReportSearch';
+import LabRevenueDashboard from './LabRevenueDashboard';
+import LabBillingReceipts from './LabBillingReceipts';
 import VideoLibrary from './VideoLibrary';
 import { Send } from 'lucide-react';
 interface LabData {
@@ -649,6 +651,16 @@ export default function LabDashboard({ onLogout }: { onLogout?: () => void | Pro
               <LabReportSearch labId={resolvedLabId} labName={labData?.name} />
             )}
 
+            {/* Revenue Dashboard */}
+            {activeMenu === 'revenue' && resolvedLabId && (
+              <LabRevenueDashboard labId={resolvedLabId} labName={labData?.name} />
+            )}
+
+            {/* Billing & Receipts */}
+            {activeMenu === 'billing' && resolvedLabId && (
+              <LabBillingReceipts labId={resolvedLabId} labName={labData?.name} />
+            )}
+
             {/* Dashboard Home */}
             {activeMenu === 'dashboard' && (<>
             {/* ðŸ‡®ðŸ‡³ Indian Tricolor Header: Saffron â†’ White â†’ Green */}
@@ -1041,7 +1053,7 @@ export default function LabDashboard({ onLogout }: { onLogout?: () => void | Pro
             )}
 
             {/* Other menu items â€” Coming Soon */}
-            {activeMenu !== 'dashboard' && activeMenu !== 'profile' && activeMenu !== 'qr-manager' && activeMenu !== 'test-catalog' && activeMenu !== 'schedule' && activeMenu !== 'bookings' && activeMenu !== 'location-manager' && activeMenu !== 'manage-doctors' && activeMenu !== 'phlebotomist-manager' && activeMenu !== 'analytics' && activeMenu !== 'report-upload' && activeMenu !== 'report-search' && (
+            {activeMenu !== 'dashboard' && activeMenu !== 'profile' && activeMenu !== 'qr-manager' && activeMenu !== 'test-catalog' && activeMenu !== 'schedule' && activeMenu !== 'bookings' && activeMenu !== 'location-manager' && activeMenu !== 'manage-doctors' && activeMenu !== 'phlebotomist-manager' && activeMenu !== 'analytics' && activeMenu !== 'report-upload' && activeMenu !== 'report-search' && activeMenu !== 'revenue' && activeMenu !== 'billing' && (
               <Card className="bg-zinc-900 border-zinc-800">
                 <CardContent className="flex flex-col items-center justify-center py-16">
                   <Settings className="w-12 h-12 text-purple-500/30 mb-4" />
