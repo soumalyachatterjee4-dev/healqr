@@ -231,17 +231,19 @@ export default function LabSocialKit({ labId, labName }: LabSocialKitProps) {
           </CardContent>
         </Card>
 
-        <Card className="bg-zinc-900 border-zinc-800 lg:col-span-3">
+        <Card className="bg-zinc-900 border-zinc-800 lg:col-span-3 overflow-hidden min-w-0">
           <CardHeader>
             <CardTitle className="text-white text-base flex items-center gap-2">
               <ImageIcon className="w-4 h-4 text-fuchsia-500" /> Preview (1080 × 1080)
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="bg-zinc-950 p-3 rounded-lg flex items-center justify-center">
-              <canvas ref={canvasRef} className="max-w-full h-auto rounded-lg" style={{ aspectRatio: '1', maxHeight: '600px' }} />
+          <CardContent className="min-w-0">
+            <div className="bg-zinc-950 p-3 rounded-lg flex items-center justify-center overflow-hidden">
+              <canvas ref={canvasRef} className="max-w-full h-auto rounded-lg block" style={{ aspectRatio: '1', maxHeight: '600px' }} />
             </div>
-            <p className="text-[11px] text-gray-500 mt-2 text-center">QR points to https://healqr.com/lab/{profileSlug || labId}</p>
+            <p className="text-[11px] text-gray-500 mt-2 text-center break-all px-2">
+              QR points to <span className="text-gray-400">https://healqr.com/lab/{profileSlug || labId}</span>
+            </p>
           </CardContent>
         </Card>
       </div>
