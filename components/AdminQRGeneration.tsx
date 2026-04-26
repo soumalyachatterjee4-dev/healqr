@@ -74,6 +74,8 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
   const [searchingQR, setSearchingQR] = useState(false);
   const [linkedDoctorData, setLinkedDoctorData] = useState<any>(null);
   const [linkedClinicData, setLinkedClinicData] = useState<any>(null);
+  const [linkedLabData, setLinkedLabData] = useState<any>(null);
+  const [linkedParaData, setLinkedParaData] = useState<any>(null);
 
   // Print Movement Panel states
   const [showPrintModal, setShowPrintModal] = useState(false);
@@ -448,6 +450,69 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
     }
   };
 
+  // Top-box (the empty rectangle dangling at the top of the poster) bounds, expressed as % of template
+  // Tuned to /public/qr-template.png — adjust if the artwork changes.
+  const NAME_BOX = { xPct: 22, yPct: 6, wPct: 56, hPct: 8 };
+
+  // Build a QR data-URL with HealQR logo overlay (matches doctor/clinic/lab/paramedical look)
+  async function generateQRWithLogo(payload: string, size = 600): Promise<string> {
+    const c = document.createElement('canvas');
+    await QRCode.toCanvas(c, payload, {
+      width: size,
+      margin: 1,
+      errorCorrectionLevel: 'H',
+      color: { dark: '#000000', light: '#FFFFFF' },
+    });
+    const ctx = c.getContext('2d');
+    if (ctx) {
+      try {
+        const logo = new Image();
+        logo.crossOrigin = 'anonymous';
+        logo.src = '/icon-192.png';
+        await new Promise<void>((resolve, reject) => {
+          logo.onload = () => resolve();
+          logo.onerror = () => reject();
+        });
+        const logoSize = size * 0.22;
+        const logoX = (size - logoSize) / 2;
+        const logoY = (size - logoSize) / 2;
+        const r = logoSize / 2 + 4;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(size / 2, size / 2, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.drawImage(logo, logoX, logoY, logoSize, logoSize);
+      } catch {
+        // Logo failed — QR is still valid without it
+      }
+    }
+    return c.toDataURL('image/png');
+  }
+
+  // Draw text inside a fixed-width box, auto-shrinking the font until it fits
+  function drawFitText(
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    cx: number,
+    cy: number,
+    maxWidth: number,
+    maxFontSize: number,
+    color = '#000000',
+    weight = 'bold'
+  ) {
+    if (!text) return;
+    let fs = maxFontSize;
+    ctx.fillStyle = color;
+    while (fs > 8) {
+      ctx.font = `${weight} ${fs}px Arial, sans-serif`;
+      if (ctx.measureText(text).width <= maxWidth) break;
+      fs -= 1;
+    }
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, cx, cy);
+  }
+
   const downloadSingleQRWithTemplate = async (qrNumber: string) => {
     try {
       setPrintProgress("downloading");
@@ -473,13 +538,10 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
 
       ctx.drawImage(templateImg, 0, 0, canvas.width, canvas.height);
 
-      const qrDataUrl = await QRCode.toDataURL(
+      // QR with HealQR logo baked in
+      const qrDataUrl = await generateQRWithLogo(
         `${window.location.origin}?doctorId=SCAN&qrNumber=${qrNumber}`,
-        {
-          width: 800,
-          margin: 1,
-          color: { dark: "#000000", light: "#FFFFFF" },
-        }
+        800
       );
 
       const qrImg = new Image();
@@ -490,6 +552,7 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
 
       ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
 
+      // QR Number directly below QR
       ctx.save();
       const fontSize = Math.floor(canvas.width * 0.035);
       ctx.font = `bold ${fontSize}px Arial, sans-serif`;
@@ -498,7 +561,26 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
       ctx.fillStyle = "#000000";
       const textY = qrY + qrSize + canvas.height * 0.005;
       ctx.fillText(qrNumber, boxCenterX, textY);
+
+      // IVR Code below QR Number (only if assigned)
+      const assigned = getAssignedInfo();
+      if (assigned?.ivrCode) {
+        ctx.font = `bold ${Math.floor(fontSize * 0.85)}px Arial, sans-serif`;
+        ctx.fillStyle = '#059669'; // emerald
+        ctx.fillText(`IVR: ${assigned.ivrCode}`, boxCenterX, textY + fontSize * 1.15);
+      }
       ctx.restore();
+
+      // Assigned name into top hanging box (only if assigned)
+      if (assigned?.name) {
+        const boxX = canvas.width * (NAME_BOX.xPct / 100);
+        const boxY = canvas.height * (NAME_BOX.yPct / 100);
+        const boxW = canvas.width * (NAME_BOX.wPct / 100);
+        const boxH = canvas.height * (NAME_BOX.hPct / 100);
+        const cx = boxX + boxW / 2;
+        const cy = boxY + boxH / 2;
+        drawFitText(ctx, assigned.name, cx, cy, boxW * 0.92, Math.floor(boxH * 0.55));
+      }
 
       const link = document.createElement("a");
       link.download = `${qrNumber}-template.png`;
@@ -579,7 +661,7 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
         ctx.textAlign = "center";
         ctx.textBaseline = "top";
         ctx.fillStyle = "#000000";
-        
+
         const textY = qrY + qrSize + (canvas.height * 0.005);
         ctx.fillText(qrNumber, boxCenterX, textY);
         ctx.restore(); // Restore state
@@ -1103,10 +1185,10 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
                   </Button>
                </div>
             </div>
-            
+
             {displayQRData && displayQRImage ? (
               <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
-                
+
                 {/* Left Column: Massive Live Preview (Main Act) */}
                 <div className="xl:col-span-7 space-y-6">
                   <div className="relative group">
@@ -1122,18 +1204,34 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
                       {/* The Big Live Container */}
                       <div className="relative w-full max-w-[500px] mx-auto aspect-[1/1.41] bg-white rounded-xl overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)] border-4 border-zinc-700">
                         {/* Template Image Background */}
-                        <img 
-                          src={`/qr-template.png?t=${new Date().getTime()}`} 
+                        <img
+                          src={`/qr-template.png?t=${new Date().getTime()}`}
                           alt="Template Background"
                           className="absolute inset-0 w-full h-full object-cover"
-                          onError={(e) => { 
-                            e.currentTarget.style.display = 'none'; 
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
                             e.currentTarget.parentElement!.innerHTML = '<div class="flex items-center justify-center h-full w-full text-xs text-red-500 font-bold bg-zinc-100 p-4 text-center">Template Missing in /public/qr-template.png</div>';
-                          }} 
+                          }}
                         />
-                        
+
+                        {/* Top hanging box — assigned name (blank when QR is unused) */}
+                        {(() => { const a = getAssignedInfo(); return a?.name ? (
+                          <div
+                            className="absolute flex items-center justify-center text-black font-bold leading-tight text-center px-1 overflow-hidden"
+                            style={{
+                              left: `${NAME_BOX.xPct}%`,
+                              top: `${NAME_BOX.yPct}%`,
+                              width: `${NAME_BOX.wPct}%`,
+                              height: `${NAME_BOX.hPct}%`,
+                              fontSize: 'clamp(8px, 1.6vw, 16px)',
+                            }}
+                          >
+                            {a.name}
+                          </div>
+                        ) : null; })()}
+
                         {/* Dynamic QR Overlay (SS2 Matching Physics) */}
-                        <div 
+                        <div
                           className="absolute flex flex-col items-center"
                           style={{
                             left: `${qrXPct}%`,
@@ -1142,13 +1240,16 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
                             transition: 'all 0.1s ease-out'
                           }}
                         >
-                          <img 
-                            src={displayQRImage} 
-                            alt="Dynamic QR" 
+                          <img
+                            src={displayQRImage}
+                            alt="Dynamic QR"
                             className="w-full h-auto drop-shadow-md bg-white p-0.5"
                           />
                           <div className="w-full text-center mt-[1%]">
                              <p className="font-bold text-black" style={{ fontSize: 'min(1vw, 10px)' }}>{displayQRData.qrNumber}</p>
+                             {(() => { const a = getAssignedInfo(); return a?.ivrCode ? (
+                               <p className="font-bold text-emerald-600" style={{ fontSize: 'min(0.85vw, 9px)' }}>IVR: {a.ivrCode}</p>
+                             ) : null; })()}
                           </div>
                         </div>
                       </div>
@@ -1204,18 +1305,18 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
 
                 {/* Right Column: Controls & Context */}
                 <div className="xl:col-span-5 space-y-6">
-                  
+
                   {/* Calibration Panel */}
                   <Card className="bg-zinc-800 border-zinc-700 p-6 shadow-inner relative overflow-hidden">
                     <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
                        <RefreshCw className="w-24 h-24" />
                     </div>
-                    
+
                     <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
                        <Target className="w-5 h-5 text-emerald-400" />
                        Precision Calibration
                     </h3>
-                    
+
                     <div className="space-y-6">
                       {/* X Position */}
                       <div>
@@ -1230,7 +1331,7 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
                           className="w-full h-2 bg-zinc-950 rounded-lg appearance-none cursor-pointer accent-emerald-500"
                         />
                       </div>
-                      
+
                       {/* Y Position */}
                       <div>
                         <div className="flex justify-between mb-2">
@@ -1244,7 +1345,7 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
                           className="w-full h-2 bg-zinc-950 rounded-lg appearance-none cursor-pointer accent-emerald-500"
                         />
                       </div>
-                      
+
                       {/* Size */}
                       <div>
                         <div className="flex justify-between mb-2">
@@ -1311,7 +1412,7 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
                            <h3 className="font-bold text-white">Assignment Info</h3>
                            <Badge variant="outline" className="border-purple-500/30 text-purple-400 text-[10px]">Verified</Badge>
                         </div>
-                        
+
                         {(linkedDoctorData || linkedClinicData) ? (
                            <div className="space-y-2">
                               <p className="text-sm text-gray-300 font-bold">
@@ -1480,18 +1581,18 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
                 <div className="flex flex-col md:flex-row gap-6">
                   {/* The Live Container */}
                   <div className="relative w-full md:w-1/2 aspect-[1/1.41] bg-white rounded-lg overflow-hidden shadow-xl border border-zinc-700 mx-auto md:mx-0">
-                    <img 
-                      src={`/qr-template.png?t=${new Date().getTime()}`} 
+                    <img
+                      src={`/qr-template.png?t=${new Date().getTime()}`}
                       alt="Template Background"
                       className="absolute inset-0 w-full h-full object-cover opacity-90"
-                      onError={(e) => { 
-                        e.currentTarget.style.display = 'none'; 
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
                         e.currentTarget.parentElement!.innerHTML = '<div class="flex items-center justify-center h-full w-full text-xs text-red-500 font-bold bg-zinc-100 p-4 text-center">Template Missing in /public/qr-template.png</div>';
-                      }} 
+                      }}
                     />
-                    
+
                     {/* Dynamic QR Overlay (Using the batch range context) */}
-                    <div 
+                    <div
                       className="absolute flex flex-col items-center"
                       style={{
                         left: `${qrXPct}%`,
@@ -1501,9 +1602,9 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
                       }}
                     >
                       {batchPreviewImage ? (
-                        <img 
-                          src={batchPreviewImage} 
-                          alt="Batch Preview QR" 
+                        <img
+                          src={batchPreviewImage}
+                          alt="Batch Preview QR"
                           className="w-full h-auto drop-shadow-md bg-white p-0.5"
                         />
                       ) : (
@@ -1515,7 +1616,7 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
                          <p className="font-bold text-black" style={{ fontSize: 'min(1vw, 8px)' }}>{`HQR${String(selectedBatch.startQR).padStart(5, '0')}`}</p>
                       </div>
                     </div>
-                    
+
                     <div className="absolute top-2 right-2">
                       <Badge className="bg-blue-500/80 text-white text-[10px] border-none px-1.5 py-0">Batch Mockup</Badge>
                     </div>
@@ -1531,7 +1632,7 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
                         Adjust the sliders below to move the QR code. The preview shows exactly where the first code (**{`HQR${String(selectedBatch.startQR).padStart(5, '0')}`}**) will be placed on your **qr-template.png**.
                       </p>
                     </div>
-                    
+
                     {selectedBatch.status !== 'generated' && (
                       <p className="bg-yellow-500/10 text-yellow-500/90 p-3 rounded-lg border border-yellow-500/20 text-xs uppercase font-bold tracking-wider text-center">
                         Batch already {selectedBatch.status}
@@ -1737,6 +1838,25 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
     </div>
   );
 
+  // Resolve assigned entity into a unified display object (name, ivrCode, role)
+  function getAssignedInfo(): { name: string; ivrCode: string; role: string } | null {
+    if (linkedDoctorData) {
+      const n = linkedDoctorData.name || linkedDoctorData.displayName || '';
+      return { name: n.toLowerCase().startsWith('dr') ? n : `Dr. ${n}`, ivrCode: linkedDoctorData.ivrCode || '', role: linkedDoctorData.specialization || 'Doctor' };
+    }
+    if (linkedClinicData) {
+      return { name: linkedClinicData.clinicName || linkedClinicData.name || '', ivrCode: linkedClinicData.ivrCode || '', role: 'Clinic' };
+    }
+    if (linkedLabData) {
+      return { name: linkedLabData.labName || linkedLabData.name || '', ivrCode: linkedLabData.ivrCode || '', role: 'Lab' };
+    }
+    if (linkedParaData) {
+      const roleMap: Record<string, string> = { phlebotomist: 'Phlebotomist', physiotherapist: 'Physiotherapist', nurse: 'Nurse', 'wound-dresser': 'Wound Dresser', aaya: 'Aaya', 'home-assistant': 'Home Assistant', nutritionist: 'Nutritionist' };
+      return { name: linkedParaData.name || '', ivrCode: linkedParaData.ivrCode || '', role: roleMap[linkedParaData.role] || 'Paramedical' };
+    }
+    return null;
+  }
+
   async function searchAndDisplayQR() {
     if (!db || !displayQRNumber.trim()) return;
 
@@ -1745,6 +1865,8 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
     setDisplayQRImage(null);
     setLinkedDoctorData(null);
     setLinkedClinicData(null);
+    setLinkedLabData(null);
+    setLinkedParaData(null);
 
     try {
       const qrCollection = collection(db, "qrPool");
@@ -1763,51 +1885,30 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
       const qrData = { id: qrDoc.id, ...qrDoc.data() } as any;
       setDisplayQRData(qrData);
 
-      // Generate QR code image
+      // Generate QR code image with HealQR logo overlay (matches doctor / clinic / lab / paramedical QR look)
       const qrUrl = `https://healqr.com/verify/${qrData.qrNumber}`;
-      const qrImage = await QRCode.toDataURL(qrUrl, {
-        width: 400,
-        margin: 2,
-        color: {
-          dark: "#000000",
-          light: "#FFFFFF",
-        },
-      });
+      const qrImage = await generateQRWithLogo(qrUrl, 600);
 
       setDisplayQRImage(qrImage);
 
-      // Fetch linked doctor/clinic data if a linkedEmail exists
+      // Fetch linked entity (doctor / clinic / lab / paramedical) by email — first match wins
       if (qrData.linkedEmail) {
         try {
-          // Try to find a doctor with this email
-          const doctorsQuery = query(
-            collection(db, "doctors"),
-            where("email", "==", qrData.linkedEmail),
-          );
-          const doctorSnapshot = await getDocs(doctorsQuery);
-          if (!doctorSnapshot.empty) {
-            const docData = doctorSnapshot.docs[0].data();
-            setLinkedDoctorData({ id: doctorSnapshot.docs[0].id, ...docData });
-          } else {
-            // Try to find a clinic with this email
-            const clinicsQuery = query(
-              collection(db, "clinics"),
-              where("email", "==", qrData.linkedEmail),
-            );
-            const clinicSnapshot = await getDocs(clinicsQuery);
-            if (!clinicSnapshot.empty) {
-              const clinicData = clinicSnapshot.docs[0].data();
-              setLinkedClinicData({
-                id: clinicSnapshot.docs[0].id,
-                ...clinicData,
-              });
+          const lookups: Array<{ col: string; setter: (d: any) => void }> = [
+            { col: 'doctors', setter: setLinkedDoctorData },
+            { col: 'clinics', setter: setLinkedClinicData },
+            { col: 'labs', setter: setLinkedLabData },
+            { col: 'paramedicals', setter: setLinkedParaData },
+          ];
+          for (const { col, setter } of lookups) {
+            const snap = await getDocs(query(collection(db, col), where('email', '==', qrData.linkedEmail)));
+            if (!snap.empty) {
+              setter({ id: snap.docs[0].id, ...snap.docs[0].data() });
+              break;
             }
           }
         } catch (lookupError) {
-          console.warn(
-            "Could not fetch linked doctor/clinic data:",
-            lookupError,
-          );
+          console.warn('Could not fetch linked entity data:', lookupError);
         }
       }
 
