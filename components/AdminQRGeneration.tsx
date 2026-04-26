@@ -452,7 +452,7 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
 
   // Top-box (the empty rectangle dangling at the top of the poster) bounds, expressed as % of template
   // Tuned to /public/qr-template.png — adjust if the artwork changes.
-  const NAME_BOX = { xPct: 22, yPct: 6, wPct: 56, hPct: 8 };
+  const NAME_BOX = { xPct: 16, yPct: 11.5, wPct: 68, hPct: 10 };
 
   // Build a QR data-URL with HealQR logo overlay (matches doctor/clinic/lab/paramedical look)
   async function generateQRWithLogo(payload: string, size = 600): Promise<string> {
@@ -1838,11 +1838,16 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
     </div>
   );
 
-  // Resolve assigned entity into a unified display object (name, ivrCode, role)
+  // Resolve assigned entity into a unified display object (name, ivrCode, role).
+  // We use the name EXACTLY as stored — no auto 'Dr.' prefix. If the entity already
+  // saved their name with 'Dr.', it stays; if not, we don't fabricate one.
   function getAssignedInfo(): { name: string; ivrCode: string; role: string } | null {
     if (linkedDoctorData) {
-      const n = linkedDoctorData.name || linkedDoctorData.displayName || '';
-      return { name: n.toLowerCase().startsWith('dr') ? n : `Dr. ${n}`, ivrCode: linkedDoctorData.ivrCode || '', role: linkedDoctorData.specialization || 'Doctor' };
+      return {
+        name: linkedDoctorData.name || linkedDoctorData.displayName || '',
+        ivrCode: linkedDoctorData.ivrCode || '',
+        role: linkedDoctorData.specialization || 'Doctor',
+      };
     }
     if (linkedClinicData) {
       return { name: linkedClinicData.clinicName || linkedClinicData.name || '', ivrCode: linkedClinicData.ivrCode || '', role: 'Clinic' };
@@ -1894,6 +1899,9 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
       // Fetch linked entity (doctor / clinic / lab / paramedical) by email — first match wins
       if (qrData.linkedEmail) {
         try {
+          const entityTypeMap: Record<string, 'doctor' | 'clinic' | 'lab' | 'paramedical'> = {
+            doctors: 'doctor', clinics: 'clinic', labs: 'lab', paramedicals: 'paramedical',
+          };
           const lookups: Array<{ col: string; setter: (d: any) => void }> = [
             { col: 'doctors', setter: setLinkedDoctorData },
             { col: 'clinics', setter: setLinkedClinicData },
@@ -1903,7 +1911,30 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
           for (const { col, setter } of lookups) {
             const snap = await getDocs(query(collection(db, col), where('email', '==', qrData.linkedEmail)));
             if (!snap.empty) {
-              setter({ id: snap.docs[0].id, ...snap.docs[0].data() });
+              const docRef = snap.docs[0];
+              let data: any = { id: docRef.id, ...docRef.data() };
+
+              // Lazy backfill: if this legacy entity has no IVR yet, mint one from
+              // the universal ivrCodes pool and persist it on the entity doc so
+              // the admin template can show it.
+              if (!data.ivrCode) {
+                try {
+                  const { generateIvrCode } = await import('../utils/ivrCodeGenerator');
+                  const minted = await generateIvrCode(
+                    data.name || data.clinicName || data.labName || 'User',
+                    data.dob || '',
+                    data.uid || data.id,
+                    entityTypeMap[col],
+                  );
+                  await updateDoc(doc(db, col, docRef.id), { ivrCode: minted });
+                  data = { ...data, ivrCode: minted };
+                  toast.success(`IVR code ${minted} generated for this ${entityTypeMap[col]}`);
+                } catch (mintErr) {
+                  console.warn('IVR auto-mint failed:', mintErr);
+                }
+              }
+
+              setter(data);
               break;
             }
           }
