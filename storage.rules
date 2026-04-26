@@ -172,6 +172,39 @@ service firebase.storage {
     }
 
     // ============================================
+    // PARAMEDICAL TEMPLATES + CAMP BANNERS
+    // ============================================
+
+    match /paramedical-templates/{paraId}/{allPaths=**} {
+      // Public read so mini-website can render
+      allow read: if true;
+      // Owner can write images (size + type checked)
+      allow write: if isOwner(paraId) && isImageFile() && isValidImageSize();
+    }
+
+    // ============================================
+    // PARAMEDICAL PROFILE PHOTOS
+    // ============================================
+
+    match /paramedical-photos/{paraId}/{allPaths=**} {
+      // Public read so mini-website can render
+      allow read: if true;
+      // Owner only, image, size capped
+      allow write: if isOwner(paraId) && isImageFile() && isValidImageSize();
+    }
+
+    // ============================================
+    // LAB TEMPLATES + CAMP BANNERS
+    // ============================================
+
+    match /lab-templates/{labId}/{allPaths=**} {
+      // Public read for lab mini-website
+      allow read: if true;
+      // Owner only
+      allow write: if isOwner(labId) && isImageFile() && isValidImageSize();
+    }
+
+    // ============================================
     // CHAT ATTACHMENTS
     // ============================================
 

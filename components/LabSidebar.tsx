@@ -23,6 +23,7 @@ import {
   Search,
   Truck,
   UserCheck,
+  Sparkles,
   Building2,
   Stethoscope,
 } from 'lucide-react';
@@ -106,6 +107,7 @@ export default function LabSidebar({
         { id: 'queue-display', label: 'Queue Display', icon: Monitor },
         { id: 'staff', label: 'Staff Attendance', icon: UserCheck },
         { id: 'social-kit', label: 'Social Kit & Offers', icon: Share2 },
+        { id: 'personalized-templates', label: 'Personalized Templates', icon: Sparkles },
       ],
     },
     {

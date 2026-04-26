@@ -5,7 +5,7 @@ import { Button } from './ui/button';
 import healqrLogo from '../assets/healqr.logo.png';
 import {
   Loader2, Star, Phone, MapPin, Clock, Calendar, Shield, Award,
-  ArrowLeft, Stethoscope, ChevronRight
+  ArrowLeft, Stethoscope, ChevronRight, Sparkles, Heart, Megaphone, X,
 } from 'lucide-react';
 
 const ROLE_LABELS: Record<string, string> = {
@@ -198,6 +198,70 @@ export default function ParamedicalMiniWebsite({ onBookNow, onBack }: Paramedica
                   {svc.price > 0 && <span className="text-teal-400 font-medium text-sm">₹{svc.price}</span>}
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Camps */}
+        {Array.isArray(profile.healthCamps) && (() => {
+          const today = new Date().toISOString().slice(0, 10);
+          const upcoming = profile.healthCamps
+            .filter((c: any) => c?.isActive !== false && c?.date >= today)
+            .sort((a: any, b: any) => (a.date || '').localeCompare(b.date || ''));
+          if (upcoming.length === 0) return null;
+          return (
+            <div className="bg-gradient-to-br from-orange-500/10 to-amber-500/10 border border-orange-500/30 rounded-xl p-5">
+              <h3 className="text-orange-400 font-semibold text-sm mb-3 flex items-center gap-2">
+                <Megaphone className="w-4 h-4" /> Upcoming Camps
+              </h3>
+              <div className="space-y-3">
+                {upcoming.map((c: any) => (
+                  <div key={c.id} className="bg-zinc-900/60 rounded-lg overflow-hidden">
+                    {c.bannerUrl && <img src={c.bannerUrl} alt={c.title} className="w-full h-32 object-cover" />}
+                    <div className="p-3">
+                      <p className="text-white font-medium">{c.title}</p>
+                      <p className="text-gray-400 text-xs flex items-center gap-1 mt-1"><Calendar className="w-3 h-3" /> {c.date}{c.startTime ? ` · ${c.startTime}${c.endTime ? `–${c.endTime}` : ''}` : ''}</p>
+                      <p className="text-gray-400 text-xs flex items-center gap-1 mt-0.5"><MapPin className="w-3 h-3" /> {c.location}{c.pincode ? ` · ${c.pincode}` : ''}</p>
+                      {c.contactPhone && (
+                        <a href={`tel:${c.contactPhone}`} className="text-orange-400 text-xs flex items-center gap-1 mt-0.5 hover:underline">
+                          <Phone className="w-3 h-3" /> {c.contactPhone}
+                        </a>
+                      )}
+                      {Array.isArray(c.services) && c.services.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {c.services.slice(0, 6).map((s: string, i: number) => (
+                            <span key={i} className="text-[10px] bg-orange-500/20 text-orange-300 px-2 py-0.5 rounded-full">{s}</span>
+                          ))}
+                        </div>
+                      )}
+                      {c.description && <p className="text-gray-400 text-xs mt-2">{c.description}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Personalized Templates (health tip + festival wish) */}
+        {Array.isArray(profile.personalizedTemplates) && profile.personalizedTemplates.filter((t: any) => t?.isActive !== false && (t?.imageUrl || t?.image)).length > 0 && (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+            <h3 className="text-white font-semibold text-sm mb-3 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-purple-400" /> From your professional
+            </h3>
+            <div className="grid grid-cols-2 gap-2">
+              {profile.personalizedTemplates
+                .filter((t: any) => t?.isActive !== false && (t?.imageUrl || t?.image))
+                .map((t: any) => (
+                  <div key={t.id} className="relative aspect-[4/5] rounded-lg overflow-hidden bg-zinc-800">
+                    <img src={t.imageUrl || t.image} alt={t.name || ''} className="w-full h-full object-cover" />
+                    <div className="absolute top-2 left-2">
+                      {t.category === 'festival-wish'
+                        ? <span className="bg-pink-500/80 text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1"><Heart className="w-2.5 h-2.5" /> Wish</span>
+                        : <span className="bg-emerald-500/80 text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1"><Sparkles className="w-2.5 h-2.5" /> Health Tip</span>}
+                    </div>
+                  </div>
+                ))}
             </div>
           </div>
         )}

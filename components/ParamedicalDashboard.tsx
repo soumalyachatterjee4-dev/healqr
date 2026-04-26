@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { auth, db } from '../lib/firebase/config';
+import { auth, db, storage } from '../lib/firebase/config';
 import { signOut } from 'firebase/auth';
 import {
   doc, getDoc, updateDoc, collection, query, where, getDocs, onSnapshot,
   addDoc, serverTimestamp, orderBy, limit, Timestamp, deleteDoc
 } from 'firebase/firestore';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { toast } from 'sonner';
 import QRCode from 'react-qr-code';
 import QRCodeLib from 'qrcode';
@@ -16,7 +17,7 @@ import {
   Plus, Trash2, Copy, Download, Star, Building2, Stethoscope, ArrowLeft,
   History, Activity, Megaphone, Lock, Shield, BrainCircuit, Upload,
   Bell, Video, Facebook, Twitter, Linkedin, MessageCircle, Send, CheckCircle2, Circle, FlaskConical, ChevronRight, LayoutDashboard, Network,
-  Package, Database, Receipt, Target
+  Package, Database, Receipt, Target, Sparkles, Camera
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -34,6 +35,7 @@ import ParamedicalAllocationQueue from './ParamedicalAllocationQueue';
 import ParamedicalMonthlyPlanner from './ParamedicalMonthlyPlanner';
 import ParamedicalDataManagement from './ParamedicalDataManagement';
 import ParamedicalEmergencyButton from './ParamedicalEmergencyButton';
+import ParamedicalPersonalizedTemplates from './ParamedicalPersonalizedTemplates';
 
 // ===== ROLE CONFIG =====
 const ROLE_LABELS: Record<string, string> = {
@@ -182,6 +184,7 @@ const SIDEBAR_ITEMS = [
   // Network & growth
   { id: 'referral-manager', label: 'Referral Manager', icon: Network, section: 'network' },
   { id: 'social-kit', label: 'Social Kit', icon: Share2, section: 'network' },
+  { id: 'personalized-templates', label: 'Personalized Templates', icon: Sparkles, section: 'network' },
 
   // Safety
   { id: 'emergency-sos', label: 'Emergency / SOS', icon: Shield, section: 'safety' },
@@ -763,6 +766,8 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
       experience: profile?.experience || '',
     });
     const [saving, setSaving] = useState(false);
+    const [uploadingPhoto, setUploadingPhoto] = useState(false);
+    const photoInputRef = useRef<HTMLInputElement>(null);
 
     const handleSave = async () => {
       if (!paraId) return;
@@ -782,8 +787,84 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
       finally { setSaving(false); }
     };
 
+    const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file || !paraId) return;
+      if (!file.type.startsWith('image/')) { toast.error('Please choose an image'); return; }
+      if (file.size > 4 * 1024 * 1024) { toast.error('Image must be under 4 MB'); return; }
+      if (!auth?.currentUser || auth.currentUser.uid !== paraId) { toast.error('Session expired — please re-login'); return; }
+      setUploadingPhoto(true);
+      try {
+        const path = `paramedical-photos/${paraId}/avatar_${Date.now()}_${file.name}`;
+        const sref = storageRef(storage, path);
+        await uploadBytes(sref, file);
+        const url = await getDownloadURL(sref);
+        await updateDoc(doc(db, 'paramedicals', paraId), { profilePhoto: url, updatedAt: new Date().toISOString() });
+        setProfile(prev => prev ? { ...prev, profilePhoto: url } : prev);
+        toast.success('Profile photo updated');
+      } catch (err: any) {
+        console.error(err);
+        toast.error(err?.code === 'storage/unauthorized' ? 'Permission denied — re-login' : (err?.message || 'Upload failed'));
+      } finally {
+        setUploadingPhoto(false);
+        if (photoInputRef.current) photoInputRef.current.value = '';
+      }
+    };
+
+    const handleRemovePhoto = async () => {
+      if (!paraId || !profile?.profilePhoto) return;
+      if (!confirm('Remove your profile photo?')) return;
+      try {
+        await updateDoc(doc(db, 'paramedicals', paraId), { profilePhoto: '', updatedAt: new Date().toISOString() });
+        setProfile(prev => prev ? { ...prev, profilePhoto: '' } : prev);
+        toast.success('Photo removed');
+      } catch (err: any) { toast.error(err?.message || 'Failed'); }
+    };
+
+    const initials = (profile?.name || '?').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+
     return (
       <div className="space-y-6">
+        {/* Photo + identity card */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+          <div className="flex items-center gap-5 flex-wrap">
+            <div className="relative">
+              {profile?.profilePhoto ? (
+                <img src={profile.profilePhoto} alt={profile.name} className="w-24 h-24 rounded-full object-cover border-2 border-teal-500/40" />
+              ) : (
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-teal-600 to-cyan-700 flex items-center justify-center text-white text-2xl font-bold border-2 border-teal-500/40">
+                  {initials}
+                </div>
+              )}
+              <button
+                type="button"
+                disabled={uploadingPhoto}
+                onClick={() => photoInputRef.current?.click()}
+                className="absolute -bottom-1 -right-1 w-9 h-9 rounded-full bg-teal-600 hover:bg-teal-700 disabled:opacity-50 flex items-center justify-center shadow-lg"
+                title="Change photo"
+              >
+                {uploadingPhoto ? <Loader2 className="w-4 h-4 text-white animate-spin" /> : <Camera className="w-4 h-4 text-white" />}
+              </button>
+              <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-white font-bold text-xl">{profile?.name || 'Your Name'}</h3>
+              <p className="text-teal-400 text-sm">{roleName}</p>
+              <p className="text-gray-500 text-xs mt-1">Photo & bio appear on your public mini-website at <span className="text-teal-400">healqr.com/para/{profile?.profileSlug || paraId.slice(0, 8)}</span></p>
+              <div className="flex gap-2 mt-3">
+                <Button size="sm" variant="outline" className="border-zinc-700 text-white" disabled={uploadingPhoto} onClick={() => photoInputRef.current?.click()}>
+                  <Camera className="w-3.5 h-3.5 mr-1.5" /> {profile?.profilePhoto ? 'Change Photo' : 'Add Photo'}
+                </Button>
+                {profile?.profilePhoto && (
+                  <Button size="sm" variant="ghost" className="text-red-400 hover:bg-red-500/10" onClick={handleRemovePhoto}>
+                    Remove
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-white font-semibold text-lg">Profile Details</h3>
@@ -1573,6 +1654,7 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
       case 'monthly-planner': return <ParamedicalMonthlyPlanner paraId={paraId} />;
       case 'data-management': return <ParamedicalDataManagement paraId={paraId} paraName={profile?.name} />;
       case 'emergency-sos': return <ParamedicalEmergencyButton paraId={paraId} paraName={profile?.name} />;
+      case 'personalized-templates': return <ParamedicalPersonalizedTemplates paraId={paraId} />;
       case 'referral-manager': return <ReferralManager />;
       case 'social-kit': return <SocialKit />;
       case 'video-library':

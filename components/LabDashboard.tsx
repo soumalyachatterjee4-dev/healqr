@@ -66,6 +66,7 @@ import LabSocialKit from './LabSocialKit';
 import LabAllocationQueue from './LabAllocationQueue';
 import LabMonthlyPlanner from './LabMonthlyPlanner';
 import LabDataManagement from './LabDataManagement';
+import LabPersonalizedTemplates from './LabPersonalizedTemplates';
 import VideoLibrary from './VideoLibrary';
 import { Send } from 'lucide-react';
 interface LabData {
@@ -722,6 +723,11 @@ export default function LabDashboard({ onLogout }: { onLogout?: () => void | Pro
             {/* Data Management */}
             {activeMenu === 'data-management' && resolvedLabId && (
               <LabDataManagement labId={resolvedLabId} labName={labData?.name} />
+            )}
+
+            {/* Personalized Templates */}
+            {activeMenu === 'personalized-templates' && resolvedLabId && (
+              <LabPersonalizedTemplates labId={resolvedLabId} />
             )}
 
             {/* Dashboard Home */}
