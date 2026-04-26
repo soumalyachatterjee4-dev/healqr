@@ -15,7 +15,8 @@ import {
   ChevronUp, Clock, MapPin, Phone, Mail, Edit3, Save, Loader2, Check,
   Plus, Trash2, Copy, Download, Star, Building2, Stethoscope, ArrowLeft,
   History, Activity, Megaphone, Lock, Shield, BrainCircuit, Upload,
-  Bell, Video, Facebook, Twitter, Linkedin, MessageCircle, Send, CheckCircle2, Circle, FlaskConical, ChevronRight, LayoutDashboard, Network
+  Bell, Video, Facebook, Twitter, Linkedin, MessageCircle, Send, CheckCircle2, Circle, FlaskConical, ChevronRight, LayoutDashboard, Network,
+  Package, Database, Receipt, Target
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -25,6 +26,14 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import type { ParamedicalRole } from './ParamedicalSignUp';
 import DashboardPromoDisplay from './DashboardPromoDisplay';
 import VideoLibrary from './VideoLibrary';
+import ParamedicalPatientRetention from './ParamedicalPatientRetention';
+import ParamedicalBilling from './ParamedicalBilling';
+import ParamedicalInventory from './ParamedicalInventory';
+import ParamedicalBroadcast from './ParamedicalBroadcast';
+import ParamedicalAllocationQueue from './ParamedicalAllocationQueue';
+import ParamedicalMonthlyPlanner from './ParamedicalMonthlyPlanner';
+import ParamedicalDataManagement from './ParamedicalDataManagement';
+import ParamedicalEmergencyButton from './ParamedicalEmergencyButton';
 
 // ===== ROLE CONFIG =====
 const ROLE_LABELS: Record<string, string> = {
@@ -146,30 +155,52 @@ interface ReferralEntry {
 // ===== SIDEBAR MENU =====
 const SIDEBAR_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'main' },
+
+  // Management
   { id: 'profile', label: 'Profile', icon: User, section: 'management' },
   { id: 'qr-manager', label: 'QR Manager', icon: QrCode, section: 'management' },
   { id: 'reviews', label: 'Manage Reviews', icon: Star, section: 'management' },
   { id: 'schedule', label: 'Schedule Maker', icon: Calendar, section: 'management' },
+
+  // Practice tools
   { id: 'todays-schedule', label: "Today's Schedule", icon: CalendarDays, section: 'practice' },
   { id: 'advance-booking', label: 'Advance Bookings', icon: CalendarPlus, section: 'practice' },
   { id: 'history', label: 'History', icon: History, section: 'practice' },
   { id: 'reports', label: 'Reports', icon: FileText, section: 'practice' },
   { id: 'analytics', label: 'Analytics', icon: BarChart3, section: 'practice' },
+  { id: 'patient-retention', label: 'Patient Retention', icon: Target, section: 'practice' },
   { id: 'revenue', label: 'Revenue Dashboard', icon: IndianRupee, section: 'practice' },
+  { id: 'billing', label: 'Billing & Receipts', icon: Receipt, section: 'practice' },
+  { id: 'inventory', label: 'Inventory', icon: Package, section: 'practice' },
+  { id: 'patient-broadcast', label: 'Patient Broadcast', icon: Megaphone, section: 'practice' },
+  { id: 'allocation-queue', label: 'Lab Allocation Queue', icon: FlaskConical, section: 'practice' },
+
+  // General
+  { id: 'monthly-planner', label: 'Monthly Planner', icon: Calendar, section: 'general' },
+  { id: 'data-management', label: 'Data Management', icon: Database, section: 'general' },
+
+  // Network & growth
   { id: 'referral-manager', label: 'Referral Manager', icon: Network, section: 'network' },
   { id: 'social-kit', label: 'Social Kit', icon: Share2, section: 'network' },
+
+  // Safety
+  { id: 'emergency-sos', label: 'Emergency / SOS', icon: Shield, section: 'safety' },
 ];
 
 const SECTION_LABELS: Record<string, string> = {
   management: 'MANAGEMENT TOOLS',
   practice: 'PRACTICE ENHANCER TOOLS',
+  general: 'GENERAL TOOLS',
   network: 'NETWORK & GROWTH',
+  safety: 'SAFETY',
 };
 
 const SECTION_COLORS: Record<string, string> = {
   management: 'blue',
   practice: 'purple',
+  general: 'emerald',
   network: 'emerald',
+  safety: 'red',
 };
 
 export default function ParamedicalDashboard({ onLogout }: { onLogout: () => void }) {
@@ -401,28 +432,33 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
     const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
       management: true,
       practice: true,
+      general: true,
       network: true,
+      safety: true,
     });
 
-    const sections = ['management', 'practice', 'network'];
+    const sections = ['management', 'practice', 'general', 'network', 'safety'];
 
     // Color maps for section headers and active items
     const sectionHeaderColor: Record<string, string> = {
       purple: 'text-purple-400/50',
       emerald: 'text-emerald-400/50',
       blue: 'text-blue-400/50',
+      red: 'text-red-400/50',
     };
 
     const sectionChevronColor: Record<string, string> = {
       purple: 'text-purple-500/40',
       emerald: 'text-emerald-500/40',
       blue: 'text-blue-500/40',
+      red: 'text-red-500/40',
     };
 
     const sectionActiveClass: Record<string, string> = {
       purple: 'bg-purple-500/15 text-purple-400',
       emerald: 'bg-emerald-500/15 text-emerald-400',
       blue: 'bg-blue-500/15 text-blue-400',
+      red: 'bg-red-500/15 text-red-400',
     };
 
     return (
@@ -1529,6 +1565,14 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
       case 'reports': return <ReportsPage />;
       case 'analytics': return <AnalyticsPage />;
       case 'revenue': return <RevenueDashboard />;
+      case 'patient-retention': return <ParamedicalPatientRetention paraId={paraId} paraName={profile?.name} />;
+      case 'billing': return <ParamedicalBilling paraId={paraId} paraName={profile?.name} />;
+      case 'inventory': return <ParamedicalInventory paraId={paraId} />;
+      case 'patient-broadcast': return <ParamedicalBroadcast paraId={paraId} paraName={profile?.name} />;
+      case 'allocation-queue': return <ParamedicalAllocationQueue paraId={paraId} />;
+      case 'monthly-planner': return <ParamedicalMonthlyPlanner paraId={paraId} />;
+      case 'data-management': return <ParamedicalDataManagement paraId={paraId} paraName={profile?.name} />;
+      case 'emergency-sos': return <ParamedicalEmergencyButton paraId={paraId} paraName={profile?.name} />;
       case 'referral-manager': return <ReferralManager />;
       case 'social-kit': return <SocialKit />;
       case 'video-library':

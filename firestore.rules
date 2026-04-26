@@ -336,6 +336,49 @@ service cloud.firestore {
       match /notifications/{notifId} {
         allow read, write: if isOwner(paraId);
       }
+
+      // Inventory + stock movements (owner only)
+      match /inventory/{itemId} {
+        allow read, write: if isOwner(paraId);
+      }
+      match /stockLogs/{logId} {
+        allow read, write: if isOwner(paraId);
+      }
+
+      // Monthly planner notes (owner only)
+      match /plannerNotes/{noteId} {
+        allow read, write: if isOwner(paraId);
+      }
+
+      // Patient broadcast logs (owner only)
+      match /broadcastLogs/{logId} {
+        allow read, write: if isOwner(paraId);
+      }
+
+      // Emergency safety: contacts + SOS logs (owner only)
+      match /emergencyContacts/{contactId} {
+        allow read, write: if isOwner(paraId);
+      }
+      match /sosLogs/{logId} {
+        allow read, write: if isOwner(paraId);
+      }
+    }
+
+    // ============================================
+    // PARAMEDICAL RECEIPTS COLLECTION
+    // ============================================
+
+    match /paramedicalReceipts/{receiptId} {
+      // Owner reads own receipts (filtered client-side by paramedicalId)
+      allow read: if isAuthenticated();
+      // Owner creates receipts (for their own bookings)
+      allow create: if isAuthenticated()
+                    && request.resource.data.paramedicalId == request.auth.uid;
+      // Updates only by owner
+      allow update: if isAuthenticated()
+                    && resource.data.paramedicalId == request.auth.uid;
+      // No deletes (audit trail)
+      allow delete: if false;
     }
 
     // ============================================
