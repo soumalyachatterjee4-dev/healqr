@@ -1004,11 +1004,11 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
         const qrY = 50;
         ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
 
-        // Center HealQR logo overlay
+        // Center HealQR logo overlay (universal HealQR icon, same as doctor + lab)
         try {
           const logo = new Image();
           logo.crossOrigin = 'anonymous';
-          logo.src = healqrLogo;
+          logo.src = '/icon-192.png';
           await new Promise<void>((resolve, reject) => {
             logo.onload = () => resolve();
             logo.onerror = () => reject();

@@ -83,6 +83,7 @@ interface LabData {
   qrCode?: string;
   logoUrl?: string;
   phone?: string;
+  ivrCode?: string;
   type: string;
 }
 
