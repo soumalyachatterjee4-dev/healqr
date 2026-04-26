@@ -21,6 +21,7 @@ interface ClinicQRManagerProps {
   profileData?: {
     image: string | null;
     name: string;
+    ivrCode?: string;
   };
 }
 
@@ -238,20 +239,44 @@ export default function ClinicQRManager({ onMenuChange, onLogout, profileData }:
 
   const generateQRCode = async () => {
     try {
-      const dataUrl = await QRCode.toDataURL(qrUrl, {
+      // Render to off-screen canvas so we can overlay the HealQR logo (matches doctor / lab / paramedical)
+      const qrCanvas = document.createElement('canvas');
+      await QRCode.toCanvas(qrCanvas, qrUrl, {
         width: qrSize,
         margin: 2,
-        errorCorrectionLevel: 'H', // High error correction for better scannability
-        color: {
-          dark: qrColor,
-          light: qrBackgroundColor,
-        },
-        type: 'image/png',
-        rendererOpts: {
-          quality: 1, // Maximum quality
-        },
+        errorCorrectionLevel: 'H',
+        color: { dark: qrColor, light: qrBackgroundColor },
       });
-      setQrCodeDataUrl(dataUrl);
+
+      const ctx = qrCanvas.getContext('2d');
+      if (ctx) {
+        try {
+          const logo = new Image();
+          logo.crossOrigin = 'anonymous';
+          logo.src = '/icon-192.png';
+          await new Promise<void>((resolve, reject) => {
+            logo.onload = () => resolve();
+            logo.onerror = () => reject();
+          });
+
+          const logoSize = qrSize * 0.22;
+          const logoX = (qrSize - logoSize) / 2;
+          const logoY = (qrSize - logoSize) / 2;
+
+          // White circle background to keep QR scannable
+          const circleRadius = logoSize / 2 + 4;
+          ctx.fillStyle = qrBackgroundColor;
+          ctx.beginPath();
+          ctx.arc(qrSize / 2, qrSize / 2, circleRadius, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.drawImage(logo, logoX, logoY, logoSize, logoSize);
+        } catch {
+          // Logo failed to load — QR is still valid without it
+        }
+      }
+
+      setQrCodeDataUrl(qrCanvas.toDataURL('image/png'));
     } catch (error) {
       console.error('Error generating QR code:', error);
     }
@@ -670,6 +695,24 @@ export default function ClinicQRManager({ onMenuChange, onLogout, profileData }:
 
               {/* Right Column */}
               <div className="space-y-6">
+                {/* IVR Code (universal pool) — for non-smartphone callers */}
+                {profileData?.ivrCode && (
+                  <div className="bg-zinc-900 border border-emerald-500/30 rounded-xl p-6">
+                    <Label className="mb-2 block text-gray-400 flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-emerald-400" />
+                      IVR Code (for non-smartphone users)
+                    </Label>
+                    <div className="bg-black border border-emerald-500/30 rounded-lg p-4">
+                      <p className="text-emerald-400 font-mono text-2xl font-bold tracking-widest">
+                        {profileData.ivrCode}
+                      </p>
+                    </div>
+                    <p className="text-gray-500 text-xs mt-2">
+                      Patients without a smartphone can call HealQR&apos;s IVR line and enter this 5-character code to book.
+                    </p>
+                  </div>
+                )}
+
                 {/* Your Personal URL */}
                 <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
                   <Label className="mb-4 block text-gray-400">Your Personal URL</Label>
