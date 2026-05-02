@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { auth, db, storage } from '../lib/firebase/config';
 import { signOut } from 'firebase/auth';
 import {
-  doc, getDoc, updateDoc, collection, query, where, getDocs, onSnapshot,
+  doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, onSnapshot,
   addDoc, serverTimestamp, orderBy, limit, Timestamp, deleteDoc
 } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -17,7 +17,7 @@ import {
   Plus, Trash2, Copy, Download, Star, Building2, Stethoscope, ArrowLeft,
   History, Activity, Megaphone, Lock, Shield, BrainCircuit, Upload,
   Bell, Video, Facebook, Twitter, Linkedin, MessageCircle, Send, CheckCircle2, Circle, FlaskConical, ChevronRight, LayoutDashboard, Network,
-  Package, Database, Receipt, Target, Sparkles, Camera
+  Package, Database, Receipt, Target, Sparkles, Camera, Eye, Briefcase, Minus
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -82,7 +82,6 @@ interface ParamedicalProfile {
   experience?: string;
   qrNumber?: string;
   profileSlug?: string;
-  ivrCode?: string;
   bookingUrl?: string;
   bio?: string;
   serviceAreas?: string[];
@@ -95,6 +94,43 @@ interface ParamedicalProfile {
   schedules?: ScheduleSlot[];
   verified?: boolean;
   createdAt?: any;
+  // Registration details (read-only, set during signup / admin)
+  dateOfBirth?: string;
+  paramedicalCode?: string;
+  residentialPincode?: string;
+  landmark?: string;
+  companyName?: string;
+  // Optional "Dr." prefix for village paramedical staff who use it culturally
+  useDrPrefix?: boolean;
+  // Service badges (max 4) shown on Mini Website — distinct from priced `services`
+  serviceBadges?: string[];
+  serviceBadgesLabel?: string; // e.g., "Done Here", "Available"
+  // Schedule manager extras
+  plannedOff?: { enabled: boolean; startDate?: string; endDate?: string };
+  maxAdvanceDays?: number;
+  vcTimeSlots?: VCTimeSlot[];
+  manualClinics?: ManualClinic[];
+  // Clinic codes from which this paramedical hides QR booking data
+  selfRestrictedClinics?: string[];
+  // MR access toggle (allow Medical Representatives to visit)
+  allowMR?: boolean;
+}
+
+interface VCTimeSlot {
+  id: number;
+  startTime: string;
+  endTime: string;
+  days: string[];
+  isActive: boolean;
+}
+
+interface ManualClinic {
+  id: string;
+  name: string;
+  address: string;
+  phone?: string;
+  clinicCode?: string; // HQR-xxxx-xxxx-CLN → links to clinics collection
+  createdAt?: number;
 }
 
 interface ServiceItem {
@@ -107,11 +143,24 @@ interface ServiceItem {
 
 interface ScheduleSlot {
   id: string;
-  day: string;
+  day: string;          // legacy single-day (kept for backward compat)
+  days?: string[];      // doctor-style multi-day
   startTime: string;
   endTime: string;
   isActive: boolean;
   maxBookings: number;
+  frequency?: string;
+  frequencyStartDate?: string;
+  customDate?: string;
+  chamberName?: string;
+  chamberAddress?: string;
+  clinicCode?: string;
+  clinicLocationId?: string;
+  mrAllowed?: boolean;
+  mrMaxCount?: number;
+  mrMeetingTime?: string;
+  mrIntervalAfterPatients?: number;
+  createdAt?: number;
 }
 
 interface ParaReview {
@@ -161,7 +210,6 @@ const SIDEBAR_ITEMS = [
   // Management
   { id: 'profile', label: 'Profile', icon: User, section: 'management' },
   { id: 'qr-manager', label: 'QR Manager', icon: QrCode, section: 'management' },
-  { id: 'reviews', label: 'Manage Reviews', icon: Star, section: 'management' },
   { id: 'schedule', label: 'Schedule Maker', icon: Calendar, section: 'management' },
 
   // Practice tools
@@ -577,12 +625,33 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
 
   // ===== DASHBOARD HOME =====
   const DashboardHome = () => {
-    const monthBookings = bookings.filter(b => b.appointmentDate?.startsWith(today.slice(0, 7))).length;
+    const monthPrefix = today.slice(0, 7);
+    const monthBookingsList = bookings.filter(b => b.appointmentDate?.startsWith(monthPrefix));
+    const monthBookings = monthBookingsList.length;
     const completedCount = bookings.filter(b => b.status === 'completed').length;
     const now = new Date();
     const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     const lastOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     const averageRating = reviews.length > 0 ? reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length : 0;
+
+    // Practice Overview analytics (current month) — mirrors DoctorDashboard
+    const cancelledCount = monthBookingsList.filter(b => b.status === 'cancelled' || b.status === 'rejected').length;
+    const completedThisMonth = monthBookingsList.filter(b => b.status === 'completed').length;
+    const upcomingThisMonth = monthBookingsList.filter(b => b.status === 'confirmed' || b.status === 'pending').length;
+    const dropOutsCount = monthBookingsList.filter(b =>
+      b.appointmentDate < today && b.status !== 'completed' && b.status !== 'cancelled' && b.status !== 'rejected'
+    ).length;
+    const totalVisitors = monthBookings; // every booking attempt counts as a visitor
+    const totalBookingsActive = monthBookings - cancelledCount;
+
+    const practiceOverviewData: Array<{ name: string; value: number; fill: string }> = [
+      { name: 'Total Visitors', value: totalVisitors, fill: '#3b82f6' },
+      { name: 'Total Bookings', value: totalBookingsActive, fill: '#10b981' },
+      { name: 'Completed', value: completedThisMonth, fill: '#8b5cf6' },
+      { name: 'Upcoming', value: upcomingThisMonth, fill: '#6366f1' },
+      { name: 'Drop Outs', value: dropOutsCount, fill: '#ef4444' },
+      { name: 'Cancelled', value: cancelledCount, fill: '#374151' },
+    ];
 
     return (
     <div className="space-y-3">
@@ -608,6 +677,46 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
           <Lock className="w-5 h-5 mr-2" />
           Data is encrypted
         </div>
+      </div>
+
+      {/* ★ Review Collection Widget */}
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1">
+              {renderStars(averageRating, 'w-5 h-5')}
+            </div>
+            <span className="text-white font-semibold text-base">{averageRating.toFixed(1)}/5</span>
+            <button
+              onClick={() => setReviewsOpen(true)}
+              className="text-purple-400 text-sm hover:text-purple-300 hover:underline transition-colors"
+            >
+              {reviews.length} {reviews.length === 1 ? 'review' : 'reviews'}
+            </button>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => setReviewsOpen(true)}
+            className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-3"
+          >
+            Manage Reviews
+          </Button>
+        </div>
+        {reviews.length === 0 ? (
+          <p className="text-xs text-gray-500">No reviews yet. Collect feedback from your patients.</p>
+        ) : (
+          <div className="flex gap-2 flex-wrap">
+            {reviews.slice(0, 3).map(r => (
+              <div key={r.id} className="bg-zinc-800 rounded-lg px-3 py-2 max-w-xs">
+                <div className="flex items-center gap-1 mb-1">
+                  {renderStars(r.rating, 'w-3 h-3')}
+                  <span className="text-xs text-gray-400 ml-1">{r.patientName}</span>
+                </div>
+                <p className="text-xs text-gray-300 line-clamp-1">{r.comment}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Purple Stats Card — matching LabDashboard aesthetics */}
@@ -670,8 +779,67 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
         </div>
       </div>
 
-      {/* Health Tip Card */}
-      <DashboardPromoDisplay category="health-tip" placement="landing-patient-modal" />
+      {/* Practice Overview Chart */}
+      <Card className="bg-zinc-900 border-zinc-800">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-emerald-500" />
+            <CardTitle className="text-white text-xl">Practice Overview (Current Plan Period)</CardTitle>
+          </div>
+          <p className="text-sm text-gray-400 mt-2">
+            Track your service performance metrics and patient engagement analytics.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="bg-zinc-950 rounded-xl p-6">
+            {/* Custom Bar Chart */}
+            <div className="space-y-6">
+              {practiceOverviewData.map((item, index) => {
+                const maxValue = Math.max(...practiceOverviewData.map(d => d.value), 1);
+                const percentage = (item.value / maxValue) * 100;
+
+                return (
+                  <div key={index} className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-white font-semibold text-sm">{item.name}</span>
+                      <span className="text-white font-bold text-lg">{item.value}</span>
+                    </div>
+                    <div className="relative h-8 bg-zinc-900 rounded-lg overflow-hidden">
+                      <div
+                        className="absolute top-0 left-0 h-full rounded-lg transition-all duration-1000 ease-out"
+                        style={{
+                          width: `${percentage}%`,
+                          backgroundColor: item.fill,
+                          boxShadow: `0 0 20px ${item.fill}80`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Summary Stats */}
+            <div className="grid grid-cols-3 gap-4 mt-8 pt-6 border-t border-zinc-800">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-400">{totalVisitors}</div>
+                <div className="text-xs text-gray-400 mt-1">Total Visitors</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-400">{totalBookingsActive}</div>
+                <div className="text-xs text-gray-400 mt-1">Total Bookings</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-red-400">{cancelledCount}</div>
+                <div className="text-xs text-gray-400 mt-1">Cancelled</div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Pharma Promotional Zone (admin global + pharma-targeted) */}
+      <DashboardPromoDisplay doctorId={paraId} />
 
       {/* Today's schedule preview */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
@@ -692,46 +860,6 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
               </div>
             ))}
             {todaysBookings.length > 5 && <p className="text-gray-500 text-xs text-center">+{todaysBookings.length - 5} more</p>}
-          </div>
-        )}
-      </div>
-
-      {/* ★ Review Collection Widget */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1">
-              {renderStars(averageRating, 'w-5 h-5')}
-            </div>
-            <span className="text-white font-semibold text-base">{averageRating.toFixed(1)}/5</span>
-            <button
-              onClick={() => setReviewsOpen(true)}
-              className="text-purple-400 text-sm hover:text-purple-300 hover:underline transition-colors"
-            >
-              {reviews.length} {reviews.length === 1 ? 'review' : 'reviews'}
-            </button>
-          </div>
-          <Button
-            size="sm"
-            onClick={() => setReviewsOpen(true)}
-            className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-3"
-          >
-            Manage Reviews
-          </Button>
-        </div>
-        {reviews.length === 0 ? (
-          <p className="text-xs text-gray-500">No reviews yet. Collect feedback from your patients.</p>
-        ) : (
-          <div className="flex gap-2 flex-wrap">
-            {reviews.slice(0, 3).map(r => (
-              <div key={r.id} className="bg-zinc-800 rounded-lg px-3 py-2 max-w-xs">
-                <div className="flex items-center gap-1 mb-1">
-                  {renderStars(r.rating, 'w-3 h-3')}
-                  <span className="text-xs text-gray-400 ml-1">{r.patientName}</span>
-                </div>
-                <p className="text-xs text-gray-300 line-clamp-1">{r.comment}</p>
-              </div>
-            ))}
           </div>
         )}
       </div>
@@ -764,10 +892,26 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
       pincode: profile?.pincode || '',
       bio: profile?.bio || '',
       experience: profile?.experience || '',
+      useDrPrefix: profile?.useDrPrefix || false,
+      serviceBadges: profile?.serviceBadges || [],
+      serviceBadgesLabel: profile?.serviceBadgesLabel || 'Done Here',
     });
+    const [newBadge, setNewBadge] = useState('');
     const [saving, setSaving] = useState(false);
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
     const photoInputRef = useRef<HTMLInputElement>(null);
+
+    const addBadge = () => {
+      const v = newBadge.trim();
+      if (!v) return;
+      if (form.serviceBadges.length >= 4) { toast.error('Maximum 4 badges'); return; }
+      if (form.serviceBadges.includes(v)) { toast.error('Already added'); return; }
+      setForm({ ...form, serviceBadges: [...form.serviceBadges, v] });
+      setNewBadge('');
+    };
+    const removeBadge = (idx: number) => {
+      setForm({ ...form, serviceBadges: form.serviceBadges.filter((_, i) => i !== idx) });
+    };
 
     const handleSave = async () => {
       if (!paraId) return;
@@ -779,6 +923,9 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
           pincode: form.pincode.trim(),
           bio: form.bio.trim(),
           experience: form.experience.trim(),
+          useDrPrefix: !!form.useDrPrefix,
+          serviceBadges: form.serviceBadges,
+          serviceBadgesLabel: form.serviceBadgesLabel.trim() || 'Done Here',
         });
         setProfile(prev => prev ? { ...prev, ...form } : prev);
         setEditing(false);
@@ -848,7 +995,7 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
               <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="text-white font-bold text-xl">{profile?.name || 'Your Name'}</h3>
+              <h3 className="text-white font-bold text-xl">{profile?.useDrPrefix ? 'Dr. ' : ''}{profile?.name || 'Your Name'}</h3>
               <p className="text-teal-400 text-sm">{roleName}</p>
               <p className="text-gray-500 text-xs mt-1">Photo & bio appear on your public mini-website at <span className="text-teal-400">healqr.com/para/{profile?.profileSlug || paraId.slice(0, 8)}</span></p>
               <div className="flex gap-2 mt-3">
@@ -865,20 +1012,55 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
           </div>
         </div>
 
+        {/* Registration Details (read-only) */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+          <h3 className="text-white font-semibold text-lg mb-1">Registration Details</h3>
+          <p className="text-gray-500 text-xs mb-5">These fields cannot be edited</p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-gray-400 text-xs mb-1 block">Email Address</label>
+              <Input value={profile?.email || ''} disabled className="bg-black border-zinc-800 text-white opacity-70" />
+            </div>
+            <div>
+              <label className="text-gray-400 text-xs mb-1 block">Date of Birth</label>
+              <Input value={profile?.dateOfBirth || '—'} disabled className="bg-black border-zinc-800 text-white opacity-70" />
+            </div>
+            <div>
+              <label className="text-gray-400 text-xs mb-1 block">Paramedical Code</label>
+              <Input value={profile?.paramedicalCode || '—'} disabled className="bg-black border-zinc-800 text-white opacity-70" />
+            </div>
+            <div>
+              <label className="text-gray-400 text-xs mb-1 block">Residential Pin Code</label>
+              <Input value={profile?.residentialPincode || '—'} disabled className="bg-black border-zinc-800 text-white opacity-70" />
+            </div>
+            <div>
+              <label className="text-gray-400 text-xs mb-1 block">State</label>
+              <Input value={profile?.state || '—'} disabled className="bg-black border-zinc-800 text-white opacity-70" />
+            </div>
+            <div>
+              <label className="text-gray-400 text-xs mb-1 block">Landmark</label>
+              <Input value={profile?.landmark || '—'} disabled className="bg-black border-zinc-800 text-white opacity-70" />
+            </div>
+            <div>
+              <label className="text-gray-400 text-xs mb-1 block">QR Number (Linked) <span className="text-teal-400">(VIRTUAL)</span></label>
+              <Input value={profile?.qrNumber || '—'} disabled className="bg-black border-zinc-800 text-white opacity-70" />
+            </div>
+            <div>
+              <label className="text-gray-400 text-xs mb-1 block">Company Name</label>
+              <Input value={profile?.companyName || '—'} disabled className="bg-black border-zinc-800 text-white opacity-70" />
+            </div>
+          </div>
+        </div>
+
+        {/* Profile Details (editable) */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-white font-semibold text-lg">Profile Details</h3>
-            {!editing ? (
+            {!editing && (
               <Button size="sm" variant="outline" onClick={() => setEditing(true)} className="border-zinc-700 text-white">
                 <Edit3 className="w-4 h-4 mr-2" /> Edit
               </Button>
-            ) : (
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => setEditing(false)} className="border-zinc-700 text-white">Cancel</Button>
-                <Button size="sm" onClick={handleSave} disabled={saving} className="bg-teal-600 hover:bg-teal-700">
-                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Save className="w-4 h-4 mr-1" /> Save</>}
-                </Button>
-              </div>
             )}
           </div>
 
@@ -886,16 +1068,32 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
             <div>
               <label className="text-gray-400 text-xs mb-1 block">Name</label>
               {editing ? <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="bg-black border-zinc-800 text-white" />
-                : <p className="text-white">{profile?.name}</p>}
+                : <p className="text-white">{profile?.useDrPrefix ? 'Dr. ' : ''}{profile?.name}</p>}
             </div>
             <div>
               <label className="text-gray-400 text-xs mb-1 block">Role</label>
               <p className="text-teal-400 font-medium">{roleName}</p>
             </div>
-            <div>
-              <label className="text-gray-400 text-xs mb-1 block">Email</label>
-              <p className="text-white">{profile?.email}</p>
+
+            {/* Dr. prefix checkbox — culturally important for village paramedical staff */}
+            <div className="md:col-span-2">
+              <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                editing ? 'border-teal-500/40 bg-teal-500/5 hover:bg-teal-500/10' : 'border-zinc-800 bg-black/40 cursor-not-allowed opacity-80'
+              }`}>
+                <input
+                  type="checkbox"
+                  disabled={!editing}
+                  checked={form.useDrPrefix}
+                  onChange={e => setForm({ ...form, useDrPrefix: e.target.checked })}
+                  className="mt-1 w-4 h-4 accent-teal-500 cursor-pointer"
+                />
+                <div>
+                  <p className="text-white text-sm font-medium">Display "Dr." before my name</p>
+                  <p className="text-gray-500 text-xs mt-0.5">Some healthcare professionals (e.g. RMPs, village practitioners) traditionally use the "Dr." prefix. Tick this box if you wish to display it on your profile, mini-website and bookings.</p>
+                </div>
+              </label>
             </div>
+
             <div>
               <label className="text-gray-400 text-xs mb-1 block">Phone</label>
               {editing ? <Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className="bg-black border-zinc-800 text-white" />
@@ -917,7 +1115,130 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
                 className="w-full bg-black border border-zinc-800 text-white rounded-lg p-3 min-h-[80px] focus:border-teal-500 focus:outline-none" placeholder="Tell patients about your services..." />
                 : <p className="text-white text-sm">{profile?.bio || 'No bio added yet.'}</p>}
             </div>
+
+            {/* Service Badges (max 4) — shown on Mini Website */}
+            <div className="md:col-span-2 pt-2 border-t border-zinc-800">
+              <label className="text-white text-sm font-medium mb-1 block">Service Badges (Max 4)</label>
+              <p className="text-xs text-gray-500 mb-3">
+                Highlight services you provide (e.g., "ECG", "Wound Dressing", "BP Check"). These badges appear on your public mini-website.
+              </p>
+
+              {/* Badge status text */}
+              <div className="mb-3">
+                <label className="text-gray-400 text-xs mb-1 block">Service Status Text</label>
+                {editing ? (
+                  <Input
+                    value={form.serviceBadgesLabel}
+                    onChange={e => setForm({ ...form, serviceBadgesLabel: e.target.value })}
+                    placeholder="e.g., Done Here, Available"
+                    maxLength={50}
+                    className="bg-black border-zinc-800 text-white"
+                  />
+                ) : (
+                  <p className="text-white text-sm">{profile?.serviceBadgesLabel || 'Done Here'}</p>
+                )}
+                <p className="text-[10px] text-gray-600 mt-1">This text will appear once below all service badges</p>
+              </div>
+
+              {/* Add new badge input */}
+              {editing && form.serviceBadges.length < 4 && (
+                <div className="mb-3">
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Input
+                      value={newBadge}
+                      onChange={e => setNewBadge(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addBadge(); } }}
+                      placeholder="Type a badge name (e.g., ECG, Wound Dressing)"
+                      className="flex-1 min-w-0 bg-black border-zinc-800 text-white"
+                    />
+                    <Button
+                      type="button"
+                      onClick={addBadge}
+                      disabled={!newBadge.trim()}
+                      className="bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed shrink-0 sm:w-auto w-full px-6 gap-2"
+                    >
+                      <Plus className="w-4 h-4" /> Add Badge
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-gray-600 mt-1.5">
+                    Press <kbd className="px-1 py-0.5 bg-zinc-800 rounded text-gray-400">Enter</kbd> or click <span className="text-teal-400">Add Badge</span> to add. You can add up to 4 badges.
+                  </p>
+                </div>
+              )}
+
+              {/* Display badges */}
+              {(editing ? form.serviceBadges : profile?.serviceBadges || []).length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {(editing ? form.serviceBadges : profile?.serviceBadges || []).map((badge, idx) => (
+                    <div
+                      key={idx}
+                      className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-3 py-1.5 rounded-full text-sm flex items-center gap-2"
+                    >
+                      <span>{badge}</span>
+                      {editing && (
+                        <button onClick={() => removeBadge(idx)} className="hover:bg-white/20 rounded-full p-0.5">
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                !editing && <p className="text-gray-500 text-xs italic">No service badges added yet.</p>
+              )}
+
+              {editing && form.serviceBadges.length >= 4 && (
+                <p className="text-xs text-yellow-400 mt-2">Maximum 4 service badges reached</p>
+              )}
+            </div>
           </div>
+
+          {/* Save / Cancel buttons — inside the Profile Details card */}
+          {editing && (
+            <div
+              className="mt-6 pt-5 border-t border-zinc-800"
+              style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12 }}
+            >
+              <button
+                type="button"
+                onClick={() => setEditing(false)}
+                style={{
+                  height: 48,
+                  backgroundColor: 'transparent',
+                  border: '1px solid #3f3f46',
+                  color: '#fff',
+                  borderRadius: 8,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                style={{
+                  height: 48,
+                  backgroundColor: saving ? '#047857' : '#10b981',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: 8,
+                  fontSize: 16,
+                  fontWeight: 700,
+                  cursor: saving ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)'
+                }}
+              >
+                {saving ? '⏳ Saving...' : '✓ SAVE CHANGES'}
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
@@ -945,7 +1266,116 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
     const posterCanvasRef = useRef<HTMLCanvasElement>(null);
     const [posterDataUrl, setPosterDataUrl] = useState<string>('');
     const bookingUrl = `https://healqr.com/para/${profile?.profileSlug || paraId}`;
-    const ivrCode = profile?.ivrCode || '';
+    // Phone Booking Code = the HQR number itself (unified IVR)
+    const phoneCode = profile?.qrNumber || '';
+
+    // ----- Customizable simple QR (no poster framing) -----
+    const [qrSize, setQrSize] = useState(300);
+    const [qrColor, setQrColor] = useState('#000000');
+    const qrBackgroundColor = '#ffffff';
+    const [qrUrl, setQrUrl] = useState(bookingUrl);
+    const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
+
+    useEffect(() => { setQrUrl(bookingUrl); }, [bookingUrl]);
+
+    const colorPresets = [
+      { name: 'Black', value: '#000000' },
+      { name: 'Emerald', value: '#10b981' },
+      { name: 'Blue', value: '#3b82f6' },
+      { name: 'Purple', value: '#8b5cf6' },
+      { name: 'Red', value: '#ef4444' },
+    ];
+
+    const downloadSizes = [
+      { name: '1" × 1"', width: 300, height: 300, description: 'Small sticker' },
+      { name: '2" × 2"', width: 600, height: 600, description: 'Medium sticker' },
+      { name: '4" × 4"', width: 1200, height: 1200, description: 'Large sticker' },
+      { name: 'A4 Portrait', width: 2480, height: 3508, description: 'Print quality' },
+      { name: 'A4 Landscape', width: 3508, height: 2480, description: 'Print quality' },
+      { name: 'FB Post', width: 1200, height: 630, description: 'Facebook' },
+      { name: 'IG Story', width: 1080, height: 1920, description: 'Instagram' },
+      { name: 'IG Post', width: 1080, height: 1080, description: 'Instagram' },
+      { name: 'LinkedIn', width: 1200, height: 627, description: 'LinkedIn' },
+      { name: 'Poster', width: 1500, height: 2100, description: 'Large print' },
+    ];
+
+    // Generate simple customizable QR (size + color reactive)
+    useEffect(() => {
+      const gen = async () => {
+        try {
+          const qrCanvas = document.createElement('canvas');
+          await QRCodeLib.toCanvas(qrCanvas, qrUrl, {
+            width: qrSize,
+            margin: 2,
+            errorCorrectionLevel: 'H',
+            color: { dark: qrColor, light: qrBackgroundColor },
+          });
+          // Logo overlay
+          const ctx = qrCanvas.getContext('2d');
+          if (ctx) {
+            try {
+              const logo = new Image();
+              logo.crossOrigin = 'anonymous';
+              logo.src = '/icon-192.png';
+              await new Promise<void>((resolve, reject) => {
+                logo.onload = () => resolve();
+                logo.onerror = () => reject();
+              });
+              const logoSize = qrSize * 0.22;
+              const logoX = (qrSize - logoSize) / 2;
+              const logoY = (qrSize - logoSize) / 2;
+              ctx.fillStyle = qrBackgroundColor;
+              ctx.beginPath();
+              ctx.arc(qrSize / 2, qrSize / 2, logoSize / 2 + 4, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.drawImage(logo, logoX, logoY, logoSize, logoSize);
+            } catch {}
+          }
+          setQrCodeDataUrl(qrCanvas.toDataURL('image/png'));
+        } catch (err) { console.error('QR gen failed', err); }
+      };
+      gen();
+    }, [qrUrl, qrSize, qrColor]);
+
+    const handleDownloadQR = () => {
+      if (!qrCodeDataUrl) return;
+      const a = document.createElement('a');
+      a.download = `QR-${(profile?.name || 'paramedical').replace(/\s+/g, '-')}.png`;
+      a.href = qrCodeDataUrl;
+      a.click();
+    };
+
+    // Render the styled poster onto a canvas at custom size and download
+    const handleDownloadWithSize = async (size: { name: string; width: number; height: number }) => {
+      if (!posterDataUrl) { toast.error('Poster not ready, try again in a moment'); return; }
+      const img = new Image();
+      img.src = posterDataUrl;
+      await new Promise<void>((resolve) => { img.onload = () => resolve(); });
+      const canvas = document.createElement('canvas');
+      canvas.width = size.width;
+      canvas.height = size.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      // White background fill
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, size.width, size.height);
+      // Aspect-fit poster into target size
+      const posterAspect = img.width / img.height;
+      const targetAspect = size.width / size.height;
+      let drawW = size.width, drawH = size.height, dx = 0, dy = 0;
+      if (posterAspect > targetAspect) {
+        drawH = size.width / posterAspect;
+        dy = (size.height - drawH) / 2;
+      } else {
+        drawW = size.height * posterAspect;
+        dx = (size.width - drawW) / 2;
+      }
+      ctx.drawImage(img, dx, dy, drawW, drawH);
+      const a = document.createElement('a');
+      a.download = `HealQR-${size.name.replace(/[^a-z0-9]/gi, '-')}-${profile?.qrNumber || 'paramedical'}.png`;
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+    };
 
     const handleSaveSlug = async () => {
       if (!slugInput.trim() || !paraId) return;
@@ -1031,10 +1461,11 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
           console.warn('[Paramedical QR] Logo overlay skipped:', e);
         }
 
-        // IVR pill below QR
-        if (ivrCode) {
+        // Phone Booking Code pill below QR (the HQR number IS the IVR code)
+        const phoneCode = profile?.qrNumber || '';
+        if (phoneCode) {
           const pillY = qrY + qrSize + 18;
-          const codeText = `\u{1F4DE} IVR Code: ${ivrCode}`;
+          const codeText = `\u{1F4DE} ${phoneCode}`;
           ctx.font = 'bold 22px system-ui, -apple-system, sans-serif';
           const textW = ctx.measureText(codeText).width;
           const pillW = textW + 40;
@@ -1051,7 +1482,7 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
         }
 
         // Name (clear gap below pill — pill bottom ≈ qrY+qrSize+56)
-        const nameY = ivrCode ? qrY + qrSize + 110 : qrY + qrSize + 40;
+        const nameY = phoneCode ? qrY + qrSize + 110 : qrY + qrSize + 40;
         ctx.fillStyle = '#1f2937';
         ctx.font = 'bold 30px system-ui, sans-serif';
         ctx.textAlign = 'center';
@@ -1078,12 +1509,12 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
         ctx.lineTo(W * 0.8, nameY + 85);
         ctx.stroke();
 
-        // IVR call-out for non-smartphone users
-        if (ivrCode) {
+        // Phone-booking call-out for non-smartphone users
+        if (phoneCode) {
           ctx.fillStyle = '#6b7280';
           ctx.font = '14px system-ui, sans-serif';
           ctx.fillText('No smartphone? Call 1800-XXX-XXXX', W / 2, nameY + 110);
-          ctx.fillText(`and enter code: ${ivrCode}`, W / 2, nameY + 130);
+          ctx.fillText(`and enter code: ${phoneCode}`, W / 2, nameY + 130);
         }
 
         // HealQR brand
@@ -1095,7 +1526,7 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
       };
       generate();
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [bookingUrl, ivrCode, profile?.name, profile?.qrNumber]);
+    }, [bookingUrl, phoneCode, profile?.name, profile?.qrNumber]);
 
     const downloadPoster = () => {
       if (!posterDataUrl) return;
@@ -1111,60 +1542,159 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
     };
 
     return (
-      <div className="space-y-6">
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-          <h3 className="text-white font-semibold mb-6">Your QR Code</h3>
-          <div className="flex flex-col md:flex-row gap-6 items-center md:items-start">
-            <div ref={canvasRef} className="bg-white p-3 rounded-2xl">
-              {posterDataUrl ? (
-                <img src={posterDataUrl} alt="HealQR poster" className="w-[260px] h-auto rounded-lg" />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* ============ LEFT COLUMN ============ */}
+        <div className="space-y-6">
+          {/* Live Preview */}
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+            <h2 className="text-emerald-400 mb-6 font-semibold text-lg">Live Preview</h2>
+            <div className="bg-white rounded-lg p-8 flex flex-col items-center justify-center min-h-[400px]">
+              {qrCodeDataUrl ? (
+                <>
+                  <img src={qrCodeDataUrl} alt="QR Code" className="max-w-full h-auto" />
+                  {profile?.qrNumber && (
+                    <div className="mt-4 flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-5 py-2">
+                      <Phone className="w-4 h-4 text-emerald-500" />
+                      <span className="text-sm font-bold text-emerald-600 tracking-wider">{profile.qrNumber}</span>
+                    </div>
+                  )}
+                </>
               ) : (
-                <div className="w-[260px] aspect-[600/850] flex items-center justify-center text-gray-400 text-xs">
-                  Generating…
-                </div>
+                <p className="text-gray-500">Generating QR code...</p>
               )}
             </div>
-            <div className="flex-1 space-y-4 text-center md:text-left">
-              <div>
-                <p className="text-gray-400 text-xs mb-1">QR Number</p>
-                <p className="text-white font-mono text-2xl font-bold">{profile?.qrNumber || 'Not assigned'}</p>
-              </div>
-              {ivrCode && (
-                <div>
-                  <p className="text-gray-400 text-xs mb-1">IVR Code (for non-smartphone users)</p>
-                  <p className="text-emerald-400 font-mono text-xl font-bold tracking-wider">{ivrCode}</p>
-                </div>
-              )}
-              <div>
-                <p className="text-gray-400 text-xs mb-1">Booking URL</p>
-                <div className="flex items-center gap-2">
-                  <code className="text-teal-400 text-sm bg-black px-3 py-1.5 rounded-lg border border-zinc-800 flex-1 truncate">{bookingUrl}</code>
-                  <Button size="sm" variant="outline" onClick={copyUrl} className="border-zinc-700"><Copy className="w-4 h-4" /></Button>
-                </div>
-              </div>
-              <div className="flex gap-2 flex-wrap">
-                <Button onClick={downloadPoster} disabled={!posterDataUrl} className="bg-teal-600 hover:bg-teal-700">
-                  <Download className="w-4 h-4 mr-2" /> Download QR Poster
-                </Button>
-              </div>
+            <div className="mt-6">
+              <Button onClick={handleDownloadQR} className="w-full bg-emerald-500 hover:bg-emerald-600 h-12 flex items-center justify-center gap-2">
+                <Download className="w-5 h-5" /> Download QR Only
+              </Button>
+            </div>
+          </div>
+
+          {/* Download Professional Template */}
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+            <h3 className="text-emerald-400 mb-6 flex items-center gap-2 font-semibold">
+              <Download className="w-5 h-5" /> Download Professional Template
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              {downloadSizes.map((size) => (
+                <button
+                  key={size.name}
+                  onClick={() => handleDownloadWithSize(size)}
+                  className="h-auto py-3 px-4 flex flex-col items-start text-left bg-transparent border border-zinc-700 hover:border-emerald-500 hover:bg-emerald-500/10 rounded-lg transition-colors"
+                >
+                  <span className="text-emerald-400 text-sm font-medium">{size.name}</span>
+                  <span className="text-xs text-gray-400">{size.description}</span>
+                </button>
+              ))}
             </div>
           </div>
           <canvas ref={posterCanvasRef} style={{ display: 'none' }} />
         </div>
 
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-          <h3 className="text-white font-semibold mb-4">Custom Profile URL</h3>
-          <div className="flex gap-2">
-            <div className="flex items-center bg-black border border-zinc-800 rounded-lg px-3">
-              <span className="text-gray-500 text-sm">healqr.com/para/</span>
+        {/* ============ RIGHT COLUMN ============ */}
+        <div className="space-y-6">
+          {/* Personal URL */}
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+            <p className="mb-4 block text-gray-400 text-sm">Your Personal URL</p>
+            <div className="bg-black border border-emerald-500/30 rounded-lg p-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-emerald-400 break-all flex-1 text-sm">{bookingUrl}</p>
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="icon" onClick={copyUrl} className="text-emerald-400 hover:bg-emerald-500/10">
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => window.open(bookingUrl, '_blank')} className="text-emerald-400 hover:bg-emerald-500/10">
+                    <Share2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
             </div>
-            <Input value={slugInput} onChange={e => setSlugInput(e.target.value)}
-              className="bg-black border-zinc-800 text-white flex-1" placeholder="your-name" />
-            <Button onClick={handleSaveSlug} disabled={savingSlug} className="bg-teal-600 hover:bg-teal-700">
-              {savingSlug ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
-            </Button>
           </div>
-          <p className="text-gray-500 text-xs mt-2">Lowercase letters, numbers, and hyphens only.</p>
+
+          {/* Custom URL */}
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+            <h3 className="text-emerald-400 mb-4 flex items-center gap-2 font-semibold">
+              <Sparkles className="w-5 h-5" /> {profile?.profileSlug ? 'Your Custom URL' : 'Claim Your Custom URL'}
+            </h3>
+            <p className="text-gray-400 text-sm mb-3">Get a clean, shareable URL instead of a long ID link.</p>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-gray-500 text-sm whitespace-nowrap">healqr.com/para/</span>
+              <Input
+                value={slugInput}
+                onChange={e => setSlugInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                placeholder="your-name"
+                className="bg-black border-zinc-700 text-white h-9 text-sm"
+                maxLength={50}
+              />
+            </div>
+            <div className="flex gap-2 mt-3">
+              <Button onClick={handleSaveSlug} disabled={savingSlug || !slugInput.trim()} className="bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 h-9 text-sm">
+                {savingSlug ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save URL'}
+              </Button>
+            </div>
+            <p className="text-gray-500 text-xs mt-2">Lowercase letters, numbers, and hyphens only.</p>
+          </div>
+
+          {/* Customize QR */}
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+            <h3 className="text-emerald-400 mb-6 flex items-center gap-2 font-semibold">
+              <Sparkles className="w-5 h-5" /> Customize QR Code
+            </h3>
+            <div className="space-y-6">
+              <div>
+                <label className="mb-3 block text-sm text-white">QR Code Size: {qrSize}px</label>
+                <input
+                  type="range"
+                  min={200}
+                  max={600}
+                  step={50}
+                  value={qrSize}
+                  onChange={e => setQrSize(Number(e.target.value))}
+                  className="w-full accent-emerald-500"
+                />
+                <div className="flex justify-between mt-2">
+                  <span className="text-xs text-gray-500">200px</span>
+                  <span className="text-xs text-gray-500">600px</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-3 block text-sm text-white">QR Code Color</label>
+                <div className="flex gap-2 mb-3">
+                  {colorPresets.map(p => (
+                    <button
+                      key={p.value}
+                      onClick={() => setQrColor(p.value)}
+                      title={p.name}
+                      className={`w-12 h-12 rounded-lg border-2 transition-all ${qrColor === p.value ? 'border-emerald-500 scale-110' : 'border-zinc-700 hover:border-zinc-600'}`}
+                      style={{ backgroundColor: p.value }}
+                    />
+                  ))}
+                </div>
+                <div className="flex gap-2 items-center">
+                  <Input type="color" value={qrColor} onChange={e => setQrColor(e.target.value)} className="w-20 h-12 cursor-pointer bg-black border-zinc-800" />
+                  <Input type="text" value={qrColor} onChange={e => setQrColor(e.target.value)} placeholder="#000000" className="flex-1 bg-black border-zinc-800 text-white h-12 rounded-lg" />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm text-white">QR Code URL</label>
+                <Input type="text" value={qrUrl} onChange={e => setQrUrl(e.target.value)} placeholder="https://healqr.com/para/..." className="bg-black border-zinc-800 text-white h-12 rounded-lg" />
+              </div>
+            </div>
+          </div>
+
+          {/* Professional Design info */}
+          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-6">
+            <h3 className="text-emerald-400 mb-3 font-semibold">Professional Design</h3>
+            <ul className="text-gray-300 text-sm space-y-2">
+              <li>• Teal-green header with HealQR branding</li>
+              <li>• Large centered QR code with logo overlay</li>
+              <li>• Phone Booking Code (HQR number) for non-smartphone users</li>
+              <li>• Your name, role and QR number displayed clearly</li>
+              <li>• Perfect for clinic walls, business cards, posters</li>
+            </ul>
+          </div>
         </div>
       </div>
     );
@@ -1172,89 +1702,1095 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
 
   // ===== SCHEDULE MAKER =====
   const ScheduleMaker = () => {
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const ALL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const [currentTab, setCurrentTab] = useState<'clinics' | 'schedules' | 'vcTime'>('clinics');
     const [schedules, setSchedules] = useState<ScheduleSlot[]>(profile?.schedules || []);
+
+    // ==== My Clinics state ====
+    const [manualClinics, setManualClinics] = useState<ManualClinic[]>(profile?.manualClinics || []);
+    const [selfRestrictedClinics, setSelfRestrictedClinics] = useState<string[]>(profile?.selfRestrictedClinics || []);
+    const [allowMR, setAllowMR] = useState<boolean>(profile?.allowMR ?? true);
+    const [clinicFormName, setClinicFormName] = useState('');
+    const [clinicFormPhone, setClinicFormPhone] = useState('');
+    const [clinicFormCode, setClinicFormCode] = useState('');
+    const [clinicFormAddress, setClinicFormAddress] = useState('');
+    const [editingClinicId, setEditingClinicId] = useState<string | null>(null);
+    const [loadingClinic, setLoadingClinic] = useState(false);
+    const [matchedClinicId, setMatchedClinicId] = useState<string | null>(null);
+    const [savingClinic, setSavingClinic] = useState(false);
+
+    const resetClinicForm = () => {
+      setEditingClinicId(null);
+      setClinicFormName('');
+      setClinicFormPhone('');
+      setClinicFormCode('');
+      setClinicFormAddress('');
+      setMatchedClinicId(null);
+    };
+
+    // Verify clinic code — looks up clinic doc and pre-fills form
+    const handleVerifyClinicFormCode = async () => {
+      const code = clinicFormCode.trim().toUpperCase();
+      if (!code) { toast.error('Please enter a clinic code first'); return; }
+      setLoadingClinic(true);
+      try {
+        // Try direct document by ID (some clinic codes == doc ID)
+        let clinicData: any = null;
+        let clinicDocId: string | null = null;
+        const byIdSnap = await getDoc(doc(db, 'clinics', code));
+        if (byIdSnap.exists()) {
+          clinicData = byIdSnap.data();
+          clinicDocId = byIdSnap.id;
+        } else {
+          // Query by clinicCode field
+          const q = query(collection(db, 'clinics'), where('clinicCode', '==', code));
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            clinicData = snap.docs[0].data();
+            clinicDocId = snap.docs[0].id;
+          }
+        }
+        if (!clinicData || !clinicDocId) {
+          toast.error('Clinic code not found');
+          setMatchedClinicId(null);
+          return;
+        }
+        setClinicFormName(clinicData.name || clinicData.clinicName || '');
+        setClinicFormPhone(clinicData.phone || clinicData.clinicPhone || '');
+        setClinicFormAddress(clinicData.address || clinicData.clinicAddress || '');
+        setMatchedClinicId(clinicDocId);
+        toast.success('Clinic linked!', { description: `Connected to ${clinicData.name || clinicData.clinicName}. Click ADD CLINIC to save.` });
+      } catch (err: any) {
+        toast.error(err.message || 'Failed to verify code');
+      } finally { setLoadingClinic(false); }
+    };
+
+    const handleSaveManualClinic = async () => {
+      if (!clinicFormName.trim() || !clinicFormAddress.trim()) {
+        toast.error('Clinic name and address are required');
+        return;
+      }
+      if (!paraId) return;
+      setSavingClinic(true);
+      try {
+        const targetCode = clinicFormCode.trim().toUpperCase() || undefined;
+        let updated: ManualClinic[];
+        if (editingClinicId) {
+          updated = manualClinics.map(c => c.id === editingClinicId ? {
+            ...c,
+            name: clinicFormName.trim(),
+            phone: clinicFormPhone.trim(),
+            address: clinicFormAddress.trim(),
+            clinicCode: targetCode,
+          } : c);
+          toast.success('Clinic updated');
+        } else {
+          // Dedupe by (id + code)
+          const newId = matchedClinicId || `manual_${Date.now()}`;
+          const dup = manualClinics.some(c => c.id === newId && c.clinicCode === targetCode);
+          if (dup) {
+            toast.error('This clinic is already added');
+            setSavingClinic(false);
+            return;
+          }
+          const entry: ManualClinic = {
+            id: newId,
+            name: clinicFormName.trim(),
+            address: clinicFormAddress.trim(),
+            phone: clinicFormPhone.trim(),
+            clinicCode: targetCode,
+            createdAt: Date.now(),
+          };
+          updated = [...manualClinics, entry];
+          toast.success('Clinic added');
+        }
+        setManualClinics(updated);
+        await updateDoc(doc(db, 'paramedicals', paraId), { manualClinics: updated, updatedAt: serverTimestamp() });
+        setProfile(prev => prev ? { ...prev, manualClinics: updated } : prev);
+
+        // Bidirectional link with clinic doc
+        if (matchedClinicId && !editingClinicId) {
+          try {
+            const clinicRef = doc(db, 'clinics', matchedClinicId);
+            const clinicSnap = await getDoc(clinicRef);
+            const linkedParamedical = {
+              paramedicalId: paraId,
+              name: profile?.name || '',
+              role: profile?.role || '',
+              phone: profile?.phone || '',
+              qrNumber: profile?.qrNumber || '',
+              profileSlug: profile?.profileSlug || '',
+              linkedAt: Date.now(),
+            };
+            if (clinicSnap.exists()) {
+              const existing = clinicSnap.data().linkedParamedicalsDetails || [];
+              const already = existing.some((p: any) => p.paramedicalId === paraId);
+              if (!already) {
+                await updateDoc(clinicRef, { linkedParamedicalsDetails: [...existing, linkedParamedical] });
+              }
+            } else {
+              await setDoc(clinicRef, { linkedParamedicalsDetails: [linkedParamedical] }, { merge: true });
+            }
+          } catch (linkErr) {
+            console.error('Bidirectional link failed:', linkErr);
+          }
+        }
+        resetClinicForm();
+      } catch (err: any) {
+        toast.error(err.message || 'Failed to save');
+      } finally { setSavingClinic(false); }
+    };
+
+    const handleEditManualClinic = (c: ManualClinic) => {
+      setEditingClinicId(c.id);
+      setClinicFormName(c.name);
+      setClinicFormPhone(c.phone || '');
+      setClinicFormCode(c.clinicCode || '');
+      setClinicFormAddress(c.address);
+      setMatchedClinicId(c.clinicCode ? c.id : null);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const handleDeleteManualClinic = async (clinicId: string) => {
+      if (!paraId) return;
+      if (!window.confirm('Remove this clinic from your list?')) return;
+      const deleted = manualClinics.find(c => c.id === clinicId);
+      const updated = manualClinics.filter(c => c.id !== clinicId);
+      setManualClinics(updated);
+      try {
+        await updateDoc(doc(db, 'paramedicals', paraId), { manualClinics: updated, updatedAt: serverTimestamp() });
+        setProfile(prev => prev ? { ...prev, manualClinics: updated } : prev);
+        // Unlink from clinic doc
+        if (deleted?.clinicCode && deleted.id) {
+          try {
+            const clinicRef = doc(db, 'clinics', deleted.id);
+            const clinicSnap = await getDoc(clinicRef);
+            if (clinicSnap.exists()) {
+              const existing = clinicSnap.data().linkedParamedicalsDetails || [];
+              const next = existing.filter((p: any) => p.paramedicalId !== paraId);
+              if (next.length !== existing.length) {
+                await updateDoc(clinicRef, { linkedParamedicalsDetails: next });
+              }
+            }
+          } catch (e) { console.error('Unlink failed:', e); }
+        }
+        toast.success('Clinic removed');
+      } catch (err: any) { toast.error(err.message); }
+    };
+
+    const handleToggleSelfRestriction = async (clinicCode: string) => {
+      if (!paraId) return;
+      const next = selfRestrictedClinics.includes(clinicCode)
+        ? selfRestrictedClinics.filter(c => c !== clinicCode)
+        : [...selfRestrictedClinics, clinicCode];
+      setSelfRestrictedClinics(next);
+      try {
+        await updateDoc(doc(db, 'paramedicals', paraId), { selfRestrictedClinics: next });
+        setProfile(prev => prev ? { ...prev, selfRestrictedClinics: next } : prev);
+      } catch (err: any) { toast.error(err.message); }
+    };
+
+    const handleToggleAllowMR = async () => {
+      if (!paraId) return;
+      const next = !allowMR;
+      setAllowMR(next);
+      try {
+        await updateDoc(doc(db, 'paramedicals', paraId), { allowMR: next });
+        setProfile(prev => prev ? { ...prev, allowMR: next } : prev);
+        toast.success(next ? 'MR visits allowed' : 'MR visits blocked');
+      } catch (err: any) { toast.error(err.message); }
+    };
     const [saving, setSaving] = useState(false);
 
-    const addSlot = () => {
-      setSchedules([...schedules, {
-        id: Date.now().toString(),
-        day: 'Monday',
-        startTime: '09:00',
-        endTime: '17:00',
-        isActive: true,
-        maxBookings: 10,
-      }]);
+    // Global Settings: Planned Off
+    const [plannedOffEnabled, setPlannedOffEnabled] = useState(profile?.plannedOff?.enabled || false);
+    const [plannedStart, setPlannedStart] = useState(profile?.plannedOff?.startDate || '');
+    const [plannedEnd, setPlannedEnd] = useState(profile?.plannedOff?.endDate || '');
+    const [savingPlanned, setSavingPlanned] = useState(false);
+
+    // Global Settings: Max Advance Days
+    const [maxAdvanceDays, setMaxAdvanceDays] = useState<string>(String(profile?.maxAdvanceDays ?? 30));
+    const [savingMaxDays, setSavingMaxDays] = useState(false);
+
+    // VC Time slots
+    const [vcTimeSlots, setVcTimeSlots] = useState<VCTimeSlot[]>(profile?.vcTimeSlots || []);
+    const [vcStart, setVcStart] = useState('');
+    const [vcEnd, setVcEnd] = useState('');
+    const [vcDays, setVcDays] = useState<string[]>([]);
+    const [savingVc, setSavingVc] = useState(false);
+
+    // ==== Doctor-style Schedule Maker state ====
+    const [smSelectedDays, setSmSelectedDays] = useState<string[]>([]);
+    const [smFrequency, setSmFrequency] = useState('Daily');
+    const [smFrequencyStartDate, setSmFrequencyStartDate] = useState('');
+    const [smCustomDate, setSmCustomDate] = useState('');
+    const [smSelectedManualClinicKey, setSmSelectedManualClinicKey] = useState<string>('none');
+    const [smChamberName, setSmChamberName] = useState('');
+    const [smChamberAddress, setSmChamberAddress] = useState('');
+    const [smClinicCode, setSmClinicCode] = useState('');
+    const [smStartTime, setSmStartTime] = useState('');
+    const [smEndTime, setSmEndTime] = useState('');
+    const [smMaxCapacity, setSmMaxCapacity] = useState<number>(10);
+    const [smMrAllowed, setSmMrAllowed] = useState(false);
+    const [smMrMaxCount, setSmMrMaxCount] = useState(1);
+    const [smMrMeetingTime, setSmMrMeetingTime] = useState('before');
+    const [smMrInterval, setSmMrInterval] = useState(1);
+    const [smEditingId, setSmEditingId] = useState<string | null>(null);
+    const [smSaving, setSmSaving] = useState(false);
+
+    const toggleSmDay = (d: string) =>
+      setSmSelectedDays(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]);
+
+    // Auto-fill chamber name/address when a manual clinic is picked
+    useEffect(() => {
+      if (smSelectedManualClinicKey === 'none') return;
+      const found = manualClinics.find(c => `${c.id}::${c.clinicCode || ''}` === smSelectedManualClinicKey);
+      if (found) {
+        setSmChamberName(found.name);
+        setSmChamberAddress(found.address);
+        setSmClinicCode(found.clinicCode || '');
+      }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [smSelectedManualClinicKey]);
+
+    const resetScheduleForm = () => {
+      setSmSelectedDays([]);
+      setSmFrequency('Daily');
+      setSmFrequencyStartDate('');
+      setSmCustomDate('');
+      setSmSelectedManualClinicKey('none');
+      setSmChamberName('');
+      setSmChamberAddress('');
+      setSmClinicCode('');
+      setSmStartTime('');
+      setSmEndTime('');
+      setSmMaxCapacity(10);
+      setSmMrAllowed(false);
+      setSmMrMaxCount(1);
+      setSmMrMeetingTime('before');
+      setSmMrInterval(1);
+      setSmEditingId(null);
     };
 
-    const updateSlot = (id: string, field: string, value: any) => {
-      setSchedules(schedules.map(s => s.id === id ? { ...s, [field]: value } : s));
-    };
-
-    const removeSlot = (id: string) => {
-      setSchedules(schedules.filter(s => s.id !== id));
-    };
-
-    const handleSave = async () => {
-      setSaving(true);
+    const handleSaveSchedule = async () => {
+      if (smFrequency !== 'Custom' && smSelectedDays.length === 0) {
+        toast.error('Please select at least one day'); return;
+      }
+      if (!smChamberName.trim() || !smChamberAddress.trim()) {
+        toast.error('Please fill chamber name and address'); return;
+      }
+      if (!smStartTime || !smEndTime) { toast.error('Please set start and end times'); return; }
+      if (!paraId) return;
+      setSmSaving(true);
       try {
-        await updateDoc(doc(db, 'paramedicals', paraId), { schedules });
-        setProfile(prev => prev ? { ...prev, schedules } : prev);
-        toast.success('Schedule saved!');
+        const payload: ScheduleSlot = {
+          id: smEditingId || Date.now().toString(),
+          day: smSelectedDays[0] || '',
+          days: smSelectedDays,
+          startTime: smStartTime,
+          endTime: smEndTime,
+          isActive: true,
+          maxBookings: smMaxCapacity,
+          frequency: smFrequency,
+          frequencyStartDate: smFrequencyStartDate || undefined,
+          customDate: smCustomDate || undefined,
+          chamberName: smChamberName.trim(),
+          chamberAddress: smChamberAddress.trim(),
+          clinicCode: smClinicCode.trim().toUpperCase() || undefined,
+          mrAllowed: smMrAllowed,
+          mrMaxCount: smMrAllowed ? smMrMaxCount : undefined,
+          mrMeetingTime: smMrAllowed ? smMrMeetingTime : undefined,
+          mrIntervalAfterPatients: smMrAllowed && smMrMeetingTime === 'interval' ? smMrInterval : undefined,
+          createdAt: Date.now(),
+        };
+        const updated = smEditingId
+          ? schedules.map(s => s.id === smEditingId ? payload : s)
+          : [...schedules, payload];
+        setSchedules(updated);
+        await updateDoc(doc(db, 'paramedicals', paraId), { schedules: updated, updatedAt: serverTimestamp() });
+        setProfile(prev => prev ? { ...prev, schedules: updated } : prev);
+        toast.success(smEditingId ? 'Schedule updated' : 'Schedule created');
+        resetScheduleForm();
+      } catch (err: any) { toast.error(err.message || 'Failed to save'); }
+      finally { setSmSaving(false); }
+    };
+
+    const handleEditSchedule = (s: ScheduleSlot) => {
+      setSmEditingId(s.id);
+      setSmSelectedDays(s.days && s.days.length ? s.days : (s.day ? [s.day] : []));
+      setSmFrequency(s.frequency || 'Daily');
+      setSmFrequencyStartDate(s.frequencyStartDate || '');
+      setSmCustomDate(s.customDate || '');
+      setSmChamberName(s.chamberName || '');
+      setSmChamberAddress(s.chamberAddress || '');
+      setSmClinicCode(s.clinicCode || '');
+      setSmStartTime(s.startTime);
+      setSmEndTime(s.endTime);
+      setSmMaxCapacity(s.maxBookings || 10);
+      setSmMrAllowed(!!s.mrAllowed);
+      setSmMrMaxCount(s.mrMaxCount || 1);
+      setSmMrMeetingTime(s.mrMeetingTime || 'before');
+      setSmMrInterval(s.mrIntervalAfterPatients || 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const handleDeleteSchedule = async (id: string) => {
+      if (!paraId) return;
+      if (!window.confirm('Delete this schedule?')) return;
+      const updated = schedules.filter(s => s.id !== id);
+      setSchedules(updated);
+      try {
+        await updateDoc(doc(db, 'paramedicals', paraId), { schedules: updated, updatedAt: serverTimestamp() });
+        setProfile(prev => prev ? { ...prev, schedules: updated } : prev);
+        toast.success('Schedule deleted');
       } catch (err: any) { toast.error(err.message); }
-      finally { setSaving(false); }
+    };
+
+    const handleToggleScheduleActive = async (id: string) => {
+      if (!paraId) return;
+      const updated = schedules.map(s => s.id === id ? { ...s, isActive: !s.isActive } : s);
+      setSchedules(updated);
+      try {
+        await updateDoc(doc(db, 'paramedicals', paraId), { schedules: updated });
+        setProfile(prev => prev ? { ...prev, schedules: updated } : prev);
+      } catch (err: any) { toast.error(err.message); }
+    };
+
+    // ---- Planned Off save ----
+    const handleSavePlanned = async () => {
+      if (plannedOffEnabled && (!plannedStart || !plannedEnd)) {
+        toast.error('Please select start and end dates');
+        return;
+      }
+      setSavingPlanned(true);
+      try {
+        const payload = { enabled: plannedOffEnabled, startDate: plannedStart, endDate: plannedEnd };
+        await updateDoc(doc(db, 'paramedicals', paraId), { plannedOff: payload });
+        setProfile(prev => prev ? { ...prev, plannedOff: payload } : prev);
+        toast.success('Planned off updated');
+      } catch (err: any) { toast.error(err.message); }
+      finally { setSavingPlanned(false); }
+    };
+
+    // ---- Max Advance Days save ----
+    const handleSaveMaxDays = async () => {
+      const val = parseInt(maxAdvanceDays);
+      if (isNaN(val) || val < 1 || val > 365) {
+        toast.error('Enter a value between 1 and 365');
+        return;
+      }
+      setSavingMaxDays(true);
+      try {
+        await updateDoc(doc(db, 'paramedicals', paraId), { maxAdvanceDays: val });
+        setProfile(prev => prev ? { ...prev, maxAdvanceDays: val } : prev);
+        toast.success('Advance booking limit updated');
+      } catch (err: any) { toast.error(err.message); }
+      finally { setSavingMaxDays(false); }
+    };
+
+    // ---- VC Time handlers ----
+    const toggleVcDay = (d: string) => setVcDays(vcDays.includes(d) ? vcDays.filter(x => x !== d) : [...vcDays, d]);
+
+    const addVcSlot = async () => {
+      if (!vcStart || !vcEnd || vcDays.length === 0) { toast.error('Fill all fields'); return; }
+      const next = [...vcTimeSlots, { id: Date.now(), startTime: vcStart, endTime: vcEnd, days: vcDays, isActive: true }];
+      setVcTimeSlots(next);
+      setVcStart(''); setVcEnd(''); setVcDays([]);
+      setSavingVc(true);
+      try {
+        await updateDoc(doc(db, 'paramedicals', paraId), { vcTimeSlots: next });
+        setProfile(prev => prev ? { ...prev, vcTimeSlots: next } : prev);
+        toast.success('VC slot added');
+      } catch (err: any) { toast.error(err.message); }
+      finally { setSavingVc(false); }
+    };
+
+    const removeVcSlot = async (id: number) => {
+      const next = vcTimeSlots.filter(s => s.id !== id);
+      setVcTimeSlots(next);
+      try {
+        await updateDoc(doc(db, 'paramedicals', paraId), { vcTimeSlots: next });
+        setProfile(prev => prev ? { ...prev, vcTimeSlots: next } : prev);
+        toast.success('Removed');
+      } catch (err: any) { toast.error(err.message); }
+    };
+
+    const toggleVcSlotActive = async (id: number) => {
+      const next = vcTimeSlots.map(s => s.id === id ? { ...s, isActive: !s.isActive } : s);
+      setVcTimeSlots(next);
+      try {
+        await updateDoc(doc(db, 'paramedicals', paraId), { vcTimeSlots: next });
+        setProfile(prev => prev ? { ...prev, vcTimeSlots: next } : prev);
+      } catch (err: any) { toast.error(err.message); }
     };
 
     return (
       <div className="space-y-6">
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-white font-semibold">Weekly Schedule</h3>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={addSlot} className="border-zinc-700 text-white">
-                <Plus className="w-4 h-4 mr-1" /> Add Slot
-              </Button>
-              <Button size="sm" onClick={handleSave} disabled={saving} className="bg-teal-600 hover:bg-teal-700">
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Save className="w-4 h-4 mr-1" /> Save</>}
-              </Button>
+        {/* Tab bar */}
+        <div>
+          <h1 className="text-white text-xl font-semibold">Schedule Manager</h1>
+          <p className="text-gray-400 text-sm mt-1">Manage your practice schedules and availability</p>
+        </div>
+        <div className="flex items-center gap-6 border-b border-zinc-800">
+          <button
+            onClick={() => setCurrentTab('clinics')}
+            className={`pb-3 px-2 text-sm font-medium transition-colors relative ${currentTab === 'clinics' ? 'text-emerald-400' : 'text-gray-400 hover:text-gray-300'}`}
+          >
+            My Clinics
+            {currentTab === 'clinics' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 rounded-t-full" />}
+          </button>
+          <button
+            onClick={() => setCurrentTab('schedules')}
+            className={`pb-3 px-2 text-sm font-medium transition-colors relative ${currentTab === 'schedules' ? 'text-emerald-400' : 'text-gray-400 hover:text-gray-300'}`}
+          >
+            Schedule Manager
+            {currentTab === 'schedules' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 rounded-t-full" />}
+          </button>
+          <button
+            onClick={() => setCurrentTab('vcTime')}
+            className={`pb-3 px-2 text-sm font-medium transition-colors relative ${currentTab === 'vcTime' ? 'text-emerald-400' : 'text-gray-400 hover:text-gray-300'}`}
+          >
+            VC Time
+            {currentTab === 'vcTime' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 rounded-t-full" />}
+          </button>
+        </div>
+
+        {currentTab === 'clinics' && (
+          <div className="space-y-8">
+            {/* Manage Clinics form */}
+            <div>
+              <h2 className="text-white font-semibold mb-1">Manage Clinics</h2>
+              <p className="text-gray-400 text-sm mb-6">Add and manage clinics where you practice</p>
+
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-gray-300 text-sm mb-2 block">Clinic Name</label>
+                    <Input value={clinicFormName} onChange={e => setClinicFormName(e.target.value)} placeholder="e.g. City Health Center" className="bg-black border-zinc-700 text-white" />
+                  </div>
+                  <div>
+                    <label className="text-gray-300 text-sm mb-2 block">Clinic Phone</label>
+                    <Input value={clinicFormPhone} onChange={e => setClinicFormPhone(e.target.value)} placeholder="+91 98765 43210" className="bg-black border-zinc-700 text-white" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-gray-300 text-sm mb-2 block">Clinic Code <span className="text-gray-500 text-xs">(Optional)</span></label>
+                    <div className="flex gap-2">
+                      <Input value={clinicFormCode} onChange={e => setClinicFormCode(e.target.value.toUpperCase())}
+                        placeholder="HQR-XXXXXX-XXXX-CLN" className="bg-black border-zinc-700 text-white font-mono flex-1" />
+                      <Button type="button" onClick={handleVerifyClinicFormCode} disabled={loadingClinic || !clinicFormCode.trim()}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-4">
+                        {loadingClinic ? <Loader2 className="w-4 h-4 animate-spin" /> : 'LINK'}
+                      </Button>
+                    </div>
+                    <p className="text-[10px] text-gray-500 italic mt-1">Linking a code enables dual bookings via Paramedical & Clinic QR codes.</p>
+                  </div>
+                  <div>
+                    <label className="text-gray-300 text-sm mb-2 block">Address</label>
+                    <Input value={clinicFormAddress} onChange={e => setClinicFormAddress(e.target.value)} placeholder="Full address of the clinic" className="bg-black border-zinc-700 text-white" />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  {editingClinicId && (
+                    <Button onClick={resetClinicForm} variant="outline" className="border-zinc-700 text-white">CANCEL</Button>
+                  )}
+                  <Button onClick={handleSaveManualClinic} disabled={savingClinic} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                    {savingClinic ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+                    {editingClinicId ? 'UPDATE CLINIC' : 'ADD CLINIC'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* MR Access */}
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex-1 min-w-[220px]">
+                  <h3 className="text-white font-semibold">Medical Representative (MR) Access</h3>
+                  <p className="text-gray-400 text-sm mt-1">
+                    Allow Medical Representatives from pharmaceutical companies to schedule visits with you.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleToggleAllowMR}
+                  className={`w-12 h-7 rounded-full relative transition-colors ${allowMR ? 'bg-emerald-500' : 'bg-zinc-700'}`}
+                >
+                  <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full transition-transform ${allowMR ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                </button>
+              </div>
+              <p className={`text-xs mt-3 ${allowMR ? 'text-emerald-400' : 'text-red-400'}`}>
+                {allowMR ? '✅ MRs can send you visit requests' : '🔒 MR visit requests are blocked'}
+              </p>
+            </div>
+
+            {/* Your Clinics list */}
+            <div>
+              <h2 className="text-white font-semibold mb-4">Your Clinics</h2>
+              {manualClinics.length === 0 ? (
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-12">
+                  <div className="flex flex-col items-center justify-center text-center">
+                    <div className="w-16 h-16 mb-4 flex items-center justify-center bg-black/50 rounded-full">
+                      <Building2 className="w-8 h-8 text-gray-600" />
+                    </div>
+                    <h3 className="text-white mb-2">No Clinics Added</h3>
+                    <p className="text-gray-400 text-sm">Add your practicing clinics to start scheduling chambers there</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {manualClinics.map(clinic => (
+                    <div key={clinic.id + (clinic.clinicCode || '')} className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-4 flex-1 min-w-0">
+                          <div className="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                            <Building2 className="w-5 h-5 text-emerald-400" />
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="text-white font-medium text-base uppercase truncate">{clinic.name}</h4>
+                            <div className="flex items-center gap-2 text-gray-400 text-xs mt-1">
+                              <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+                              <span className="truncate">{clinic.address}</span>
+                            </div>
+                            {clinic.phone && (
+                              <div className="flex items-center gap-2 text-gray-400 text-xs mt-1">
+                                <Phone className="w-3.5 h-3.5" />
+                                <span>{clinic.phone}</span>
+                              </div>
+                            )}
+                            {clinic.clinicCode && (
+                              <div className="flex items-center gap-2 text-emerald-400 text-xs mt-1">
+                                <QrCode className="w-3.5 h-3.5" />
+                                <span className="font-mono">{clinic.clinicCode}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-1 flex-shrink-0">
+                          <button onClick={() => handleEditManualClinic(clinic)} className="text-gray-400 hover:text-white p-1">
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => handleDeleteManualClinic(clinic.id)} className="text-red-400 hover:text-red-300 p-1">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {clinic.clinicCode && (
+                        <div className="mt-4 pt-4 border-t border-zinc-800">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Eye className={`w-4 h-4 ${selfRestrictedClinics.includes(clinic.clinicCode) ? 'text-red-400' : 'text-emerald-400'}`} />
+                              <span className="text-xs text-gray-300">Hide my QR data from clinic</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleSelfRestriction(clinic.clinicCode!)}
+                              className={`w-10 h-5 rounded-full relative transition-colors ${selfRestrictedClinics.includes(clinic.clinicCode) ? 'bg-red-500' : 'bg-emerald-500'}`}
+                            >
+                              <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${selfRestrictedClinics.includes(clinic.clinicCode) ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                            </button>
+                          </div>
+                          <p className={`text-[10px] mt-1 ml-6 ${selfRestrictedClinics.includes(clinic.clinicCode) ? 'text-red-400' : 'text-gray-500'}`}>
+                            {selfRestrictedClinics.includes(clinic.clinicCode)
+                              ? '🔒 Clinic cannot see your QR booking patients'
+                              : '✅ Clinic can see your QR booking patients'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
+        )}
 
-          {schedules.length === 0 ? (
-            <div className="text-center py-12">
-              <Calendar className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-              <p className="text-gray-500">No schedule set. Add time slots for patients to book.</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {schedules.map(slot => (
-                <div key={slot.id} className={`bg-zinc-800/50 border rounded-lg p-4 ${slot.isActive ? 'border-zinc-700' : 'border-zinc-800 opacity-60'}`}>
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3 items-center">
-                    <select value={slot.day} onChange={e => updateSlot(slot.id, 'day', e.target.value)}
-                      className="bg-black border border-zinc-700 text-white rounded-lg px-3 py-2 text-sm" style={{ colorScheme: 'dark' }}>
-                      {days.map(d => <option key={d} value={d}>{d}</option>)}
-                    </select>
-                    <Input type="time" value={slot.startTime} onChange={e => updateSlot(slot.id, 'startTime', e.target.value)}
-                      className="bg-black border-zinc-700 text-white text-sm" />
-                    <Input type="time" value={slot.endTime} onChange={e => updateSlot(slot.id, 'endTime', e.target.value)}
-                      className="bg-black border-zinc-700 text-white text-sm" />
-                    <Input type="number" value={slot.maxBookings} onChange={e => updateSlot(slot.id, 'maxBookings', parseInt(e.target.value) || 1)}
-                      className="bg-black border-zinc-700 text-white text-sm" min={1} max={50} placeholder="Max bookings" />
-                    <div className="flex items-center gap-2 justify-end">
-                      <button onClick={() => updateSlot(slot.id, 'isActive', !slot.isActive)}
-                        className={`px-3 py-1 rounded text-xs font-medium ${slot.isActive ? 'bg-teal-500/20 text-teal-400' : 'bg-zinc-700 text-gray-400'}`}>
-                        {slot.isActive ? 'Active' : 'Off'}
+        {currentTab === 'schedules' && (
+          <>
+            {/* Global Settings */}
+            <div>
+              <h2 className="text-white font-semibold mb-1">Global Settings</h2>
+              <p className="text-gray-400 text-sm mb-6">Configure general availability and booking settings</p>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Planned Off */}
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                  <h3 className="text-white font-semibold mb-2">Planned Off</h3>
+                  <p className="text-gray-400 text-sm mb-6">
+                    When enabled, your QR code will be temporarily deactivated and patients will not be able to book. Use this for vacations or planned leaves.
+                  </p>
+
+                  <div className="space-y-4">
+                    <div className={`py-3 px-4 rounded-lg border ${plannedOffEnabled ? 'bg-red-500/10 border-red-500/20' : 'bg-emerald-500/10 border-emerald-500/20'}`}>
+                      <div className="flex items-center gap-3">
+                        <div className={`w-2 h-2 rounded-full ${plannedOffEnabled ? 'bg-red-500' : 'bg-emerald-500'}`} />
+                        <span className={`text-sm ${plannedOffEnabled ? 'text-red-400' : 'text-emerald-400'}`}>
+                          {plannedOffEnabled ? 'QR Code Inactive — Select Dates' : 'QR Code Active — Accepting Bookings'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between py-3 px-4 bg-black/40 rounded-lg">
+                      <span className="text-gray-300 text-sm">Enable Planned Off</span>
+                      <button
+                        type="button"
+                        onClick={() => setPlannedOffEnabled(!plannedOffEnabled)}
+                        className={`w-11 h-6 rounded-full transition-colors relative ${plannedOffEnabled ? 'bg-emerald-500' : 'bg-zinc-700'}`}
+                      >
+                        <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-transform ${plannedOffEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
                       </button>
-                      <button onClick={() => removeSlot(slot.id)} className="text-red-400 hover:text-red-300 p-1">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                    </div>
+
+                    {plannedOffEnabled && (
+                      <div className="bg-black/40 border border-zinc-800 rounded-lg p-4 space-y-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-gray-400 text-xs mb-1 block">Start Date</label>
+                            <Input type="date" value={plannedStart} onChange={e => setPlannedStart(e.target.value)}
+                              min={new Date(Date.now() + 86400000).toISOString().split('T')[0]}
+                              className="bg-zinc-900 border-zinc-700 text-white" />
+                          </div>
+                          <div>
+                            <label className="text-gray-400 text-xs mb-1 block">End Date</label>
+                            <Input type="date" value={plannedEnd} onChange={e => setPlannedEnd(e.target.value)}
+                              min={plannedStart || new Date(Date.now() + 86400000).toISOString().split('T')[0]}
+                              className="bg-zinc-900 border-zinc-700 text-white" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex justify-end">
+                      <Button onClick={handleSavePlanned} disabled={savingPlanned} className="bg-emerald-600 hover:bg-emerald-700">
+                        {savingPlanned ? <Loader2 className="w-4 h-4 animate-spin" /> : 'SAVE'}
+                      </Button>
                     </div>
                   </div>
                 </div>
-              ))}
+
+                {/* Max Advance Days */}
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                  <h3 className="text-white font-semibold mb-2">Maximum Advance Booking Days</h3>
+                  <p className="text-gray-400 text-sm mb-6">
+                    Set how far in advance patients can book appointments. For example, if set to 30 days, patients can only book up to 30 days from today.
+                  </p>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-gray-300 text-sm mb-2 block">Maximum Days</label>
+                      <div className="flex items-center gap-3">
+                        <Input type="number" min={1} max={365} value={maxAdvanceDays}
+                          onChange={e => setMaxAdvanceDays(e.target.value)}
+                          className="bg-black border-zinc-700 text-white flex-1" />
+                        <span className="text-gray-400 text-sm min-w-[40px]">days</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-2 py-3 px-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                      <svg className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                      <p className="text-blue-400 text-sm">
+                        Patients will see available slots only within the next {maxAdvanceDays || 0} days.
+                      </p>
+                    </div>
+
+                    <div className="flex justify-end">
+                      <Button onClick={handleSaveMaxDays} disabled={savingMaxDays} className="bg-emerald-600 hover:bg-emerald-700">
+                        {savingMaxDays ? <Loader2 className="w-4 h-4 animate-spin" /> : 'SAVE'}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-          )}
-        </div>
+
+            {/* ========== SCHEDULE MAKER (doctor-style form) ========== */}
+            <div>
+              <div className="flex items-start justify-between mb-6">
+                <h2 className="text-white font-semibold">Schedule Maker</h2>
+                <p className="text-gray-400 text-sm hidden md:block">Create new practice schedules</p>
+              </div>
+
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-6">
+                {/* Select Days */}
+                <div className="space-y-3">
+                  <label className="text-gray-300 text-sm">Select Days</label>
+                  <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+                    {ALL_DAYS.map(day => (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => toggleSmDay(day)}
+                        className={`py-3 px-2 rounded-lg text-sm transition-all ${
+                          smSelectedDays.includes(day)
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-black/50 text-gray-400 hover:bg-black hover:text-gray-300'
+                        }`}
+                      >
+                        {day.substring(0, 3)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Frequency */}
+                <div className="space-y-2">
+                  <label className="text-gray-300 text-sm">Frequency</label>
+                  <select value={smFrequency} onChange={e => setSmFrequency(e.target.value)}
+                    className="w-full bg-black/50 border border-zinc-700 text-white rounded-lg px-3 py-2 text-sm" style={{ colorScheme: 'dark' }}>
+                    <option value="Daily">Daily</option>
+                    <option value="Weekly">Weekly</option>
+                    <option value="Bi-Weekly">Bi-Weekly</option>
+                    <option value="Monthly">Monthly</option>
+                    <option value="Custom">Custom</option>
+                  </select>
+                </div>
+
+                {(smFrequency === 'Bi-Weekly' || smFrequency === 'Monthly') && (
+                  <div className="space-y-2">
+                    <label className="text-gray-300 text-sm">Start Date</label>
+                    <Input type="date" value={smFrequencyStartDate} onChange={e => setSmFrequencyStartDate(e.target.value)}
+                      className="bg-black/50 border-zinc-700 text-white" />
+                    <p className="text-blue-400 text-xs">
+                      {smFrequency === 'Bi-Weekly'
+                        ? 'The schedule will repeat every 2 weeks starting from this date.'
+                        : 'The schedule will repeat on the same day of the month from this date.'}
+                    </p>
+                  </div>
+                )}
+
+                {smFrequency === 'Custom' && (
+                  <div className="space-y-2">
+                    <label className="text-gray-300 text-sm">Select Date</label>
+                    <Input type="date" value={smCustomDate} onChange={e => setSmCustomDate(e.target.value)}
+                      className="bg-black/50 border-zinc-700 text-white" />
+                    <p className="text-blue-400 text-xs">One-time event like a medical camp or special consultation day.</p>
+                  </div>
+                )}
+
+                {/* Select Clinic */}
+                <div className="space-y-2">
+                  <label className="text-gray-300 text-sm">Select Clinic</label>
+                  <select
+                    value={smSelectedManualClinicKey}
+                    onChange={e => setSmSelectedManualClinicKey(e.target.value)}
+                    className="w-full bg-black/50 border border-zinc-700 text-white rounded-lg px-3 py-2 text-sm"
+                    style={{ colorScheme: 'dark' }}
+                  >
+                    <option value="none">None (Enter manually)</option>
+                    {manualClinics.map((c, idx) => (
+                      <option key={`${c.id}::${c.clinicCode || idx}`} value={`${c.id}::${c.clinicCode || ''}`}>
+                        {c.name} {c.clinicCode ? '(Linked)' : '(Manual)'}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-gray-500 text-xs">Select from your added clinics to auto-fill chamber details.</p>
+                </div>
+
+                {/* Chamber Name + Address */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-gray-300 text-sm">Chamber Name</label>
+                    <Input value={smChamberName} onChange={e => setSmChamberName(e.target.value)}
+                      placeholder="Enter chamber name"
+                      disabled={smSelectedManualClinicKey !== 'none'}
+                      className="bg-black/50 border-zinc-700 text-white" />
+                    {smSelectedManualClinicKey !== 'none' && (
+                      <p className="text-xs text-emerald-500">✓ Auto-filled from clinic</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-gray-300 text-sm">Chamber Address</label>
+                    <Input value={smChamberAddress} onChange={e => setSmChamberAddress(e.target.value)}
+                      placeholder="Enter chamber address"
+                      disabled={smSelectedManualClinicKey !== 'none'}
+                      className="bg-black/50 border-zinc-700 text-white" />
+                    {smSelectedManualClinicKey !== 'none' && (
+                      <p className="text-xs text-emerald-500">✓ Auto-filled from clinic</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Clinic Code (optional) */}
+                <div className="space-y-2">
+                  <label className="text-gray-300 text-sm flex items-center gap-2">
+                    Clinic Code <span className="text-gray-500 text-xs">(Optional)</span>
+                  </label>
+                  <Input value={smClinicCode} onChange={e => setSmClinicCode(e.target.value.toUpperCase())}
+                    placeholder="Enter clinic code to link this chamber"
+                    className="bg-black/50 border-zinc-700 text-white font-mono" />
+                </div>
+
+                {/* Start + End Time */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-gray-300 text-sm">Start Time</label>
+                    <Input type="time" value={smStartTime} onChange={e => setSmStartTime(e.target.value)}
+                      className="bg-black/50 border-zinc-700 text-white" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-gray-300 text-sm">End Time</label>
+                    <Input type="time" value={smEndTime} onChange={e => setSmEndTime(e.target.value)}
+                      className="bg-black/50 border-zinc-700 text-white" />
+                  </div>
+                </div>
+
+                {/* Max Booking Capacity */}
+                <div className="space-y-2">
+                  <label className="text-gray-300 text-sm">Maximum Booking Capacity</label>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => setSmMaxCapacity(Math.max(1, smMaxCapacity - 1))}
+                      className="w-10 h-10 flex items-center justify-center bg-black/50 border border-zinc-700 rounded-lg hover:bg-black">
+                      <Minus className="w-4 h-4 text-gray-400" />
+                    </button>
+                    <Input type="number" min={1} max={500} value={smMaxCapacity}
+                      onChange={e => setSmMaxCapacity(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="flex-1 text-center bg-black/50 border-zinc-700 text-white" />
+                    <span className="text-gray-400 text-sm whitespace-nowrap">patient/s</span>
+                    <button type="button" onClick={() => setSmMaxCapacity(smMaxCapacity + 1)}
+                      className="w-10 h-10 flex items-center justify-center bg-black/50 border border-zinc-700 rounded-lg hover:bg-black">
+                      <Plus className="w-4 h-4 text-gray-400" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* MR Settings */}
+                <div className="pt-4 border-t border-zinc-800 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <label className="text-gray-300 text-sm flex items-center gap-2">
+                      <Briefcase className="w-4 h-4 text-amber-500" />
+                      Allow Medical Representative (MR) Visits
+                    </label>
+                    <button type="button" onClick={() => setSmMrAllowed(!smMrAllowed)}
+                      className={`w-11 h-6 rounded-full transition-colors relative ${smMrAllowed ? 'bg-amber-500' : 'bg-zinc-700'}`}>
+                      <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-transform ${smMrAllowed ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                    </button>
+                  </div>
+
+                  {smMrAllowed && (
+                    <div className="pl-6 space-y-4 border-l-2 border-zinc-800 ml-2">
+                      <div className="space-y-2">
+                        <label className="text-gray-400 text-xs">Number of MRs Allowed</label>
+                        <div className="flex items-center gap-2">
+                          <button type="button" onClick={() => setSmMrMaxCount(Math.max(1, smMrMaxCount - 1))}
+                            className="w-10 h-10 flex items-center justify-center bg-black/50 border border-zinc-700 rounded-lg">
+                            <Minus className="w-4 h-4 text-gray-400" />
+                          </button>
+                          <Input type="number" min={1} max={10} value={smMrMaxCount}
+                            onChange={e => setSmMrMaxCount(Math.max(1, parseInt(e.target.value) || 1))}
+                            className="w-20 text-center bg-black/50 border-zinc-700 text-white" />
+                          <span className="text-gray-400 text-sm">MR/s</span>
+                          <button type="button" onClick={() => setSmMrMaxCount(Math.min(10, smMrMaxCount + 1))}
+                            className="w-10 h-10 flex items-center justify-center bg-black/50 border border-zinc-700 rounded-lg">
+                            <Plus className="w-4 h-4 text-gray-400" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-gray-400 text-xs">Meeting Time</label>
+                        <select value={smMrMeetingTime} onChange={e => setSmMrMeetingTime(e.target.value)}
+                          className="w-full bg-black/50 border border-zinc-700 text-white rounded-lg px-3 py-2 text-sm" style={{ colorScheme: 'dark' }}>
+                          <option value="before">Before Patients</option>
+                          <option value="after">After Patients</option>
+                          <option value="interval">Interval Between Patients</option>
+                        </select>
+                      </div>
+                      {smMrMeetingTime === 'interval' && (
+                        <div className="space-y-2">
+                          <label className="text-gray-400 text-xs">After every X patients</label>
+                          <select value={smMrInterval} onChange={e => setSmMrInterval(parseInt(e.target.value))}
+                            className="w-full bg-black/50 border border-zinc-700 text-white rounded-lg px-3 py-2 text-sm" style={{ colorScheme: 'dark' }}>
+                            <option value={1}>After 1 patient</option>
+                            <option value={2}>After 2 patients</option>
+                            <option value={3}>After 3 patients</option>
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex items-center justify-between pt-4">
+                  <Button onClick={resetScheduleForm} variant="outline" className="border-zinc-700 text-gray-300">
+                    RESET
+                  </Button>
+                  <Button onClick={handleSaveSchedule} disabled={smSaving} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                    {smSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                    {smEditingId ? 'UPDATE SCHEDULE' : 'SAVE SCHEDULE'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* ========== VIEW SCHEDULES ========== */}
+            <div>
+              <div className="flex items-start justify-between mb-6">
+                <h2 className="text-white font-semibold">View Schedules</h2>
+                <p className="text-gray-400 text-sm hidden md:block">Manage your existing schedules</p>
+              </div>
+
+              {schedules.length === 0 ? (
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-12">
+                  <div className="flex flex-col items-center text-center">
+                    <Calendar className="w-16 h-16 text-gray-600 mb-4" strokeWidth={1.5} />
+                    <h3 className="text-white mb-2">No Schedules Created</h3>
+                    <p className="text-gray-400 text-sm">Create your first schedule using the form above</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {schedules.map(schedule => {
+                    const dayList = schedule.days && schedule.days.length ? schedule.days : (schedule.day ? [schedule.day] : []);
+                    return (
+                      <div key={schedule.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-4">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                          <div className="flex flex-wrap gap-2 flex-1">
+                            {dayList.map(d => (
+                              <span key={d} className="px-3 py-1 bg-emerald-500/20 border border-emerald-500/30 rounded-full text-emerald-400 text-xs sm:text-sm">
+                                {d}
+                              </span>
+                            ))}
+                            {schedule.frequency && (
+                              <span className="px-3 py-1 bg-zinc-700/50 border border-zinc-600 rounded-full text-gray-400 text-xs sm:text-sm">
+                                {schedule.frequency}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className={`text-xs sm:text-sm font-bold uppercase tracking-wider ${schedule.isActive ? 'text-emerald-400' : 'text-zinc-500'}`}>
+                              {schedule.isActive ? 'Active' : 'Inactive'}
+                            </span>
+                            <button type="button" onClick={() => handleToggleScheduleActive(schedule.id)}
+                              className={`w-11 h-6 rounded-full transition-colors relative ${schedule.isActive ? 'bg-emerald-500' : 'bg-zinc-700'}`}>
+                              <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-transform ${schedule.isActive ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          {(schedule.chamberName || schedule.chamberAddress) && (
+                            <div className="flex items-start gap-3">
+                              <MapPin className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                              <div>
+                                <p className="text-white text-sm font-bold uppercase">{schedule.chamberName}</p>
+                                <p className="text-zinc-300 text-sm">{schedule.chamberAddress}</p>
+                                {schedule.clinicCode && (
+                                  <p className="text-emerald-400 text-xs font-mono mt-1">🔗 {schedule.clinicCode}</p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          <div className="flex items-start gap-3">
+                            <Clock className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                            <div>
+                              <p className="text-white text-sm font-bold">{schedule.startTime} – {schedule.endTime}</p>
+                              <p className="text-zinc-400 text-xs uppercase tracking-widest">
+                                Working Hours · Max {schedule.maxBookings} patient/s
+                              </p>
+                            </div>
+                          </div>
+                          {schedule.mrAllowed && (
+                            <div className="flex items-start gap-3">
+                              <Briefcase className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
+                              <p className="text-amber-400 text-xs">
+                                MR visits allowed · {schedule.mrMaxCount} MR/s ·
+                                {schedule.mrMeetingTime === 'before' ? ' Before patients' : schedule.mrMeetingTime === 'after' ? ' After patients' : ` Every ${schedule.mrIntervalAfterPatients} patient(s)`}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-2 border-t border-zinc-800">
+                          <Button size="sm" variant="outline" onClick={() => handleEditSchedule(schedule)} className="border-zinc-700 text-white">
+                            <Edit3 className="w-4 h-4 mr-1" /> Edit
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => handleDeleteSchedule(schedule.id)} className="border-red-500/30 text-red-400 hover:bg-red-500/10">
+                            <Trash2 className="w-4 h-4 mr-1" /> Delete
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {currentTab === 'vcTime' && (
+          <>
+            {/* Add VC Slot */}
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+              <h3 className="text-white font-semibold mb-1">Add Video Consultation Slot</h3>
+              <p className="text-gray-400 text-sm mb-6">Set hours when you are available for online video consultations.</p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="text-gray-300 text-sm mb-2 block">Start Time</label>
+                  <Input type="time" value={vcStart} onChange={e => setVcStart(e.target.value)} className="bg-black border-zinc-700 text-white" />
+                </div>
+                <div>
+                  <label className="text-gray-300 text-sm mb-2 block">End Time</label>
+                  <Input type="time" value={vcEnd} onChange={e => setVcEnd(e.target.value)} className="bg-black border-zinc-700 text-white" />
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <label className="text-gray-300 text-sm mb-2 block">Days</label>
+                <div className="flex flex-wrap gap-2">
+                  {ALL_DAYS.map(d => (
+                    <button key={d} type="button" onClick={() => toggleVcDay(d)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${vcDays.includes(d) ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50' : 'bg-black text-gray-400 border-zinc-700 hover:border-zinc-600'}`}>
+                      {d.slice(0, 3)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button onClick={addVcSlot} disabled={savingVc} className="bg-emerald-600 hover:bg-emerald-700">
+                  {savingVc ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Plus className="w-4 h-4 mr-1" /> Add VC Slot</>}
+                </Button>
+              </div>
+            </div>
+
+            {/* VC slots list */}
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+              <h3 className="text-white font-semibold mb-4">Your VC Slots</h3>
+              {vcTimeSlots.length === 0 ? (
+                <div className="text-center py-12">
+                  <Clock className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                  <p className="text-gray-400">No VC time slots added yet</p>
+                  <p className="text-gray-500 text-sm mt-1">Add your available video consultation hours above</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {vcTimeSlots.map(s => (
+                    <div key={s.id} className={`bg-zinc-800/50 border rounded-lg p-4 flex items-center justify-between gap-3 flex-wrap ${s.isActive ? 'border-emerald-500/30' : 'border-zinc-800 opacity-60'}`}>
+                      <div className="flex-1 min-w-[200px]">
+                        <p className="text-white font-medium">{s.startTime} – {s.endTime}</p>
+                        <p className="text-gray-400 text-xs mt-1">{s.days.join(', ')}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => toggleVcSlotActive(s.id)}
+                          className={`px-3 py-1 rounded text-xs font-medium ${s.isActive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-700 text-gray-400'}`}>
+                          {s.isActive ? 'Active' : 'Off'}
+                        </button>
+                        <button onClick={() => removeVcSlot(s.id)} className="text-red-400 hover:text-red-300 p-1">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
     );
   };

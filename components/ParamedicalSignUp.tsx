@@ -8,6 +8,7 @@ import { sendSignInLinkToEmail } from 'firebase/auth';
 import { collection, getDocs, query, where, addDoc, serverTimestamp } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { getStateFromPincode } from '../utils/pincodeMapping';
+import { formatQR } from '../utils/qrNumber';
 import DashboardPromoDisplay from './DashboardPromoDisplay';
 
 const PARAMEDICAL_ROLES = [
@@ -84,7 +85,7 @@ export default function ParamedicalSignUp({ onBack, onLogin }: ParamedicalSignUp
         }
       });
 
-      const qrNumber = `HQR${String(maxNumber + 1).padStart(5, '0')}`;
+      const qrNumber = formatQR(maxNumber + 1);
 
       // Block QR in pool
       await addDoc(qrPoolCollection, {

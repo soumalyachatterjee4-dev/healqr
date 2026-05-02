@@ -20,8 +20,9 @@ interface ClinicQRManagerProps {
   onLogout?: () => void;
   profileData?: {
     image: string | null;
+    profileImage?: string | null;
     name: string;
-    ivrCode?: string;
+    qrNumber?: string;
   };
 }
 
@@ -695,20 +696,20 @@ export default function ClinicQRManager({ onMenuChange, onLogout, profileData }:
 
               {/* Right Column */}
               <div className="space-y-6">
-                {/* IVR Code (universal pool) — for non-smartphone callers */}
-                {profileData?.ivrCode && (
+                {/* Phone Booking Code (the HQR number IS the IVR code) */}
+                {profileData?.qrNumber && (
                   <div className="bg-zinc-900 border border-emerald-500/30 rounded-xl p-6">
                     <Label className="mb-2 block text-gray-400 flex items-center gap-2">
                       <Zap className="w-4 h-4 text-emerald-400" />
-                      IVR Code (for non-smartphone users)
+                      Phone Booking Code (for non-smartphone users)
                     </Label>
                     <div className="bg-black border border-emerald-500/30 rounded-lg p-4">
                       <p className="text-emerald-400 font-mono text-2xl font-bold tracking-widest">
-                        {profileData.ivrCode}
+                        {profileData.qrNumber}
                       </p>
                     </div>
                     <p className="text-gray-500 text-xs mt-2">
-                      Patients without a smartphone can call HealQR&apos;s IVR line and enter this 5-character code to book.
+                      Patients without a smartphone can call HealQR&apos;s IVR line and enter the digits of this code (e.g. {profileData.qrNumber.replace(/\D/g, '')}) to book.
                     </p>
                   </div>
                 )}

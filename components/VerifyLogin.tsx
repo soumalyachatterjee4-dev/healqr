@@ -66,6 +66,8 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
       localStorage.removeItem('healqr_phlebo_id');
       localStorage.removeItem('healqr_is_paramedical');
       localStorage.removeItem('healqr_paramedical_id');
+      localStorage.removeItem('healqr_is_mr');
+      localStorage.removeItem('healqr_mr_id');
       localStorage.removeItem('healqr_assistant_pages');
       localStorage.removeItem('healqr_assistant_doctor_id');
       localStorage.removeItem('healqr_doctor_stats');
@@ -300,20 +302,6 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
             if (pendingData && pendingRef) {
               const { setDoc, deleteDoc } = await import('firebase/firestore');
 
-              // Generate IVR code so the QR poster matches doctor / clinic / lab
-              let paraIvrCode = '';
-              try {
-                const { generateIvrCode } = await import('../utils/ivrCodeGenerator');
-                paraIvrCode = await generateIvrCode(
-                  pendingData.name || 'Professional',
-                  pendingData.dob || '',
-                  user.uid,
-                  'paramedical'
-                );
-              } catch (ivrErr) {
-                console.error('[VerifyLogin] paramedical IVR generation failed:', ivrErr);
-              }
-
               // Generate profile slug + booking URL once at signup so QR is stable
               const paraSlug = (pendingData.name || 'pro')
                 .toLowerCase()
@@ -329,7 +317,6 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
                 verified: true,
                 verifiedAt: new Date().toISOString(),
                 createdAt: pendingData.createdAt || new Date().toISOString(),
-                ivrCode: paraIvrCode,
                 profileSlug: pendingData.profileSlug || paraSlug,
                 bookingUrl: paraBookingUrl,
               });
@@ -397,6 +384,96 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
               setMessage('This email is not registered. Redirecting to Sign Up...');
               setTimeout(() => {
                 window.location.href = '/?page=paramedical-signup';
+              }, 2500);
+              return;
+            }
+          }
+        } else if (loginType === 'mr') {
+          // ✅ MR LOGIN / SIGNUP FLOW
+          const isSignup = searchParams.get('signup') === 'true';
+
+          if (isSignup) {
+            // Check pending MR signup
+            const pendingQ = query(collection(db, 'pending_mr_signups'), where('email', '==', email), limit(1));
+            const pendingSnap = await getDocs(pendingQ);
+
+            if (!pendingSnap.empty) {
+              const pendingData = pendingSnap.docs[0].data();
+              const pendingRef = pendingSnap.docs[0].ref;
+              const { setDoc, deleteDoc } = await import('firebase/firestore');
+
+              // Create medicalReps doc with auth uid as doc ID
+              await setDoc(doc(db, 'medicalReps', user.uid), {
+                ...pendingData,
+                uid: user.uid,
+                email: email,
+                verified: true,
+                verifiedAt: new Date().toISOString(),
+                createdAt: pendingData.createdAt || new Date().toISOString(),
+              });
+              await deleteDoc(pendingRef);
+
+              localStorage.setItem('userId', user.uid);
+              localStorage.setItem('healqr_user_email', email);
+              localStorage.setItem('healqr_authenticated', 'true');
+              localStorage.setItem('healqr_is_mr', 'true');
+              localStorage.setItem('healqr_mr_id', user.uid);
+              localStorage.removeItem('healqr_is_clinic');
+              localStorage.removeItem('healqr_is_lab');
+              localStorage.removeItem('healqr_is_assistant');
+              localStorage.removeItem('healqr_is_paramedical');
+              localStorage.removeItem('healqr_is_phlebo');
+              if (pendingData.name) {
+                localStorage.setItem('healqr_user_name', pendingData.name);
+              }
+            } else {
+              await auth.signOut();
+              setStatus('error');
+              setMessage('No pending MR signup found for this email. Please sign up first.');
+              setTimeout(() => {
+                window.location.href = '/?page=mr-signup';
+              }, 2500);
+              return;
+            }
+          } else {
+            // Regular MR login: check medicalReps collection
+            let mrDoc = await getDoc(doc(db, 'medicalReps', user.uid));
+            let mrData: any = null;
+            let mrId = user.uid;
+
+            if (!mrDoc.exists()) {
+              // Fallback: query by email
+              const mrByEmailQ = query(collection(db, 'medicalReps'), where('email', '==', email), limit(1));
+              const mrByEmailSnap = await getDocs(mrByEmailQ);
+              if (!mrByEmailSnap.empty) {
+                mrData = mrByEmailSnap.docs[0].data();
+                mrId = mrByEmailSnap.docs[0].id;
+              }
+            } else {
+              mrData = mrDoc.data();
+            }
+
+            if (mrData) {
+              localStorage.setItem('userId', mrId);
+              localStorage.setItem('healqr_user_email', email);
+              localStorage.setItem('healqr_authenticated', 'true');
+              localStorage.setItem('healqr_is_mr', 'true');
+              localStorage.setItem('healqr_mr_id', mrId);
+              localStorage.removeItem('healqr_is_clinic');
+              localStorage.removeItem('healqr_is_lab');
+              localStorage.removeItem('healqr_is_assistant');
+              localStorage.removeItem('healqr_is_paramedical');
+              localStorage.removeItem('healqr_is_phlebo');
+              if (mrData.name) {
+                localStorage.setItem('healqr_user_name', mrData.name);
+              }
+            } else {
+              console.warn('⚠️ No MR registration found for this email. Redirecting to MR signup.');
+              await auth.signOut();
+              setStatus('error');
+              setMessage('This email is not registered as a Medical Representative. Redirecting you to Sign Up...');
+              setTimeout(() => {
+                window.location.href = '/?page=mr-signup';
               }, 2500);
               return;
             }
@@ -509,7 +586,8 @@ export default function VerifyLogin({ onSuccess, onError }: VerifyLoginProps) {
       const isClinic = localStorage.getItem('healqr_is_clinic');
       const isLab = localStorage.getItem('healqr_is_lab');
       const isPhlebo = localStorage.getItem('healqr_is_paramedical');
-      setMessage(isAssistant ? 'Assistant access granted!' : isPhlebo ? 'Professional login successful!' : isLab ? 'Lab login successful!' : isClinic ? 'Clinic login successful!' : 'Login successful!');
+      const isMR = localStorage.getItem('healqr_is_mr');
+      setMessage(isAssistant ? 'Assistant access granted!' : isMR ? 'MR login successful!' : isPhlebo ? 'Professional login successful!' : isLab ? 'Lab login successful!' : isClinic ? 'Clinic login successful!' : 'Login successful!');
 
 
       // Immediately redirect to clean URL - App.tsx will handle routing based on localStorage

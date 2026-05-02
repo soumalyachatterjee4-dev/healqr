@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { MEDICAL_SPECIALTIES } from '../utils/medicalSpecialties';
 import { Badge } from './ui/badge';
 import { getStateFromPincode } from '../utils/pincodeMapping';
+import { formatQR } from '../utils/qrNumber';
 
 // Company lookup cache
 interface PharmaCompanyMatch {
@@ -240,8 +241,8 @@ export default function SignUp({ onNext, onBack, onLogin, onNavigateToLanding, i
           }
         });
 
-        // Generate next HQR number in universal sequence
-        finalQrNumber = `HQR${String(maxNumber + 1).padStart(5, '0')}`;
+        // Generate next HQR number in universal sequence (variable-length, no zero-padding)
+        finalQrNumber = formatQR(maxNumber + 1);
 
         // Save Virtual QR to qrPool collection (universal pool)
         await addDoc(qrPoolCollection, {

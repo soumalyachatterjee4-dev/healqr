@@ -29,6 +29,8 @@ interface Chamber {
 
 interface ChamberWithBookingCount extends Chamber {
   bookedCount: number;
+  mrBookedCount?: number;
+  mrMaxCount?: number;
 }
 
 interface SelectChamberProps {
@@ -61,6 +63,7 @@ interface SelectChamberProps {
   }>; // Clinic planned off periods with metadata
   language?: Language;
   vcTimeSlots?: Array<{id: number; startTime: string; endTime: string; days: string[]; isActive: boolean}>;
+  mrMode?: boolean;
 }
 
 export default function SelectChamber({
@@ -83,6 +86,7 @@ export default function SelectChamber({
   clinicAddress,
   clinicPlannedOffPeriods = [],
   vcTimeSlots = [],
+  mrMode = false,
 }: SelectChamberProps) {
 
   const accentColor = themeColor === 'blue' ? 'blue' : 'emerald';
@@ -270,11 +274,24 @@ export default function SelectChamber({
 
               const bookedCount = allDocs.filter((data: any) => {
                 const isMatchingDate = data.appointmentDate === selectedDateStr;
-                // Count ALL bookings (including cancelled) to match Dashboard logic
-                // const isNotCancelled = data.status !== 'cancelled';
                 return isMatchingDate;
               }).length;
 
+              let mrBookedCount = 0;
+              let mrMaxCount = (chamber as any).mrMaxCount || 0;
+              
+              if (mrMode) {
+                const mrBookingsRef = collection(db, 'mrBookings');
+                const mrQ = query(
+                  mrBookingsRef,
+                  where('chamberId', '==', chamber.id)
+                );
+                const mrSnapshot = await getDocs(mrQ);
+                const mrAllDocs = mrSnapshot.docs.map(doc => doc.data());
+                mrBookedCount = mrAllDocs.filter((data: any) => {
+                  return data.appointmentDate === selectedDateStr && ['confirmed', 'pending_special', 'met'].includes(data.status);
+                }).length;
+              }
 
               // Convert start time to minutes for sorting (use rescheduled time if available)
               const effectiveStart = (chamber as any).rescheduledStartTime || chamber.startTime;
@@ -284,6 +301,8 @@ export default function SelectChamber({
               return {
                 ...chamber,
                 bookedCount,
+                mrBookedCount,
+                mrMaxCount,
                 startMinutes, // For sorting
                 blockedDates: (chamber as any).blockedDates || [] // Explicitly preserve blockedDates
               };
@@ -626,6 +645,11 @@ export default function SelectChamber({
                               <span className={`text-sm font-medium ${statusColor}`}>
                                 {booked}/{capacity}
                               </span>
+                              {mrMode && (
+                                <Badge className="bg-blue-500/20 text-blue-400 text-[10px] ml-2 font-bold">
+                                  {chamber.mrBookedCount || 0}/{chamber.mrMaxCount || 0} MR
+                                </Badge>
+                              )}
                             </div>
                           )}
                         </div>

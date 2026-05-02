@@ -229,6 +229,19 @@ service firebase.storage {
     }
 
     // ============================================
+    // MR PROFILE PHOTOS
+    // ============================================
+
+    match /mr_profiles/{fileName} {
+      // Allow read by anyone
+      allow read: if true;
+
+      // Allow write by authenticated users for their own profiles
+      // Filename is prefixed with the user's ID
+      allow write: if isAuthenticated() && isImageFile() && isValidImageSize();
+    }
+
+    // ============================================
     // TEMPLATES (ADMIN ONLY)
     // ============================================
 

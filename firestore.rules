@@ -625,6 +625,17 @@ service cloud.firestore {
     }
 
     // ============================================
+    // MR BOOKINGS COLLECTION
+    // ============================================
+
+    match /mrBookings/{bookingId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if false;
+    }
+
+    // ============================================
     // APPOINTMENTS COLLECTION (Alternative naming for bookings)
     // ============================================
 
@@ -1785,6 +1796,49 @@ service cloud.firestore {
 
       // No updates or deletes (codes are immutable once created)
       allow update, delete: if false;
+    }
+
+    // ============================================
+    // MEDICAL REPRESENTATIVES (MR) COLLECTION
+    // ============================================
+
+    match /medicalReps/{mrId} {
+      // Allow read for search and profile loading
+      allow read: if true;
+      // Allow create during verification flow
+      allow create: if isAuthenticated();
+      // Allow update/delete only by owner
+      allow update, delete: if isOwner(mrId);
+    }
+
+    // ============================================
+    // PENDING MR SIGNUPS COLLECTION
+    // ============================================
+
+    match /pending_mr_signups/{docId} {
+      // Allow anyone to create (signup flow before auth)
+      allow create: if true;
+      // Allow read for verification
+      allow read: if true;
+      // Allow delete after successful verification
+      allow delete: if isAuthenticated();
+      // No updates
+      allow update: if false;
+    }
+
+    // ============================================
+    // MR-DOCTOR LINKS COLLECTION
+    // ============================================
+
+    match /mrDoctorLinks/{linkId} {
+      // Allow read by doctor or MR involved
+      allow read: if true;
+      // Allow create by anyone (MR sends request)
+      allow create: if true;
+      // Allow update by doctor or MR involved
+      allow update: if true;
+      // No deletes
+      allow delete: if false;
     }
 
     // ============================================

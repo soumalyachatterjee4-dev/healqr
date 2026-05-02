@@ -31,6 +31,11 @@ export interface Patient {
   isWalkIn?: boolean; // Whether patient is a walk-in (true) or QR advance booking (false)
   reviewScheduled?: boolean; // Whether review request is scheduled
   followUpScheduled?: boolean; // Whether follow-up is scheduled
+  referredBy?: string; // MR referral
+  referrerName?: string;
+  referrerOrganization?: string;
+  referrerRole?: string;
+  referrerPhone?: string;
 }
 
 interface ViewPatientsModalProps {
@@ -163,9 +168,14 @@ export default function ViewPatientsModal({ isOpen, onClose, patients: initialPa
                           VC
                         </Badge>
                       )}
-                      {(patient as any).referrerName && (
+                      {patient.referrerName && (
                         <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30 text-[10px]">
-                          Ref: {(patient as any).referrerName}
+                          Ref: {patient.referrerName} {patient.referrerOrganization ? `(${patient.referrerOrganization}${patient.referrerDivision ? ` - ${patient.referrerDivision}` : ''})` : ''}
+                        </Badge>
+                      )}
+                      {!patient.referrerName && patient.referredBy && (
+                        <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30 text-[10px]">
+                          Ref: {patient.referredBy}
                         </Badge>
                       )}
                       {patient.bookingId && (

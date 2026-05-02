@@ -423,7 +423,18 @@ export default function WalkInPatientsPage({ patients, onBack, onMenuChange }: W
               >
                 {/* Line 1: Name and Badge */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-                  <h3 className="text-white text-lg md:text-xl font-semibold">{patient.patientName}</h3>
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-white text-lg md:text-xl font-semibold">{patient.patientName}</h3>
+                    {patient.referrerName ? (
+                      <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 text-[10px]">
+                        Ref: {patient.referrerName} {patient.referrerOrganization ? `(${patient.referrerOrganization}${patient.referrerDivision ? ` - ${patient.referrerDivision}` : ''})` : ''}
+                      </Badge>
+                    ) : patient.referredBy && (
+                      <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">
+                        {patient.referredBy}
+                      </Badge>
+                    )}
+                  </div>
                   {/* Booking Channel Badge - SINGLE BADGE ONLY */}
                   <Badge
                     className={`w-fit text-xs md:text-sm font-semibold ${

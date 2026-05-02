@@ -439,6 +439,7 @@ export default function PatientDetailsForm({
           referrerRole: sessionStorage.getItem('booking_referrer_role') || null,
           referrerOrganization: sessionStorage.getItem('booking_referrer_organization') || null,
           referrerPhone: sessionStorage.getItem('booking_referrer_phone') || null,
+          referrerDivision: sessionStorage.getItem('booking_referrer_division') || null,
           createdAt: serverTimestamp()
         });
 

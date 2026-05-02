@@ -11,7 +11,13 @@ import {
   ArrowLeft,
   MapPin,
   Video,
-  RefreshCw
+  RefreshCw,
+  Briefcase,
+  UserCircle2,
+  Building2,
+  Phone,
+  X,
+  Check
 } from 'lucide-react';
 import { addDoctorNotification } from '../services/doctorNotificationService';
 import { useState, useEffect } from 'react';
@@ -406,6 +412,10 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
     startMinutes: number;
     rescheduledStartTime?: string;
     rescheduledEndTime?: string;
+    mrAllowed?: boolean;
+    mrMaxCount?: number;
+    mrMeetingTime?: string;
+    mrIntervalAfterPatients?: number;
   }>>([]);
   const [loading, setLoading] = useState(true);
 
@@ -418,6 +428,12 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
 
   // Date change detection for auto-refresh at midnight
   const [currentDate, setCurrentDate] = useState(new Date().toDateString());
+
+  // MR state
+  const [showMRVisits, setShowMRVisits] = useState(false);
+  const [selectedChamberForMR, setSelectedChamberForMR] = useState<typeof chambers[0] | null>(null);
+  const [mrVisits, setMrVisits] = useState<any[]>([]);
+  const [loadingMRs, setLoadingMRs] = useState(false);
 
   // Load chambers from Firestore and filter for next 24 hours
   useEffect(() => {
@@ -579,6 +595,10 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
               // Reschedule: check if todayReschedule matches today's date
               rescheduledStartTime: chamber.todayReschedule?.date === todayStr ? chamber.todayReschedule.startTime : undefined,
               rescheduledEndTime: chamber.todayReschedule?.date === todayStr ? chamber.todayReschedule.endTime : undefined,
+              mrAllowed: chamber.mrAllowed,
+              mrMaxCount: chamber.mrMaxCount,
+              mrMeetingTime: chamber.mrMeetingTime,
+              mrIntervalAfterPatients: chamber.mrIntervalAfterPatients,
             } as any;
           })
         );
@@ -813,6 +833,12 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
               verifiedByPatient: data.verifiedByPatient || false, // Include verification status
               verificationMethod: data.verificationMethod, // Include verification method (can be undefined)
               isWalkIn: data.isWalkIn !== undefined ? data.isWalkIn : true, // Walk-ins default to true
+              referredBy: data.referredBy, // Include MR referral
+              referrerName: data.referrerName,
+              referrerOrganization: data.referrerOrganization,
+              referrerRole: data.referrerRole,
+              referrerPhone: data.referrerPhone,
+              referrerDivision: data.referrerDivision,
               timestamp: data.date?.toDate ? data.date.toDate() : new Date(data.date),
               dateStr: data.date?.toDate
                 ? data.date.toDate().toISOString().split('T')[0]
@@ -1219,6 +1245,109 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
     } catch (error) {
       console.error('Error reactivating chamber:', error);
       toast.error('Failed to reactivate chamber');
+    }
+  };
+
+  const handleViewMR = async (chamber: typeof chambers[0]) => {
+    setSelectedChamberForMR(chamber);
+    setShowMRVisits(true);
+    setLoadingMRs(true);
+    
+    try {
+      const { db } = await import('../lib/firebase/config');
+      const { collection, query, where, getDocs } = await import('firebase/firestore');
+      
+      const todayStr = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
+      const mrBookingsRef = collection(db!, 'mrBookings');
+      
+      let numericChamberId = typeof chamber.id === 'string' ? parseInt(chamber.id, 10) : chamber.id;
+      if (!numericChamberId || isNaN(numericChamberId)) {
+        numericChamberId = -1;
+      }
+      
+      const q = query(
+        mrBookingsRef,
+        where('chamberId', '==', numericChamberId),
+        where('appointmentDate', '==', todayStr),
+        where('status', 'in', ['confirmed', 'met', 'pending_special', 'cancelled'])
+      );
+      
+      const snapshot = await getDocs(q);
+      const visits = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // Sort by slot index
+      visits.sort((a: any, b: any) => (a.slotIndex || 0) - (b.slotIndex || 0));
+      
+      setMrVisits(visits);
+    } catch (error) {
+      console.error('Error fetching MR visits:', error);
+      toast.error('Failed to load MR visits');
+    } finally {
+      setLoadingMRs(false);
+    }
+  };
+
+  const handleToggleMRMet = async (visitId: string, currentStatus: boolean) => {
+    try {
+      const { db } = await import('../lib/firebase/config');
+      const { doc, updateDoc } = await import('firebase/firestore');
+      
+      await updateDoc(doc(db!, 'mrBookings', visitId), {
+        isMet: !currentStatus,
+        status: !currentStatus ? 'met' : 'confirmed'
+      });
+      
+      setMrVisits(prev => prev.map(v => 
+        v.id === visitId ? { ...v, isMet: !currentStatus, status: !currentStatus ? 'met' : 'confirmed' } : v
+      ));
+      
+      toast.success(currentStatus ? 'Marked as pending' : 'Marked as met');
+    } catch (error) {
+      console.error('Error updating MR visit:', error);
+      toast.error('Failed to update status');
+    }
+  };
+
+  const handleCancelMR = async (visitId: string) => {
+    try {
+      const { db } = await import('../lib/firebase/config');
+      const { doc, updateDoc } = await import('firebase/firestore');
+      
+      await updateDoc(doc(db!, 'mrBookings', visitId), {
+        status: 'cancelled',
+        cancelledBy: 'doctor',
+        cancelledAt: new Date().toISOString()
+      });
+      
+      setMrVisits(prev => prev.map(v => 
+        v.id === visitId ? { ...v, status: 'cancelled' } : v
+      ));
+      
+      toast.success('MR visit cancelled');
+    } catch (error) {
+      console.error('Error cancelling MR visit:', error);
+      toast.error('Failed to cancel MR visit');
+    }
+  };
+
+  const handleRestoreMR = async (visitId: string) => {
+    try {
+      const { db } = await import('../lib/firebase/config');
+      const { doc, updateDoc } = await import('firebase/firestore');
+      
+      await updateDoc(doc(db!, 'mrBookings', visitId), {
+        status: 'confirmed',
+        restoredAt: new Date().toISOString()
+      });
+      
+      setMrVisits(prev => prev.map(v => 
+        v.id === visitId ? { ...v, status: 'confirmed' } : v
+      ));
+      
+      toast.success('MR visit restored');
+    } catch (error) {
+      console.error('Error restoring MR visit:', error);
+      toast.error('Failed to restore MR visit');
     }
   };
 
@@ -1782,6 +1911,17 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
                             <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.414 0 .004 5.412.001 12.049a11.82 11.82 0 001.611 6.008L0 24l6.102-1.6a11.777 11.777 0 005.941 1.6h.005c6.634 0 12.043-5.412 12.046-12.049a11.795 11.795 0 00-3.486-8.504z"/></svg>
                         </Button>
                       )}
+                      {chamber.mrAllowed && (
+                        <Button
+                          onClick={() => handleViewMR(chamber)}
+                          disabled={!isActiveToday}
+                          style={{ backgroundColor: isActiveToday ? '#d97706' : '#374151', color: isActiveToday ? '#ffffff' : '#9ca3af' }}
+                          className="font-semibold disabled:cursor-not-allowed h-10 px-4 hover:opacity-90 border-0"
+                          title="View MR Visits"
+                        >
+                          VIEW MR
+                        </Button>
+                      )}
                       <Button
                         onClick={() => handleViewPatients(chamber)}
                         disabled={!isActiveToday}
@@ -1870,6 +2010,134 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
               >
                 Cancel
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MR Visits Modal */}
+      {showMRVisits && selectedChamberForMR && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-gray-900 sm:rounded-2xl w-full sm:max-w-2xl h-[90vh] sm:h-[80vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom-4 sm:slide-in-from-bottom-8">
+            <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0">
+                  <Briefcase className="w-5 h-5 text-amber-500" />
+                </div>
+                <div>
+                  <h2 className="text-white font-bold text-lg">MR Visits</h2>
+                  <p className="text-gray-400 text-sm">{selectedChamberForMR.name}</p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowMRVisits(false)}
+                className="text-gray-400 hover:text-white hover:bg-gray-800"
+              >
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar">
+              {loadingMRs ? (
+                <div className="flex flex-col items-center justify-center h-40 space-y-4">
+                  <RefreshCw className="w-8 h-8 text-amber-500 animate-spin" />
+                  <p className="text-gray-400">Loading MR visits...</p>
+                </div>
+              ) : mrVisits.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-40 text-center space-y-4">
+                  <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center">
+                    <Briefcase className="w-8 h-8 text-gray-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-gray-300 font-medium">No MR visits scheduled</h3>
+                    <p className="text-gray-500 text-sm mt-1">There are no approved MR meetings for this chamber today.</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {mrVisits.map((visit) => (
+                    <div key={visit.id} className={`bg-gray-800/50 border ${visit.status === 'cancelled' ? 'border-red-900/50 opacity-75' : 'border-gray-700'} rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all`}>
+                      <div className="flex items-start gap-4">
+                        <div className={`w-12 h-12 rounded-lg flex flex-col items-center justify-center shrink-0 ${
+                          visit.status === 'cancelled' ? 'bg-red-500/10 border border-red-500/20' : 'bg-amber-500/10 border border-amber-500/20'
+                        }`}>
+                          <span className={`${visit.status === 'cancelled' ? 'text-red-500' : 'text-amber-500'} text-xs font-semibold`}>SLOT</span>
+                          <span className={`${visit.status === 'cancelled' ? 'text-red-400' : 'text-amber-400'} font-bold`}>{visit.slotNumber || '-'}</span>
+                        </div>
+                        <div>
+                          <h4 className="text-white font-medium flex items-center gap-2">
+                            <span className={visit.status === 'cancelled' ? 'line-through text-gray-400' : ''}>{visit.mrName}</span>
+                            {(visit.isMet || visit.status === 'met') && <Badge className="bg-emerald-500/20 text-emerald-400 text-[10px] border-none">MET</Badge>}
+                            {visit.status === 'cancelled' && <Badge className="bg-red-500/20 text-red-400 text-[10px] border-none">CANCELLED</Badge>}
+                            {visit.status === 'pending_special' && <Badge className="bg-purple-500/20 text-purple-400 text-[10px] border-none">SPECIAL REQ</Badge>}
+                          </h4>
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 mt-1 text-sm text-gray-400">
+                            <span className="flex items-center gap-1">
+                              <Building2 className="w-3.5 h-3.5" />
+                              {visit.mrCompany} ({visit.mrDivision})
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Phone className="w-3.5 h-3.5" />
+                              {visit.mrPhone || visit.mrMobile || 'N/A'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+                        {visit.status === 'cancelled' ? (
+                          <Button
+                            onClick={() => handleRestoreMR(visit.id)}
+                            variant="outline"
+                            size="sm"
+                            className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 w-full sm:w-auto"
+                          >
+                            <RefreshCw className="w-4 h-4 mr-2" />
+                            Restore
+                          </Button>
+                        ) : (
+                          <>
+                            <Button
+                              onClick={() => handleToggleMRMet(visit.id, visit.isMet || visit.status === 'met')}
+                              variant={visit.isMet || visit.status === 'met' ? "outline" : "default"}
+                              size="sm"
+                              className={visit.isMet || visit.status === 'met'
+                                ? "border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 flex-1 sm:flex-auto" 
+                                : "bg-emerald-600 hover:bg-emerald-700 text-white flex-1 sm:flex-auto"
+                              }
+                            >
+                              {(visit.isMet || visit.status === 'met') ? (
+                                <>
+                                  <Check className="w-4 h-4 mr-2" />
+                                  Met
+                                </>
+                              ) : (
+                                <>
+                                  <Check className="w-4 h-4 mr-2" />
+                                  Mark Met
+                                </>
+                              )}
+                            </Button>
+                            {!(visit.isMet || visit.status === 'met') && (
+                              <Button
+                                onClick={() => handleCancelMR(visit.id)}
+                                variant="outline"
+                                size="sm"
+                                className="border-red-900/50 text-red-400 hover:bg-red-950/30 flex-none px-3"
+                                title="Cancel MR Visit"
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

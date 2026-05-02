@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
-import { Video, User, AlertCircle, Star, Grid3x3, Smartphone, Clock, FileText, CheckCircle, TrendingUp, Bell, Users, Layout, ShoppingCart, Building2, MessageSquare, MonitorPlay, ShoppingBag, ScanLine, Twitter, Linkedin, Facebook, ArrowLeft, Sparkles, QrCode, Microscope, Share2 } from 'lucide-react';
+import { Video, User, AlertCircle, Star, Grid3x3, Smartphone, Clock, FileText, CheckCircle, TrendingUp, Bell, Users, Layout, ShoppingCart, Building2, MessageSquare, MonitorPlay, ShoppingBag, ScanLine, Twitter, Linkedin, Facebook, ArrowLeft, Sparkles, QrCode, Microscope, Share2, Stethoscope } from 'lucide-react';
 import { toast } from 'sonner';
 import { collection, query, where, getDocs, getCountFromServer, Timestamp, orderBy, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase/config';
@@ -307,71 +307,97 @@ export default function LandingPage({
               multi-language support, and complete patient data ownership.
             </p>
 
-            {/* 4-Way Entry Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto mb-16">
+            {/* Stakeholder Gateway — Indian Flag Layout (Saffron · White · Green) */}
+            <div className="max-w-6xl mx-auto mb-16 space-y-6">
 
-              {/* 1. Patients - Orange */}
-              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 hover:border-orange-500/50 transition-all group flex flex-col">
-                <div className="h-12 w-12 bg-orange-500/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-orange-500/20 transition-colors">
-                  <Users className="w-6 h-6 text-orange-500" />
-                </div>
-                <h3 className="text-xl font-semibold text-orange-500 mb-2">For Patients</h3>
-                <p className="text-gray-400 text-sm mb-6">Easily find doctors, book appointments, and access your medical records securely. Experience seamless healthcare with QR-powered convenience and multi-language support.</p>
-                <div className="flex flex-col gap-2 mt-auto">
+              {/* TOP — Patients (Saffron wide) */}
+              <div className="bg-gradient-to-br from-orange-500/15 to-orange-600/10 border-4 border-orange-500 rounded-2xl p-6 md:p-8 hover:border-orange-400 transition-all group shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50">
+                <div className="flex flex-col md:flex-row items-start md:items-center gap-5">
+                  <div className="h-16 w-16 bg-orange-500/15 rounded-2xl flex items-center justify-center flex-shrink-0 group-hover:bg-orange-500/25 transition-colors">
+                    <Users className="w-8 h-8 text-orange-500" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-2xl md:text-3xl font-bold text-orange-500 mb-1">For Patients</h3>
+                    <p className="text-gray-400 text-sm md:text-base">Find doctors, book appointments, and access your medical records securely with QR-powered convenience and multi-language support.</p>
+                  </div>
                   <Button
                     onClick={() => setShowPatientOptions(true)}
-                    className="w-full bg-orange-600 hover:bg-orange-700 text-white"
+                    className="w-full md:w-auto md:min-w-[180px] bg-orange-600 hover:bg-orange-700 text-white py-5 md:py-6 px-8 text-base font-semibold"
                   >
                     Get Started
                   </Button>
                 </div>
               </div>
 
-              {/* 2. Clinics / Hospitals - Blue */}
-              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 hover:border-blue-500/50 transition-all group flex flex-col">
-                <div className="h-12 w-12 bg-blue-500/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-blue-500/20 transition-colors">
-                  <Building2 className="w-6 h-6 text-blue-500" />
+              {/* MIDDLE — 3 Healthcare Professional Stakeholders (White band) */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+                {/* Clinics / Hospitals */}
+                <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 hover:border-blue-500/50 transition-all group flex flex-col">
+                  <div className="h-12 w-12 bg-blue-500/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-blue-500/20 transition-colors">
+                    <Building2 className="w-6 h-6 text-blue-500" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-blue-500 mb-2 h-14 flex items-center">For Clinics & Hospitals</h3>
+                  <p className="text-gray-400 text-sm mb-6 h-16">Manage multiple doctors & OPD operations under one QR.</p>
+                  <div className="flex flex-col gap-2 mt-auto">
+                    <Button
+                      onClick={() => setShowClinicOptions(true)}
+                      className="w-full bg-white hover:bg-gray-100 text-blue-600 font-semibold"
+                    >
+                      Get Started
+                    </Button>
+                  </div>
                 </div>
-                <h3 className="text-xl font-semibold text-blue-500 mb-2">For Clinics & Hospitals</h3>
-                <p className="text-gray-400 text-sm mb-6">Manage multiple doctors across multiple locations with unified OPD operations under a single QR code. Streamline scheduling, doctor access, and clinic management effortlessly.</p>
-                <div className="flex flex-col gap-2 mt-auto">
-                  <Button
-                    onClick={() => setShowClinicOptions(true)}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                  >
-                    Get Started
-                  </Button>
+
+                {/* Labs / Diagnostic Centers */}
+                <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 hover:border-blue-500/50 transition-all group flex flex-col">
+                  <div className="h-12 w-12 bg-blue-500/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-blue-500/20 transition-colors">
+                    <Microscope className="w-6 h-6 text-blue-500" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-blue-500 mb-2 h-14 flex items-center">For Labs & Diagnostics</h3>
+                  <p className="text-gray-400 text-sm mb-6 h-16">Test bookings, sample collection & reports in one place.</p>
+                  <div className="flex flex-col gap-2 mt-auto">
+                    <Button
+                      onClick={() => setShowLabOptions(true)}
+                      className="w-full bg-white hover:bg-gray-100 text-blue-600 font-semibold"
+                    >
+                      Get Started
+                    </Button>
+                  </div>
                 </div>
+
+                {/* Healthcare Professionals / Paramedical */}
+                <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 hover:border-blue-500/50 transition-all group flex flex-col">
+                  <div className="h-12 w-12 bg-blue-500/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-blue-500/20 transition-colors">
+                    <Stethoscope className="w-6 h-6 text-blue-500" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-blue-500 mb-2 h-14 flex items-center">For Healthcare Professionals</h3>
+                  <p className="text-gray-400 text-sm mb-6 h-16">Physios, nurses, dietitians & paramedical staff.</p>
+                  <div className="flex flex-col gap-2 mt-auto">
+                    <Button
+                      onClick={() => setShowParamedicalOptions(true)}
+                      className="w-full bg-white hover:bg-gray-100 text-blue-600 font-semibold"
+                    >
+                      Get Started
+                    </Button>
+                  </div>
+                </div>
+
               </div>
 
-              {/* 3. Doctors - Green */}
-              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 hover:border-emerald-500/50 transition-all group flex flex-col">
-                <div className="h-12 w-12 bg-emerald-500/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-emerald-500/20 transition-colors">
-                  <User className="w-6 h-6 text-emerald-500" />
-                </div>
-                <h3 className="text-xl font-semibold text-emerald-500 mb-2">For Doctors</h3>
-                <p className="text-gray-400 text-sm mb-6">Effortlessly manage your practice, appointments, and patient records with QR-based booking. Enjoy multi-location access, analytics, and secure patient data ownership—all in one platform.</p>
-                <div className="flex flex-col gap-2 mt-auto">
+              {/* BOTTOM — Doctors (Green wide) */}
+              <div className="bg-gradient-to-br from-emerald-500/15 to-emerald-600/10 border-4 border-emerald-500 rounded-2xl p-6 md:p-8 hover:border-emerald-400 transition-all group shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50">
+                <div className="flex flex-col md:flex-row items-start md:items-center gap-5">
+                  <div className="h-16 w-16 bg-emerald-500/15 rounded-2xl flex items-center justify-center flex-shrink-0 group-hover:bg-emerald-500/25 transition-colors">
+                    <User className="w-8 h-8 text-emerald-500" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-2xl md:text-3xl font-bold text-emerald-500 mb-1">For Doctors</h3>
+                    <p className="text-gray-400 text-sm md:text-base">Manage your practice, appointments, and patient records with QR-based booking. Multi-location access, analytics, and complete patient data ownership.</p>
+                  </div>
                   <Button
                     onClick={() => setShowDoctorOptions(true)}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
-                  >
-                    Get Started
-                  </Button>
-                </div>
-              </div>
-
-              {/* 4. Labs / Diagnostic Centers - Purple */}
-              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 hover:border-purple-500/50 transition-all group flex flex-col">
-                <div className="h-12 w-12 bg-purple-500/10 rounded-lg flex items-center justify-center mb-4 group-hover:bg-purple-500/20 transition-colors">
-                  <Microscope className="w-6 h-6 text-purple-500" />
-                </div>
-                <h3 className="text-xl font-semibold text-purple-500 mb-2">For Labs & Diagnostic Centers</h3>
-                <p className="text-gray-400 text-sm mb-6">Manage test bookings, sample collection, report delivery, and doctor referrals with a single QR code. Branches, staff, and analytics—all in one platform.</p>
-                <div className="flex flex-col gap-2 mt-auto">
-                  <Button
-                    onClick={() => setShowLabOptions(true)}
-                    className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                    className="w-full md:w-auto md:min-w-[180px] bg-emerald-600 hover:bg-emerald-700 text-white py-5 md:py-6 px-8 text-base font-semibold"
                   >
                     Get Started
                   </Button>
@@ -898,6 +924,14 @@ export default function LandingPage({
                     className="text-gray-400 hover:text-teal-500 transition-colors text-sm text-left"
                   >
                     Healthcare Professional Gateway
+                  </button>
+                </li>
+                <li>
+                  <button
+                    onClick={() => window.location.href = '/?page=mr-signup'}
+                    className="text-gray-400 hover:text-blue-500 transition-colors text-sm text-left"
+                  >
+                    Medical Representative
                   </button>
                 </li>
               </ul>

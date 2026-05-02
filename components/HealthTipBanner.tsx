@@ -43,7 +43,7 @@ export default function HealthTipBanner() {
         <img
           src={tip.imageUrl}
           alt={tip.name}
-          className="w-full h-auto max-h-48 object-cover"
+          className="w-full h-auto object-contain"
         />
       ) : (
         <div className="p-4 flex items-start gap-3">

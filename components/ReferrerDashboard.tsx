@@ -26,6 +26,8 @@ interface DoctorResult {
   phone: string;
   address: string;
   city: string;
+  profileSlug?: string;
+  useDrPrefix?: boolean;
 }
 
 interface ReferralRecord {
@@ -149,6 +151,8 @@ export default function ReferrerDashboard({ referrerId, referrerPhone, onLogout,
             phone: data.phone || '',
             address: data.address || '',
             city: data.city || '',
+            profileSlug: data.profileSlug || '',
+            useDrPrefix: data.useDrPrefix !== false,
           });
         }
       });
@@ -171,6 +175,10 @@ export default function ReferrerDashboard({ referrerId, referrerPhone, onLogout,
   const getReferralUrl = () => {
     if (!selectedDoctor) return '';
     const baseUrl = window.location.origin;
+    // Use profile slug if available, otherwise fallback to doctorId
+    if (selectedDoctor.profileSlug) {
+      return `${baseUrl}/dr/${selectedDoctor.profileSlug}?refBy=${referrerId}`;
+    }
     return `${baseUrl}/?doctorId=${selectedDoctor.id}&refBy=${referrerId}`;
   };
 
@@ -191,16 +199,44 @@ export default function ReferrerDashboard({ referrerId, referrerPhone, onLogout,
     const url = URL.createObjectURL(svgBlob);
 
     img.onload = () => {
-      canvas.width = 512;
-      canvas.height = 512;
+      canvas.width = 1024; // Higher resolution for download
+      canvas.height = 1024;
       if (ctx) {
         ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, 512, 512);
-        ctx.drawImage(img, 0, 0, 512, 512);
-        const link = document.createElement('a');
-        link.download = `Referral-QR-Dr-${selectedDoctor?.name || 'Doctor'}.png`;
-        link.href = canvas.toDataURL('image/png');
-        link.click();
+        ctx.fillRect(0, 0, 1024, 1024);
+        ctx.drawImage(img, 0, 0, 1024, 1024);
+        
+        // Draw logo in the center
+        const logoImg = new Image();
+        logoImg.onload = () => {
+          const logoSize = 160;
+          const x = (1024 - logoSize) / 2;
+          const y = (1024 - logoSize) / 2;
+          
+          // Background circle for logo
+          ctx.beginPath();
+          ctx.arc(512, 512, 90, 0, Math.PI * 2);
+          ctx.fillStyle = '#ffffff';
+          ctx.fill();
+          
+          ctx.drawImage(logoImg, x, y, logoSize, logoSize);
+          
+          // Add "Powered by HEALQR.COM" branding at the bottom
+          ctx.fillStyle = '#6b7280';
+          ctx.font = 'bold 24px system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('Powered by', 512, 920);
+          
+          ctx.fillStyle = '#10b981';
+          ctx.font = 'bold 32px system-ui, sans-serif';
+          ctx.fillText('HEALQR.COM', 512, 965);
+          
+          const link = document.createElement('a');
+          link.download = `Referral-QR-Dr-${selectedDoctor?.name || 'Doctor'}.png`;
+          link.href = canvas.toDataURL('image/png');
+          link.click();
+        };
+        logoImg.src = '/icon-192.png';
       }
       URL.revokeObjectURL(url);
     };
@@ -380,10 +416,22 @@ export default function ReferrerDashboard({ referrerId, referrerPhone, onLogout,
                   </div>
 
                   {/* QR Code */}
-                  <div ref={qrRef} className="flex justify-center">
-                    <div className="bg-white p-4 rounded-xl">
-                      <QRCode value={getReferralUrl()} size={200} level="H" />
+                  <div ref={qrRef} className="flex justify-center relative">
+                    <div className="bg-white p-4 rounded-xl relative shadow-lg">
+                      <QRCode value={getReferralUrl()} size={220} level="H" />
+                      {/* Logo overlay */}
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="bg-white p-1.5 rounded-full shadow-md border border-gray-100">
+                          <img src="/icon-192.png" alt="Logo" className="w-10 h-10 object-contain" />
+                        </div>
+                      </div>
                     </div>
+                  </div>
+
+                  {/* Powered by Branding */}
+                  <div className="text-center pt-2">
+                    <p className="text-gray-500 text-[10px] font-medium uppercase tracking-widest">Powered by</p>
+                    <p className="text-emerald-500 text-xs font-bold tracking-tight">HEALQR.COM</p>
                   </div>
 
                   {/* Referrer info badge */}

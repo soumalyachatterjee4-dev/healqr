@@ -41,6 +41,7 @@ import {
 } from "firebase/firestore";
 // @ts-ignore
 import QRCode from "qrcode";
+import { formatQR, normaliseQR, parseQRNumber, MAX_HQR } from "../utils/qrNumber";
 
 interface QRBatch {
   id: string;
@@ -127,7 +128,7 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
     if (showPrintModal && selectedBatch) {
       const generateBatchPreview = async () => {
         try {
-          const qrNumber = `HQR${String(selectedBatch.startQR).padStart(5, "0")}`;
+          const qrNumber = formatQR(selectedBatch.startQR);
           const qrUrl = await QRCode.toDataURL(qrNumber);
           setBatchPreviewImage(qrUrl);
         } catch (error) {
@@ -246,7 +247,7 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
       // Create QR codes in Firestore
       const qrsCreated = [];
       for (let i = startNumber; i <= endNumber; i++) {
-        const qrNumber = `HQR${String(i).padStart(5, "0")}`;
+        const qrNumber = formatQR(i);
 
         // Check if exists
         const existingQuery = query(
@@ -399,7 +400,7 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
 
         for (let i = startIdx; i < endIdx; i++) {
           const qrNum = batch.startQR + i;
-          const qrNumber = `HQR${String(qrNum).padStart(5, "0")}`;
+          const qrNumber = formatQR(qrNum);
           const localIdx = i - startIdx;
           const col = localIdx % cols;
           const row = Math.floor(localIdx / cols);
@@ -453,6 +454,60 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
   // Top-box (the empty rectangle dangling at the top of the poster) bounds, expressed as % of template
   // Tuned to /public/qr-template.png — adjust if the artwork changes.
   const NAME_BOX = { xPct: 16, yPct: 11.5, wPct: 68, hPct: 10 };
+
+  // ---- One-click migration: rewrite legacy zero-padded qrNumber strings ----
+  // For each qrPool doc, derives the integer (HQR00380 -> 380), writes back the
+  // canonical unpadded form (HQR380) plus a numeric `qrNumberInt` field used for
+  // ordering / range lookups. Idempotent — already-migrated docs are skipped.
+  // Also propagates the new qrNumber onto any linked entity doc that references it
+  // (doctors / clinics / labs / paramedicals).
+  const [migrating, setMigrating] = useState(false);
+  const runQrNumberMigration = async () => {
+    if (!db) return;
+    if (!confirm('Migrate all qrPool docs to the new variable-length HQR<n> format?\n\nLegacy: HQR00380   →   New: HQR380 (+ qrNumberInt: 380)\n\nThis is safe to re-run.')) return;
+    setMigrating(true);
+    try {
+      const poolSnap = await getDocs(collection(db, 'qrPool'));
+      let updatedPool = 0, updatedEntities = 0;
+      for (const d of poolSnap.docs) {
+        const data: any = d.data();
+        const oldQr: string = data.qrNumber || '';
+        const intN = parseQRNumber(oldQr);
+        if (!intN) continue;
+        const canonical = formatQR(intN);
+        // Skip if already migrated (canonical name + int both present)
+        if (data.qrNumber === canonical && data.qrNumberInt === intN) continue;
+
+        await updateDoc(doc(db, 'qrPool', d.id), {
+          qrNumber: canonical,
+          qrNumberInt: intN,
+        });
+        updatedPool++;
+
+        // Propagate to any linked entity doc (matches by linkedEmail)
+        if (data.linkedEmail) {
+          for (const col of ['doctors', 'clinics', 'labs', 'paramedicals']) {
+            const entSnap = await getDocs(query(collection(db, col), where('email', '==', data.linkedEmail)));
+            for (const ed of entSnap.docs) {
+              const eData: any = ed.data();
+              if (eData.qrNumber && eData.qrNumber !== canonical) {
+                await updateDoc(doc(db, col, ed.id), { qrNumber: canonical });
+                updatedEntities++;
+              }
+            }
+          }
+        }
+      }
+      toast.success(`Migration complete — ${updatedPool} qrPool doc(s), ${updatedEntities} entity doc(s) updated`);
+      await loadBatches();
+      await getNextAvailableNumber();
+    } catch (err) {
+      console.error('Migration failed:', err);
+      toast.error('Migration failed — see console');
+    } finally {
+      setMigrating(false);
+    }
+  };
 
   // Build a QR data-URL with HealQR logo overlay (matches doctor/clinic/lab/paramedical look)
   async function generateQRWithLogo(payload: string, size = 600): Promise<string> {
@@ -552,7 +607,7 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
 
       ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
 
-      // QR Number directly below QR
+      // QR Number directly below QR — this IS the IVR code (patient dials the digits)
       ctx.save();
       const fontSize = Math.floor(canvas.width * 0.035);
       ctx.font = `bold ${fontSize}px Arial, sans-serif`;
@@ -561,15 +616,10 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
       ctx.fillStyle = "#000000";
       const textY = qrY + qrSize + canvas.height * 0.005;
       ctx.fillText(qrNumber, boxCenterX, textY);
-
-      // IVR Code below QR Number (only if assigned)
-      const assigned = getAssignedInfo();
-      if (assigned?.ivrCode) {
-        ctx.font = `bold ${Math.floor(fontSize * 0.85)}px Arial, sans-serif`;
-        ctx.fillStyle = '#059669'; // emerald
-        ctx.fillText(`IVR: ${assigned.ivrCode}`, boxCenterX, textY + fontSize * 1.15);
-      }
       ctx.restore();
+
+      // (Use getAssignedInfo() only for the top-box name now — IVR is the qrNumber itself.)
+      const assigned = getAssignedInfo();
 
       // Assigned name into top hanging box (only if assigned)
       if (assigned?.name) {
@@ -633,7 +683,7 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
         ctx.drawImage(templateImg, 0, 0, canvas.width, canvas.height);
 
         const qrNum = batch.startQR + i;
-        const qrNumber = `HQR${String(qrNum).padStart(5, "0")}`;
+        const qrNumber = formatQR(qrNum);
 
         // Generate the QR Code at high resolution for crisp print quality
         const qrDataUrl = await QRCode.toDataURL(
@@ -879,7 +929,7 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
                   </div>
                   <div className="text-right">
                     <p className="text-2xl font-bold text-emerald-400 font-mono">
-                      HQR{String(nextAvailable).padStart(5, "0")}
+                      {nextAvailable !== null ? formatQR(nextAvailable) : '—'}
                     </p>
                     <Button
                       variant="ghost"
@@ -910,7 +960,7 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
                   value={startNumber}
                   onChange={(e) => setStartNumber(Number(e.target.value))}
                   min={1}
-                  max={99999}
+                  max={MAX_HQR}
                   className="bg-zinc-950 border-zinc-800 text-white placeholder:text-gray-500"
                 />
               </div>
@@ -925,7 +975,7 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
                   value={endNumber}
                   onChange={(e) => setEndNumber(Number(e.target.value))}
                   min={1}
-                  max={99999}
+                  max={MAX_HQR}
                   className="bg-zinc-950 border-zinc-800 text-white placeholder:text-gray-500"
                 />
               </div>
@@ -1009,8 +1059,8 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
               <p className="text-blue-400">
                 <strong>Batch Summary:</strong> {endNumber - startNumber + 1} QR
                 codes will be created (
-                {`HQR${String(startNumber).padStart(5, "0")}`} to{" "}
-                {`HQR${String(endNumber).padStart(5, "0")}`})
+                {formatQR(startNumber)} to{" "}
+                {formatQR(endNumber)})
               </p>
             </div>
 
@@ -1161,6 +1211,16 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
                <div>
                   <h2 className="text-xl sm:text-2xl font-bold text-white">QR Display Panel</h2>
                   <p className="text-gray-400 text-sm mt-1">Search, calibrate, and download single QR templates</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={runQrNumberMigration}
+                    disabled={migrating}
+                    className="mt-2 border-amber-500/40 text-amber-400 hover:bg-amber-500/10 h-8 text-xs"
+                  >
+                    {migrating ? <RefreshCw className="w-3 h-3 mr-1 animate-spin" /> : <RefreshCw className="w-3 h-3 mr-1" />}
+                    {migrating ? 'Migrating…' : 'Migrate Legacy HQR Numbers'}
+                  </Button>
                </div>
                <div className="flex gap-2 w-full sm:w-auto sm:min-w-[300px]">
                   <div className="relative flex-1">
@@ -1169,7 +1229,7 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
                       type="text"
                       value={displayQRNumber}
                       onChange={(e) => setDisplayQRNumber(e.target.value.toUpperCase())}
-                      placeholder="Enter QR Number (e.g. HQR00374)"
+                      placeholder="Enter QR Number (e.g. HQR380 or 380)"
                       className="pl-10 bg-zinc-950 border-zinc-800 text-white h-11"
                       onKeyDown={async (e) => {
                         if (e.key === "Enter") await searchAndDisplayQR();
@@ -1247,9 +1307,6 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
                           />
                           <div className="w-full text-center mt-[1%]">
                              <p className="font-bold text-black" style={{ fontSize: 'min(1vw, 10px)' }}>{displayQRData.qrNumber}</p>
-                             {(() => { const a = getAssignedInfo(); return a?.ivrCode ? (
-                               <p className="font-bold text-emerald-600" style={{ fontSize: 'min(0.85vw, 9px)' }}>IVR: {a.ivrCode}</p>
-                             ) : null; })()}
                           </div>
                         </div>
                       </div>
@@ -1613,7 +1670,7 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
                         </div>
                       )}
                       <div className="w-full text-center mt-[1%]">
-                         <p className="font-bold text-black" style={{ fontSize: 'min(1vw, 8px)' }}>{`HQR${String(selectedBatch.startQR).padStart(5, '0')}`}</p>
+                         <p className="font-bold text-black" style={{ fontSize: 'min(1vw, 8px)' }}>{formatQR(selectedBatch.startQR)}</p>
                       </div>
                     </div>
 
@@ -1629,7 +1686,7 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
                         Placement Verification
                       </p>
                       <p className="text-xs leading-relaxed">
-                        Adjust the sliders below to move the QR code. The preview shows exactly where the first code (**{`HQR${String(selectedBatch.startQR).padStart(5, '0')}`}**) will be placed on your **qr-template.png**.
+                        Adjust the sliders below to move the QR code. The preview shows exactly where the first code (**{formatQR(selectedBatch.startQR)}**) will be placed on your **qr-template.png**.
                       </p>
                     </div>
 
@@ -1838,26 +1895,26 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
     </div>
   );
 
-  // Resolve assigned entity into a unified display object (name, ivrCode, role).
+  // Resolve assigned entity into a unified display object (name, role).
   // We use the name EXACTLY as stored — no auto 'Dr.' prefix. If the entity already
   // saved their name with 'Dr.', it stays; if not, we don't fabricate one.
-  function getAssignedInfo(): { name: string; ivrCode: string; role: string } | null {
+  // IVR is unified with the qrNumber itself, so no ivrCode is returned.
+  function getAssignedInfo(): { name: string; role: string } | null {
     if (linkedDoctorData) {
       return {
         name: linkedDoctorData.name || linkedDoctorData.displayName || '',
-        ivrCode: linkedDoctorData.ivrCode || '',
         role: linkedDoctorData.specialization || 'Doctor',
       };
     }
     if (linkedClinicData) {
-      return { name: linkedClinicData.clinicName || linkedClinicData.name || '', ivrCode: linkedClinicData.ivrCode || '', role: 'Clinic' };
+      return { name: linkedClinicData.clinicName || linkedClinicData.name || '', role: 'Clinic' };
     }
     if (linkedLabData) {
-      return { name: linkedLabData.labName || linkedLabData.name || '', ivrCode: linkedLabData.ivrCode || '', role: 'Lab' };
+      return { name: linkedLabData.labName || linkedLabData.name || '', role: 'Lab' };
     }
     if (linkedParaData) {
       const roleMap: Record<string, string> = { phlebotomist: 'Phlebotomist', physiotherapist: 'Physiotherapist', nurse: 'Nurse', 'wound-dresser': 'Wound Dresser', aaya: 'Aaya', 'home-assistant': 'Home Assistant', nutritionist: 'Nutritionist' };
-      return { name: linkedParaData.name || '', ivrCode: linkedParaData.ivrCode || '', role: roleMap[linkedParaData.role] || 'Paramedical' };
+      return { name: linkedParaData.name || '', role: roleMap[linkedParaData.role] || 'Paramedical' };
     }
     return null;
   }
@@ -1874,11 +1931,14 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
     setLinkedParaData(null);
 
     try {
+      // Normalise input so the admin can paste any of: HQR380, HQR00380, 380, 00380
+      const canonical = normaliseQR(displayQRNumber);
+      if (!canonical) {
+        toast.error('Enter a valid HQR number');
+        return;
+      }
       const qrCollection = collection(db, "qrPool");
-      const q = query(
-        qrCollection,
-        where("qrNumber", "==", displayQRNumber.trim().toUpperCase()),
-      );
+      const q = query(qrCollection, where("qrNumber", "==", canonical));
       const snapshot = await getDocs(q);
 
       if (snapshot.empty) {
@@ -1896,12 +1956,11 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
 
       setDisplayQRImage(qrImage);
 
-      // Fetch linked entity (doctor / clinic / lab / paramedical) by email — first match wins
+      // Fetch linked entity (doctor / clinic / lab / paramedical) by email — first match wins.
+      // We only need the entity to render the assigned name in the template's top box;
+      // IVR is now unified with the HQR number itself, so no ivrCode lookup is needed.
       if (qrData.linkedEmail) {
         try {
-          const entityTypeMap: Record<string, 'doctor' | 'clinic' | 'lab' | 'paramedical'> = {
-            doctors: 'doctor', clinics: 'clinic', labs: 'lab', paramedicals: 'paramedical',
-          };
           const lookups: Array<{ col: string; setter: (d: any) => void }> = [
             { col: 'doctors', setter: setLinkedDoctorData },
             { col: 'clinics', setter: setLinkedClinicData },
@@ -1912,29 +1971,7 @@ export default function AdminQRGeneration({ onBack }: AdminQRGenerationProps) {
             const snap = await getDocs(query(collection(db, col), where('email', '==', qrData.linkedEmail)));
             if (!snap.empty) {
               const docRef = snap.docs[0];
-              let data: any = { id: docRef.id, ...docRef.data() };
-
-              // Lazy backfill: if this legacy entity has no IVR yet, mint one from
-              // the universal ivrCodes pool and persist it on the entity doc so
-              // the admin template can show it.
-              if (!data.ivrCode) {
-                try {
-                  const { generateIvrCode } = await import('../utils/ivrCodeGenerator');
-                  const minted = await generateIvrCode(
-                    data.name || data.clinicName || data.labName || 'User',
-                    data.dob || '',
-                    data.uid || data.id,
-                    entityTypeMap[col],
-                  );
-                  await updateDoc(doc(db, col, docRef.id), { ivrCode: minted });
-                  data = { ...data, ivrCode: minted };
-                  toast.success(`IVR code ${minted} generated for this ${entityTypeMap[col]}`);
-                } catch (mintErr) {
-                  console.warn('IVR auto-mint failed:', mintErr);
-                }
-              }
-
-              setter(data);
+              setter({ id: docRef.id, ...docRef.data() });
               break;
             }
           }

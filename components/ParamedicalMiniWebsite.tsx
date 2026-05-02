@@ -131,6 +131,25 @@ export default function ParamedicalMiniWebsite({ onBookNow, onBack }: Paramedica
       </div>
 
       <div className="max-w-lg mx-auto px-4 -mt-4 space-y-4 pb-24">
+        {/* Service Badges (admin-curated, max 4) */}
+        {Array.isArray(profile.serviceBadges) && profile.serviceBadges.length > 0 && (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+            <div className="flex flex-wrap gap-2 justify-center">
+              {profile.serviceBadges.map((badge: string, idx: number) => (
+                <span
+                  key={idx}
+                  className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-1.5 rounded-full text-sm font-medium shadow-md"
+                >
+                  {badge}
+                </span>
+              ))}
+            </div>
+            <p className="text-center text-teal-400 text-xs mt-3 font-medium">
+              {profile.serviceBadgesLabel || 'Done Here'}
+            </p>
+          </div>
+        )}
+
         {/* Bio */}
         {profile.bio && (
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">

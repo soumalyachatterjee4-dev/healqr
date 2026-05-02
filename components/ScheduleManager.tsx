@@ -5,7 +5,7 @@ import { Switch } from './ui/switch';
 import { Card } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
-import { Menu, Info, Plus, Minus, Calendar, Pencil, Trash2, Clock, MapPin, Users, CalendarIcon, Check, Eye, AlertTriangle, Phone, Building2, QrCode } from 'lucide-react';
+import { Menu, Info, Plus, Minus, Calendar, Pencil, Trash2, Clock, MapPin, Users, CalendarIcon, Check, Eye, AlertTriangle, Phone, Building2, QrCode, Briefcase } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import DashboardSidebar from './DashboardSidebar';
 import { toast } from 'sonner';
@@ -274,6 +274,12 @@ export default function ScheduleManager({
   const [endTime, setEndTime] = useState('');
   const [maxCapacity, setMaxCapacity] = useState(1);
   const [editingScheduleId, setEditingScheduleId] = useState<number | null>(null);
+
+  // MR Settings States
+  const [mrAllowed, setMrAllowed] = useState(false);
+  const [mrMaxCount, setMrMaxCount] = useState(3);
+  const [mrMeetingTime, setMrMeetingTime] = useState('interval');
+  const [mrIntervalAfterPatients, setMrIntervalAfterPatients] = useState(2);
 
   // State for saved schedules
   const [demoSchedules, setDemoSchedules] = useState<Array<{
@@ -838,6 +844,10 @@ export default function ScheduleManager({
     setEndTime('');
     setMaxCapacity(1);
     setEditingScheduleId(null);
+    setMrAllowed(false);
+    setMrMaxCount(3);
+    setMrMeetingTime('interval');
+    setMrIntervalAfterPatients(2);
   };
 
   const handleEditSchedule = (schedule: typeof demoSchedules[0]) => {
@@ -872,6 +882,10 @@ export default function ScheduleManager({
     setStartTime(schedule.startTime);
     setEndTime(schedule.endTime);
     setMaxCapacity(schedule.maxCapacity);
+    setMrAllowed(schedule.mrAllowed || false);
+    setMrMaxCount(schedule.mrMaxCount || 3);
+    setMrMeetingTime(schedule.mrMeetingTime || 'interval');
+    setMrIntervalAfterPatients(schedule.mrIntervalAfterPatients || 2);
 
     // Scroll to form
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1188,9 +1202,18 @@ export default function ScheduleManager({
       startTime,
       endTime,
       maxCapacity,
+      mrAllowed: !!mrAllowed,
       isActive: editingScheduleId ? demoSchedules.find(s => s.id === editingScheduleId)?.isActive ?? true : true,
       createdAt: editingScheduleId ? demoSchedules.find(s => s.id === editingScheduleId)?.createdAt : Date.now(),
     };
+
+    if (mrAllowed) {
+      if (mrMaxCount !== undefined) newSchedule.mrMaxCount = mrMaxCount;
+      if (mrMeetingTime !== undefined) newSchedule.mrMeetingTime = mrMeetingTime;
+      if (mrMeetingTime === 'interval' && mrIntervalAfterPatients !== undefined) {
+        newSchedule.mrIntervalAfterPatients = mrIntervalAfterPatients;
+      }
+    }
 
     // Only add optional fields if they have values (Firestore doesn't accept undefined)
     if (frequencyStartDate) {
@@ -1234,9 +1257,13 @@ export default function ScheduleManager({
           startTime: s.startTime,
           endTime: s.endTime,
           maxCapacity: s.maxCapacity,
+          mrAllowed: !!s.mrAllowed,
           isActive: s.isActive ?? true,
           createdAt: s.createdAt,
         };
+        if (s.mrMaxCount !== undefined) cleanSchedule.mrMaxCount = s.mrMaxCount;
+        if (s.mrMeetingTime !== undefined) cleanSchedule.mrMeetingTime = s.mrMeetingTime;
+        if (s.mrIntervalAfterPatients !== undefined) cleanSchedule.mrIntervalAfterPatients = s.mrIntervalAfterPatients;
         if (s.frequencyStartDate) cleanSchedule.frequencyStartDate = s.frequencyStartDate;
         if (s.customDate) cleanSchedule.customDate = s.customDate;
         if (s.clinicCode) cleanSchedule.clinicCode = s.clinicCode;
@@ -1283,6 +1310,10 @@ export default function ScheduleManager({
           startTime: s.startTime,
           endTime: s.endTime,
           maxCapacity: s.maxCapacity,
+          mrAllowed: s.mrAllowed,
+          mrMaxCount: s.mrMaxCount,
+          mrMeetingTime: s.mrMeetingTime,
+          mrIntervalAfterPatients: s.mrIntervalAfterPatients,
           isActive: s.isActive ?? true,
           createdAt: s.createdAt,
         };
@@ -2441,6 +2472,85 @@ export default function ScheduleManager({
                   </div>
                 </div>
 
+                {/* MR Settings */}
+                <div className="space-y-4 pt-4 border-t border-gray-700">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="mr-allowed" className="text-gray-300 text-sm flex items-center gap-2">
+                      <Briefcase className="w-4 h-4 text-amber-500" />
+                      Allow Medical Representative (MR) Visits
+                    </Label>
+                    <Switch
+                      id="mr-allowed"
+                      checked={mrAllowed}
+                      onCheckedChange={setMrAllowed}
+                      className="data-[state=checked]:bg-amber-500"
+                    />
+                  </div>
+
+                  {mrAllowed && (
+                    <div className="pl-6 space-y-4 border-l-2 border-gray-700 ml-2">
+                      <div className="space-y-2">
+                        <Label className="text-gray-400 text-xs">Number of MRs Allowed</Label>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setMrMaxCount(Math.max(1, mrMaxCount - 1))}
+                            className="w-10 h-10 flex items-center justify-center bg-gray-900/50 border border-gray-700 rounded-lg hover:bg-gray-900 transition-colors"
+                          >
+                            <Minus className="w-4 h-4 text-gray-400" />
+                          </button>
+                          <Input
+                            type="number"
+                            min="1"
+                            max="10"
+                            value={mrMaxCount}
+                            onChange={(e) => setMrMaxCount(Math.max(1, parseInt(e.target.value) || 1))}
+                            className="w-20 py-2 px-2 h-10 bg-gray-900/50 border border-gray-700 text-white text-center"
+                          />
+                          <span className="text-gray-400 text-sm whitespace-nowrap">MR/s</span>
+                          <button
+                            type="button"
+                            onClick={() => setMrMaxCount(Math.min(10, mrMaxCount + 1))}
+                            className="w-10 h-10 flex items-center justify-center bg-gray-900/50 border border-gray-700 rounded-lg hover:bg-gray-900 transition-colors"
+                          >
+                            <Plus className="w-4 h-4 text-gray-400" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-gray-400 text-xs">Meeting Time</Label>
+                        <Select value={mrMeetingTime} onValueChange={setMrMeetingTime}>
+                          <SelectTrigger className="w-full bg-gray-900/50 border-gray-700 text-white">
+                            <SelectValue placeholder="Select meeting time" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-gray-800 border-gray-700">
+                            <SelectItem value="before" className="text-white hover:bg-gray-700 focus:bg-gray-700 focus:text-white cursor-pointer">Before Patients</SelectItem>
+                            <SelectItem value="after" className="text-white hover:bg-gray-700 focus:bg-gray-700 focus:text-white cursor-pointer">After Patients</SelectItem>
+                            <SelectItem value="interval" className="text-white hover:bg-gray-700 focus:bg-gray-700 focus:text-white cursor-pointer">Interval Between Patients</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {mrMeetingTime === 'interval' && (
+                        <div className="space-y-2">
+                          <Label className="text-gray-400 text-xs">Interval (After every X patients)</Label>
+                          <Select value={mrIntervalAfterPatients.toString()} onValueChange={(v) => setMrIntervalAfterPatients(parseInt(v))}>
+                            <SelectTrigger className="w-full bg-gray-900/50 border-gray-700 text-white">
+                              <SelectValue placeholder="Select interval" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-gray-800 border-gray-700">
+                              <SelectItem value="1" className="text-white hover:bg-gray-700 focus:bg-gray-700 focus:text-white cursor-pointer">After 1 patient</SelectItem>
+                              <SelectItem value="2" className="text-white hover:bg-gray-700 focus:bg-gray-700 focus:text-white cursor-pointer">After 2 patients</SelectItem>
+                              <SelectItem value="3" className="text-white hover:bg-gray-700 focus:bg-gray-700 focus:text-white cursor-pointer">After 3 patients</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 {/* Action Buttons */}
                 <div className="flex items-center justify-between pt-4">
                   <Button
@@ -2640,10 +2750,18 @@ export default function ScheduleManager({
 
                       {/* Capacity & Actions */}
                       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-4 border-t border-gray-700">
-                        <div className="flex items-center gap-2">
-                          <Users className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
-                          <span className="text-white text-sm font-bold">{schedule.maxCapacity}</span>
-                          <span className="text-gray-400 text-xs sm:text-sm lowercase">patients/day</span>
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-2">
+                            <Users className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
+                            <span className="text-white text-sm font-bold">{schedule.maxCapacity}</span>
+                            <span className="text-gray-400 text-xs sm:text-sm lowercase">patients/day</span>
+                          </div>
+                          {schedule.mrAllowed && (
+                            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded-md">
+                              <Briefcase className="w-3.5 h-3.5 text-amber-500" />
+                              <span className="text-amber-500 text-xs font-semibold">{schedule.mrMaxCount} MRs</span>
+                            </div>
+                          )}
                         </div>
 
                         <div className="flex items-center gap-2 w-full sm:w-auto">

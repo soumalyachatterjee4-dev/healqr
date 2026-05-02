@@ -9,6 +9,7 @@ import { sendSignInLinkToEmail, createUserWithEmailAndPassword } from 'firebase/
 import { collection, getDocs } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { getStateFromPincode } from '../utils/pincodeMapping';
+import { formatQR } from '../utils/qrNumber';
 
 interface PharmaCompanyMatch {
   id: string;
@@ -176,7 +177,7 @@ export default function ClinicSignUp({ onBack, onLogin }: ClinicSignUpProps) {
           }
         });
 
-        finalQrNumber = `HQR${String(maxNumber + 1).padStart(5, '0')}`;
+        finalQrNumber = formatQR(maxNumber + 1);
         // Save Virtual QR to qrPool collection
         await addDoc(qrPoolCollection, {
           qrNumber: finalQrNumber,

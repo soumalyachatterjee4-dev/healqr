@@ -84,7 +84,6 @@ interface ClinicData {
   phone?: string;
   logoUrl?: string;
   companyName?: string;
-  ivrCode?: string;
   linkedDoctorCodes?: string[];
   linkedDoctorsDetails?: Array<{
     doctorId: string;
@@ -680,7 +679,7 @@ export default function ClinicDashboard({ onLogout }: { onLogout?: () => void | 
         profileData={{
           image: clinicData?.logoUrl || null,
           name: displayClinicName,
-          ivrCode: clinicData?.ivrCode,
+          qrNumber: clinicData?.qrNumber,
         }}
       />
     );

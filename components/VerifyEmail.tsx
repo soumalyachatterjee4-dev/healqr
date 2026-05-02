@@ -143,10 +143,6 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
             const { generateClinicCode } = await import('../utils/idGenerator');
             const clinicCode = await generateClinicCode(signupData.pinCode);
 
-            // Generate IVR code for non-smartphone users
-            const { generateIvrCode } = await import('../utils/ivrCodeGenerator');
-            const ivrCode = await generateIvrCode(signupData.clinicName, '', user.uid, 'clinic');
-
             // Generate clinic slug and booking URL
             let clinicSlug = signupData.clinicName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
             let bookingUrl = `https://healqr.com/clinic/${clinicSlug}`;
@@ -177,7 +173,6 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
                 clinicSlug: clinicSlug,
                 bookingUrl: bookingUrl,
                 qrCode: qrUrl,
-                ivrCode: ivrCode,
                 createdAt: serverTimestamp(),
                 type: 'clinic',
                 linkedDoctorCodes: [],
@@ -300,10 +295,6 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
           const { generateLabCode } = await import('../utils/idGenerator');
           const labCode = await generateLabCode(signupData.pinCode);
 
-          // Generate IVR code for non-smartphone users
-          const { generateIvrCode: generateLabIvrCode } = await import('../utils/ivrCodeGenerator');
-          const ivrCode = await generateLabIvrCode(signupData.labName || signupData.name, '', user.uid, 'lab');
-
           // Generate lab slug and booking URL
           const labName = signupData.labName || signupData.name;
           let labSlug = labName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
@@ -334,7 +325,6 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
             labSlug: labSlug,
             bookingUrl: bookingUrl,
             qrCode: qrUrl,
-            ivrCode: ivrCode,
             createdAt: serverTimestamp(),
             type: 'lab',
             locations: signupData.locations || [{ id: '001', name: labName, landmark: '' }],
@@ -485,7 +475,6 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
         email: email,
         qrNumber: qrId,
         bookingUrl: bookingUrl,
-        ivrCode: '' // Will be set after generation
       };
 
       // Save doctor data to Firestore (permanent storage) - OPTIMIZE: Run in parallel with QR linking
@@ -500,11 +489,6 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
 
         // Generate unique doctor code based on pincode
         const doctorCode = await generateDoctorCode(signupData.pinCode || '000000');
-
-        // Generate IVR code for non-smartphone users
-        const { generateIvrCode } = await import('../utils/ivrCodeGenerator');
-        const ivrCode = await generateIvrCode(signupData.name, signupData.dob || '', user.uid, 'doctor');
-        tempDoctorData.ivrCode = ivrCode; // Pass IVR code to styled QR generator
 
         await setDoc(doctorDocRef, {
           uid: user.uid,
@@ -522,7 +506,6 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
           division: (signupData.division || '').trim(), // Division for pre-printed QR
           qrDocId: '', // Will be set after QR doc lookup
           doctorCode: doctorCode,
-          ivrCode: ivrCode,
           baCode: signupData.baCode || '',
           activationQrCode: signupData.activationQrCode || '',
           qrCode: qrUrl,
@@ -765,10 +748,10 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
       console.warn('Logo overlay skipped:', e);
     }
 
-    // IVR Code pill (below QR)
-    if (data.ivrCode) {
+    // Phone Booking Code pill (below QR) — the HQR number IS the IVR code
+    if (data.qrNumber) {
       const pillY = qrY + qrSize + 18;
-      const codeText = `📞 IVR Code: ${data.ivrCode}`;
+      const codeText = `📞 ${data.qrNumber}`;
       ctx.font = 'bold 22px system-ui, -apple-system, sans-serif';
       const textWidth = ctx.measureText(codeText).width;
       const pillWidth = textWidth + 40;
@@ -786,8 +769,8 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
       ctx.fillText(codeText, width / 2, pillY + pillHeight / 2);
     }
 
-    // Doctor name — when IVR pill present, leave a clear gap below it (pill bottom ≈ qrSize+56)
-    const nameY = data.ivrCode ? qrY + qrSize + 110 : qrY + qrSize + 40;
+    // Doctor name — when pill present, leave a clear gap below it (pill bottom ≈ qrSize+56)
+    const nameY = data.qrNumber ? qrY + qrSize + 110 : qrY + qrSize + 40;
     ctx.fillStyle = '#1f2937';
     ctx.font = 'bold 30px system-ui, sans-serif';
     ctx.textAlign = 'center';
@@ -812,12 +795,12 @@ export default function VerifyEmail({ onSuccess, onError }: VerifyEmailProps) {
     ctx.lineTo(width * 0.8, nameY + 90);
     ctx.stroke();
 
-    // IVR info text for non-smartphone users
-    if (data.ivrCode) {
+    // Phone-booking call-out for non-smartphone users
+    if (data.qrNumber) {
       ctx.fillStyle = '#6b7280';
       ctx.font = '14px system-ui, sans-serif';
       ctx.fillText('No smartphone? Call 1800-XXX-XXXX', width / 2, nameY + 115);
-      ctx.fillText(`and enter code: ${data.ivrCode}`, width / 2, nameY + 135);
+      ctx.fillText(`and enter code: ${data.qrNumber}`, width / 2, nameY + 135);
     }
 
     // HealQR branding

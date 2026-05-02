@@ -28,7 +28,8 @@ import {
   Database,
   Target,
   Monitor,
-  Megaphone
+  Megaphone,
+  Briefcase
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import healqrLogo from '../assets/healqr.logo.png';
@@ -157,6 +158,7 @@ export default function DashboardSidebar({
     { id: 'patient-broadcast', label: 'Patient Broadcast', icon: Megaphone },
     { id: 'social-kit', label: 'Social Kit & Offers', icon: Share2 },
     { id: 'paramedical-manager', label: 'Paramedical Manager', icon: Heart },
+    { id: 'mr-management', label: 'MR Management', icon: Briefcase },
   ];
 
   const generalTools = [

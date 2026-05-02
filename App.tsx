@@ -107,6 +107,10 @@ const PhlebotomistLogin = lazy(() => import("./components/ParamedicalLogin"));
 const PhlebotomistDashboard = lazy(() => import("./components/ParamedicalDashboard"));
 const ParamedicalSignUp = lazy(() => import("./components/ParamedicalSignUp"));
 const ParamedicalLogin = lazy(() => import("./components/ParamedicalLogin"));
+const MRSignUp = lazy(() => import("./components/MRSignUp"));
+const MRLogin = lazy(() => import("./components/MRLogin"));
+const MRDashboard = lazy(() => import("./components/MRDashboard"));
+const MRManagement = lazy(() => import("./components/MRManagement"));
 const ParamedicalDashboard = lazy(() => import("./components/ParamedicalDashboard"));
 const ParamedicalMiniWebsite = lazy(() => import("./components/ParamedicalMiniWebsite"));
 const ParamedicalBookingFlow = lazy(() => import("./components/ParamedicalBookingFlow"));
@@ -278,6 +282,10 @@ export default function App() {
     | "paramedical-dashboard"
     | "paramedical-mini-website"
     | "paramedical-booking-flow"
+    | "mr-signup"
+    | "mr-login"
+    | "mr-dashboard"
+    | "mr-management"
   >(() => {
     // CRITICAL: Check URL pathname FIRST — prevents flash of wrong page on magic link clicks
     const pathname = window.location.pathname;
@@ -315,18 +323,24 @@ export default function App() {
     if (pathname.includes('/assistant-login')) return 'assistant-login';
     if (pathname.includes('/master-access-login')) return 'master-access-login';
     if (pathname.includes('/temp-doctor-login')) return 'temp-doctor-login';
+    if (pathname.includes('/mr-signup')) return 'mr-signup';
+    if (pathname.includes('/mr-login')) return 'mr-login';
+    if (pathname === '/mr' || pathname === '/mr/') return 'mr-signup';
 
     // Initialize currentPage from localStorage to prevent flash/auto-logout on refresh
     const isClinic = localStorage.getItem('healqr_is_clinic') === 'true';
     const isLab = localStorage.getItem('healqr_is_lab') === 'true';
     const isPhlebo = localStorage.getItem('healqr_is_phlebo') === 'true' || localStorage.getItem('healqr_is_paramedical') === 'true';
     const isAssistant = localStorage.getItem('healqr_is_assistant') === 'true';
+    const isMR = localStorage.getItem('healqr_is_mr') === 'true';
     const hasClinicSession = isClinic && (localStorage.getItem('userId') || localStorage.getItem('healqr_user_email'));
     if (hasClinicSession) return 'clinic-dashboard'; // Clinic owners AND clinic assistants
     const hasLabSession = isLab && (localStorage.getItem('userId') || localStorage.getItem('healqr_user_email'));
     if (hasLabSession) return 'lab-dashboard';
     const hasPhlebSession = isPhlebo && (localStorage.getItem('userId') || localStorage.getItem('healqr_user_email'));
     if (hasPhlebSession) return 'paramedical-dashboard';
+    const hasMRSession = isMR && (localStorage.getItem('userId') || localStorage.getItem('healqr_user_email'));
+    if (hasMRSession) return 'mr-dashboard';
     // Doctor-level assistants should also start on dashboard
     if (isAssistant && localStorage.getItem('healqr_assistant_doctor_id')) return 'dashboard';
     return 'landing';
@@ -1048,6 +1062,18 @@ export default function App() {
       } catch {}
     }
 
+    // Handle MR Direct Referral (?mrId=...)
+    const mrIdParam = urlParams.get('mrId');
+    if (mrIdParam) {
+      sessionStorage.setItem('booking_referrer_id', mrIdParam);
+      sessionStorage.setItem('booking_referrer_name', urlParams.get('mrName') || '');
+      sessionStorage.setItem('booking_referrer_role', 'MR');
+      sessionStorage.setItem('booking_referrer_organization', urlParams.get('mrCompany') || '');
+      sessionStorage.setItem('booking_referrer_phone', urlParams.get('mrPhone') || '');
+      sessionStorage.setItem('booking_referrer_division', urlParams.get('mrDivision') || '');
+      sessionStorage.setItem('booking_source', 'mr_referral');
+    }
+
     // Handle Clinic QR Scan (ONLY if no doctor selected yet)
     // Skip if this is a master-access-login link (also has clinicId param)
     if (clinicId && !doctorId && !pathname.includes('/master-access-login')) {
@@ -1078,6 +1104,12 @@ export default function App() {
       return;
     } else if (pageParam === 'phlebo-login' || pageParam === 'paramedical-login') {
       setCurrentPage('paramedical-login');
+      return;
+    } else if (pageParam === 'mr-signup') {
+      setCurrentPage('mr-signup');
+      return;
+    } else if (pageParam === 'mr-login') {
+      setCurrentPage('mr-login');
       return;
     } else if (pageParam === 'clinic-dashboard') {
       setCurrentPage('clinic-dashboard');
@@ -1356,11 +1388,15 @@ export default function App() {
 
       // If doctorId is "SCAN", look up doctor by QR number
       if (doctorId === 'SCAN') {
-        const qrNumber = urlParams.get('qrNumber');
+        const rawQr = urlParams.get('qrNumber');
+        // Normalise: accepts HQR380, HQR00380 (legacy padded form on already-printed
+        // standees), or just digits (380). All resolve to canonical "HQR380".
+        const { normaliseQR } = await import('./utils/qrNumber');
+        const qrNumber = rawQr ? normaliseQR(rawQr) : '';
         if (qrNumber && db) {
           const { collection, query, where, getDocs } = await import('firebase/firestore');
           const doctorsRef = collection(db, 'doctors');
-          const q = query(doctorsRef, where('qrNumber', '==', qrNumber.toUpperCase()));
+          const q = query(doctorsRef, where('qrNumber', '==', qrNumber));
           const querySnapshot = await getDocs(q);
 
           if (!querySnapshot.empty) {
@@ -1441,8 +1477,9 @@ export default function App() {
             }
           } else {
             // Not found in doctors — check clinics collection (pre-printed QR may belong to a clinic)
+            // qrNumber here is already normalised by normaliseQR() above
             const clinicsRef = collection(db, 'clinics');
-            const clinicQ = query(clinicsRef, where('qrNumber', '==', qrNumber.toUpperCase()));
+            const clinicQ = query(clinicsRef, where('qrNumber', '==', qrNumber));
             const clinicSnapshot = await getDocs(clinicQ);
 
             if (!clinicSnapshot.empty) {
@@ -1661,9 +1698,9 @@ export default function App() {
       const isAdvertiserPage = currentPage === 'advertiser-login' || currentPage === 'advertiser-signup' || currentPage === 'advertiser-verify' || pageParam === 'advertiser-login' || pageParam === 'advertiser-signup' || pageParam === 'advertiser-verify';
       const isPharmaPage = currentPage === 'pharma-login' || currentPage === 'pharma-verify' || currentPage === 'pharma-portal' || currentPage === 'pharma-signup' || pageParam === 'pharma-login' || pageParam === 'pharma-verify' || pageParam === 'pharma-portal' || pageParam === 'pharma-signup';
 
-      if (isVerificationLink || isBookingMode || hasBookingDoctorId || hasBookingClinicId || isSlugUrl || isNotificationPage || isVerifyVisit || isOnVerifyLoginPage || isOnVerifyEmailPage || isOnAssistantLoginPage || isOnMasterAccessLoginPage || isClinicPage || isLabPage || isPhlebPage || isAdvertiserPage || isPharmaPage || currentPage === 'verify-email' || currentPage === 'verify-login' || currentPage === 'assistant-login' || currentPage === 'master-access-login' || currentPage === 'temp-doctor-login' || currentPage === 'temp-doctor-dashboard' || currentPage === 'admin-verify' || currentPage === 'verify-walkin' || currentPage === 'queue-display' || currentPage === 'lab-queue-display' || pageParam === 'lab-queue-display' || currentPage === 'leave-apply' || currentPage.startsWith('booking-') || currentPage === 'clinic-booking-flow' || currentPage === 'lab-mini-website') {
+      if (isVerificationLink || hasBookingDoctorId || hasBookingClinicId || isSlugUrl || isNotificationPage || isVerifyVisit || isOnVerifyLoginPage || isOnVerifyEmailPage || isOnAssistantLoginPage || isOnMasterAccessLoginPage || isClinicPage || isLabPage || isPhlebPage || isAdvertiserPage || isPharmaPage || currentPage === 'verify-email' || currentPage === 'verify-login' || currentPage === 'assistant-login' || currentPage === 'master-access-login' || currentPage === 'temp-doctor-login' || currentPage === 'temp-doctor-dashboard' || currentPage === 'admin-verify' || currentPage === 'verify-walkin' || currentPage === 'queue-display' || currentPage === 'lab-queue-display' || pageParam === 'lab-queue-display' || currentPage === 'leave-apply' || currentPage.startsWith('booking-') || currentPage === 'clinic-booking-flow' || currentPage === 'lab-mini-website') {
         console.log('🔍 [AUTH] EARLY RETURN - skipping auth check. Reasons:', {
-          isVerificationLink, isBookingMode, hasBookingDoctorId, hasBookingClinicId, isSlugUrl,
+          isVerificationLink, hasBookingDoctorId, hasBookingClinicId, isSlugUrl,
           isNotificationPage, isVerifyVisit, isOnVerifyLoginPage, isOnVerifyEmailPage,
           isPhlebPage, isClinicPage, isLabPage, currentPage
         });
@@ -2945,6 +2982,8 @@ export default function App() {
       setCurrentPage("social-kit");
     else if (menu === "paramedical-manager")
       setCurrentPage("paramedical-manager");
+    else if (menu === "mr-management")
+      setCurrentPage("mr-management");
     else if (menu === "reminder-notifications")
       setCurrentPage("reminder-notifications");
     else if (menu === "video-library") {
@@ -3012,6 +3051,8 @@ export default function App() {
       localStorage.removeItem('healqr_is_location_manager');
       localStorage.removeItem('healqr_location_id');
       localStorage.removeItem('healqr_parent_clinic_id');
+      localStorage.removeItem('healqr_is_mr');
+      localStorage.removeItem('healqr_mr_id');
       localStorage.removeItem('userId');
       localStorage.removeItem('healqr_profile_photo');
       localStorage.removeItem('healqr_doctor_stats');
@@ -3397,7 +3438,8 @@ export default function App() {
             image: userProfileData.profileImage,
             name: userProfileData.name || userName,
             degrees: userProfileData.degrees,
-            specialities: userProfileData.specialities
+            specialities: userProfileData.specialities,
+            qrNumber: userQrNumber,
           }}
           onLogout={handleLogout}
           onMenuChange={menuChangeHandler}
@@ -4304,6 +4346,40 @@ export default function App() {
             doctorName={notifData.doctorName}
             scheduledDate={notifData.date}
             scheduledTime={notifData.time}
+          />
+        </Suspense>
+      )}
+
+      {currentPage === "mr-signup" && (
+        <Suspense fallback={<PageLoader />}>
+          <MRSignUp
+            onBack={() => setCurrentPage("landing")}
+            onLogin={() => setCurrentPage("mr-login")}
+          />
+        </Suspense>
+      )}
+
+      {currentPage === "mr-login" && (
+        <Suspense fallback={<PageLoader />}>
+          <MRLogin
+            onBack={() => setCurrentPage("landing")}
+            onSignUp={() => setCurrentPage("mr-signup")}
+          />
+        </Suspense>
+      )}
+
+      {currentPage === "mr-dashboard" && (
+        <Suspense fallback={<PageLoader />}>
+          <MRDashboard onLogout={handleLogout} />
+        </Suspense>
+      )}
+
+      {currentPage === "mr-management" && (
+        <Suspense fallback={<PageLoader />}>
+          <MRManagement
+            doctorId={localStorage.getItem('userId') || ''}
+            onMenuChange={menuChangeHandler}
+            onLogout={handleLogout}
           />
         </Suspense>
       )}

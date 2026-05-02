@@ -26,6 +26,7 @@ interface QRManagerProps {
     degrees?: string[];
     specialties?: string[];
     specialities?: string[];
+    qrNumber?: string;
   };
   activeAddOns?: string[];
   initialTab?: string;
@@ -42,7 +43,7 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [assignedQrCode, setAssignedQrCode] = useState<string>('');
-  const [ivrCode, setIvrCode] = useState<string>('');
+  const [qrNumber, setQrNumber] = useState<string>('');
 
   // Doctor Information
   const doctorImage = profileData?.image || null;
@@ -126,9 +127,9 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
           setAssignedQrCode(data.activationQrCode);
         }
 
-        // Set IVR code
-        if (data.ivrCode) {
-          setIvrCode(data.ivrCode);
+        // Set QR number (used as the unified Phone Booking Code / IVR code)
+        if (data.qrNumber) {
+          setQrNumber(data.qrNumber);
         }
 
         if (data.trialEndDate) {
@@ -591,10 +592,10 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
     ctx.font = `700 ${height * 0.028}px system-ui, -apple-system, sans-serif`;
     ctx.fillText('HEALQR.COM', width / 2, footerY + footerHeight * 0.82);
 
-    // IVR Code section (above footer if available)
-    if (ivrCode) {
+    // Phone Booking Code section (above footer) — the HQR number IS the IVR code
+    if (qrNumber) {
       const ivrY = footerY - height * 0.06;
-      const ivrText = `📞 IVR: ${ivrCode}`;
+      const ivrText = `📞 ${qrNumber}`;
       ctx.font = `bold ${height * 0.026}px system-ui, sans-serif`;
       const ivrWidth = ctx.measureText(ivrText).width + height * 0.04;
       const ivrHeight = height * 0.04;
@@ -716,10 +717,10 @@ export default function QRManager({ onMenuChange, onLogout, onTestBooking, profi
                           alt="QR Code"
                           className="max-w-full h-auto"
                         />
-                        {ivrCode && (
+                        {qrNumber && (
                           <div className="mt-4 flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-5 py-2">
                             <Phone className="w-4 h-4 text-emerald-400" />
-                            <span className="text-sm font-bold text-emerald-400 tracking-wider">IVR: {ivrCode}</span>
+                            <span className="text-sm font-bold text-emerald-400 tracking-wider">{qrNumber}</span>
                           </div>
                         )}
                       </>
