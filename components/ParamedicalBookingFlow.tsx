@@ -19,19 +19,26 @@ const SERVICE_LABELS: Record<string, string> = {
   'home-assistant': 'Home Care Visit',
 };
 
-type BookingStep = 'schedule' | 'details' | 'confirmation';
+type BookingStep = 'chamber' | 'schedule' | 'details' | 'confirmation';
 
 interface ParamedicalBookingFlowProps {
   onBack: () => void;
 }
 
+// Helper: get day list from a schedule (supports both new days[] and legacy day)
+const getScheduleDays = (s: any): string[] =>
+  s.days && Array.isArray(s.days) && s.days.length ? s.days : (s.day ? [s.day] : []);
+
 export default function ParamedicalBookingFlow({ onBack }: ParamedicalBookingFlowProps) {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [step, setStep] = useState<BookingStep>('schedule');
+  const [step, setStep] = useState<BookingStep>('chamber');
   const [submitting, setSubmitting] = useState(false);
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
   const [confirmationData, setConfirmationData] = useState<any>(null);
+
+  // Chamber state
+  const [selectedChamber, setSelectedChamber] = useState<any>(null);
 
   // Schedule state
   const [selectedDate, setSelectedDate] = useState('');
@@ -67,28 +74,52 @@ export default function ParamedicalBookingFlow({ onBack }: ParamedicalBookingFlo
     load();
   }, [paraId]);
 
-  // Generate available dates (next 14 days that match schedule)
+  // Auto-skip chamber step if only one chamber exists
   useEffect(() => {
-    if (!profile?.schedules?.length) return;
-    // When date is selected, find matching time slots
-    if (!selectedDate) return;
+    if (!profile || loading) return;
+    if (step !== 'chamber' || selectedChamber) return;
+    const active = (profile.schedules || []).filter((s: any) => s.isActive);
+    if (active.length === 1) {
+      setSelectedChamber(active[0]);
+      setStep('schedule');
+    }
+  }, [profile, loading, step, selectedChamber]);
+
+  // When date is selected, find matching time slots for the selected chamber
+  useEffect(() => {
+    if (!profile?.schedules?.length || !selectedDate || !selectedChamber) return;
     const dateObj = new Date(selectedDate);
     const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
-    const matchingSlots = profile.schedules.filter((s: any) => s.isActive && s.day === dayName);
+    // Only show slots belonging to the chosen chamber that are active on this day
+    const matchingSlots = profile.schedules.filter((s: any) => {
+      if (!s.isActive) return false;
+      const chamberMatch = s.id === selectedChamber.id;
+      if (!chamberMatch) return false;
+      return getScheduleDays(s).includes(dayName);
+    });
     setAvailableSlots(matchingSlots);
     setSelectedSlot('');
-  }, [selectedDate, profile]);
+  }, [selectedDate, profile, selectedChamber]);
+
+  // Group schedules by chamber (unique chamberName + chamberAddress)
+  const getChambers = () => {
+    if (!profile?.schedules?.length) return [];
+    const activeSchedules = profile.schedules.filter((s: any) => s.isActive);
+    // De-duplicate by schedule id — each schedule entry is its own "chamber"
+    return activeSchedules;
+  };
 
   const getAvailableDates = () => {
-    if (!profile?.schedules?.length) return [];
-    const activeDays = new Set(profile.schedules.filter((s: any) => s.isActive).map((s: any) => s.day));
+    if (!profile?.schedules?.length || !selectedChamber) return [];
+    const days = getScheduleDays(selectedChamber);
+    const activeDaysSet = new Set(days);
     const dates: string[] = [];
     const today = new Date();
-    for (let i = 1; i <= 14; i++) {
+    for (let i = 0; i <= 14; i++) {
       const d = new Date(today);
       d.setDate(today.getDate() + i);
       const dayName = d.toLocaleDateString('en-US', { weekday: 'long' });
-      if (activeDays.has(dayName)) {
+      if (activeDaysSet.has(dayName)) {
         dates.push(d.toISOString().split('T')[0]);
       }
     }
@@ -121,7 +152,11 @@ export default function ParamedicalBookingFlow({ onBack }: ParamedicalBookingFlo
       const existingSnap = await getDocs(existingQ);
       const serialNo = existingSnap.size + 1;
 
-      const bookingData = {
+      // Generate HQR-style booking ID
+      const datePart = selectedDate.replace(/-/g, '').slice(2);
+      const bookingId = `HQR-${datePart}-${String(serialNo).padStart(4, '0')}-P`;
+
+      const bookingData: any = {
         paramedicalId: paraId,
         paramedicalName: profile?.name || '',
         paramedicalRole: profile?.role || '',
@@ -138,10 +173,22 @@ export default function ParamedicalBookingFlow({ onBack }: ParamedicalBookingFlo
         notes: notes.trim(),
         status: 'confirmed',
         serialNo,
+        tokenNumber: `#${serialNo}`,
+        bookingId,
         bookingSource,
         scanSessionId,
+        visitType: 'qr',
+        isWalkIn: false,
         createdAt: serverTimestamp(),
       };
+
+      // Attach chamber details so Today's Schedule can associate the booking
+      if (selectedChamber) {
+        bookingData.scheduleId = selectedChamber.id;
+        if (selectedChamber.chamberName) bookingData.chamberName = selectedChamber.chamberName;
+        if (selectedChamber.chamberAddress) bookingData.chamberAddress = selectedChamber.chamberAddress;
+        if (selectedChamber.clinicCode) bookingData.clinicCode = selectedChamber.clinicCode;
+      }
 
       const docRef = await addDoc(collection(db, 'paramedicalBookings'), bookingData);
       setConfirmationData({ ...bookingData, id: docRef.id, serialNo });
@@ -165,6 +212,7 @@ export default function ParamedicalBookingFlow({ onBack }: ParamedicalBookingFlo
 
   const serviceLabel = SERVICE_LABELS[profile?.role] || 'Service';
   const availableDates = getAvailableDates();
+  const chambers = getChambers();
 
   // ===== CONFIRMATION SCREEN =====
   if (bookingConfirmed && confirmationData) {
@@ -196,6 +244,18 @@ export default function ParamedicalBookingFlow({ onBack }: ParamedicalBookingFlo
               <span className="text-gray-400 text-sm">Token #</span>
               <span className="text-teal-400 font-bold text-lg">{confirmationData.serialNo}</span>
             </div>
+            {confirmationData.bookingId && (
+              <div className="flex justify-between">
+                <span className="text-gray-400 text-sm">Booking ID</span>
+                <span className="text-blue-400 font-mono text-xs">{confirmationData.bookingId}</span>
+              </div>
+            )}
+            {confirmationData.chamberName && (
+              <div className="flex justify-between">
+                <span className="text-gray-400 text-sm">Chamber</span>
+                <span className="text-white text-sm text-right">{confirmationData.chamberName}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-gray-400 text-sm">Patient</span>
               <span className="text-white text-sm">{confirmationData.patientName}</span>
@@ -208,12 +268,80 @@ export default function ParamedicalBookingFlow({ onBack }: ParamedicalBookingFlo
     );
   }
 
+  // ===== STEP: CHAMBER =====
+  if (step === 'chamber') {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-white">
+        <div className="sticky top-0 z-30 bg-zinc-950/90 backdrop-blur-lg border-b border-zinc-800 px-4 py-3 flex items-center gap-3">
+          <button onClick={onBack} className="text-gray-400 hover:text-white"><ArrowLeft className="w-5 h-5" /></button>
+          <span className="text-white font-semibold text-sm">Select Chamber</span>
+        </div>
+
+        <div className="max-w-lg mx-auto p-4 space-y-6">
+          {/* Professional info */}
+          <div className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+            <div className="w-12 h-12 bg-teal-500/20 rounded-lg flex items-center justify-center">
+              <Stethoscope className="w-6 h-6 text-teal-400" />
+            </div>
+            <div>
+              <p className="text-white font-medium">{profile?.name}</p>
+              <p className="text-gray-400 text-sm">{serviceLabel}</p>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-teal-500" /> Choose a Chamber
+            </h3>
+            {chambers.length === 0 ? (
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8 text-center">
+                <p className="text-gray-500">No active chambers. This professional hasn't set up any schedules yet.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {chambers.map((c: any) => {
+                  const dList = getScheduleDays(c);
+                  const isSelected = selectedChamber?.id === c.id;
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => { setSelectedChamber(c); setStep('schedule'); }}
+                      className={`w-full text-left p-4 rounded-xl border transition-colors ${
+                        isSelected ? 'bg-teal-500/10 border-teal-500' : 'bg-zinc-900 border-zinc-800 hover:border-zinc-600'
+                      }`}
+                    >
+                      <p className="text-white font-semibold uppercase text-sm">{c.chamberName || 'Chamber'}</p>
+                      {c.chamberAddress && <p className="text-gray-400 text-xs mt-1">{c.chamberAddress}</p>}
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {dList.map((d: string) => (
+                          <span key={d} className="px-2 py-0.5 rounded-full bg-teal-500/15 border border-teal-500/30 text-teal-400 text-[10px] font-medium">
+                            {d.slice(0, 3)}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-2">
+                        <Clock className="w-3 h-3" />
+                        <span>{c.startTime} – {c.endTime}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // ===== STEP: SCHEDULE =====
   if (step === 'schedule') {
     return (
       <div className="min-h-screen bg-zinc-950 text-white">
         <div className="sticky top-0 z-30 bg-zinc-950/90 backdrop-blur-lg border-b border-zinc-800 px-4 py-3 flex items-center gap-3">
-          <button onClick={onBack} className="text-gray-400 hover:text-white"><ArrowLeft className="w-5 h-5" /></button>
+          <button onClick={() => { if (chambers.length > 1) { setStep('chamber'); setSelectedChamber(null); } else { onBack(); } }} className="text-gray-400 hover:text-white">
+            <ArrowLeft className="w-5 h-5" />
+          </button>
           <span className="text-white font-semibold text-sm">Select Date & Time</span>
         </div>
 

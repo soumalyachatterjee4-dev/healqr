@@ -36,6 +36,7 @@ import ParamedicalMonthlyPlanner from './ParamedicalMonthlyPlanner';
 import ParamedicalDataManagement from './ParamedicalDataManagement';
 import ParamedicalEmergencyButton from './ParamedicalEmergencyButton';
 import ParamedicalPersonalizedTemplates from './ParamedicalPersonalizedTemplates';
+import ParamedicalTodaysSchedule from './ParamedicalTodaysSchedule';
 
 // ===== ROLE CONFIG =====
 const ROLE_LABELS: Record<string, string> = {
@@ -1983,6 +1984,7 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
       if (!paraId) return;
       setSmSaving(true);
       try {
+        // Build payload without undefined values (Firestore rejects undefined)
         const payload: ScheduleSlot = {
           id: smEditingId || Date.now().toString(),
           day: smSelectedDays[0] || '',
@@ -1992,17 +1994,20 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
           isActive: true,
           maxBookings: smMaxCapacity,
           frequency: smFrequency,
-          frequencyStartDate: smFrequencyStartDate || undefined,
-          customDate: smCustomDate || undefined,
           chamberName: smChamberName.trim(),
           chamberAddress: smChamberAddress.trim(),
-          clinicCode: smClinicCode.trim().toUpperCase() || undefined,
           mrAllowed: smMrAllowed,
-          mrMaxCount: smMrAllowed ? smMrMaxCount : undefined,
-          mrMeetingTime: smMrAllowed ? smMrMeetingTime : undefined,
-          mrIntervalAfterPatients: smMrAllowed && smMrMeetingTime === 'interval' ? smMrInterval : undefined,
           createdAt: Date.now(),
         };
+        if (smFrequencyStartDate) payload.frequencyStartDate = smFrequencyStartDate;
+        if (smCustomDate) payload.customDate = smCustomDate;
+        const code = smClinicCode.trim().toUpperCase();
+        if (code) payload.clinicCode = code;
+        if (smMrAllowed) {
+          payload.mrMaxCount = smMrMaxCount;
+          payload.mrMeetingTime = smMrMeetingTime;
+          if (smMrMeetingTime === 'interval') payload.mrIntervalAfterPatients = smMrInterval;
+        }
         const updated = smEditingId
           ? schedules.map(s => s.id === smEditingId ? payload : s)
           : [...schedules, payload];
@@ -3176,7 +3181,17 @@ export default function ParamedicalDashboard({ onLogout }: { onLogout: () => voi
       case 'profile': return <ProfilePage />;
       case 'qr-manager': return <QRManagerPage />;
       case 'schedule': return <ScheduleMaker />;
-      case 'todays-schedule': return <TodaysSchedule />;
+      case 'todays-schedule': return (
+        <ParamedicalTodaysSchedule
+          paraId={paraId}
+          profile={profile}
+          bookings={bookings}
+          serviceLabel={serviceLabel}
+          onAddWalkIn={() => toast.info('Walk-in patient capture coming soon')}
+          onOpenSchedule={() => setActiveMenu('schedule')}
+          setProfile={setProfile}
+        />
+      );
       case 'advance-booking': return <AdvanceBookings />;
       case 'history': return <HistoryPage />;
       case 'reports': return <ReportsPage />;

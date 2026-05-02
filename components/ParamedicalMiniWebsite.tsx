@@ -90,7 +90,10 @@ export default function ParamedicalMiniWebsite({ onBookNow, onBack }: Paramedica
   const serviceLabel = SERVICE_LABELS[profile.role] || 'Service';
   const gradientColor = ROLE_COLORS[profile.role] || 'from-teal-600 to-cyan-600';
   const schedules = profile.schedules || [];
-  const activeDays = [...new Set(schedules.filter((s: any) => s.isActive).map((s: any) => s.day))];
+  const activeSchedules = schedules.filter((s: any) => s.isActive);
+  const activeDays = [...new Set(
+    activeSchedules.flatMap((s: any) => (s.days && s.days.length ? s.days : (s.day ? [s.day] : [])))
+  )];
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
@@ -191,14 +194,45 @@ export default function ParamedicalMiniWebsite({ onBookNow, onBack }: Paramedica
                 );
               })}
             </div>
-            {/* Show time slots */}
-            <div className="mt-3 space-y-1">
-              {schedules.filter((s: any) => s.isActive).map((s: any, i: number) => (
-                <div key={i} className="flex items-center gap-2 text-xs text-gray-400">
-                  <Clock className="w-3 h-3" />
-                  <span>{s.day}: {s.startTime} - {s.endTime}</span>
-                </div>
-              ))}
+          </div>
+        )}
+
+        {/* Chambers & Schedule */}
+        {activeSchedules.length > 0 && (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+            <h3 className="text-white font-semibold text-sm mb-3 flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-teal-500" /> Chambers & Schedule
+            </h3>
+            <div className="space-y-3">
+              {activeSchedules.map((s: any, i: number) => {
+                const dList = s.days && s.days.length ? s.days : (s.day ? [s.day] : []);
+                return (
+                  <div key={i} className="bg-black/30 border border-zinc-800 rounded-lg p-3">
+                    {s.chamberName && (
+                      <p className="text-white text-sm font-semibold uppercase">{s.chamberName}</p>
+                    )}
+                    {s.chamberAddress && (
+                      <p className="text-gray-400 text-xs mt-0.5">{s.chamberAddress}</p>
+                    )}
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {dList.map((d: string) => (
+                        <span key={d} className="px-2 py-0.5 rounded-full bg-teal-500/15 border border-teal-500/30 text-teal-400 text-[10px] font-medium">
+                          {d.slice(0, 3)}
+                        </span>
+                      ))}
+                      {s.frequency && s.frequency !== 'Daily' && s.frequency !== 'Weekly' && (
+                        <span className="px-2 py-0.5 rounded-full bg-zinc-700 text-gray-300 text-[10px]">
+                          {s.frequency}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-2">
+                      <Clock className="w-3 h-3" />
+                      <span>{s.startTime} – {s.endTime}</span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
