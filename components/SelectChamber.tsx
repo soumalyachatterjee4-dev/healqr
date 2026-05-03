@@ -64,6 +64,11 @@ interface SelectChamberProps {
   language?: Language;
   vcTimeSlots?: Array<{id: number; startTime: string; endTime: string; days: string[]; isActive: boolean}>;
   mrMode?: boolean;
+  // Paramedical / multi-provider support (backward compatible)
+  providerCollection?: 'doctors' | 'paramedicals'; // Firestore collection of the provider profile
+  bookingsCollection?: 'bookings' | 'paramedicalBookings'; // Where bookings are stored
+  providerIdField?: 'doctorId' | 'paramedicalId'; // Field name in the bookings doc
+  schedulesField?: 'chambers' | 'schedules'; // Field name on the provider doc that holds scheduled chambers
 }
 
 export default function SelectChamber({
@@ -87,6 +92,10 @@ export default function SelectChamber({
   clinicPlannedOffPeriods = [],
   vcTimeSlots = [],
   mrMode = false,
+  providerCollection = 'doctors',
+  bookingsCollection = 'bookings',
+  providerIdField = 'doctorId',
+  schedulesField = 'chambers',
 }: SelectChamberProps) {
 
   const accentColor = themeColor === 'blue' ? 'blue' : 'emerald';
@@ -207,8 +216,10 @@ export default function SelectChamber({
     const loadBookingCounts = async () => {
       try {
         setLoadingCounts(true);
-        const doctorId = sessionStorage.getItem('booking_doctor_id');
-        if (!doctorId || chambers.length === 0) {
+        // Provider id key in sessionStorage: doctor or paramedical
+        const ssKey = providerCollection === 'paramedicals' ? 'booking_paramedical_id' : 'booking_doctor_id';
+        const providerId = sessionStorage.getItem(ssKey);
+        if (!providerId || chambers.length === 0) {
           setLoadingCounts(false);
           return;
         }
@@ -221,9 +232,9 @@ export default function SelectChamber({
 
         const { collection, query, where, getDocs, doc, getDoc } = await import('firebase/firestore');
 
-        // Reload doctor data to get latest blockedDates
-        const doctorRef = doc(db, 'doctors', doctorId);
-        const doctorSnap = await getDoc(doctorRef);
+        // Reload provider data to get latest blockedDates
+        const providerRef = doc(db, providerCollection, providerId);
+        const doctorSnap = await getDoc(providerRef);
         let chambersWithBlockedDates = chambers;
 
         if (doctorSnap.exists()) {
@@ -231,7 +242,7 @@ export default function SelectChamber({
           // Update chambers with blockedDates and todayReschedule from Firestore
           const todayStr = new Date(selectedDate.getTime() - selectedDate.getTimezoneOffset() * 60000).toISOString().split('T')[0];
           chambersWithBlockedDates = chambers.map(chamber => {
-            const firestoreChamber = doctorData.chambers?.find((c: any) => c.id === chamber.id);
+            const firestoreChamber = (doctorData[schedulesField] as any[] | undefined)?.find((c: any) => c.id === chamber.id);
             const blockedDates = firestoreChamber?.blockedDates || [];
             // Check for today's reschedule
             let rescheduledStartTime: string | undefined;
@@ -257,11 +268,13 @@ export default function SelectChamber({
         const chambersWithBookingData = await Promise.all(
           chambersWithBlockedDates.map(async (chamber) => {
             try {
-              const bookingsRef = collection(db, 'bookings');
-              // Query by chamberId only to avoid composite index requirement
+              const bookingsRef = collection(db, bookingsCollection);
+              // Query by chamberId only to avoid composite index requirement.
+              // For paramedicals, schedule id maps to scheduleId rather than chamberId
+              // — newer paramedical bookings save scheduleId; we accept both.
               const q = query(
                 bookingsRef,
-                where('chamberId', '==', chamber.id)
+                where(providerCollection === 'paramedicals' ? 'scheduleId' : 'chamberId', '==', chamber.id)
               );
 
               const snapshot = await getDocs(q);
@@ -279,7 +292,7 @@ export default function SelectChamber({
 
               let mrBookedCount = 0;
               let mrMaxCount = (chamber as any).mrMaxCount || 0;
-              
+
               if (mrMode) {
                 const mrBookingsRef = collection(db, 'mrBookings');
                 const mrQ = query(
@@ -382,8 +395,9 @@ export default function SelectChamber({
 
   // 🔥 REAL-TIME LISTENER: Separate useEffect to avoid infinite loop
   useEffect(() => {
-    const doctorId = sessionStorage.getItem('booking_doctor_id');
-    if (!doctorId) return;
+    const ssKey = providerCollection === 'paramedicals' ? 'booking_paramedical_id' : 'booking_doctor_id';
+    const providerId = sessionStorage.getItem(ssKey);
+    if (!providerId) return;
 
     let timeoutId: NodeJS.Timeout | null = null;
 
@@ -394,8 +408,8 @@ export default function SelectChamber({
       const { collection, query, where, onSnapshot } = await import('firebase/firestore');
 
       const bookingsQuery = query(
-        collection(db, 'bookings'),
-        where('doctorId', '==', doctorId)
+        collection(db, bookingsCollection),
+        where(providerIdField, '==', providerId)
       );
 
       const unsubscribe = onSnapshot(bookingsQuery, (snapshot) => {
@@ -586,17 +600,20 @@ export default function SelectChamber({
                     return { ...chamber, isExpired, isBlockedForDate, isCutoff };
                   })
                   .sort((a, b) => {
-                    // Expired chambers go to bottom
-                    if (a.isExpired && !b.isExpired) return 1;
-                    if (!a.isExpired && b.isExpired) return -1;
+                    // Any disabled chamber (expired / bookings-closed / blocked) goes to bottom
+                    const aDisabled = !!(a.isExpired || (a as any).isCutoff || (a as any).isBlockedForDate);
+                    const bDisabled = !!(b.isExpired || (b as any).isCutoff || (b as any).isBlockedForDate);
+                    if (aDisabled && !bDisabled) return 1;
+                    if (!aDisabled && bDisabled) return -1;
 
-                    // Both active or both expired: sort by start time ascending
+                    // Within the same group: sort by start time ascending
                     return ((a as any).startMinutes || 0) - ((b as any).startMinutes || 0);
                   })
                   .map((chamber, index) => {
-                    const capacity = chamber.maxCapacity || 0;
+                    // If maxCapacity is not set (e.g., paramedical schedules), treat as unlimited (use 50 as soft cap for display)
+                    const capacity = chamber.maxCapacity && chamber.maxCapacity > 0 ? chamber.maxCapacity : 50;
                     const booked = chamber.bookedCount || 0;
-                    const isFull = booked >= capacity;
+                    const isFull = chamber.maxCapacity && chamber.maxCapacity > 0 ? booked >= capacity : false;
                     const percentageFull = capacity > 0 ? (booked / capacity) * 100 : 0;
                     const isExpired = (chamber as any).isExpired;
                     const isCutoff = (chamber as any).isCutoff || false;

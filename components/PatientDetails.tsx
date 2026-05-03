@@ -1,4 +1,4 @@
-import { ArrowLeft, Calendar, MapPin, Clock, Bell, Eye, Star, Apple, Phone, X, Check, RotateCcw, CheckCircle2, Video, Send, UserCircle, Sparkles, History, Upload, Lock, QrCode, FileText, Stethoscope, Loader2, MessageCircle, Heart, Users } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Clock, Bell, Eye, Star, Apple, Phone, X, Check, RotateCcw, CheckCircle2, Video, Send, UserCircle, Sparkles, History, Upload, Lock, QrCode, FileText, Stethoscope, Loader2, MessageCircle, Heart, Users, Menu } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import FollowUpModal from './FollowUpModal';
 import CancellationModal from './CancellationModal';
@@ -74,6 +74,9 @@ interface PatientDetailsProps {
   doctorLanguage?: Language; // Doctor's preferred language for AI translation
   doctorId?: string; // Doctor ID for loading correct doctor info (for non-linked doctors)
   readOnly?: boolean; // When true, hides all interactive buttons (clinic owner/manager/assistant view)
+  bookingsCollection?: string; // Firestore collection to read/write bookings (doctor='bookings', paramedical='paramedicalBookings')
+  providerCollection?: string; // Firestore collection for the provider (doctor='doctors', paramedical='paramedicals'). Used for chronic-care sub-collection.
+  onOpenSidebar?: () => void; // Callback to open the surrounding dashboard sidebar (mobile hamburger)
 }
 
 interface PatientButtonStates {
@@ -110,6 +113,9 @@ export default function PatientDetails({
   activeAddOns = [],
   doctorId,
   readOnly = false,
+  bookingsCollection = 'bookings',
+  providerCollection = 'doctors',
+  onOpenSidebar,
 }: PatientDetailsProps) {
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [aiUploadModalOpen, setAiUploadModalOpen] = useState(false);
@@ -253,7 +259,7 @@ export default function PatientDetails({
     if (!dId || !db) return;
     const checkChronic = async () => {
       try {
-        const snap = await getDocs(collection(db!, 'doctors', dId, 'chronicPatients'));
+        const snap = await getDocs(collection(db!, providerCollection, dId, 'chronicPatients'));
         const phones = new Set<string>();
         snap.forEach(d => { const ph = d.data().phone; if (ph) phones.add(ph); });
         setChronicAdded(phones);
@@ -271,7 +277,7 @@ export default function PatientDetails({
     if (!dId || !db) return;
     setChronicSaving(true);
     try {
-      await addDoc(collection(db!, 'doctors', dId, 'chronicPatients'), {
+      await addDoc(collection(db!, providerCollection, dId, 'chronicPatients'), {
         patientName: chronicPatient.name,
         phone: chronicPatient.phone,
         age: String(chronicPatient.age || ''),
@@ -537,7 +543,7 @@ export default function PatientDetails({
 
             if (!db) return;
 
-            await updateDoc(doc(db, 'bookings', patient.id), {
+            await updateDoc(doc(db, bookingsCollection, patient.id), {
               status: 'dropout',
               dropoutReason: 'not_seen_by_midnight',
               dropoutMarkedAt: new Date(),
@@ -641,7 +647,7 @@ export default function PatientDetails({
               const { db: fireDb } = await import('../lib/firebase/config');
               const { doc: docRef, updateDoc: updateBooking } = await import('firebase/firestore');
               if (fireDb) {
-                await updateBooking(docRef(fireDb, 'bookings', patient.id), {
+                await updateBooking(docRef(fireDb, bookingsCollection, patient.id), {
                   vcLinkSentAt: new Date(),
                   vcLinkSentBy: 'system_auto',
                 });
@@ -681,7 +687,7 @@ export default function PatientDetails({
         // Only for video consultation patients
         if (patient.consultationType !== 'video') return;
 
-        const bookingRef = docRef(fireDb, 'bookings', patient.id);
+        const bookingRef = docRef(fireDb, bookingsCollection, patient.id);
         const unsub = onSnapshot(bookingRef, (snapshot) => {
           if (!snapshot.exists()) return;
           const data = snapshot.data();
@@ -767,7 +773,7 @@ export default function PatientDetails({
       const { db: fireDb } = await import('../lib/firebase/config');
       const { doc: docRef, updateDoc: updateBooking } = await import('firebase/firestore');
       if (fireDb) {
-        await updateBooking(docRef(fireDb, 'bookings', patient.id), {
+        await updateBooking(docRef(fireDb, bookingsCollection, patient.id), {
           vcDoctorJoined: true,
           vcDoctorJoinedAt: new Date(),
         });
@@ -794,7 +800,7 @@ export default function PatientDetails({
             // Mark VC as completed in Firestore
             try {
               if (fireDb) {
-                await updateBooking(docRef(fireDb, 'bookings', patient.id), {
+                await updateBooking(docRef(fireDb, bookingsCollection, patient.id), {
                   vcCompleted: true,
                   vcCompletedAt: new Date(),
                   vcDuration: null, // Will be calculated from join/end times
@@ -854,7 +860,7 @@ export default function PatientDetails({
         notificationDate.setDate(notificationDate.getDate() - 3);
 
         // Update Firestore with follow-up schedule (use patient.id which is the Firestore doc ID)
-        const bookingRef = doc(db, 'bookings', selectedPatient.id);
+        const bookingRef = doc(db, bookingsCollection, selectedPatient.id);
         await updateDoc(bookingRef, {
           followUpScheduled: true,
           followUpScheduledDate: followUpDate,
@@ -1057,7 +1063,7 @@ export default function PatientDetails({
     try {
       const { doc: docRef, getDoc: firestoreGetDoc } = await import('firebase/firestore');
       const { db: fireDb } = await import('../lib/firebase/config');
-      const bookingDoc = await firestoreGetDoc(docRef(fireDb!, 'bookings', patient.id));
+      const bookingDoc = await firestoreGetDoc(docRef(fireDb!, bookingsCollection, patient.id));
       if (bookingDoc.exists()) {
         const data = bookingDoc.data();
         if (data.rxLastData) {
@@ -1092,7 +1098,7 @@ export default function PatientDetails({
       toast.loading('Updating Digital RX...', { id: 'rx-regen' });
       const { doc: docRef, updateDoc: updateBooking } = await import('firebase/firestore');
       const { db: fireDb } = await import('../lib/firebase/config');
-      const bookingRef = docRef(fireDb!, 'bookings', selectedPatientForFlow.id);
+      const bookingRef = docRef(fireDb!, bookingsCollection, selectedPatientForFlow.id);
       await updateBooking(bookingRef, {
         digitalRxUrl: downloadURL,
         ...(rxData ? { rxLastData: rxData } : {}),
@@ -1267,7 +1273,7 @@ export default function PatientDetails({
       // ============================================
       const { doc: docRef, updateDoc: updateBooking } = await import('firebase/firestore');
       const seenTimestamp = new Date();
-      const bookingRef = docRef(fireDb!, 'bookings', patient.id);
+      const bookingRef = docRef(fireDb!, bookingsCollection, patient.id);
 
       await updateBooking(bookingRef, {
         isMarkedSeen: true,
@@ -1486,7 +1492,7 @@ export default function PatientDetails({
       }
 
       // Use patient.id which is the Firestore document ID
-      await updateDoc(doc(db!, 'bookings', patient.id), {
+      await updateDoc(doc(db!, bookingsCollection, patient.id), {
         isCancelled: true,
         status: 'cancelled',
         cancellationType: 'PATIENT INDIVIDUAL TOGGLE',
@@ -1496,7 +1502,7 @@ export default function PatientDetails({
       // Update referrer history if referred patient
       try {
         const { getDoc: gDoc, collection: cRef, query: qRef, where: wRef, getDocs: gDocs } = await import('firebase/firestore');
-        const bookSnap = await gDoc(doc(db!, 'bookings', patient.id));
+        const bookSnap = await gDoc(doc(db!, bookingsCollection, patient.id));
         const bData = bookSnap.data();
         if (bData?.referrerId) {
           const histRef = cRef(db!, 'referrers', bData.referrerId, 'referralHistory');
@@ -1614,7 +1620,7 @@ export default function PatientDetails({
       }
 
       // Use patient.id which is the Firestore document ID
-      await updateDoc(doc(db!, 'bookings', patient.id), {
+      await updateDoc(doc(db!, bookingsCollection, patient.id), {
         isCancelled: false,
         status: 'confirmed',
         restoredAt: new Date(),
@@ -1623,7 +1629,7 @@ export default function PatientDetails({
       // Update referrer history if referred patient
       try {
         const { getDoc: gDoc, collection: cRef, query: qRef, where: wRef, getDocs: gDocs } = await import('firebase/firestore');
-        const bookSnap = await gDoc(doc(db!, 'bookings', patient.id));
+        const bookSnap = await gDoc(doc(db!, bookingsCollection, patient.id));
         const bData = bookSnap.data();
         if (bData?.referrerId) {
           const histRef = cRef(db!, 'referrers', bData.referrerId, 'referralHistory');
@@ -1739,6 +1745,15 @@ export default function PatientDetails({
       <div className="border-b border-zinc-800 bg-[#0a0a0a]/80 backdrop-blur-sm sticky top-0 z-40">
         <div className="px-4 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
+            {onOpenSidebar && (
+              <button
+                onClick={onOpenSidebar}
+                className="lg:hidden p-2 text-gray-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors"
+                title="Open menu"
+              >
+                <Menu className="w-6 h-6" />
+              </button>
+            )}
             <button
               onClick={onBack}
               className="p-2 text-gray-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors"
@@ -2032,7 +2047,7 @@ export default function PatientDetails({
                           onClick={async (e) => {
                             e.preventDefault();
                             try {
-                              const bookingRef = doc(db, 'bookings', patient.id);
+                              const bookingRef = doc(db, bookingsCollection, patient.id);
                               await updateDoc(bookingRef, {
                                 inChamber: !isInChamber,
                                 ...((!isInChamber) ? { inChamberAt: serverTimestamp() } : { inChamberAt: null }),

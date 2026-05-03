@@ -1,13 +1,14 @@
 import { useMemo, useState, useEffect } from 'react';
 import {
   Calendar, CalendarDays, Clock, MapPin, Phone, Users, Plus, ArrowLeft,
-  Briefcase, CheckCircle2, XCircle, Eye, Bell, Star, FileText, Sparkles,
-  Video, Building2, QrCode, RefreshCw,
+  Briefcase, Video, Building2, QrCode,
 } from 'lucide-react';
 import { collection, query, where, getDocs, doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase/config';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
+import PatientDetails from './PatientDetails';
+import { decrypt } from '../utils/encryptionService';
 
 interface ScheduleSlot {
   id: string;
@@ -106,14 +107,16 @@ export default function ParamedicalTodaysSchedule({
   const [selectedChamber, setSelectedChamber] = useState<ScheduleSlot | null>(null);
   const [mrPanelChamber, setMrPanelChamber] = useState<ScheduleSlot | null>(null);
 
-  // Sub-page: chamber patient list
+  // Sub-page: chamber patient list — uses the SAME PatientDetails UI as the doctor side
   if (selectedChamber) {
+    const bookedCount = qrBookings.filter(b =>
+      b.scheduleId === selectedChamber.id || b.chamberName === selectedChamber.chamberName,
+    ).length;
     return (
-      <ChamberPatientsView
+      <ParamedicalPatientDetailsLoader
         chamber={selectedChamber}
-        bookings={qrBookings.filter(b => b.scheduleId === selectedChamber.id || b.chamberName === selectedChamber.chamberName)}
         paraId={paraId}
-        serviceLabel={serviceLabel}
+        bookedCount={bookedCount}
         onBack={() => setSelectedChamber(null)}
       />
     );
@@ -332,155 +335,203 @@ export default function ParamedicalTodaysSchedule({
 
 /* ============================================================
    Sub-view: Per-chamber Patient List
+   Re-uses the doctor `PatientDetails` UI so paramedicals get
+   the exact same, fully-featured patient management screen
+   (cancel + restore, notifications, reschedule, etc.).
    ============================================================ */
-function ChamberPatientsView({
-  chamber, bookings, paraId, serviceLabel, onBack,
+function ParamedicalPatientDetailsLoader({
+  chamber, paraId, bookedCount, onBack,
 }: {
   chamber: ScheduleSlot;
-  bookings: Booking[];
   paraId: string;
-  serviceLabel: string;
+  bookedCount: number;
   onBack: () => void;
 }) {
-  const [updatingId, setUpdatingId] = useState('');
+  const [patients, setPatients] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  const markStatus = async (bookingId: string, status: string) => {
-    setUpdatingId(bookingId);
-    try {
-      await updateDoc(doc(db, 'paramedicalBookings', bookingId), {
-        status,
-        ...(status === 'completed' ? { completedAt: new Date().toISOString() } : {}),
-      });
-      toast.success(`Marked as ${status}`);
-    } catch (err: any) { toast.error(err.message); }
-    finally { setUpdatingId(''); }
-  };
+  const refreshPatients = () => setRefreshTrigger(t => t + 1);
 
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <button onClick={onBack} className="text-gray-400 hover:text-white">
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <div>
-          <h2 className="text-white font-semibold">Patient Details</h2>
-          <p className="text-gray-400 text-xs">View and manage patient notifications for selected chamber</p>
+  useEffect(() => {
+    const load = async () => {
+      if (!db || !paraId) { setLoading(false); return; }
+      try {
+        setLoading(true);
+        const today = new Date();
+        const todayStr = new Date(today.getTime() - today.getTimezoneOffset() * 60000)
+          .toISOString().split('T')[0];
+
+        const bookingsRef = collection(db, 'paramedicalBookings');
+
+        // Primary query: by paramedicalId + scheduleId + today
+        const primaryQ = query(
+          bookingsRef,
+          where('paramedicalId', '==', paraId),
+          where('scheduleId', '==', chamber.id),
+          where('appointmentDate', '==', todayStr),
+        );
+        let snap = await getDocs(primaryQ);
+        let docs = snap.docs.filter(d => d.data().type !== 'walkin_booking');
+
+        // Fallback: chamber name match (for bookings saved before scheduleId was added)
+        if (docs.length === 0) {
+          const fallbackQ = query(
+            bookingsRef,
+            where('paramedicalId', '==', paraId),
+            where('appointmentDate', '==', todayStr),
+          );
+          const fallbackSnap = await getDocs(fallbackQ);
+          docs = fallbackSnap.docs.filter(d => {
+            const data = d.data();
+            if (data.type === 'walkin_booking') return false;
+            if (data.scheduleId && String(data.scheduleId) === String(chamber.id)) return true;
+            const cn = (data.chamberName || data.chamber || '').toString().toLowerCase();
+            const target = (chamber.chamberName || '').toString().toLowerCase();
+            return cn !== '' && target !== '' && cn === target;
+          });
+        }
+
+        const mapped = docs.map(d => {
+          const data: any = d.data();
+          const bookingTime = data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt || Date.now());
+
+          const buildAppointmentDateTime = (dateValue: any, timeValue: any, fallback: Date) => {
+            if (dateValue && timeValue && timeValue !== 'immediate') {
+              const dateStr = typeof dateValue === 'string'
+                ? dateValue
+                : (dateValue.toDate ? dateValue.toDate().toISOString().split('T')[0] : '');
+              const timeStr = String(timeValue);
+              const date = new Date(dateStr);
+              if (!isNaN(date.getTime())) {
+                const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+                if (match) {
+                  let hour = parseInt(match[1], 10);
+                  const minute = parseInt(match[2], 10);
+                  const ampm = (match[3] || '').toLowerCase();
+                  if (ampm === 'pm' && hour < 12) hour += 12;
+                  if (ampm === 'am' && hour === 12) hour = 0;
+                  date.setHours(hour, minute, 0, 0);
+                  return date;
+                }
+              }
+            }
+            if (dateValue?.toDate) return dateValue.toDate();
+            if (dateValue) {
+              const parsed = new Date(dateValue);
+              if (!isNaN(parsed.getTime())) return parsed;
+            }
+            return fallback;
+          };
+
+          const appointmentFallback = data.date?.toDate ? data.date.toDate() : bookingTime;
+          const appointmentTime = buildAppointmentDateTime(data.appointmentDate, data.time, appointmentFallback);
+
+          const isCancelledStatus = (data.isCancelled === true) || (data.status === 'cancelled');
+
+          const patientName = decrypt(data.patientName_encrypted || data.patientName || '');
+          const whatsappNumber = decrypt(data.whatsappNumber_encrypted || data.whatsappNumber || data.patientPhone || '');
+          const ageDecrypted = decrypt(data.age_encrypted || '');
+          const genderDecrypted = decrypt(data.gender_encrypted || data.gender || '');
+          const purposeDecrypted = decrypt(data.purposeOfVisit_encrypted || data.purposeOfVisit || '');
+
+          let parsedAge = 0;
+          if (ageDecrypted) {
+            const n = parseInt(String(ageDecrypted).trim());
+            parsedAge = isNaN(n) ? 0 : n;
+          } else if (data.age) {
+            const n = typeof data.age === 'number' ? data.age : parseInt(String(data.age).trim());
+            parsedAge = isNaN(n) ? 0 : n;
+          }
+
+          return {
+            id: d.id,
+            name: patientName || data.patientName || 'N/A',
+            phone: whatsappNumber || data.patientPhone || data.phone || 'N/A',
+            bookingId: data.bookingId || d.id,
+            age: parsedAge,
+            gender: (genderDecrypted || 'MALE').toUpperCase(),
+            visitType: purposeDecrypted || data.visitType || (data.consultationType === 'video' ? 'Video Consultation' : 'In-Person'),
+            bookingTime,
+            appointmentTime,
+            appointmentDate: data.appointmentDate,
+            paymentVerified: data.paymentVerified || false,
+            consultationType: data.consultationType || 'chamber',
+            language: data.language || 'english',
+            prescriptionUrl: data.prescriptionUrl,
+            prescriptionReviewed: data.prescriptionReviewed || false,
+            isCancelled: isCancelledStatus,
+            isMarkedSeen: data.isMarkedSeen || false,
+            reminderSent: data.reminderSent || data.reminderScheduled || false,
+            followUpScheduled: data.followUpScheduled || false,
+            reviewScheduled: data.reviewScheduled || false,
+            tokenNumber: data.tokenNumber || `#${data.serialNo || 0}`,
+            serialNo: data.serialNo || 0,
+            chamber: data.chamber || chamber.chamberName || 'Chamber',
+            isWalkIn: data.isWalkIn !== undefined ? data.isWalkIn : false,
+            isDataRestricted: false,
+            bookingSource: data.bookingSource || 'paramedical_qr',
+            clinicId: data.clinicId || '',
+            digitalRxUrl: data.digitalRxUrl || '',
+            dietChartUrl: data.dietChartUrl || '',
+            vcPatientJoined: data.vcPatientJoined || false,
+            vcCompleted: data.vcCompleted || false,
+            vcLinkSentAt: data.vcLinkSentAt || null,
+            referrerName: data.referrerName || null,
+            referrerRole: data.referrerRole || null,
+          };
+        })
+        .filter(p => p.name !== 'N/A' && p.phone !== 'N/A')
+        .sort((a, b) => {
+          if (a.isCancelled !== b.isCancelled) return a.isCancelled ? 1 : -1;
+          if (a.isMarkedSeen !== b.isMarkedSeen) return a.isMarkedSeen ? 1 : -1;
+          return (a.serialNo || 0) - (b.serialNo || 0);
+        });
+
+        setPatients(mapped);
+      } catch (err) {
+        console.error('Error loading paramedical chamber patients:', err);
+        toast.error('Failed to load patient details');
+        setPatients([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [chamber.id, chamber.chamberName, paraId, refreshTrigger]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0a0f1a] text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 mx-auto bg-gray-700/30 rounded-full flex items-center justify-center animate-pulse mb-4">
+            <Calendar className="w-8 h-8 text-gray-500" />
+          </div>
+          <p className="text-gray-400">Loading patient details...</p>
         </div>
       </div>
+    );
+  }
 
-      {bookings.length === 0 ? (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-12 text-center">
-          <Users className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-          <h3 className="text-white font-semibold mb-1">No patients yet</h3>
-          <p className="text-gray-500 text-sm">No bookings found for {chamber.chamberName} today.</p>
-        </div>
-      ) : (
-        bookings.map((b, idx) => (
-          <div key={b.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-semibold text-sm flex-shrink-0">
-                {b.tokenNumber ? String(b.tokenNumber).replace('#', '') : idx + 1}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <h4 className="text-white font-semibold text-sm uppercase">{b.patientName}</h4>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium uppercase ${
-                    b.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400' :
-                    b.status === 'confirmed' ? 'bg-teal-500/20 text-teal-400' :
-                    b.status === 'cancelled' ? 'bg-red-500/20 text-red-400' :
-                    'bg-yellow-500/20 text-yellow-400'
-                  }`}>
-                    {b.status}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 flex-wrap text-xs text-gray-400">
-                  <span><Phone className="w-3 h-3 inline mr-1" />{b.patientPhone}</span>
-                  {b.bookingId && (
-                    <span className="font-mono text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">{b.bookingId}</span>
-                  )}
-                  {(b.visitType === 'qr' || !b.isWalkIn) && (
-                    <span className="bg-purple-500/15 text-purple-300 px-2 py-0.5 rounded">QR SCAN</span>
-                  )}
-                  {b.patientAge && <span>{b.patientAge} years</span>}
-                  {b.patientGender && <span className="bg-blue-500/15 text-blue-300 px-2 py-0.5 rounded uppercase text-[10px]">{b.patientGender}</span>}
-                </div>
-                <p className="text-gray-500 text-xs mt-1">{b.serviceType || serviceLabel}</p>
-
-                {b.allottedBy?.name && (
-                  <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-300 border border-purple-500/30">
-                    Allotted by {b.allottedBy.type === 'doctor' ? 'Dr. ' : b.allottedBy.type === 'clinic' ? 'Clinic ' : b.allottedBy.type === 'lab' ? 'Lab ' : ''}{b.allottedBy.name}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Action icons row */}
-            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-zinc-800">
-              <ActionIcon icon={Sparkles} label="AI Diet" color="purple" />
-              <ActionIcon icon={Eye} label="Mark Seen" color="emerald" />
-              <ActionIcon icon={Bell} label="Notify" color="blue" />
-              <ActionIcon icon={Calendar} label="Reschedule" color="amber" />
-              <ActionIcon icon={Star} label="Review" color="yellow" />
-              <ActionIcon icon={FileText} label="Notes" color="cyan" />
-            </div>
-
-            {/* Cancel button */}
-            {b.status !== 'completed' && b.status !== 'cancelled' && (
-              <>
-                <button
-                  onClick={() => markStatus(b.id, 'cancelled')}
-                  className="w-full mt-3 px-4 py-2 rounded-lg bg-transparent border border-red-500/30 text-red-400 hover:bg-red-500/10 text-sm font-medium flex items-center justify-center gap-2"
-                >
-                  <XCircle className="w-4 h-4" /> Cancel Booking
-                </button>
-                <div className="grid grid-cols-4 gap-2 mt-2">
-                  <SecondaryAction icon={RefreshCw} label="" />
-                  <SecondaryAction icon={FileText} label="" />
-                  <SecondaryAction icon={CheckCircle2} label="" />
-                  <button
-                    onClick={() => markStatus(b.id, 'completed')}
-                    disabled={updatingId === b.id}
-                    className="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium disabled:opacity-50"
-                  >
-                    Complete
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        ))
-      )}
-    </div>
-  );
-}
-
-function ActionIcon({ icon: Icon, label, color }: { icon: any; label: string; color: string }) {
-  const colorMap: Record<string, string> = {
-    purple: 'bg-purple-500/15 border-purple-500/30 text-purple-400',
-    emerald: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400',
-    blue: 'bg-blue-500/15 border-blue-500/30 text-blue-400',
-    amber: 'bg-amber-500/15 border-amber-500/30 text-amber-400',
-    yellow: 'bg-yellow-500/15 border-yellow-500/30 text-yellow-400',
-    cyan: 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400',
-  };
   return (
-    <button
-      title={label}
-      className={`w-10 h-10 rounded-lg border flex items-center justify-center transition-colors ${colorMap[color] || colorMap.emerald} hover:opacity-80`}
-    >
-      <Icon className="w-4 h-4" />
-    </button>
-  );
-}
-
-function SecondaryAction({ icon: Icon, label }: { icon: any; label: string }) {
-  return (
-    <button
-      title={label}
-      className="px-3 py-2 rounded-lg bg-black/40 border border-zinc-800 text-gray-400 hover:bg-zinc-800 hover:text-white flex items-center justify-center"
-    >
-      <Icon className="w-4 h-4" />
-    </button>
+    <PatientDetails
+      chamberName={chamber.chamberName || 'Chamber'}
+      chamberAddress={chamber.chamberAddress || ''}
+      scheduleTime={`${chamber.startTime || ''} - ${chamber.endTime || ''}`}
+      scheduleDate={chamber.frequency || todayDay()}
+      currentPatients={bookedCount}
+      totalPatients={chamber.maxBookings || 0}
+      patients={patients}
+      onBack={onBack}
+      onRefresh={refreshPatients}
+      prepaymentActive={false}
+      activeAddOns={['chronic-care']}
+      doctorLanguage="english"
+      doctorId={paraId}
+      readOnly={false}
+      bookingsCollection="paramedicalBookings"
+      providerCollection="paramedicals"
+    />
   );
 }
 

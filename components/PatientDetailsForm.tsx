@@ -20,7 +20,7 @@ import { db } from '../lib/firebase/config';
 import { doc, getDoc, addDoc, collection, updateDoc, increment, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { requestNotificationPermission } from '../services/fcm.service';
-import { generateBookingId } from '../utils/idGenerator';
+import { generateBookingId, generateParamedicalBookingId } from '../utils/idGenerator';
 import type { Language } from '../utils/translations';
 import { normalizePatientName, normalizeIndicNumerals } from '../utils/translations';
 import { encrypt } from '../utils/encryptionService';
@@ -52,6 +52,11 @@ interface PatientDetailsFormProps {
   themeColor?: 'emerald' | 'blue';
   isClinicBooking?: boolean;
   language?: Language;
+  // Multi-provider support (paramedical / doctor). Backward-compatible defaults.
+  providerCollection?: 'doctors' | 'paramedicals';
+  bookingsCollection?: 'bookings' | 'paramedicalBookings';
+  providerIdField?: 'doctorId' | 'paramedicalId';
+  schedulesField?: 'chambers' | 'schedules';
 }
 
 export interface PatientFormData {
@@ -92,8 +97,13 @@ export default function PatientDetailsForm({
   isTestMode = false, // Demo mode - skip database operations
   useDrPrefix = true,
   themeColor = 'emerald',
-  isClinicBooking = false
+  isClinicBooking = false,
+  providerCollection = 'doctors',
+  bookingsCollection = 'bookings',
+  providerIdField = 'doctorId',
+  schedulesField = 'chambers',
 }: PatientDetailsFormProps) {
+  const isParamedical = providerCollection === 'paramedicals';
   const [formData, setFormData] = useState<PatientFormData>({
     patientName: '',
     whatsappNumber: '',
@@ -144,7 +154,7 @@ export default function PatientDetailsForm({
     }
 
     if (!doctorId) {
-      toast.error('Doctor information missing');
+      toast.error(isParamedical ? 'Professional information missing' : 'Doctor information missing');
       return;
     }
 
@@ -189,26 +199,29 @@ export default function PatientDetailsForm({
         return;
       }
 
-      // Get doctor's code from Firestore
-      const doctorDoc = await getDoc(doc(db, 'doctors', doctorId));
+      // Get provider's code from Firestore (doctors / paramedicals)
+      const doctorDoc = await getDoc(doc(db, providerCollection, doctorId));
       if (!doctorDoc.exists()) {
-        toast.error('Doctor not found');
+        toast.error(isParamedical ? 'Professional not found' : 'Doctor not found');
         setIsSubmitting(false);
         return;
       }
 
       const doctorData = doctorDoc.data();
-      const doctorCode = doctorData.doctorCode;
+      // Doctor uses doctorCode; paramedical uses paramedicalCode (fallback to id)
+      const doctorCode = doctorData.doctorCode || doctorData.paramedicalCode || doctorData.code || `HQR-PARA-${doctorId.slice(0, 6).toUpperCase()}`;
 
       if (!doctorCode) {
-        toast.error('Doctor code not found. Please contact support.');
+        toast.error('Provider code not found. Please contact support.');
         setIsSubmitting(false);
         return;
       }
 
-      // Generate unique booking ID using doctor code
-      // Generate unique booking ID using doctor code
-      const bookingId = await generateBookingId(doctorCode, selectedDate || new Date());
+      // Generate unique booking ID. Doctors use the strict HQR-PINCODE-SERIAL-DR
+      // generator; paramedicals use a relaxed paramedical-specific generator.
+      const bookingId = isParamedical
+        ? await generateParamedicalBookingId(doctorId, selectedDate || new Date())
+        : await generateBookingId(doctorCode, selectedDate || new Date());
 
       // ============================================
       // ?? STEP 1: GET CHAMBER ID FIRST
@@ -218,30 +231,31 @@ export default function PatientDetailsForm({
 
       if (doctorDoc.exists()) {
         const doctorData = doctorDoc.data();
+        const providerSchedules = doctorData[schedulesField] as any[] | undefined;
 
-        if (doctorData.chambers && Array.isArray(doctorData.chambers)) {
+        if (providerSchedules && Array.isArray(providerSchedules)) {
           let foundChamber: any = null;
 
           // ?? PRIORITY: Use selectedChamberId if provided (exact match by ID)
           if (selectedChamberId !== undefined && selectedChamberId !== null) {
-            foundChamber = doctorData.chambers.find((c: any) => c.id === selectedChamberId);
+            foundChamber = providerSchedules.find((c: any) => c.id === selectedChamberId);
           }
 
           // Fallback: Try exact name match
           if (!foundChamber) {
-            foundChamber = doctorData.chambers.find((c: any) => c.chamberName === selectedChamber);
+            foundChamber = providerSchedules.find((c: any) => c.chamberName === selectedChamber);
           }
 
           // If no exact match, try case-insensitive match
           if (!foundChamber) {
-            foundChamber = doctorData.chambers.find((c: any) =>
+            foundChamber = providerSchedules.find((c: any) =>
               c.chamberName?.toLowerCase() === selectedChamber?.toLowerCase()
             );
           }
 
           // If still no match, try partial match (both ways)
           if (!foundChamber && selectedChamber) {
-            foundChamber = doctorData.chambers.find((c: any) =>
+            foundChamber = providerSchedules.find((c: any) =>
               c.chamberName?.includes(selectedChamber) || selectedChamber?.includes(c.chamberName)
             );
           }
@@ -249,7 +263,7 @@ export default function PatientDetailsForm({
           // Last resort: normalize and compare (remove special chars, spaces)
           if (!foundChamber && selectedChamber) {
             const normalizedSelected = selectedChamber.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-            foundChamber = doctorData.chambers.find((c: any) => {
+            foundChamber = providerSchedules.find((c: any) => {
               const normalizedChamber = c.chamberName?.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
               return normalizedChamber === normalizedSelected;
             });
@@ -258,7 +272,7 @@ export default function PatientDetailsForm({
           if (foundChamber) {
             chamberId = foundChamber.id;
           } else {
-            console.error('? Chamber not found! Selected:', selectedChamber, '| Available:', doctorData.chambers.map((c: any) => c.chamberName));
+            console.error('? Chamber not found! Selected:', selectedChamber, '| Available:', providerSchedules.map((c: any) => c.chamberName));
             console.error('?? Using chamberId = -1 (this booking will not appear in chamber views)');
           }
         }
@@ -269,7 +283,7 @@ export default function PatientDetailsForm({
       // Filter by BOTH doctorId AND chamberId for unified serial numbers
       // ============================================
       // ============================================
-      const bookingsRef = collection(db, 'bookings');
+      const bookingsRef = collection(db, bookingsCollection);
 
       // Format date for appointment saving (YYYY-MM-DD) - using local timezone
       const appointmentDateToSave = selectedDate
@@ -289,8 +303,8 @@ export default function PatientDetailsForm({
 
       const q = query(
         bookingsRef,
-        where('doctorId', '==', doctorId),
-        where('chamberId', 'in', uniqueChamberIds)
+        where(providerIdField, '==', doctorId),
+        where(isParamedical ? 'scheduleId' : 'chamberId', 'in', uniqueChamberIds)
       );
 
 
@@ -326,6 +340,7 @@ export default function PatientDetailsForm({
       // ? Validate planned off periods and chamber active status
       if (doctorDoc.exists()) {
         const doctorData = doctorDoc.data();
+        const providerSchedulesForCheck = doctorData[schedulesField] as any[] | undefined;
 
         // Check if selected date falls in a planned off period
         if (doctorData.plannedOffPeriods && Array.isArray(doctorData.plannedOffPeriods) && selectedDate) {
@@ -372,8 +387,8 @@ export default function PatientDetailsForm({
         }
 
         // Check if chamber is active (already resolved chamberId above)
-        if (doctorData.chambers && Array.isArray(doctorData.chambers) && chamberId !== -1) {
-          const foundChamber = doctorData.chambers.find((c: any) => c.id === chamberId);
+        if (providerSchedulesForCheck && Array.isArray(providerSchedulesForCheck) && chamberId !== -1) {
+          const foundChamber = providerSchedulesForCheck.find((c: any) => c.id === chamberId);
           if (foundChamber && foundChamber.isActive === false) {
             toast.error('This chamber is currently unavailable for bookings. Please try again later.');
             setIsSubmitting(false);
@@ -389,9 +404,9 @@ export default function PatientDetailsForm({
       const normalizedAge = normalizeIndicNumerals(formData.age?.toString() || '');
       // Save booking to Firestore with encrypted sensitive fields
       try {
-        await addDoc(collection(db, 'bookings'), {
+        const bookingPayload: any = {
           bookingId,
-          doctorCode, // Store doctor code for queries
+          doctorCode, // Store provider code for queries (paramedical uses same field name for compatibility)
           tokenNumber,
           serialNo, // Store numeric serial for sorting
 
@@ -405,9 +420,10 @@ export default function PatientDetailsForm({
           // Plain searchable fields
           patientPhone: `+91${formData.whatsappNumber}`, // ?? SEARCHABLE phone for history queries
           patientName: normalizedName, // ?? SEARCHABLE name for queries
-          doctorId,
+          [providerIdField]: doctorId,
+          // Provider name + specialty/service for history display (always store under doctorName/doctorSpecialty for display reuse)
           doctorName,
-          doctorSpecialty: doctorSpecialty || 'General Medicine', // For history display
+          doctorSpecialty: doctorSpecialty || (isParamedical ? 'Healthcare Professional' : 'General Medicine'),
           bookingDate: appointmentDateToSave, // For history display (YYYY-MM-DD)
           bookingTime: selectedTime || '', // For history display (HH:MM AM/PM)
           chamberName: selectedChamber || '',
@@ -441,7 +457,13 @@ export default function PatientDetailsForm({
           referrerPhone: sessionStorage.getItem('booking_referrer_phone') || null,
           referrerDivision: sessionStorage.getItem('booking_referrer_division') || null,
           createdAt: serverTimestamp()
-        });
+        };
+        // For paramedicals, also save scheduleId so per-schedule booking counts work in Today's Schedule
+        if (isParamedical) {
+          bookingPayload.scheduleId = chamberId;
+          bookingPayload.paramedicalName = doctorName;
+        }
+        await addDoc(collection(db, bookingsCollection), bookingPayload);
 
         // Update QR scan record to mark as completed
         const scanSessionId = sessionStorage.getItem('scan_session_id');
@@ -518,35 +540,41 @@ export default function PatientDetailsForm({
         throw saveError; // Re-throw to be caught by outer try-catch
       }
 
-      // ? INCREMENT DOCTOR'S BOOKING COUNT (CRITICAL)
+      // ? INCREMENT PROVIDER'S BOOKING COUNT (CRITICAL for doctors; best-effort for paramedicals)
+      try {
+        await updateDoc(doc(db, providerCollection, doctorId), {
+          bookingsCount: increment(1)
+        });
+      } catch (e) {
+        // Paramedicals may not have bookingsCount field — non-blocking
+        if (!isParamedical) console.error('Failed to increment booking count:', e);
+      }
 
-      await updateDoc(doc(db, 'doctors', doctorId), {
-        bookingsCount: increment(1)
-      });
+      // Doctor-only: check subscription/limit auto-block
+      if (!isParamedical) {
+        const updatedDoctorDoc = await getDoc(doc(db, providerCollection, doctorId));
+        if (updatedDoctorDoc.exists()) {
+          const data = updatedDoctorDoc.data();
 
-      // Check if limit reached and auto-block
-      const updatedDoctorDoc = await getDoc(doc(db, 'doctors', doctorId));
-      if (updatedDoctorDoc.exists()) {
-        const data = updatedDoctorDoc.data();
-
-        // Check booking limit
-        if (data.bookingsCount >= data.bookingsLimit) {
-          await updateDoc(doc(db, 'doctors', doctorId), {
-            bookingBlocked: true,
-            blockReason: 'booking_limit'
-          });
-        }
-
-        // Check trial expiry
-        if (data.subscriptionStatus === 'trial' && data.trialEndDate) {
-          const today = new Date();
-          const trialEnd = data.trialEndDate.toDate();
-          if (today > trialEnd) {
-            await updateDoc(doc(db, 'doctors', doctorId), {
+          // Check booking limit
+          if (data.bookingsCount >= data.bookingsLimit) {
+            await updateDoc(doc(db, providerCollection, doctorId), {
               bookingBlocked: true,
-              blockReason: 'trial_expired',
-              subscriptionStatus: 'expired'
+              blockReason: 'booking_limit'
             });
+          }
+
+          // Check trial expiry
+          if (data.subscriptionStatus === 'trial' && data.trialEndDate) {
+            const today = new Date();
+            const trialEnd = data.trialEndDate.toDate();
+            if (today > trialEnd) {
+              await updateDoc(doc(db, providerCollection, doctorId), {
+                bookingBlocked: true,
+                blockReason: 'trial_expired',
+                subscriptionStatus: 'expired'
+              });
+            }
           }
         }
       }
@@ -629,7 +657,7 @@ export default function PatientDetailsForm({
       // Update the booking document with reminder status
       if (reminderScheduled) {
         try {
-          const bookingsRef = collection(db, 'bookings');
+          const bookingsRef = collection(db, bookingsCollection);
           const q = query(
             bookingsRef,
             where('bookingId', '==', bookingId)

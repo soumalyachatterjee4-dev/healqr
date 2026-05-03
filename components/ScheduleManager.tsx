@@ -1310,13 +1310,13 @@ export default function ScheduleManager({
           startTime: s.startTime,
           endTime: s.endTime,
           maxCapacity: s.maxCapacity,
-          mrAllowed: s.mrAllowed,
-          mrMaxCount: s.mrMaxCount,
-          mrMeetingTime: s.mrMeetingTime,
-          mrIntervalAfterPatients: s.mrIntervalAfterPatients,
+          mrAllowed: !!s.mrAllowed,
           isActive: s.isActive ?? true,
-          createdAt: s.createdAt,
+          createdAt: s.createdAt ?? Date.now(),
         };
+        if (s.mrMaxCount !== undefined) cleanSchedule.mrMaxCount = s.mrMaxCount;
+        if (s.mrMeetingTime !== undefined) cleanSchedule.mrMeetingTime = s.mrMeetingTime;
+        if (s.mrIntervalAfterPatients !== undefined) cleanSchedule.mrIntervalAfterPatients = s.mrIntervalAfterPatients;
         if (s.frequencyStartDate) cleanSchedule.frequencyStartDate = s.frequencyStartDate;
         if (s.customDate) cleanSchedule.customDate = s.customDate;
         if (s.clinicCode) cleanSchedule.clinicCode = s.clinicCode;
@@ -2286,7 +2286,7 @@ export default function ScheduleManager({
                     <SelectContent>
                       <SelectItem value="none">None (Enter manually)</SelectItem>
                       {manualClinics.map((clinic, idx) => (
-                        <SelectItem key={`${clinic.id}::${clinic.clinicCode || idx}`} value={`${clinic.id}::${clinic.clinicCode || idx}`}>
+                        <SelectItem key={`${clinic.id}::${clinic.clinicCode || idx}`} value={`${clinic.id}::${clinic.clinicCode || ''}`}>
                           <div className="flex items-center justify-between w-full gap-4">
                             <span>{clinic.name}</span>
                             <span className={`text-[10px] px-2 py-0.5 rounded-full border ${
@@ -2997,7 +2997,7 @@ export default function ScheduleManager({
             {/* Add/Edit VC Slot Form */}
             <Card className="bg-gray-800/50 border-gray-700 p-6 mb-6">
               <h3 className="text-white mb-4">{editingVcSlotId !== null ? 'Edit VC Slot' : 'Add VC Time Slot'}</h3>
-              
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div>
                   <Label className="text-gray-300 text-sm mb-2 block">Start Time</Label>

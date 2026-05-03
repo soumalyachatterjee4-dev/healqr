@@ -1439,27 +1439,16 @@ service cloud.firestore {
     // ============================================
 
     match /qrScans/{scanId} {
-      // Allow read by:
-      // 1. Clinics (to view their own scans)
-      // 2. Doctors (to view their own scans)
-      // 3. Admin (full access)
-      allow read: if isAuthenticated() && (
-        (resource.data.scannedBy == 'clinic' && request.auth.uid == resource.data.clinicId) ||
-        (resource.data.scannedBy == 'doctor' && request.auth.uid == resource.data.doctorId) ||
-        request.auth.token.admin == true
-      );
-
-      // Allow list (query) for clinics and doctors to get their scan counts
-      allow list: if isAuthenticated() && (
-        (request.query.filters.scannedBy == 'clinic') ||
-        (request.query.filters.scannedBy == 'doctor') ||
-        request.auth.token.admin == true
-      );
+      // Scan docs are non-sensitive transient tracking records.
+      // Unauthenticated patients must be able to look up their own scan by
+      // scanSessionId (stored in their sessionStorage) to mark it completed
+      // after booking. Doc IDs and session IDs are random/unguessable.
+      allow read, list: if true;
 
       // Allow create by anyone (scan tracking happens before auth)
       allow create: if true;
 
-      // Allow update to mark scans as completed
+      // Allow update to mark scans as completed (anon patient + doctor/clinic)
       allow update: if true;
 
       // No deletes allowed

@@ -44,15 +44,18 @@ function PatientDetailsLoader({
   chamber,
   onBack,
   onMenuChange,
+  onLogout,
   activeAddOns,
   doctorLanguage = 'english'
 }: {
   chamber: { id: number; name: string; address: string; startTime: string; endTime: string; schedule: string; booked: number; capacity: number };
   onBack: () => void;
   onMenuChange?: (menu: string) => void;
+  onLogout?: () => void;
   activeAddOns: string[];
   doctorLanguage?: 'english' | 'hindi' | 'bengali';
 }) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [chamberPatients, setChamberPatients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -342,22 +345,35 @@ function PatientDetailsLoader({
   const isAssistantSession = localStorage.getItem('healqr_is_assistant') === 'true';
 
   return (
-    <PatientDetails
-      chamberName={chamber.name}
-      chamberAddress={chamber.address}
-      scheduleTime={`${chamber.startTime} - ${chamber.endTime}`}
-      scheduleDate={chamber.schedule}
-      currentPatients={chamber.booked}
-      totalPatients={chamber.capacity}
-      patients={chamberPatients}
-      onBack={onBack}
-      onMenuChange={onMenuChange}
-      onRefresh={refreshPatients}
-      prepaymentActive={activeAddOns.includes('prepayment-collection')}
-      activeAddOns={activeAddOns}
-      doctorLanguage={doctorLanguage}
-      readOnly={isAssistantSession}
-    />
+    <div className="min-h-screen bg-[#0a0f1a]">
+      <DashboardSidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        activeMenu="today"
+        onMenuChange={onMenuChange || (() => {})}
+        onLogout={onLogout}
+        activeAddOns={activeAddOns}
+      />
+      <div className="lg:ml-64">
+        <PatientDetails
+          chamberName={chamber.name}
+          chamberAddress={chamber.address}
+          scheduleTime={`${chamber.startTime} - ${chamber.endTime}`}
+          scheduleDate={chamber.schedule}
+          currentPatients={chamber.booked}
+          totalPatients={chamber.capacity}
+          patients={chamberPatients}
+          onBack={onBack}
+          onMenuChange={onMenuChange}
+          onOpenSidebar={() => setSidebarOpen(true)}
+          onRefresh={refreshPatients}
+          prepaymentActive={activeAddOns.includes('prepayment-collection')}
+          activeAddOns={activeAddOns}
+          doctorLanguage={doctorLanguage}
+          readOnly={isAssistantSession}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -1252,32 +1268,32 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
     setSelectedChamberForMR(chamber);
     setShowMRVisits(true);
     setLoadingMRs(true);
-    
+
     try {
       const { db } = await import('../lib/firebase/config');
       const { collection, query, where, getDocs } = await import('firebase/firestore');
-      
+
       const todayStr = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
       const mrBookingsRef = collection(db!, 'mrBookings');
-      
+
       let numericChamberId = typeof chamber.id === 'string' ? parseInt(chamber.id, 10) : chamber.id;
       if (!numericChamberId || isNaN(numericChamberId)) {
         numericChamberId = -1;
       }
-      
+
       const q = query(
         mrBookingsRef,
         where('chamberId', '==', numericChamberId),
         where('appointmentDate', '==', todayStr),
         where('status', 'in', ['confirmed', 'met', 'pending_special', 'cancelled'])
       );
-      
+
       const snapshot = await getDocs(q);
       const visits = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      
+
       // Sort by slot index
       visits.sort((a: any, b: any) => (a.slotIndex || 0) - (b.slotIndex || 0));
-      
+
       setMrVisits(visits);
     } catch (error) {
       console.error('Error fetching MR visits:', error);
@@ -1291,16 +1307,16 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
     try {
       const { db } = await import('../lib/firebase/config');
       const { doc, updateDoc } = await import('firebase/firestore');
-      
+
       await updateDoc(doc(db!, 'mrBookings', visitId), {
         isMet: !currentStatus,
         status: !currentStatus ? 'met' : 'confirmed'
       });
-      
-      setMrVisits(prev => prev.map(v => 
+
+      setMrVisits(prev => prev.map(v =>
         v.id === visitId ? { ...v, isMet: !currentStatus, status: !currentStatus ? 'met' : 'confirmed' } : v
       ));
-      
+
       toast.success(currentStatus ? 'Marked as pending' : 'Marked as met');
     } catch (error) {
       console.error('Error updating MR visit:', error);
@@ -1312,17 +1328,17 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
     try {
       const { db } = await import('../lib/firebase/config');
       const { doc, updateDoc } = await import('firebase/firestore');
-      
+
       await updateDoc(doc(db!, 'mrBookings', visitId), {
         status: 'cancelled',
         cancelledBy: 'doctor',
         cancelledAt: new Date().toISOString()
       });
-      
-      setMrVisits(prev => prev.map(v => 
+
+      setMrVisits(prev => prev.map(v =>
         v.id === visitId ? { ...v, status: 'cancelled' } : v
       ));
-      
+
       toast.success('MR visit cancelled');
     } catch (error) {
       console.error('Error cancelling MR visit:', error);
@@ -1334,16 +1350,16 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
     try {
       const { db } = await import('../lib/firebase/config');
       const { doc, updateDoc } = await import('firebase/firestore');
-      
+
       await updateDoc(doc(db!, 'mrBookings', visitId), {
         status: 'confirmed',
         restoredAt: new Date().toISOString()
       });
-      
-      setMrVisits(prev => prev.map(v => 
+
+      setMrVisits(prev => prev.map(v =>
         v.id === visitId ? { ...v, status: 'confirmed' } : v
       ));
-      
+
       toast.success('MR visit restored');
     } catch (error) {
       console.error('Error restoring MR visit:', error);
@@ -1559,6 +1575,7 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
           setSelectedChamberForDetails(null);
         }}
         onMenuChange={onMenuChange}
+        onLogout={onLogout}
         activeAddOns={activeAddOns}
         doctorLanguage={doctorLanguage}
       />
@@ -2085,7 +2102,7 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
                           </div>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
                         {visit.status === 'cancelled' ? (
                           <Button
@@ -2104,7 +2121,7 @@ export default function TodaysSchedule({ onMenuChange, onLogout, activeAddOns = 
                               variant={visit.isMet || visit.status === 'met' ? "outline" : "default"}
                               size="sm"
                               className={visit.isMet || visit.status === 'met'
-                                ? "border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 flex-1 sm:flex-auto" 
+                                ? "border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 flex-1 sm:flex-auto"
                                 : "bg-emerald-600 hover:bg-emerald-700 text-white flex-1 sm:flex-auto"
                               }
                             >

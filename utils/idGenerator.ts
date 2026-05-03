@@ -368,6 +368,56 @@ export async function generateBookingId(doctorCode: string, bookingDate?: Date):
 }
 
 /**
+ * Generate unique Paramedical Booking ID (no strict provider-code validation).
+ * Format: HQR-PARA-{paramedicalIdShort}-YYMMDD-SERIAL-P
+ *
+ * Used when provider is a paramedical (different code conventions than doctors).
+ */
+export async function generateParamedicalBookingId(
+  paramedicalId: string,
+  bookingDate?: Date,
+): Promise<string> {
+  if (!db) {
+    throw new Error('Firebase not initialized');
+  }
+
+  const date = bookingDate || new Date();
+  const year = date.getFullYear().toString().slice(-2);
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  const dateStr = `${year}${month}${day}`;
+
+  const idShort = (paramedicalId || '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase() || 'PARA00';
+  const prefix = `HQR-PARA-${idShort}-${dateStr}-`;
+
+  try {
+    const bookingsRef = collection(db, 'paramedicalBookings');
+    const q = query(
+      bookingsRef,
+      where('bookingId', '>=', prefix),
+      where('bookingId', '<=', `${prefix}\uf8ff`),
+      orderBy('bookingId', 'desc'),
+      limit(1),
+    );
+    const snapshot = await getDocs(q);
+
+    let nextSerial = 1;
+    if (!snapshot.empty) {
+      const lastId = snapshot.docs[0].data().bookingId as string;
+      const match = lastId.match(/-(\d{4})-P$/);
+      if (match) nextSerial = parseInt(match[1]) + 1;
+    }
+
+    const serialFormatted = nextSerial.toString().padStart(4, '0');
+    return `${prefix}${serialFormatted}-P`;
+  } catch (error) {
+    console.error('❌ Error generating paramedical booking ID:', error);
+    const ts = Date.now().toString().slice(-4);
+    return `${prefix}${ts}-P`;
+  }
+}
+
+/**
  * Validate Doctor Code format
  * @param code - Code to validate
  * @returns boolean - True if valid
